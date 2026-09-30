@@ -29,6 +29,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # BUG-004: the whitespace check inspects a commit range, which
+          # needs history. A shallow clone makes the range unresolvable and
+          # the check would have to silently skip itself.
+          fetch-depth: 0
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -46,8 +51,12 @@ jobs:
           test -f gradle/wrapper/gradle-wrapper.properties
           grep -q 'distributionUrl' gradle/wrapper/gradle-wrapper.properties
 
-      - name: Whitespace errors
-        run: git diff --check
+      # BUG-004: `git diff --check` with no range inspects only the working
+      # tree, which on a CI checkout is always clean. It therefore passed
+      # unconditionally and could never fail for a defect committed in the PR.
+      # The committed range is what actually needs checking.
+      - name: Whitespace errors in committed changes
+        run: bash infrastructure/scripts/check-whitespace.sh
 
       - name: Compile backend and shared
         run: ./gradlew :services:api:compileKotlin :shared:contracts:compileKotlin :shared:models:compileKotlin :shared:validation:compileKotlin --console=plain
@@ -131,15 +140,17 @@ jobs:
             esac
           done
 
+      # The inline version of this step only looked for .env and a few key
+      # extensions. The script classifies every hit, so a deliberate canary in a
+      # test is not confused with a real credential, and an unrecognised host
+      # fails instead of being assumed harmless.
       - name: No secrets committed
-        run: |
-          set -euo pipefail
-          if git ls-files --error-unmatch .env >/dev/null 2>&1; then
-            echo "::error::.env must never be committed"
-            exit 1
-          fi
-          git ls-files | grep -Ei '\.(pem|key|p12|jks|keystore)$' && {
-            echo "::error::Key material found in the repository"; exit 1; } || true
+        run: bash infrastructure/scripts/secret-scan.sh
+
+      # Proves the secret scan can still fail. A control that has only ever
+      # printed PASS is not a control.
+      - name: Secret scan self-test
+        run: bash infrastructure/scripts/secret-scan-test.sh
 
       - name: Upload test reports
         if: always()

@@ -1,0 +1,182 @@
+# Compañero de Escuela
+
+A school companion app: one place to see today's classes, attendance,
+timetable and institutional notices, designed for the network and hardware
+realities of a public school rather than for a campus with fibre.
+
+This repository is at the **foundation** stage. There is a working build, a
+working API, a runnable Android app and a test suite, but no product feature
+is implemented yet. See [Roadmap](docs/product/ROADMAP.md).
+
+---
+
+## Status
+
+| | |
+|---|---|
+| Branch | `feat/foundation` |
+| Tests | 73 distinct across 13 suites (84 executions: Android suites run per variant) |
+| Android | debug APK 20.0 MB, minified release APK 1.5 MB |
+| API | `/health` 200, `/ready` 503 while no database is configured |
+| Lint | 0 errors |
+
+---
+
+## What is here
+
+```
+companero-de-escuela/
+├── shared/                      # Pure Kotlin, no Android, no Ktor
+│   ├── contracts/               # API wire types (ApiResponse, ApiError, health)
+│   ├── models/                  # Academic domain (Student, Teacher, Schedule, ...)
+│   └── validation/              # Config validation primitives
+│
+├── services/
+│   └── api/                     # Ktor 3 backend
+│       ├── config/              # Env-driven settings, fails fast
+│       ├── database/            # MongoDB lifecycle behind an interface
+│       ├── health/              # /health, /ready, /version
+│       ├── plugins/             # Serialization, call id, CORS, StatusPages
+│       └── integrations/        # Institution adapters + mappers + mocks
+│
+├── apps/android/
+│   ├── app/                     # Single activity, Compose shell, Hilt
+│   └── core/
+│       ├── common/              # Outcome, AppError, DispatcherProvider
+│       ├── designsystem/        # Material 3 theme, type scale, shapes
+│       ├── ui/                  # ContentState, ContentStateHost
+│       ├── navigation/          # Destinations, bottom bar, nav shell
+│       ├── network/             # Ktor client, Outcome error translation
+│       └── testing/             # TestDispatcherProvider
+│
+└── docs/                        # Architecture, security, privacy, quality
+```
+
+### Modules that deliberately do not exist yet
+
+`core:database`, `core:datastore`, `core:security`, `core:location`,
+`core:notifications` and every `feature:*` module are **not** in
+`settings.gradle.kts`. They are documented as target state in
+[ADR-001](docs/architecture/ADR-001-MODULE-BOUNDARIES.md) and each one is
+created when it takes on real responsibility. An empty module reads as
+finished in review, so none are included as placeholders.
+
+---
+
+## Requirements
+
+| Tool | Version | Notes |
+|---|---|---|
+| JDK | 17+ | Builds run on JDK 21 |
+| Android SDK | compileSdk 36 | `minSdk 26`, `targetSdk 36` |
+| Gradle | 8.14.3 | Via the wrapper; no local install needed |
+
+Only the Gradle wrapper and an Android SDK are required. There is no database
+to install: the API boots without one and reports itself as degraded.
+
+---
+
+## Build and test
+
+The wrapper is the only supported entry point.
+
+```bash
+# Everything
+./gradlew build
+
+# Backend
+./gradlew :services:api:test
+
+# Android
+./gradlew :apps:android:app:assembleDebug
+./gradlew :apps:android:app:testDebugUnitTest
+./gradlew lint
+```
+
+On Windows use `gradlew.bat`. To keep the log readable, a helper is included:
+
+```bat
+infrastructure\scripts\build.cmd build
+```
+
+It writes the full output to `%TEMP%\companero-build-logs` and prints the
+path.
+
+---
+
+## Running the API
+
+```bash
+cp .env.example .env      # or: Copy-Item .env.example .env
+./gradlew :services:api:run
+```
+
+| Variable | Required | Notes |
+|---|---|---|
+| `APP_ENV` | yes | `local` \| `development` \| `staging` \| `production` |
+| `API_HOST` / `API_PORT` | no | Defaults `127.0.0.1` / `8080` |
+| `MONGODB_DATABASE` | yes | Logical database name |
+| `MONGODB_URI` | no | Blank boots without a database |
+| `JWT_SECRET` | in production | Minimum 32 characters |
+
+With no database configured the service still starts, which is deliberate:
+
+- `GET /health` → `200`, status `up`, `mongodb` reported `degraded`
+- `GET /ready` → `503`, status `down`
+- `GET /version` → `200`
+
+`/ready` returning 503 without a database is **correct behaviour**, not a
+failure. It is how a load balancer learns the instance cannot serve traffic.
+See [API architecture](docs/architecture/API_ARCHITECTURE.md).
+
+`staging` and `production` refuse to start with mock providers configured, so
+fabricated academic data can never reach a real user.
+
+---
+
+## Running the app
+
+```bash
+./gradlew :apps:android:app:installDebug
+```
+
+The debug build targets `http://10.0.2.2:8080/`, which is the host machine as
+seen from the Android emulator. For a physical device, pass the machine's LAN
+address via `ApiEnvironment.lan(address)` in
+`apps/android/app/src/main/kotlin/org/companerodeescuela/di/NetworkModule.kt`.
+
+---
+
+## Architecture in one paragraph
+
+Android never talks to an institutional system. It calls our API. The API
+converts each institution's quirks inside an adapter, so the rest of the
+system only ever sees our own domain types. Every adapter has a mock
+implementation so the whole platform runs with no external dependency, and
+those mocks are locked out of staging and production. The rules are in
+[Integration architecture](docs/integrations/INTEGRATION_ARCHITECTURE.md).
+
+---
+
+## Documentation
+
+| Area | Document |
+|---|---|
+| System | [System architecture](docs/architecture/SYSTEM_ARCHITECTURE.md) |
+| Android | [Android architecture](docs/architecture/ANDROID_ARCHITECTURE.md) |
+| API | [API architecture](docs/architecture/API_ARCHITECTURE.md) |
+| Decisions | [ADR-001: module boundaries](docs/architecture/ADR-001-MODULE-BOUNDARIES.md) |
+| Integrations | [Integration architecture](docs/integrations/INTEGRATION_ARCHITECTURE.md) |
+| Product | [Vision](docs/product/PRODUCT_VISION.md) · [Roadmap](docs/product/ROADMAP.md) |
+| UX | [Design system](docs/ux/DESIGN_SYSTEM.md) |
+| Security | [Security model](docs/security/SECURITY_MODEL.md) · [Threat model](docs/security/THREAT_MODEL.md) |
+| Privacy | [Location privacy](docs/privacy/LOCATION_PRIVACY.md) |
+| Quality | [Test plan](docs/quality/TEST_PLAN.md) · [Bug register](docs/quality/BUG_REGISTER.md) · [Release readiness](docs/quality/RELEASE_READINESS.md) |
+
+---
+
+## Contributing
+
+Small, coherent commits. No secrets, ever: `.env` is git-ignored and
+`.env.example` documents every variable with the values left blank. Run
+`./gradlew build` before pushing. CI runs the same tasks locally.

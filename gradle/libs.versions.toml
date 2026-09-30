@@ -91,6 +91,13 @@ ktor-server-test-host = { group = "io.ktor", name = "ktor-server-test-host" }
 ktor-server-config-yaml = { group = "io.ktor", name = "ktor-server-config-yaml" }
 ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json" }
 
+# --- Ktor client (Android) ---
+ktor-client-core = { group = "io.ktor", name = "ktor-client-core" }
+ktor-client-android = { group = "io.ktor", name = "ktor-client-android" }
+ktor-client-content-negotiation = { group = "io.ktor", name = "ktor-client-content-negotiation" }
+ktor-client-logging = { group = "io.ktor", name = "ktor-client-logging" }
+ktor-client-mock = { group = "io.ktor", name = "ktor-client-mock" }
+
 # --- MongoDB ---
 mongodb-driver-kotlin-coroutine = { group = "org.mongodb", name = "mongodb-driver-kotlin-coroutine", version.ref = "mongodbDriver" }
 mongodb-driver-sync = { group = "org.mongodb", name = "mongodb-driver-sync", version.ref = "mongodbDriver" }

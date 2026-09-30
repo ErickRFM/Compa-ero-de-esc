@@ -37,6 +37,15 @@ include(":services:api")
 
 // ---------------------------------------------------------------------------
 // Android application
+//
+// Only modules with real content are included here. A module that Gradle
+// knows about but nobody maintains is worse than a module that does not
+// exist yet, because it looks finished in a code review.
+//
+// The target end state (core:database, core:datastore, core:security,
+// core:location, core:notifications, and the feature modules) is documented
+// in docs/architecture/module-structure.md. Each one is added at the point
+// where it earns its first line of production code.
 // ---------------------------------------------------------------------------
 include(":apps:android:app")
 
@@ -45,22 +54,4 @@ include(":apps:android:core:designsystem")
 include(":apps:android:core:ui")
 include(":apps:android:core:navigation")
 include(":apps:android:core:network")
-include(":apps:android:core:database")
-include(":apps:android:core:datastore")
-include(":apps:android:core:security")
 include(":apps:android:core:testing")
-
-include(":apps:android:feature:auth")
-include(":apps:android:feature:home")
-include(":apps:android:feature:attendance")
-include(":apps:android:feature:scanner")
-include(":apps:android:feature:schedule")
-include(":apps:android:feature:subjects")
-include(":apps:android:feature:announcements")
-include(":apps:android:feature:calendar")
-include(":apps:android:feature:tasks")
-include(":apps:android:feature:library")
-include(":apps:android:feature:events")
-include(":apps:android:feature:campus")
-include(":apps:android:feature:profile")
-include(":apps:android:feature:settings")

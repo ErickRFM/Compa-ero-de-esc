@@ -10,7 +10,7 @@ Establish the technical foundation so that every later phase is additive.
 - Institutional provider boundary with mappers and mocks
 - Mocks locked out of staging and production
 - Android foundation: Compose shell, design system, navigation, network layer
-- 73 distinct tests (84 executions), CI workflows, architecture and security documentation
+- 92 distinct tests (118 executions), CI workflows, architecture and security documentation
 
 **What "complete" means here:** the build is green, the service starts, the
 test suite genuinely executes, and the integration boundary is real. No

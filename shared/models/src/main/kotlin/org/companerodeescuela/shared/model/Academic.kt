@@ -7,9 +7,15 @@ import java.time.Instant
 /**
  * Institutional identifier of a person inside the platform.
  *
- * This is a [value class] on purpose: it prevents a `studentId` from being
- * passed where a `teacherId` is expected, which is exactly the class of bug
- * that leaks one student's data into another's view.
+ * Deliberately one type for every role. Splitting it into `StudentId` and
+ * `TeacherId` would only be worth the cost if the two arrived from different
+ * sources or were looked up through different paths, and neither is true yet:
+ * every identifier comes from the same identity feed.
+ *
+ * What actually stops a student's id reaching a teacher's view is the
+ * [Student] / [Teacher] split below, not this type. An earlier version of this
+ * file claimed the opposite in its KDoc, which described a guarantee the
+ * compiler was not providing.
  */
 @JvmInline
 value class PersonId(val value: String) {
@@ -20,7 +26,7 @@ value class PersonId(val value: String) {
     override fun toString(): String = value
 }
 
-/** Institutional identifier of a course, subject or session. */
+/** Institutional identifier of an academic entity: subject, course, group, room. */
 @JvmInline
 value class AcademicId(val value: String) {
     init {

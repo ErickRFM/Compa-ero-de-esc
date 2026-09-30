@@ -4,7 +4,7 @@ Defects found during the foundation phase. These are recorded as architecture
 lessons, not as anecdotes: each one is now protected by a test that fails
 without the fix.
 
-The common thread is that **all three were invisible to a green build.**
+The common thread is that **all five were invisible to a green build.**
 
 ---
 
@@ -255,18 +255,171 @@ distinction once, at a boundary, and let the compiler carry it.
 
 ---
 
+## BUG-004 — the CI whitespace check inspected nothing
+
+| | |
+|---|---|
+| **Severity** | Medium |
+| **Status** | Fixed |
+| **Found by** | Running the CI command by hand against a commit that contained the defect |
+| **Protected by** | `infrastructure/scripts/check-whitespace-test.sh` (9 cases, 15 assertions) |
+
+### What was wrong
+
+CI ran:
+
+```bash
+git diff --check
+```
+
+With no range, `git diff` compares the working tree to the index. On a clean CI
+checkout the working tree *is* the index, so there is no diff to inspect, so
+`--check` has nothing to report and exits 0.
+
+The check was green on every run and had never once examined a committed line.
+
+### Proof
+
+A commit with trailing whitespace on an added line was pushed to the exact
+state CI sees. Running the CI command by hand on that checkout:
+
+```
+$ git diff --check
+$ echo $?
+0
+```
+
+No output, exit 0 — the same result CI was getting on a commit that
+demonstrably contained the problem.
+
+### Why the correct fix is not `git diff --check` either
+
+The intuitive patch is `git diff --check origin/main...HEAD`. That fixes
+`pull_request`, but the same workflow also runs on `push`, where the merge base
+is the wrong reference and three-dot ranges resolve against a fork-tracking
+branch that may not exist.
+
+The range depends on the event. Deriving it inside the script from
+`GITHUB_EVENT_NAME` and `GITHUB_EVENT_BEFORE`, with explicit fallbacks, is the
+only version that is correct for every trigger rather than for the one being
+debugged.
+
+### Fix
+
+`infrastructure/scripts/check-whitespace.sh` resolves the range by event and
+runs `git diff --check` against it. Both workflows check out full history
+(`fetch-depth: 0`), without which no range resolution can work at all.
+
+`check-whitespace-test.sh` builds throwaway repositories with deliberately
+broken commits and asserts the script **fails** on each one, covering the
+first commit, a new branch, a normal push, a pull request, and a clean
+repository that must pass.
+
+### Lesson
+
+**A check that cannot fail is worse than no check, because it is read as
+evidence.**
+
+The command was plausible, the step was named correctly, and it had presumably
+never failed because it had never done anything. Verification of a check means
+watching it fail on a known-bad input, which is what the harness is for.
+
+---
+
+## BUG-005 — `gradlew clean` did not clean
+
+| | |
+|---|---|
+| **Severity** | High |
+| **Status** | Fixed |
+| **Found by** | A from-scratch build finishing in 2 seconds |
+| **Protected by** | Verifying module build directories are gone after `clean` |
+
+### What was wrong
+
+The root `clean` task deleted only the root project's build directory:
+
+```kotlin
+tasks.register<Delete>("clean") {
+    delete(rootProject.layout.buildDirectory)
+}
+```
+
+Every one of the eleven module build directories survived. Module-level build
+outputs are what Gradle's up-to-date checks consult, so `clean build`
+immediately afterwards skipped nearly all the work:
+
+```
+BUILD SUCCESSFUL in 2s
+635 actionable tasks: 7 executed, 616 up-to-date
+```
+
+### Why it matters more than it looks
+
+This is the same class of defect as the three above, one level up. Every
+"built from clean" claim in this repository — including the ones in these
+documents — was resting on a clean that did not clean. A stale output directory
+can hide a broken incremental path, and the verification value of
+"clean, then build" collapses to nothing.
+
+Nothing was actually broken in the product code. The evidence was.
+
+### Fix
+
+```kotlin
+// Deletes every module's build directory, not just the root one.
+//
+// BUG-005: this used to delete only rootProject's build directory, so
+// `gradlew clean build` left all eleven module build directories intact and
+// Gradle reported most tasks as up-to-date. A clean build reported as a clean
+// build was not one, which is the same failure as BUG-003 in a different place:
+// the exit code was fine and the evidence behind it was not.
+tasks.register<Delete>("clean") {
+    delete(rootProject.layout.buildDirectory)
+    subprojects.forEach { delete(it.layout.buildDirectory) }
+}
+```
+
+After the fix a from-scratch build runs 286 tasks with 0 module build
+directories remaining, and the total figures in the
+[test plan](TEST_PLAN.md) were recomputed from that run rather than inherited.
+
+Note that on Windows two `core:network` jar files can survive while the Gradle
+daemon holds them open. That is file locking, not a broken clean; it resolves
+once the daemon is stopped.
+
+### Lesson
+
+**"Clean" is a claim about state, so it needs verifying like any other claim.**
+
+The habit that caught this was noticing that a build was too fast to be real.
+A second useful habit is to check that the thing you deleted is actually gone:
+
+```powershell
+Get-ChildItem -Recurse -Directory -Filter build | Where-Object { $_.FullName -match "(apps|services|shared)\\" }
+```
+
+This is the general form of the lesson from BUG-003: measure the artefact the
+check is supposed to produce, not the exit code of the step that claims to
+produce it.
+
+---
+
 ## Summary
 
 | ID | Severity | Found by | Now protected by |
 |---|---|---|---|
-| BUG-001 | Critical | Code review | Boot-path call + registry test |
-| BUG-002 | High | Failing test | `ApiCallTest` (6) |
+| BUG-001 | Critical | Code review | Boot-path call + registry test + `ApplicationModuleBootTest` |
+| BUG-002 | High | Failing test | `ApiCallTest` (20) |
 | BUG-003 | Critical | Report count check | `useJUnitPlatform()` in 4 modules |
+| BUG-004 | Medium | Running the CI command by hand | `check-whitespace-test.sh` (9 cases) |
+| BUG-005 | High | A 2-second "clean" build | `clean` deletes all module dirs |
 | FIX-001 | Modelling | Type review | Distinct `Student` / `Teacher` types |
 
-All three bugs share one property: **the build was green throughout.** Two were
-found by tests once the tests actually ran, and one by reading the boot path.
-None was found by a passing build.
+All five bugs share one property: **the build was green throughout.** Two were
+found by tests once the tests actually ran, one by reading the boot path, one by
+running a CI command manually, and one by noticing a build was too fast to be
+true. None was found by a passing build.
 
 ## Related
 

@@ -44,8 +44,10 @@ include(":services:api")
 //
 // The target end state (core:database, core:datastore, core:security,
 // core:location, core:notifications, and the feature modules) is documented
-// in docs/architecture/module-structure.md. Each one is added at the point
-// where it earns its first line of production code.
+// in docs/architecture/ADR-001-MODULE-BOUNDARIES.md, which records why the
+// 25 placeholder modules were removed and what triggers each deferred one.
+// Each module is added at the point where it earns its first line of
+// production code.
 // ---------------------------------------------------------------------------
 include(":apps:android:app")
 

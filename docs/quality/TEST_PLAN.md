@@ -4,17 +4,22 @@
 
 | | |
 |---|---|
-| Distinct tests | 73 |
-| Distinct suites | 13 |
-| Executions reported by Gradle | 84 |
+| Distinct tests | 92 |
+| Distinct suites | 14 |
+| Executions reported by Gradle | 118 |
+| Report files | 16 |
 | Failures | 0 |
 | Skipped | 0 |
 
-**On the difference between 73 and 84.** The Android modules have two build
+**On the difference between 92 and 118.** The Android modules have two build
 variants, so `testDebugUnitTest` and `testReleaseUnitTest` each execute the
-same 11 tests. Gradle therefore reports 62 JVM + 11 debug + 11 release = 84
-executions, across 15 report files. The honest count of distinct tests is
-**73**. Both numbers are given so neither is mistaken for the other.
+same 26 tests. Gradle therefore reports 66 JVM + 26 debug + 26 release = 118
+executions, across 16 report files. The honest count of distinct tests is
+**92**. Both numbers are given so neither is mistaken for the other.
+
+Counting distinct tests by suite *and* variant is the easy mistake: it reports
+118, overstating coverage by 26 tests that exist once. The suite name is the
+unit, not the suite/variant pair.
 
 **The distinction between discovered, executed and skipped is tracked
 deliberately.** A suite that compiles but never runs reports zero tests and
@@ -82,18 +87,47 @@ contract are covered together rather than mocked individually.
 wrong-password and unknown-user indistinguishability, and the registry
 refusing mocks outside local and development.
 
-### Android: network — 6 tests
+### Android: network — 20 tests
 
-`ApiCallTest` drives the **real Ktor client** through `MockEngine`: 500
-retryable, 401 unauthorized and not retryable, empty success, malformed body
-mapped to a serialization failure, and a dropped connection mapped to a
-network failure.
+`ApiCallTest` drives the **real Ktor client** through `MockEngine`, so the
+request pipeline, plugins and error mapping are covered together.
+
+- a parameterized matrix over every status the API can return (400, 401, 403,
+  404, 409, 422, 500, 502, 503) asserting the status is preserved, the retry
+  policy is right and each one has a presentable message;
+- 200 with a valid body deserialises into the contract type;
+- 204 with no body is a unit success rather than a serialization failure;
+- a 200 whose body is well-formed JSON of the wrong shape is still a contract
+  break;
+- a unit endpoint never captures the error body at all, and a body-reading
+  endpoint caps it at `MAX_ERROR_BODY` for the log; neither reaches a
+  user-facing message;
+- a timeout and a dropped connection are both retryable network failures;
+- the base URL must be absolute and end with a slash.
+
+429 is absent on purpose: no endpoint rate-limits yet, and a row for a
+behaviour that does not exist would document a fiction.
 
 ### Android: UI state — 5 tests
 
 `ContentStateTest`: the Outcome to ContentState mapping, caller-defined
 emptiness, and that every `userMessage` is presentable and free of raw
 technical strings.
+
+### Boot path — 4 tests
+
+`ApplicationModuleBootTest` exists because BUG-001 proved that unit-testing a
+security rule is not the same as enforcing it. It boots the **real application
+module** through `testApplication`:
+
+- production refuses to boot, and the message names the offending providers;
+- staging refuses to boot;
+- local boots and serves `/health`;
+- the guard runs before any route is reachable.
+
+The equivalent is verified against the installed distribution outside the test
+suite too, by starting the real process in each environment and confirming the
+port never binds.
 
 ## Test doubles
 

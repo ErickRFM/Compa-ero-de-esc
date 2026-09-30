@@ -15,7 +15,7 @@ is implemented yet. See [Roadmap](docs/product/ROADMAP.md).
 | | |
 |---|---|
 | Branch | `feat/foundation` |
-| Tests | 73 distinct across 13 suites (84 executions: Android suites run per variant) |
+| Tests | 92 distinct across 14 suites (118 executions: Android suites run per variant) |
 | Android | debug APK 20.0 MB, minified release APK 1.5 MB |
 | API | `/health` 200, `/ready` 503 while no database is configured |
 | Lint | 0 errors |

@@ -17,7 +17,7 @@ institutional integration.
 | `./gradlew lint` | Pass, 0 errors, 3 warnings |
 | Debug APK | Builds, 20.0 MB |
 | Minified release APK | Builds, 1.5 MB |
-| Test count | 73 distinct tests, 13 suites, 84 executions, 0 failures, 0 skipped |
+| Test count | 92 distinct tests, 14 suites, 118 executions, 0 failures, 0 skipped |
 | `GET /health` | 200, status `up` |
 | `GET /ready` | 503, status `down` — **correct with no database** |
 | `GET /version` | 200 |
@@ -86,7 +86,7 @@ Met:
 - [x] Misconfiguration fails loudly and names the variable
 - [x] Mock providers locked out of staging and production
 - [x] Android app builds, debug and minified
-- [x] 73 distinct tests, all genuinely executed
+- [x] 92 distinct tests, all genuinely executed
 - [x] Lint clean of errors
 - [x] Architecture, security, privacy and quality documented
 - [x] CI validates the same tasks locally

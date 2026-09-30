@@ -17,6 +17,14 @@ plugins {
     alias(libs.plugins.ktor) apply false
 }
 
+// Deletes every module's build directory, not just the root one.
+//
+// BUG-005: this used to delete only rootProject's build directory, so
+// `gradlew clean build` left all eleven module build directories intact and
+// Gradle reported most tasks as up-to-date. A clean build reported as a clean
+// build was not one, which is the same failure as BUG-003 in a different place:
+// the exit code was fine and the evidence behind it was not.
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
+    subprojects.forEach { delete(it.layout.buildDirectory) }
 }

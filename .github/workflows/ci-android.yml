@@ -18,7 +18,10 @@ concurrency:
 jobs:
   verify:
     name: Android compile, test, lint and package
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: the floating label migrates to Ubuntu 26 on
+    # 2026-10-19, and a foundation PR should not silently change its own
+    # toolchain underneath a green build.
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
 
     env:
@@ -52,21 +55,24 @@ jobs:
       - name: Verify Android tests actually executed
         run: |
           set -euo pipefail
-          files=$(find apps -path '*test-results/testDebugUnitTest/*' -name 'TEST-*.xml' | wc -l)
-          if [ "$files" -eq 0 ]; then
+          reports=$(find apps -path '*test-results/testDebugUnitTest/*' -name 'TEST-*.xml' | wc -l)
+          if [ "$reports" -eq 0 ]; then
             echo "::error::No Android JUnit reports. The tests did not run. See BUG-003."
             exit 1
           fi
-          total=$(find apps -path '*test-results/testDebugUnitTest/*' -name 'TEST-*.xml' \
-            -exec grep -ho 'tests="[0-9]*"' {} + | grep -o '[0-9]*' | paste -sd+ | bc)
-          failures=$(find apps -path '*test-results/testDebugUnitTest/*' -name 'TEST-*.xml' \
-            -exec grep -ho 'failures="[0-9]*"' {} + | grep -o '[0-9]*' | paste -sd+ | bc)
-          echo "android suites=$files tests=$total failures=$failures"
+          # awk, not bc: bc is not guaranteed to be installed on the runner
+          # image, and under `set -e` a missing binary fails the step for a
+          # reason unrelated to the tests.
+          read -r total failures errors <<< "$(find apps -path '*test-results/testDebugUnitTest/*' -name 'TEST-*.xml' -print0 \
+            | xargs -0 -r grep -hoE '(tests|failures|errors)="[0-9]+"' \
+            | awk -F'"' '{ v=$2+0; if ($1 ~ /^tests/) t+=v; else if ($1 ~ /^failures/) f+=v; else e+=v }
+                       END { printf "%d %d %d", t+0, f+0, e+0 }')"
+          echo "android suites=$reports tests=$total failures=$failures errors=$errors"
           if [ "$total" -lt 1 ]; then
             echo "::error::Zero Android tests executed. useJUnitPlatform() is missing."
             exit 1
           fi
-          if [ "$failures" -ne 0 ]; then
+          if [ "$failures" -ne 0 ] || [ "$errors" -ne 0 ]; then
             echo "::error::Failing Android tests present."
             exit 1
           fi

@@ -17,7 +17,10 @@ concurrency:
 jobs:
   verify:
     name: Backend compile, test and smoke
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: the floating label migrates to Ubuntu 26 on
+    # 2026-10-19, and a foundation PR should not silently change its own
+    # toolchain underneath a green build.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     env:
@@ -57,18 +60,23 @@ jobs:
       - name: Verify tests actually executed
         run: |
           set -euo pipefail
-          files=$(find . -path '*/test-results/*' -name 'TEST-*.xml' | wc -l)
-          if [ "$files" -eq 0 ]; then
+          # Scoped to the backend and shared modules on purpose. An unscoped
+          # `find .` would silently start counting Android reports too if a
+          # future change ever ran both in one job, and the number would stop
+          # meaning what the summary claims it means.
+          reports=$(find services/api shared -path '*/test-results/*' -name 'TEST-*.xml' | wc -l)
+          if [ "$reports" -eq 0 ]; then
             echo "::error::No JUnit XML reports found. The tests did not run."
             exit 1
           fi
-          total=$(find . -path '*/test-results/*' -name 'TEST-*.xml' \
-            -exec grep -ho 'tests="[0-9]*"' {} + | grep -o '[0-9]*' | paste -sd+ | bc)
-          failures=$(find . -path '*/test-results/*' -name 'TEST-*.xml' \
-            -exec grep -ho 'failures="[0-9]*"' {} + | grep -o '[0-9]*' | paste -sd+ | bc)
-          errors=$(find . -path '*/test-results/*' -name 'TEST-*.xml' \
-            -exec grep -ho 'errors="[0-9]*"' {} + | grep -o '[0-9]*' | paste -sd+ | bc)
-          echo "suites=$files tests=$total failures=$failures errors=$errors"
+          # awk, not bc: bc is not guaranteed to be installed on the runner
+          # image, and under `set -e` a missing binary fails the step for a
+          # reason unrelated to the tests.
+          read -r total failures errors <<< "$(find services/api shared -path '*/test-results/*' -name 'TEST-*.xml' -print0 \
+            | xargs -0 -r grep -hoE '(tests|failures|errors)="[0-9]+"' \
+            | awk -F'"' '{ v=$2+0; if ($1 ~ /^tests/) t+=v; else if ($1 ~ /^failures/) f+=v; else e+=v }
+                       END { printf "%d %d %d", t+0, f+0, e+0 }')"
+          echo "backend suites=$reports tests=$total failures=$failures errors=$errors"
           if [ "$total" -lt 1 ]; then
             echo "::error::Zero tests executed. See BUG-003."
             exit 1

@@ -40,6 +40,8 @@ dependencies {
     api(project(":shared:contracts"))
     implementation(project(":apps:android:core:common"))
 
+    // The aggregate already includes junit-jupiter-params, which the
+    // @ParameterizedTest status matrix relies on.
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlin.test)
     testImplementation(platform(libs.ktor.bom))

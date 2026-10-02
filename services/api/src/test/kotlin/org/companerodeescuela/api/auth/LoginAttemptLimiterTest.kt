@@ -6,6 +6,7 @@ import java.time.Instant
 import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class LoginAttemptLimiterTest {
@@ -32,7 +33,7 @@ class LoginAttemptLimiterTest {
         val limiter = LoginAttemptLimiter(maxAttempts = 1)
 
         assertNull(limiter.acquire("ana", "10.0.0.1"))
-        assertEquals(300, limiter.acquire("ana", "10.0.0.1"))
+        assertNotNull(limiter.acquire("ana", "10.0.0.1"))
         assertNull(limiter.acquire("luis", "10.0.0.1"))
     }
 

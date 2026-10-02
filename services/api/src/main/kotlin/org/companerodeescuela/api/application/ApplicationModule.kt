@@ -4,6 +4,9 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.routing.routing
 import org.companerodeescuela.api.academic.academicRoutes
+import org.companerodeescuela.api.attendance.AttendanceService
+import org.companerodeescuela.api.attendance.InMemoryAttendanceRepository
+import org.companerodeescuela.api.attendance.attendanceRoutes
 import org.companerodeescuela.api.auth.authRoutes
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.database.MongoConnection
@@ -34,6 +37,10 @@ fun Application.module(
     configurePlugins(settings)
 
     val healthService = HealthService(settings = settings, mongoConnection = mongoConnection)
+    val attendanceService = AttendanceService(
+        repository = InMemoryAttendanceRepository(),
+        academicProvider = providerRegistry.academic,
+    )
 
     monitor.subscribe(ApplicationStopped) {
         providerRegistry.close()
@@ -44,5 +51,6 @@ fun Application.module(
         healthRoutes(settings = settings, healthService = healthService)
         authRoutes(settings = settings, identityProvider = providerRegistry.identity)
         academicRoutes(settings = settings, academicProvider = providerRegistry.academic)
+        attendanceRoutes(settings = settings, service = attendanceService)
     }
 }

@@ -94,6 +94,7 @@ fun Application.configurePlugins(settings: ApiSettings) {
     install(CORS) {
         allowMethod(HttpMethod.Get)
         allowMethod(HttpMethod.Post)
+        allowMethod(HttpMethod.Patch)
         allowHeader(HttpHeaders.ContentType)
         allowHeader(HttpHeaders.Authorization)
         allowHeader(REQUEST_ID_HEADER)

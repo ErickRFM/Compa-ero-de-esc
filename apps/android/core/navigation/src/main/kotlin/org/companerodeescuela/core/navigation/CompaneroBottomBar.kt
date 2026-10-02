@@ -1,5 +1,8 @@
 package org.companerodeescuela.core.navigation
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -10,18 +13,7 @@ import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
 
-/**
- * Top-level navigation bar.
- *
- * Uses `saveState`/`restoreState`/`popUpTo(startDestination)` so switching
- * tabs does not grow the back stack without bound, which is the usual cause
- * of a bottom bar that feels broken after a few taps.
- */
 @Composable
 fun CompaneroBottomBar(
     navController: NavHostController,
@@ -50,7 +42,6 @@ fun CompaneroBottomBar(
                         imageVector = when (topLevel) {
                             TopLevelDestination.Home -> Icons.Filled.Home
                             TopLevelDestination.Schedule -> Icons.Filled.DateRange
-                            TopLevelDestination.Profile -> Icons.Filled.Person
                         },
                         contentDescription = topLevel.label,
                     )

@@ -60,7 +60,12 @@ class MainActivity : ComponentActivity() {
                             CompaneroScaffold {
                                 composable(Destination.Home.route) { HomeScreen() }
                                 composable(Destination.Schedule.route) { ScheduleScreen() }
-                                composable(Destination.Profile.route) { ProfileScreen() }
+                                composable(Destination.Profile.route) {
+                                    ProfileScreen(
+                                        displayName = session.displayName,
+                                        onLogout = sessionViewModel::logout,
+                                    )
+                                }
                             }
                         }
                     }

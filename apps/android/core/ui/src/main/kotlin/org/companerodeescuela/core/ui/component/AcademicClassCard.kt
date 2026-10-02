@@ -1,0 +1,79 @@
+package org.companerodeescuela.core.ui.component
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+
+@Composable
+fun AcademicClassCard(
+    subject: String,
+    time: String,
+    location: String,
+    teacher: String,
+    modifier: Modifier = Modifier,
+    eyebrow: String? = null,
+    supportingText: String? = null,
+    emphasized: Boolean = false,
+) {
+    val containerColor = if (emphasized) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            eyebrow?.let {
+                Text(
+                    text = it.uppercase(),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (emphasized) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+            Text(
+                text = subject,
+                style = MaterialTheme.typography.titleLarge,
+            )
+            Text(
+                text = time,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                text = location,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = teacher,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            supportingText?.let {
+                Text(
+                    text = it,
+                    modifier = Modifier.padding(top = 4.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+    }
+}

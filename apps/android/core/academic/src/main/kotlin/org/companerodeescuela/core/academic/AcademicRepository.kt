@@ -70,7 +70,8 @@ class AcademicRepository(
                 }
             }
             is Outcome.Failure -> {
-                if (remote.error is AppError.Http && remote.error.status == 401) {
+                val error = remote.error
+                if (error is AppError.Http && error.status == 401) {
                     tokenStore.clear()
                     remote
                 } else {

@@ -1,0 +1,8 @@
+<resources>
+    <string name="nav_app_title">Compañero</string>
+    <string name="nav_profile_title">Perfil</string>
+    <string name="nav_back">Volver</string>
+    <string name="nav_open_profile">Abrir perfil</string>
+    <string name="nav_home">Hoy</string>
+    <string name="nav_schedule">Agenda</string>
+</resources>

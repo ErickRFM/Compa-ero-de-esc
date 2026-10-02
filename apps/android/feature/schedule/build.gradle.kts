@@ -30,6 +30,7 @@ dependencies {
     implementation(project(":apps:android:core:academic"))
     implementation(project(":apps:android:core:common"))
     implementation(project(":apps:android:core:designsystem"))
+    implementation(project(":apps:android:core:ui"))
 
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

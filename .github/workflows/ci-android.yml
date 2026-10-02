@@ -1,0 +1,160 @@
+name: ci-android
+
+# Android validation. No deployment and no store publishing.
+# Proves the app compiles, the JUnit 5 suites genuinely execute, lint is
+# clean of errors, and both a debug and a minified release APK build.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Android compile, test, lint and package
+    # Pinned, not ubuntu-latest: the floating label migrates to Ubuntu 26 on
+    # 2026-10-19, and a foundation PR should not silently change its own
+    # toolchain underneath a green build.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+
+    env:
+      GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # BUG-004: the whitespace check inspects a commit range, which
+          # needs history. A shallow clone makes the range unresolvable and
+          # the check would have to silently skip itself.
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # BUG-004: `git diff --check` with no range inspects only the working
+      # tree, which on a CI checkout is always clean. It passed
+      # unconditionally and could never catch a committed defect.
+      - name: Whitespace errors in committed changes
+        run: bash infrastructure/scripts/check-whitespace.sh
+
+      - name: Compile Android sources
+        run: ./gradlew :apps:android:app:compileDebugKotlin --console=plain
+
+      # BUG-003: AGP defaults to the JUnit 4 runner, which compiles a JUnit 5
+      # suite and then reports zero tests without failing. useJUnitPlatform()
+      # is set in every Android module; this step proves it took effect.
+      - name: Run Android unit tests
+        run: ./gradlew :apps:android:core:common:testDebugUnitTest :apps:android:core:ui:testDebugUnitTest :apps:android:core:network:testDebugUnitTest --console=plain
+
+      - name: Verify Android tests actually executed
+        run: |
+          set -euo pipefail
+          reports=$(find apps -path '*test-results/testDebugUnitTest/*' -name 'TEST-*.xml' | wc -l)
+          if [ "$reports" -eq 0 ]; then
+            echo "::error::No Android JUnit reports. The tests did not run. See BUG-003."
+            exit 1
+          fi
+          # awk, not bc: bc is not guaranteed to be installed on the runner
+          # image, and under `set -e` a missing binary fails the step for a
+          # reason unrelated to the tests.
+          read -r total failures errors <<< "$(find apps -path '*test-results/testDebugUnitTest/*' -name 'TEST-*.xml' -print0 \
+            | xargs -0 -r grep -hoE '(tests|failures|errors)="[0-9]+"' \
+            | awk -F'"' '{ v=$2+0; if ($1 ~ /^tests/) t+=v; else if ($1 ~ /^failures/) f+=v; else e+=v }
+                       END { printf "%d %d %d", t+0, f+0, e+0 }')"
+          echo "android suites=$reports tests=$total failures=$failures errors=$errors"
+          if [ "$total" -lt 1 ]; then
+            echo "::error::Zero Android tests executed. useJUnitPlatform() is missing."
+            exit 1
+          fi
+          if [ "$failures" -ne 0 ] || [ "$errors" -ne 0 ]; then
+            echo "::error::Failing Android tests present."
+            exit 1
+          fi
+
+      - name: Lint
+        run: ./gradlew lint --console=plain
+
+      # Warnings are reported, not failed. Errors must be zero.
+      - name: Lint has no errors
+        run: |
+          set -euo pipefail
+          reports=$(find . -name 'lint-results*.xml' | wc -l)
+          if [ "$reports" -eq 0 ]; then
+            echo "::error::No lint reports produced."
+            exit 1
+          fi
+          # grep exits 1 when there are zero matches. Under pipefail that made
+          # a perfectly clean lint report fail before the numeric comparison.
+          # awk always exits successfully and returns an explicit zero.
+          errors=$(find . -name 'lint-results*.xml' -print0 \
+            | xargs -0 -r awk 'BEGIN { c=0 } /severity="Error"/ { c++ } END { print c+0 }')
+          warnings=$(find . -name 'lint-results*.xml' -print0 \
+            | xargs -0 -r awk 'BEGIN { c=0 } /severity="Warning"/ { c++ } END { print c+0 }')
+          echo "lint errors=$errors warnings=$warnings"
+          if [ "$errors" -ne 0 ]; then
+            echo "::error::Lint errors present."
+            exit 1
+          fi
+
+      - name: Build debug APK
+        run: ./gradlew :apps:android:app:assembleDebug --console=plain
+
+      - name: Debug APK exists
+        run: |
+          set -euo pipefail
+          apk=apps/android/app/build/outputs/apk/debug/app-debug.apk
+          test -f "$apk" || { echo "::error::$apk not found"; exit 1; }
+          echo "debug apk: $(du -h "$apk" | cut -f1)"
+
+      - name: Build minified release APK
+        run: ./gradlew :apps:android:app:assembleRelease --console=plain
+
+      # Release is minified and resource-shrunk. R8 failing to keep a
+      # serialization class would only show up at runtime, so the size
+      # difference is checked here as a cheap proxy.
+      - name: Release APK exists and is minified
+        run: |
+          set -euo pipefail
+          release=apps/android/app/build/outputs/apk/release/app-release-unsigned.apk
+          debug=apps/android/app/build/outputs/apk/debug/app-debug.apk
+          test -f "$release" || { echo "::error::$release not found"; exit 1; }
+          r=$(stat -c%s "$release")
+          d=$(stat -c%s "$debug")
+          echo "debug=$d bytes release=$r bytes"
+          if [ "$r" -ge "$d" ]; then
+            echo "::error::Release APK is not smaller than debug. R8 may be disabled."
+            exit 1
+          fi
+          echo "release apk: $(du -h "$release" | cut -f1)"
+
+      - name: No secrets committed
+        run: bash infrastructure/scripts/secret-scan.sh
+
+      # Artifact storage is useful for convenience, but quota exhaustion is
+      # external to source correctness. Packaging is already proven above by
+      # explicit file and size checks.
+      - name: Upload reports and APKs
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-artifacts
+          path: |
+            apps/android/app/build/outputs/apk/**/*.apk
+            apps/android/app/build/reports/lint-results*.html
+            **/build/test-results/**/*.xml
+          retention-days: 7

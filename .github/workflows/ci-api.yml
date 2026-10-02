@@ -1,0 +1,168 @@
+name: ci-api
+
+# Backend validation for the Ktor service and the shared Kotlin modules.
+# No deployment: this workflow only proves the backend still builds and tests.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-api-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Backend compile, test and smoke
+    # Pinned, not ubuntu-latest: the floating label migrates to Ubuntu 26 on
+    # 2026-10-19, and a foundation PR should not silently change its own
+    # toolchain underneath a green build.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    env:
+      GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # BUG-004: the whitespace check inspects a commit range, which
+          # needs history. A shallow clone makes the range unresolvable and
+          # the check would have to silently skip itself.
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Wrapper is committed and intact
+        run: |
+          test -x gradlew
+          test -f gradle/wrapper/gradle-wrapper.jar
+          test -f gradle/wrapper/gradle-wrapper.properties
+          grep -q 'distributionUrl' gradle/wrapper/gradle-wrapper.properties
+
+      # BUG-004: `git diff --check` with no range inspects only the working
+      # tree, which on a CI checkout is always clean. It therefore passed
+      # unconditionally and could never fail for a defect committed in the PR.
+      # The committed range is what actually needs checking.
+      - name: Whitespace errors in committed changes
+        run: bash infrastructure/scripts/check-whitespace.sh
+
+      - name: Compile backend and shared
+        run: ./gradlew :services:api:compileKotlin :shared:contracts:compileKotlin :shared:models:compileKotlin :shared:validation:compileKotlin --console=plain
+
+      - name: Run backend and shared tests
+        run: ./gradlew :services:api:test :shared:contracts:test :shared:validation:test --console=plain
+
+      # BUG-003: a suite can compile and never run while the build stays green.
+      # The exit code is not evidence, so the count is checked explicitly.
+      - name: Verify tests actually executed
+        run: |
+          set -euo pipefail
+          # Scoped to the backend and shared modules on purpose. An unscoped
+          # `find .` would silently start counting Android reports too if a
+          # future change ever ran both in one job, and the number would stop
+          # meaning what the summary claims it means.
+          reports=$(find services/api shared -path '*/test-results/*' -name 'TEST-*.xml' | wc -l)
+          if [ "$reports" -eq 0 ]; then
+            echo "::error::No JUnit XML reports found. The tests did not run."
+            exit 1
+          fi
+          # awk, not bc: bc is not guaranteed to be installed on the runner
+          # image, and under `set -e` a missing binary fails the step for a
+          # reason unrelated to the tests.
+          read -r total failures errors <<< "$(find services/api shared -path '*/test-results/*' -name 'TEST-*.xml' -print0 \
+            | xargs -0 -r grep -hoE '(tests|failures|errors)="[0-9]+"' \
+            | awk -F'"' '{ v=$2+0; if ($1 ~ /^tests/) t+=v; else if ($1 ~ /^failures/) f+=v; else e+=v }
+                       END { printf "%d %d %d", t+0, f+0, e+0 }')"
+          echo "backend suites=$reports tests=$total failures=$failures errors=$errors"
+          if [ "$total" -lt 1 ]; then
+            echo "::error::Zero tests executed. See BUG-003."
+            exit 1
+          fi
+          if [ "$((failures + errors))" -ne 0 ]; then
+            echo "::error::Failing tests present."
+            exit 1
+          fi
+
+      - name: Assemble runnable service
+        run: ./gradlew :services:api:installDist --console=plain
+
+      # /ready returning 503 with no database is the documented, correct
+      # behaviour. Asserting 200 here would encode the bug, not the intent.
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          APP_ENV=local \
+          API_HOST=127.0.0.1 \
+          API_PORT=8080 \
+          MONGODB_DATABASE=companero_ci \
+          ./services/api/build/install/api/bin/api &
+          pid=$!
+          trap 'kill $pid 2>/dev/null || true' EXIT
+
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+
+          echo "--- GET /health ---"
+          health=$(curl -fsS -w '\n%{http_code}' http://127.0.0.1:8080/health)
+          echo "$health"
+          [ "$(echo "$health" | tail -n1)" = "200" ] || { echo "::error::/health must be 200"; exit 1; }
+          echo "$health" | head -n1 | grep -q '"status":"up"' || { echo "::error::/health must report up"; exit 1; }
+
+          echo "--- GET /ready (503 is expected without a database) ---"
+          ready=$(curl -sS -w '\n%{http_code}' http://127.0.0.1:8080/ready)
+          echo "$ready"
+          [ "$(echo "$ready" | tail -n1)" = "503" ] || { echo "::error::/ready must be 503 with no database"; exit 1; }
+
+          echo "--- GET /version ---"
+          version=$(curl -fsS -w '\n%{http_code}' http://127.0.0.1:8080/version)
+          echo "$version"
+          [ "$(echo "$version" | tail -n1)" = "200" ] || { echo "::error::/version must be 200"; exit 1; }
+
+          echo "--- no configuration leak ---"
+          for path in health ready version; do
+            body=$(curl -sS "http://127.0.0.1:8080/$path")
+            case "$body" in
+              *mongodb://*|*"hunter2"*) echo "::error::$path leaked configuration"; exit 1 ;;
+            esac
+          done
+
+      # The inline version of this step only looked for .env and a few key
+      # extensions. The script classifies every hit, so a deliberate canary in a
+      # test is not confused with a real credential, and an unrecognised host
+      # fails instead of being assumed harmless.
+      - name: No secrets committed
+        run: bash infrastructure/scripts/secret-scan.sh
+
+      # Proves the secret scan can still fail. A control that has only ever
+      # printed PASS is not a control.
+      - name: Secret scan self-test
+        run: bash infrastructure/scripts/secret-scan-test.sh
+
+      # Reports are diagnostic evidence, not a correctness gate. GitHub can
+      # reject uploads when the repository/account artifact quota is full;
+      # that external storage condition must not turn a fully green build,
+      # tests, smoke checks and secret scan into a failed CI result.
+      - name: Upload test reports
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-reports
+          path: |
+            **/build/test-results/**/*.xml
+            **/build/reports/tests/**
+          retention-days: 7

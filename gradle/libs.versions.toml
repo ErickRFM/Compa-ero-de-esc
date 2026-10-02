@@ -53,10 +53,16 @@ androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-toolin
 androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+# Staged for the tablet layouts, which are a later milestone. Referencing it
+# from the app module now would be an unused dependency with no screen to size.
 androidx-compose-window-size = { group = "androidx.compose.material3", name = "material3-window-size-class" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "androidxNavigation" }
 
 # --- AndroidX persistence / background ---
+# Staged, not in use. core:datastore, core:database and core:security do not
+# exist yet, and ADR-001 records what triggers each one. The version pins live
+# here so that creating a module is an include line plus a dependency, not a
+# version negotiation.
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "androidxDataStore" }
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "androidxRoom" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "androidxRoom" }
@@ -70,7 +76,8 @@ androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navig
 
 # --- Kotlin ecosystem ---
 kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
-kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
+# The -android artifact already depends on -core, so declaring core separately
+# would only add a second version constraint to resolve.
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serializationJson" }
@@ -85,25 +92,35 @@ ktor-server-call-logging = { group = "io.ktor", name = "ktor-server-call-logging
 ktor-server-call-id = { group = "io.ktor", name = "ktor-server-call-id" }
 ktor-server-cors = { group = "io.ktor", name = "ktor-server-cors" }
 ktor-server-default-headers = { group = "io.ktor", name = "ktor-server-default-headers" }
+# auth and auth-jwt are staged for the login phase (M1). Referencing them from
+# services:api before there is an auth route would be an unused dependency.
 ktor-server-auth = { group = "io.ktor", name = "ktor-server-auth" }
 ktor-server-auth-jwt = { group = "io.ktor", name = "ktor-server-auth-jwt" }
 ktor-server-test-host = { group = "io.ktor", name = "ktor-server-test-host" }
-ktor-server-config-yaml = { group = "io.ktor", name = "ktor-server-config-yaml" }
 ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json" }
 
+# --- Ktor client (Android) ---
+ktor-client-core = { group = "io.ktor", name = "ktor-client-core" }
+ktor-client-android = { group = "io.ktor", name = "ktor-client-android" }
+ktor-client-content-negotiation = { group = "io.ktor", name = "ktor-client-content-negotiation" }
+ktor-client-logging = { group = "io.ktor", name = "ktor-client-logging" }
+ktor-client-mock = { group = "io.ktor", name = "ktor-client-mock" }
+
 # --- MongoDB ---
+# Only the coroutine driver. The blocking sync driver is deliberately absent:
+# it cannot be used from a coroutine without blocking a thread, and having it
+# available would make that mistake easy to write later.
 mongodb-driver-kotlin-coroutine = { group = "org.mongodb", name = "mongodb-driver-kotlin-coroutine", version.ref = "mongodbDriver" }
-mongodb-driver-sync = { group = "org.mongodb", name = "mongodb-driver-sync", version.ref = "mongodbDriver" }
 
 # --- Logging ---
 logback-classic = { group = "ch.qos.logback", name = "logback-classic", version.ref = "logback" }
 
 # --- Testing ---
+# junit-jupiter is the aggregate: it already contains junit-jupiter-api,
+# junit-jupiter-params and the engine, so the sub-artifacts are not listed
+# separately. Declaring them again would pin one version in two places.
 junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junitJupiter" }
-junit-jupiter-api = { group = "org.junit.jupiter", name = "junit-jupiter-api", version.ref = "junitJupiter" }
-junit-jupiter-params = { group = "org.junit.jupiter", name = "junit-jupiter-params", version.ref = "junitJupiter" }
 junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher", version.ref = "junitPlatform" }
-turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }

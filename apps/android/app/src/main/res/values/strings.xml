@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Compañero de Escuela</string>
+
+    <!-- Home -->
+    <string name="home_title">Compañero de Escuela</string>
+    <string name="home_subtitle">Tu base diaria, lista sin conexion</string>
+    <string name="home_foundation_notice">Fase de cimientos: la interfaz real llega en el siguiente bloque.</string>
+
+    <!-- Profile -->
+    <string name="profile_title">Perfil</string>
+    <string name="profile_notice">Aqui vive la sesion y los datos de la institucion.</string>
+</resources>

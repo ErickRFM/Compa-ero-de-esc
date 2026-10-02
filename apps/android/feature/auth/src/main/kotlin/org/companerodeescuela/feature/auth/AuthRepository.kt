@@ -1,10 +1,11 @@
 package org.companerodeescuela.feature.auth
 
 import io.ktor.client.HttpClient
-import io.ktor.client.request.contentType
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.network.apiCall
@@ -35,7 +36,7 @@ class AuthRepository(
     ): Outcome<UserSummary> {
         val result = apiCall {
             client.post("auth/login") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody(LoginRequest(username = username, password = password))
             }.requireBody<ApiResponse<LoginResponse>>()
         }.map { it.data }

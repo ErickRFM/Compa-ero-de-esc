@@ -15,6 +15,7 @@ import org.companerodeescuela.shared.contracts.ScheduleEntry
 data class ScheduleUiState(
     val loading: Boolean = true,
     val entries: List<ScheduleEntry> = emptyList(),
+    val fromCache: Boolean = false,
     val errorMessage: String? = null,
 )
 
@@ -29,15 +30,17 @@ class ScheduleViewModel @Inject constructor(
 
     fun load() {
         viewModelScope.launch {
-            when (val result = repository.readWeeklySchedule()) {
+            _state.value = _state.value.copy(loading = true, errorMessage = null)
+            when (val result = repository.load()) {
                 is Outcome.Success -> {
                     _state.value = ScheduleUiState(
                         loading = false,
-                        entries = WeeklySchedule.order(result.value),
+                        entries = WeeklySchedule.order(result.value.academic.schedule.entries),
+                        fromCache = result.value.fromCache,
                     )
                 }
                 is Outcome.Failure -> {
-                    _state.value = ScheduleUiState(
+                    _state.value = _state.value.copy(
                         loading = false,
                         errorMessage = result.error.userMessage,
                     )

@@ -28,7 +28,7 @@ android {
 dependencies {
     implementation(project(":shared:contracts"))
 
-    implementation(libs.androidx.room.runtime)
+    api(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 

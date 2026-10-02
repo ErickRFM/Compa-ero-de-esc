@@ -45,7 +45,7 @@ class HomeViewModel @Inject constructor(
                     )
                 }
                 is Outcome.Failure -> {
-                    _state.value = HomeUiState(
+                    _state.value = _state.value.copy(
                         loading = false,
                         errorMessage = result.error.userMessage,
                     )

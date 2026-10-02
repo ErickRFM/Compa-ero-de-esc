@@ -1,7 +1,7 @@
 # Master Plan — Compañero de Escuela
 
-Status: active execution plan  
-Baseline: `feat/product-foundation-v2`  
+Status: active execution plan
+Baseline: `feat/product-foundation-v2`
 Date: 2026-10-02
 
 ## Product goal

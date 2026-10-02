@@ -51,6 +51,7 @@ include(":services:api")
 // ---------------------------------------------------------------------------
 include(":apps:android:app")
 include(":apps:android:feature:auth")
+include(":apps:android:feature:home")
 
 include(":apps:android:core:common")
 include(":apps:android:core:database")

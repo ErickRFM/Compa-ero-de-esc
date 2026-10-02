@@ -3,6 +3,7 @@ package org.companerodeescuela.api.application
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.routing.routing
+import org.companerodeescuela.api.auth.authRoutes
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.database.MongoConnection
 import org.companerodeescuela.api.health.HealthService
@@ -40,5 +41,6 @@ fun Application.module(
 
     routing {
         healthRoutes(settings = settings, healthService = healthService)
+        authRoutes(settings = settings, identityProvider = providerRegistry.identity)
     }
 }

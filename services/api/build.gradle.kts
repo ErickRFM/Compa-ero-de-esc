@@ -42,6 +42,8 @@ dependencies {
     implementation(libs.ktor.server.call.id)
     implementation(libs.ktor.server.default.headers)
     implementation(libs.ktor.server.cors)
+    implementation(libs.ktor.server.auth)
+    implementation(libs.ktor.server.auth.jwt)
     implementation(libs.ktor.serialization.kotlinx.json)
 
     implementation(libs.mongodb.driver.kotlin.coroutine)

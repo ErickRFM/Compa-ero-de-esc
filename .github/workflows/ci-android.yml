@@ -97,10 +97,13 @@ jobs:
             echo "::error::No lint reports produced."
             exit 1
           fi
-          errors=$(find . -name 'lint-results*.xml' \
-            -exec grep -ho 'severity="Error"' {} + | wc -l)
-          warnings=$(find . -name 'lint-results*.xml' \
-            -exec grep -ho 'severity="Warning"' {} + | wc -l)
+          # grep exits 1 when there are zero matches. Under pipefail that made
+          # a perfectly clean lint report fail before the numeric comparison.
+          # awk always exits successfully and returns an explicit zero.
+          errors=$(find . -name 'lint-results*.xml' -print0 \
+            | xargs -0 -r awk 'BEGIN { c=0 } /severity="Error"/ { c++ } END { print c+0 }')
+          warnings=$(find . -name 'lint-results*.xml' -print0 \
+            | xargs -0 -r awk 'BEGIN { c=0 } /severity="Warning"/ { c++ } END { print c+0 }')
           echo "lint errors=$errors warnings=$warnings"
           if [ "$errors" -ne 0 ]; then
             echo "::error::Lint errors present."
@@ -141,8 +144,12 @@ jobs:
       - name: No secrets committed
         run: bash infrastructure/scripts/secret-scan.sh
 
+      # Artifact storage is useful for convenience, but quota exhaustion is
+      # external to source correctness. Packaging is already proven above by
+      # explicit file and size checks.
       - name: Upload reports and APKs
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: android-artifacts

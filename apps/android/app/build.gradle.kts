@@ -64,11 +64,17 @@ dependencies {
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
 
+    implementation(project(":apps:android:core:academic"))
     implementation(project(":apps:android:core:common"))
+    implementation(project(":apps:android:core:database"))
     implementation(project(":apps:android:core:designsystem"))
     implementation(project(":apps:android:core:ui"))
     implementation(project(":apps:android:core:navigation"))
     implementation(project(":apps:android:core:network"))
+    implementation(project(":apps:android:core:security"))
+    implementation(project(":apps:android:feature:auth"))
+    implementation(project(":apps:android:feature:home"))
+    implementation(project(":apps:android:feature:schedule"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
@@ -90,7 +96,6 @@ dependencies {
     testImplementation(project(":apps:android:core:testing"))
 }
 
-// See the note in core/ui: AGP's JUnit 4 default would run nothing.
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }

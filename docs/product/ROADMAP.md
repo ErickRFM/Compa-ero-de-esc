@@ -1,82 +1,82 @@
 # Roadmap
 
-## Foundation — complete
+## Foundation — complete on main
 
-Establish the technical foundation so that every later phase is additive.
+- Gradle monorepo and pinned toolchain
+- shared contracts/models/validation
+- Ktor API shell and provider boundary
+- Android Compose shell
+- design system, navigation and network foundations
+- tested liveness/readiness behavior
+- mock providers blocked from staging/production
 
-- Gradle 8.14.3 monorepo with a version catalog
-- Shared pure-Kotlin modules: contracts, models, validation
-- Ktor 3 API with configuration, logging, health, readiness, version
-- Institutional provider boundary with mappers and mocks
-- Mocks locked out of staging and production
-- Android foundation: Compose shell, design system, navigation, network layer
-- 92 distinct tests (118 executions), CI workflows, architecture and security documentation
+## Product Foundation — active candidate
 
-**What "complete" means here:** the build is green, the service starts, the
-test suite genuinely executes, and the integration boundary is real. No
-product feature is implemented, and that is the point.
+Branch: `feat/product-foundation-v2`
 
-## Phase 1 — Identity and academic data
+Implemented in the candidate:
 
-The first vertical slice: a student signs in and sees their real timetable.
+1. platform login and short-lived JWT;
+2. encrypted Android token storage;
+3. local JWT subject/expiry inspection;
+4. observable session invalidation;
+5. Room academic snapshot cache;
+6. cache isolation by authenticated student id;
+7. canonical `core:academic` repository;
+8. Hoy contextual experience;
+9. Agenda day/week experience;
+10. profile/logout;
+11. reusable academic UI components.
 
-1. `core:security` — credential storage, the first module created under
-   [ADR-001](../architecture/ADR-001-MODULE-BOUNDARIES.md)
-2. API authentication, JWT, session lifecycle
-3. `AcademicProvider` real implementation for the first pilot school
-4. `GET /academic/load`, `GET /academic/schedule`
-5. `core:database` — cache the academic snapshot for offline
-6. Android: `feature:auth`, `feature:home`, `feature:schedule`
-7. Offline read of the cached timetable
+External blockers before a real-user pilot:
 
-Exit criteria: a student signs in on a real device, sees their real timetable
-with the network off, and no institutional credential exists on the device.
+- real pilot-school IdentityProvider;
+- real pilot-school AcademicProvider;
+- working GitHub Actions execution or equivalent reproducible verification.
 
-## Phase 2 — Attendance
+## Next — Academic model v2
 
-1. `core:location` — created only after the privacy model is agreed
-2. Attendance endpoints
-3. `feature:attendance`
-4. Offline submission with queued sync and conflict resolution
-5. Teacher roster view
+- terms, courses and groups;
+- recurring schedule patterns;
+- dated class occurrences;
+- schedule overrides;
+- cancelled/rescheduled/online states;
+- room/teacher/time change metadata.
 
-Exit criteria: attendance is recorded in under ten seconds, works offline, and
-a location sample is stored only for as long as the policy allows.
+## Then — Due work and notices
 
-## Phase 3 — Notifications and the rest of the day
+- tasks;
+- due/overdue/completed states;
+- announcements;
+- calendar/events;
+- LMS links/summary.
 
-1. `core:notifications`
-2. `feature:announcements`, `feature:tasks`, `feature:library`, `feature:events`
-3. `core:datastore` — sync cursor, preferences
-4. Deeper offline sync
+## Then — Attendance
+
+Build in this order:
+
+1. attendance domain;
+2. teacher session lifecycle;
+3. student attendance attempt;
+4. idempotency;
+5. offline outbox/reconciliation;
+6. signed dynamic QR evidence;
+7. teacher roster/review.
+
+Location, Wi-Fi or BLE evidence is optional and requires a separate privacy and
+product decision.
 
 ## Later
 
-- Real academic providers for more than one school, which is the test of
-  whether the provider boundary actually holds
-- Parent view
-- Tablet layout
+- adaptive tablet layout;
+- notification center and local reminders;
+- optional push;
+- parent view;
+- additional institutional adapters;
+- real pilot and store-distribution work.
 
-## Explicitly deferred
+## Release rule
 
-Not planned, and not to be started without a decision record:
-
-- QR attendance codes and BLE beacons. High privacy cost, and the value over
-  a location-based flow is unproven.
-- FCM push. Requires a Google dependency the product may not want.
-- Automated publishing to app stores.
-- Any analytics or crash-reporting service.
-
-## Risks that could change this order
-
-| Risk | Effect |
-|---|---|
-| A pilot school has no usable API | Phase 1 slips; expect file-import workarounds |
-| Location permission is refused at scale | Phase 2 needs a non-GPS fallback |
-| Institutional systems are too inconsistent to normalize | The provider boundary itself needs revisiting |
-
-## Related
-
-- [Product vision](PRODUCT_VISION.md)
-- [ADR-001: module boundaries](../architecture/ADR-001-MODULE-BOUNDARIES.md)
-- [Release readiness](../quality/RELEASE_READINESS.md)
+No phase is complete because code exists. It is complete when it is merged,
+built reproducibly, tests genuinely execute, accessibility/offline/error
+states are covered and the acceptance scenario is demonstrated.

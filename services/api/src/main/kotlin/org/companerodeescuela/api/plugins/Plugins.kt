@@ -8,6 +8,9 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.install
 import io.ktor.server.application.log
+import io.ktor.server.auth.Authentication
+import io.ktor.server.auth.jwt.JWTPrincipal
+import io.ktor.server.auth.jwt.jwt
 import io.ktor.server.plugins.callid.CallId
 import io.ktor.server.plugins.callid.callId
 import io.ktor.server.plugins.calllogging.CallLogging
@@ -19,6 +22,7 @@ import io.ktor.server.request.httpMethod
 import io.ktor.server.request.path
 import io.ktor.server.response.respond
 import kotlinx.serialization.json.Json
+import org.companerodeescuela.api.auth.AuthTokenService
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.errors.toApiError
@@ -96,6 +100,21 @@ fun Application.configurePlugins(settings: ApiSettings) {
         if (!settings.environment.isProduction) {
             allowHost("localhost", schemes = listOf("http"))
             allowHost("127.0.0.1", schemes = listOf("http"))
+        }
+    }
+
+    install(Authentication) {
+        settings.jwtSecret?.let {
+            val tokenService = AuthTokenService(settings)
+            jwt(AuthTokenService.PROVIDER_NAME) {
+                realm = AuthTokenService.REALM
+                verifier(tokenService.verifier)
+                validate { credential ->
+                    credential.payload.subject
+                        ?.takeIf { subject -> subject.isNotBlank() }
+                        ?.let { JWTPrincipal(credential.payload) }
+                }
+            }
         }
     }
 

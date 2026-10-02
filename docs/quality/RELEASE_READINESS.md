@@ -2,97 +2,81 @@
 
 ## Verdict
 
-**Not releasable. Foundation milestone only.**
+**Not releasable to real students yet. Product-foundation candidate in progress.**
 
-The technical foundation is sound and verified. There is no product to
-release: two placeholder screens, no authentication, no data, and no
-institutional integration.
+The repository now contains substantially more than the original foundation,
+but two external requirements still block a real pilot: real institutional
+providers and reproducible execution evidence for the current candidate.
 
-## Verified state
+## Main
 
-| Check | Result |
-|---|---|
-| `./gradlew build` | Pass |
-| `./gradlew test` | Pass |
-| `./gradlew lint` | Pass, 0 errors, 3 warnings |
-| Debug APK | Builds, 20.0 MB |
-| Minified release APK | Builds, 1.5 MB |
-| Test count | 92 distinct tests, 14 suites, 118 executions, 0 failures, 0 skipped |
-| `GET /health` | 200, status `up` |
-| `GET /ready` | 503, status `down` — **correct with no database** |
-| `GET /version` | 200 |
-| Mock lockout | Staging and production refuse to boot |
+`main` contains the verified technical foundation.
 
-## Why 503 from `/ready` is a pass
+## Active candidate
 
-With no `MONGODB_URI` configured the service cannot serve data, so `/ready`
-answers 503. Reporting readiness while unable to serve traffic is the failure
-this endpoint exists to prevent: a load balancer would keep sending students
-to an instance that cannot answer.
+`feat/product-foundation-v2` currently contains:
 
-`/health` still answers 200 because the process is alive, and its body
-reports `mongodb: degraded` so the cause is visible. Liveness and readiness
-answer different questions and deliberately give different answers.
+- platform authentication routes and JWT issuance;
+- encrypted Android access-token storage;
+- local expiry/subject inspection;
+- observable session invalidation;
+- student-scoped academic Room cache;
+- one academic repository for remote + offline reads;
+- Hoy;
+- Agenda day/week modes;
+- profile and logout;
+- first reusable academic UX components.
 
-This is verified in CI by the API smoke step, which asserts **200 for
-`/health` and 503 for `/ready`**.
+## Current external blocker
 
-## Blocking items before any real user
+GitHub Actions workflow runs are being created for the branch, but the latest
+runs remain `pending` with no jobs materialized. That is not a passing or
+failing build result and must not be represented as either.
+
+Until Actions execute, the candidate requires an independent clean local build
+before merge/release.
+
+## Blocking items before pilot
 
 | Area | Status |
 |---|---|
-| Authentication | Not built |
-| Token storage on device | Not built, needs `core:security` |
-| Any institutional integration | Mock only |
-| Any persisted data | None. The database is wired and empty |
-| Rate limiting | Not built |
-| Location | Not built, and blocked on the privacy model |
-| Crash reporting | None. A pilot needs at least a way to receive a report |
-| Accessibility audit | Not performed against a real screen |
-| Localisation | Spanish strings only, no localisation layer |
-| Legal review | Not started |
+| Real IdentityProvider | BLOCKED externally / not configured |
+| Real AcademicProvider | BLOCKED externally / not configured |
+| Candidate clean build | REQUIRED |
+| Candidate Android unit tests | REQUIRED |
+| Candidate API tests | REQUIRED |
+| Candidate lint | REQUIRED |
+| Compose UI tests | Not yet implemented |
+| Accessibility audit | Not yet performed on candidate UX |
+| Rate limiting | Still required before public auth exposure |
+| Signing/versioning | Internal release work remains |
+| Privacy/legal review | Required before real student pilot |
 
-## Non-blocking observations
+## Candidate acceptance scenarios
 
-- 3 lint warnings, all in Android resources. Worth clearing before Phase 1.
-- Duplicate module build configuration across the seven Android modules.
-  Tolerable at seven; revisit past ten, when convention plugins start to pay
-  for themselves. Recorded in
-  [ADR-001](../architecture/ADR-001-MODULE-BOUNDARIES.md).
-- The release APK is unsigned and unversioned for distribution. Signing is
-  deliberately deferred.
+The candidate should not merge as pilot-ready until all of these are
+demonstrated:
 
-## Pilot readiness checklist
+1. valid login survives process restart while the token is valid;
+2. expiry transitions back to login;
+3. a 401 clears the local platform session;
+4. student A cannot expose cached data to student B;
+5. Hoy works from remote data and from the same student's cache;
+6. Agenda can be opened first and performs its own refresh/fallback;
+7. logout returns to authentication;
+8. no institutional password is persisted.
 
-To be completed before a real student sees this app:
+## Release evidence format
 
-1. Authentication with a real session lifecycle.
-2. `core:security` storing tokens in the Android Keystore.
-3. `core:database` caching a real academic snapshot, encrypted.
-4. A real `AcademicProvider` for one school, with malformed-input tests.
-5. Rate limiting on authentication.
-6. Audit logging for attendance access.
-7. A privacy policy and terms a parent could actually read.
-8. Accessibility review against real screens, not previews.
-9. Crash reporting, at minimum an email path.
-10. A Play Store internal-track release.
+For the merge/release record capture:
 
-## Definition of done for the foundation
+- exact HEAD SHA;
+- clean build command and result;
+- test suites / executed / failed / skipped counts;
+- lint errors/warnings;
+- debug/release artifact result;
+- API smoke result;
+- Git status/diff cleanliness;
+- known external blockers.
 
-Met:
-
-- [x] Reproducible build from a clean clone, wrapper only
-- [x] API starts with no external infrastructure
-- [x] Misconfiguration fails loudly and names the variable
-- [x] Mock providers locked out of staging and production
-- [x] Android app builds, debug and minified
-- [x] 92 distinct tests, all genuinely executed
-- [x] Lint clean of errors
-- [x] Architecture, security, privacy and quality documented
-- [x] CI validates the same tasks locally
-
-## Related
-
-- [Test plan](TEST_PLAN.md)
-- [Bug register](BUG_REGISTER.md)
-- [Roadmap](../product/ROADMAP.md)
+See [Master Plan](../product/MASTER_PLAN.md).

@@ -64,6 +64,7 @@ dependencies {
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
 
+    implementation(project(":apps:android:core:academic"))
     implementation(project(":apps:android:core:common"))
     implementation(project(":apps:android:core:database"))
     implementation(project(":apps:android:core:designsystem"))
@@ -95,7 +96,6 @@ dependencies {
     testImplementation(project(":apps:android:core:testing"))
 }
 
-// See the note in core/ui: AGP's JUnit 4 default would run nothing.
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }

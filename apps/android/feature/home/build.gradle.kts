@@ -27,11 +27,9 @@ dependencies {
     implementation(composeBom)
 
     implementation(project(":shared:contracts"))
+    implementation(project(":apps:android:core:academic"))
     implementation(project(":apps:android:core:common"))
-    implementation(project(":apps:android:core:database"))
     implementation(project(":apps:android:core:designsystem"))
-    implementation(project(":apps:android:core:network"))
-    implementation(project(":apps:android:core:security"))
 
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -46,8 +44,6 @@ dependencies {
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlin.test)
-    testImplementation(platform(libs.ktor.bom))
-    testImplementation(libs.ktor.client.mock)
     testImplementation(libs.kotlinx.coroutines.test)
 }
 

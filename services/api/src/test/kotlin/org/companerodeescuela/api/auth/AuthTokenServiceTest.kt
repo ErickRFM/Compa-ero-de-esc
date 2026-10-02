@@ -1,5 +1,6 @@
 package org.companerodeescuela.api.auth
 
+import com.auth0.jwt.JWT
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -28,7 +29,7 @@ class AuthTokenServiceTest {
         )
 
         val response = service.issue(user)
-        val decoded = service.verifier.verify(response.accessToken)
+        val decoded = JWT.decode(response.accessToken)
         val restored = service.userFrom(decoded)
 
         assertEquals(user, restored)

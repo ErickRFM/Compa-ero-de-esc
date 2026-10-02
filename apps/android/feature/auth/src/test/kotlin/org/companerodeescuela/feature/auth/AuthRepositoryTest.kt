@@ -6,6 +6,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -19,14 +20,15 @@ import org.companerodeescuela.shared.contracts.UserSummary
 class AuthRepositoryTest {
 
     @Test
-    fun `successful login persists only platform access token`() = runTest {
+    fun `successful login persists a usable platform access token`() = runTest {
+        val validToken = platformToken("student-1", 4_102_444_800)
         val engine = MockEngine {
             respond(
                 content = """
                     {
                       "data": {
-                        "accessToken": "platform-token",
-                        "expiresAtEpochSeconds": 2000000000,
+                        "accessToken": "$validToken",
+                        "expiresAtEpochSeconds": 4102444800,
                         "user": {
                           "id": "student-1",
                           "displayName": "Ana López",
@@ -54,7 +56,17 @@ class AuthRepositoryTest {
 
         val success = assertIs<Outcome.Success<UserSummary>>(result)
         assertEquals("Ana López", success.value.displayName)
-        assertEquals("platform-token", tokenStore.token)
+        assertEquals(validToken, tokenStore.token)
+    }
+
+    private fun platformToken(userId: String, expiresAt: Long): String {
+        val encoder = Base64.getUrlEncoder().withoutPadding()
+        val payload = """{"sub":"$userId","display_name":"Ana López","exp":$expiresAt}"""
+        return listOf(
+            encoder.encodeToString("{}".toByteArray()),
+            encoder.encodeToString(payload.toByteArray()),
+            "test",
+        ).joinToString(".")
     }
 
     private class FakeTokenStore : SessionTokenStore {

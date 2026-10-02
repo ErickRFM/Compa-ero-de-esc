@@ -2,7 +2,7 @@ package org.companerodeescuela.api.auth
 
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
-import com.auth0.jwt.interfaces.DecodedJWT
+import com.auth0.jwt.interfaces.Payload
 import com.auth0.jwt.interfaces.JWTVerifier
 import java.time.Clock
 import java.time.Duration
@@ -64,7 +64,7 @@ class AuthTokenService(
         )
     }
 
-    fun userFrom(jwt: DecodedJWT): UserSummary {
+    fun userFrom(jwt: Payload): UserSummary {
         val id = jwt.subject?.takeIf { it.isNotBlank() }
             ?: error("Verified token has no subject")
         val displayName = jwt.getClaim(CLAIM_DISPLAY_NAME).asString()

@@ -69,6 +69,7 @@ dependencies {
     implementation(project(":apps:android:core:ui"))
     implementation(project(":apps:android:core:navigation"))
     implementation(project(":apps:android:core:network"))
+    implementation(project(":apps:android:core:security"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

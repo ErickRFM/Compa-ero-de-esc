@@ -50,6 +50,7 @@ include(":services:api")
 // production code.
 // ---------------------------------------------------------------------------
 include(":apps:android:app")
+include(":apps:android:feature:auth")
 
 include(":apps:android:core:common")
 include(":apps:android:core:database")

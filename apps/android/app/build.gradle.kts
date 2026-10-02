@@ -71,6 +71,7 @@ dependencies {
     implementation(project(":apps:android:core:navigation"))
     implementation(project(":apps:android:core:network"))
     implementation(project(":apps:android:core:security"))
+    implementation(project(":apps:android:feature:auth"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

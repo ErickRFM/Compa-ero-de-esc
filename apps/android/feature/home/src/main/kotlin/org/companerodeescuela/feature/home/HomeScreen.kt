@@ -8,10 +8,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -19,6 +19,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+import org.companerodeescuela.core.ui.component.AcademicClassCard
+import org.companerodeescuela.core.ui.component.AcademicTimelineItem
+import org.companerodeescuela.core.ui.component.NoticeTone
+import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ScheduleEntry
 
 @Composable
@@ -44,71 +52,152 @@ fun HomeScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         Text(
-            text = overview?.let { "Hola, " + it.studentName } ?: "Hoy",
+            text = overview?.studentName
+                ?.substringBefore(" ")
+                ?.let { "Hola, $it" }
+                ?: "Hoy",
             style = MaterialTheme.typography.headlineMedium,
+        )
+        Text(
+            text = todayLabel(),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         if (state.fromCache) {
-            Card(modifier = Modifier.fillMaxWidth()) {
+            StatusNotice(
+                title = "Información guardada",
+                message = "No pudimos actualizar ahora. Tu jornada sigue disponible sin conexión.",
+                tone = NoticeTone.WARNING,
+            )
+        }
+
+        state.errorMessage?.let { message ->
+            StatusNotice(
+                title = "No pudimos actualizar",
+                message = message,
+                tone = NoticeTone.ERROR,
+            )
+            Button(onClick = viewModel::refresh) {
+                Text("Reintentar")
+            }
+        }
+
+        overview?.let { day ->
+            day.current?.let { current ->
+                AcademicClassCard(
+                    subject = current.subjectName,
+                    time = "${current.startsAt} – ${current.endsAt}",
+                    location = locationLabel(current),
+                    teacher = current.teacherName,
+                    eyebrow = "Ahora",
+                    supportingText = remainingLabel(current.endsAt, "Termina"),
+                    emphasized = true,
+                )
+            } ?: StatusNotice(
+                title = "Sin clase en este momento",
+                message = day.next?.let { "Tu siguiente clase comienza a las ${it.startsAt}." }
+                    ?: "Tu jornada académica de hoy no tiene otra clase programada.",
+            )
+
+            day.next?.takeIf { next -> next != day.current }?.let { next ->
                 Text(
-                    text = "Sin conexión. Mostrando el horario guardado en este dispositivo.",
-                    modifier = Modifier.padding(16.dp),
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = "Siguiente",
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                AcademicClassCard(
+                    subject = next.subjectName,
+                    time = "${next.startsAt} – ${next.endsAt}",
+                    location = locationLabel(next),
+                    teacher = next.teacherName,
+                    supportingText = remainingLabel(next.startsAt, "Comienza"),
                 )
             }
-        }
 
-        state.errorMessage?.let {
-            Text(text = it, color = MaterialTheme.colorScheme.error)
-            Button(onClick = viewModel::refresh) { Text("Reintentar") }
-        }
+            Text(
+                text = "Tu día",
+                style = MaterialTheme.typography.titleLarge,
+            )
 
-        overview?.let {
-            SectionTitle("Ahora")
-            it.current?.let { entry -> ClassCard(entry) }
-                ?: Text("No tienes clase en este momento.")
-
-            SectionTitle("Siguiente")
-            it.next?.let { entry -> ClassCard(entry) }
-                ?: Text("No hay otra clase programada hoy.")
-
-            SectionTitle("Tu jornada")
-            if (it.classes.isEmpty()) {
-                Text("No tienes clases programadas para hoy.")
+            if (day.classes.isEmpty()) {
+                StatusNotice(
+                    title = "Día libre",
+                    message = "No tienes clases programadas para hoy.",
+                )
             } else {
-                it.classes.forEach { entry -> ClassCard(entry) }
+                day.classes.forEach { entry ->
+                    val status = classStatus(entry, day.current, day.next)
+                    AcademicTimelineItem(
+                        time = entry.startsAt,
+                        title = entry.subjectName,
+                        subtitle = locationLabel(entry),
+                        status = status.label,
+                        highlighted = status.highlighted,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
 
-            Button(
+            TextButton(
                 onClick = viewModel::refresh,
-                modifier = Modifier.fillMaxWidth(),
+                enabled = !state.loading,
+                modifier = Modifier.align(Alignment.End),
             ) {
-                Text("Actualizar")
+                Text(if (state.loading) "Actualizando…" else "Actualizar")
             }
         }
     }
 }
 
-@Composable
-private fun SectionTitle(text: String) {
-    Text(text = text, style = MaterialTheme.typography.titleLarge)
+private data class ClassStatus(
+    val label: String?,
+    val highlighted: Boolean,
+)
+
+private fun classStatus(
+    entry: ScheduleEntry,
+    current: ScheduleEntry?,
+    next: ScheduleEntry?,
+): ClassStatus {
+    if (entry == current) return ClassStatus("Ahora", true)
+    if (entry == next) return ClassStatus("Siguiente", false)
+
+    val end = runCatching { LocalTime.parse(entry.endsAt) }.getOrNull()
+    return if (end != null && LocalTime.now().isAfter(end)) {
+        ClassStatus("Finalizada", false)
+    } else {
+        ClassStatus(null, false)
+    }
 }
 
-@Composable
-private fun ClassCard(entry: ScheduleEntry) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(text = entry.subjectName, style = MaterialTheme.typography.titleLarge)
-            Text(entry.startsAt + " – " + entry.endsAt)
-            Text(entry.classroomName ?: "Aula por confirmar")
-            Text(entry.teacherName)
-        }
+private fun locationLabel(entry: ScheduleEntry): String =
+    listOfNotNull(entry.classroomName, entry.buildingName)
+        .joinToString(" · ")
+        .ifBlank { "Aula por confirmar" }
+
+private fun remainingLabel(time: String, verb: String): String? {
+    val target = runCatching { LocalTime.parse(time) }.getOrNull() ?: return null
+    val minutes = java.time.Duration.between(LocalTime.now(), target).toMinutes()
+    return when {
+        minutes > 1 -> "$verb en $minutes min"
+        minutes == 1L -> "$verb en 1 min"
+        minutes == 0L -> "$verb ahora"
+        else -> null
     }
+}
+
+private fun todayLabel(): String {
+    val formatter = DateTimeFormatter.ofPattern(
+        "EEEE d 'de' MMMM",
+        Locale("es", "MX"),
+    )
+    return LocalDate.now()
+        .format(formatter)
+        .replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase(Locale("es", "MX")) else it.toString()
+        }
 }

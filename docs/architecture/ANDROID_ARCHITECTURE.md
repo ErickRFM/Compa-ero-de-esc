@@ -1,150 +1,166 @@
 # Android architecture
 
-Single activity, Jetpack Compose, Hilt, Material 3. The app is a shell at
-this stage: the architecture is real, the screens are placeholders.
+Single activity, Kotlin, Jetpack Compose, Hilt, Material 3 and Room.
+
+The product-foundation candidate is no longer a placeholder shell. It contains
+real authentication, session lifecycle behavior, offline academic data, Hoy and
+Agenda.
+
+## Runtime flow
+
+```
+MainActivity
+    |
+    +-- SessionViewModel
+    |      |
+    |      +-- encrypted SessionTokenStore
+    |      +-- SessionTokenInspector (sub / exp)
+    |
+    +-- authenticated shell
+           |
+           +-- Hoy
+           +-- Agenda
+           +-- Profile (secondary app-bar destination)
+```
+
+The bottom navigation intentionally contains only high-frequency destinations:
+**Hoy** and **Agenda**. Profile is available from the top app bar instead of
+using one third of permanent navigation.
+
+## Academic data flow
+
+```
+HomeViewModel -----------+
+                         |
+ScheduleViewModel -------+--> core:academic AcademicRepository
+                                  |
+                    +-------------+-------------+
+                    |                           |
+              SessionTokenStore            Ktor API
+                    |                           |
+             JWT subject/expiry                 |
+                    |                           v
+                    +------> Room cache <--- accepted remote data
+```
+
+Important behavior:
+
+- a usable token requires a parseable subject and non-expired `exp`;
+- the active subject determines the only cache owner that may be read;
+- remote academic data is rejected if its owner does not equal the JWT subject;
+- non-auth network/server failures may fall back to that student's cache;
+- a 401 clears the token and drives the global shell back to login;
+- Agenda performs its own refresh/fallback and no longer depends on Home having
+  run first.
 
 ## Module graph
 
-Dependencies point in one direction only. There is no arrow going back up.
-
 ```
-                    apps:android:app
-                            │
-        ┌───────────┬───────┼────────┐
-        ▼           ▼       ▼        ▼
-  core:design  core:ui  core:nav  core:network
-        ▲           ▲       ▲        │
-        └───────────┴───────┘        │
-                            │        ▼
-                       core:common ──┘
+                         app
+                          |
+      +-------------------+--------------------+
+      |                   |                    |
+ feature:auth        feature:home      feature:schedule
+      |                   |                    |
+      +----------+--------+---------+----------+
+                 |                  |
+            core:security      core:academic
+                                      |
+                        +-------------+-------------+
+                        |             |             |
+                   core:network  core:database  core:security
+                        |
+                   core:common
 
-  core:testing ──▶ core:common
-  shared:contracts ──▶ core:network
-```
-
-| Module | Owns | May depend on |
-|---|---|---|
-| `core:common` | `Outcome`, `AppError`, `Dispatchers` | nothing |
-| `core:designsystem` | Theme, type scale, shapes | nothing |
-| `core:ui` | `ContentState`, shared composables | `core:common`, `core:designsystem` |
-| `core:navigation` | Destinations, bottom bar, nav shell | `core:designsystem`, `core:ui` |
-| `core:network` | Ktor client, `Outcome` translation | `core:common`, `shared:contracts` |
-| `core:testing` | `TestDispatcherProvider` | `core:common` |
-| `app` | Wiring, DI, screens, manifest | all of the above |
-
-`core:common` and `core:designsystem` depend on nothing. That is deliberate: it
-is what makes them safe to use from anywhere without creating a cycle.
-
-### The rule that is easiest to break
-
-**`core:navigation` must never reference a feature.** It does not know that
-`HomeScreen` exists. Instead it takes the graph from the caller:
-
-```kotlin
-CompaneroScaffold {
-    composable(Destination.Home.route) { HomeScreen() }
-    composable(Destination.Profile.route) { ProfileScreen() }
-}
+core:ui ----------> core:designsystem / core:common
+core:navigation --> core:ui / core:designsystem
 ```
 
-Features depend on core. Core knows nothing about features. If
-`core:navigation` ever imported a feature, the app module would hold a cycle
-and the design would quietly invert.
+Feature modules never depend on one another.
+
+## Session lifecycle
+
+The real encrypted store exposes token changes as a Flow.
+
+`SessionViewModel`:
+
+1. observes the token;
+2. parses `sub`, `display_name` and `exp`;
+3. rejects malformed/expired values;
+4. marks the shell authenticated while valid;
+5. schedules local invalidation at expiry;
+6. reacts immediately when another layer clears the token after a 401.
+
+The client-side token parser is not a signature verifier. Authorization and JWT
+signature verification remain server responsibilities.
+
+## Offline policy
+
+Room is a cache, not the system of record.
+
+The current candidate stores an academic snapshot per owner id. A later
+academic-model phase may normalize this into occurrences/tasks/etc., but no
+feature is allowed to bypass the authenticated owner scope.
+
+## UX shell
+
+Shared UI primitives now include:
+
+- academic class card;
+- compact timeline item;
+- human-readable status notice;
+- generic loading/empty/error host.
+
+Hoy prioritizes current class, next class and the day's compact timeline.
+
+Agenda supports day/week reading and can refresh independently.
 
 ## Error handling
 
-One type, three layers of translation, and a feature never sees a Ktor
-exception.
+Ktor errors are translated before presentation:
 
 ```
-Ktor exception ─▶ AppError.Network / Http / Serialization / Unknown  (core:network)
-                        │  userMessage: safe to display
-                        │  technicalDetail: logged only, never shown
-                        ▼
-                  Outcome.Success / Failure                     (core:common)
-                        ▼
-              ContentState.Loading / Empty / Content / Failed   (core:ui)
-                        ▼
-                    ContentStateHost                            renders it
+network/server
+   -> AppError
+   -> Outcome
+   -> feature state
+   -> human copy
 ```
 
-`AppError` is where the product decision lives. A 401 says the session
-expired; a 403 says no permission; a 500 says try later. Those strings are
-user-facing copy, and keeping them in one file means they can be reviewed for
-accuracy by someone who is not an Android developer.
+Technical details never become user-visible strings.
 
-`technicalDetail` exists so debugging is possible without rendering a stack
-trace to a student. The `ContentStateTest` suite asserts that no
-`userMessage` contains a brace, which is a cheap guard against a raw
-technical string slipping through.
+## Accessibility and adaptive work
 
-## `ContentState` and the empty case
+Still required before pilot:
 
-`Empty` is separate from `Content` on purpose. "You have no tasks today" and
-"here are your tasks" are different screens, and collapsing them produces the
-blank list with no explanation that users report as a broken app.
+- Compose semantics tests;
+- TalkBack review;
+- large font scale;
+- 48dp target audit;
+- compact/medium/expanded layouts;
+- tablet navigation rail;
+- localization/resource extraction.
 
-Emptiness is passed in as a predicate rather than assumed. A list with no items
-is empty; a schedule with no items today might still want to show tomorrow.
-
-## Navigation
-
-`Destination` is a sealed class, not a string constant, so a typo in a route is
-a compile error and a rename is one edit.
-
-`CompaneroBottomBar` uses `saveState` / `restoreState` /
-`popUpTo(startDestination)` / `launchSingleTop`, so switching tabs does not
-grow the back stack without bound. Unbounded growth is the usual cause of a
-bottom bar that stops behaving after a few taps.
-
-## Configuration
-
-`ApiEnvironment` validates its base URL at construction:
-
-- must be absolute
-- must end with `/`
-
-`10.0.2.2` is the host machine as seen from the emulator. It lives in
-`NetworkModule`, one obvious place, rather than in a resources file where a
-wrong URL is invisible in review.
-
-## Platform configuration
-
-| Concern | Decision |
-|---|---|
-| Cleartext HTTP | Allowed only for `10.0.2.2`, `localhost`, `127.0.0.1`. Everything else requires HTTPS. |
-| Cloud backup | Disabled entirely |
-| Device transfer | Disabled entirely |
-| Backup rules | `data_extraction_rules.xml` (API 31+) and `backup_rules.xml` (older) |
-| Release build | Minified and resource-shrunk, with Proguard rules for serialization and Ktor |
-| Dynamic colour | Opt-in, off by default |
-
-Backup is off because attendance records and identifiers must not leave the
-device through a provider we do not control. That is a privacy decision;
-see [Location privacy](../privacy/LOCATION_PRIVACY.md).
-
-Dynamic colour is off by default because attendance and schedule screens get
-shared on school projectors, and Material You wallpaper extraction is not
-reliably readable on unknown projector hardware.
+These remain release gates, not optional polish.
 
 ## Testing
 
-`core:testing` supplies `TestDispatcherProvider`, so coroutine tests are
-deterministic without touching `Dispatchers.setMain` globally.
+Every Android test task must use JUnit Platform so JUnit 5 tests cannot compile
+and silently execute zero tests.
 
-Every Android module sets:
+Current candidate adds tests for:
 
-```kotlin
-tasks.withType<Test>().configureEach { useJUnitPlatform() }
-```
+- token subject/expiry inspection;
+- usable token persistence;
+- academic fallback scoped to the active user;
+- 401 session invalidation;
+- remote owner mismatch;
+- weekly schedule ordering.
 
-This is not boilerplate. AGP defaults to the JUnit 4 runner, which **compiles
-a JUnit 5 suite and then reports zero tests without failing**. Without this
-line the Android test suite is a false green. See the
-[bug register](../quality/BUG_REGISTER.md).
+CI results must record **executed test counts**, not just a green Gradle exit.
 
 ## Related
 
-- [System architecture](SYSTEM_ARCHITECTURE.md)
-- [ADR-001: module boundaries](ADR-001-MODULE-BOUNDARIES.md)
-- [Design system](../ux/DESIGN_SYSTEM.md)
+- [ADR-001](ADR-001-MODULE-BOUNDARIES.md)
+- [Master plan](../product/MASTER_PLAN.md)
+- [Release readiness](../quality/RELEASE_READINESS.md)

@@ -1,25 +1,25 @@
 package org.companerodeescuela.core.navigation
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 
-/**
- * App shell: bottom bar plus a nav host that the app module fills in.
- *
- * Destinations are registered by the caller rather than listed here, because
- * this module must not depend on any feature. That keeps the dependency
- * pointing one way (features know about core, never the reverse) and lets a
- * feature ship its own graph without touching this file.
- */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CompaneroScaffold(
     navController: NavHostController = rememberNavController(),
@@ -28,13 +28,49 @@ fun CompaneroScaffold(
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
+    val onProfile = currentDestination?.route == Destination.Profile.route
 
     Scaffold(
-        bottomBar = {
-            CompaneroBottomBar(
-                navController = navController,
-                currentDestination = currentDestination,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(if (onProfile) "Perfil" else "Compañero")
+                },
+                navigationIcon = {
+                    if (onProfile) {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(
+                                imageVector = Icons.Filled.ArrowBack,
+                                contentDescription = "Volver",
+                            )
+                        }
+                    }
+                },
+                actions = {
+                    if (!onProfile) {
+                        IconButton(
+                            onClick = {
+                                navController.navigate(Destination.Profile.route) {
+                                    launchSingleTop = true
+                                }
+                            },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Person,
+                                contentDescription = "Abrir perfil",
+                            )
+                        }
+                    }
+                },
             )
+        },
+        bottomBar = {
+            if (!onProfile) {
+                CompaneroBottomBar(
+                    navController = navController,
+                    currentDestination = currentDestination,
+                )
+            }
         },
     ) { innerPadding ->
         NavHost(

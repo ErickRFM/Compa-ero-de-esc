@@ -152,8 +152,13 @@ jobs:
       - name: Secret scan self-test
         run: bash infrastructure/scripts/secret-scan-test.sh
 
+      # Reports are diagnostic evidence, not a correctness gate. GitHub can
+      # reject uploads when the repository/account artifact quota is full;
+      # that external storage condition must not turn a fully green build,
+      # tests, smoke checks and secret scan into a failed CI result.
       - name: Upload test reports
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: api-test-reports

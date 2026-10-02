@@ -65,6 +65,7 @@ dependencies {
     implementation(composeBom)
 
     implementation(project(":apps:android:core:common"))
+    implementation(project(":apps:android:core:database"))
     implementation(project(":apps:android:core:designsystem"))
     implementation(project(":apps:android:core:ui"))
     implementation(project(":apps:android:core:navigation"))

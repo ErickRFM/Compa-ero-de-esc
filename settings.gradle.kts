@@ -52,6 +52,7 @@ include(":services:api")
 include(":apps:android:app")
 
 include(":apps:android:core:common")
+include(":apps:android:core:database")
 include(":apps:android:core:designsystem")
 include(":apps:android:core:ui")
 include(":apps:android:core:navigation")

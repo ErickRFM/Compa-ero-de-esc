@@ -12,9 +12,9 @@ data class CachedAcademicLoad(
 )
 
 interface AcademicSnapshotCache {
-    suspend fun read(): CachedAcademicLoad?
+    suspend fun read(ownerId: String): CachedAcademicLoad?
     suspend fun write(value: AcademicLoadResponse)
-    suspend fun clear()
+    suspend fun clear(ownerId: String)
 }
 
 internal class RoomAcademicSnapshotCache(
@@ -22,18 +22,29 @@ internal class RoomAcademicSnapshotCache(
     private val clock: Clock = Clock.systemUTC(),
 ) : AcademicSnapshotCache {
 
-    override suspend fun read(): CachedAcademicLoad? =
-        dao.find(CACHE_KEY)?.let { entity ->
+    override suspend fun read(ownerId: String): CachedAcademicLoad? {
+        require(ownerId.isNotBlank()) { "ownerId must not be blank" }
+        return dao.find(ownerId)?.let { entity ->
+            val decoded = AcademicSnapshotCodec.decode(entity.payloadJson)
+            if (decoded.student.id != ownerId || decoded.schedule.ownerId != ownerId) {
+                dao.delete(ownerId)
+                return null
+            }
             CachedAcademicLoad(
-                value = AcademicSnapshotCodec.decode(entity.payloadJson),
+                value = decoded,
                 updatedAtEpochSeconds = entity.updatedAtEpochSeconds,
             )
         }
+    }
 
     override suspend fun write(value: AcademicLoadResponse) {
+        require(value.student.id.isNotBlank()) { "academic snapshot owner must not be blank" }
+        require(value.schedule.ownerId == value.student.id) {
+            "academic snapshot owner mismatch"
+        }
         dao.upsert(
             AcademicSnapshotEntity(
-                cacheKey = CACHE_KEY,
+                cacheKey = value.student.id,
                 ownerId = value.student.id,
                 payloadJson = AcademicSnapshotCodec.encode(value),
                 updatedAtEpochSeconds = clock.instant().epochSecond,
@@ -41,12 +52,10 @@ internal class RoomAcademicSnapshotCache(
         )
     }
 
-    override suspend fun clear() {
-        dao.delete(CACHE_KEY)
-    }
-
-    private companion object {
-        const val CACHE_KEY = "current-user"
+    override suspend fun clear(ownerId: String) {
+        if (ownerId.isNotBlank()) {
+            dao.delete(ownerId)
+        }
     }
 }
 

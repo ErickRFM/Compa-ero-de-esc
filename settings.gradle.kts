@@ -24,7 +24,6 @@ dependencyResolutionManagement {
 
 // ---------------------------------------------------------------------------
 // Shared Kotlin modules (JVM).
-// Pure Kotlin: consumed by the Ktor API and safe to reuse elsewhere.
 // ---------------------------------------------------------------------------
 include(":shared:contracts")
 include(":shared:models")
@@ -36,24 +35,15 @@ include(":shared:validation")
 include(":services:api")
 
 // ---------------------------------------------------------------------------
-// Android application
-//
-// Only modules with real content are included here. A module that Gradle
-// knows about but nobody maintains is worse than a module that does not
-// exist yet, because it looks finished in a code review.
-//
-// The target end state (core:database, core:datastore, core:security,
-// core:location, core:notifications, and the feature modules) is documented
-// in docs/architecture/ADR-001-MODULE-BOUNDARIES.md, which records why the
-// 25 placeholder modules were removed and what triggers each deferred one.
-// Each module is added at the point where it earns its first line of
-// production code.
+// Android application.
+// Only modules with real production responsibility are included.
 // ---------------------------------------------------------------------------
 include(":apps:android:app")
 include(":apps:android:feature:auth")
 include(":apps:android:feature:home")
 include(":apps:android:feature:schedule")
 
+include(":apps:android:core:academic")
 include(":apps:android:core:common")
 include(":apps:android:core:database")
 include(":apps:android:core:designsystem")

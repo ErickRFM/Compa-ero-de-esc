@@ -25,14 +25,18 @@ android {
 dependencies {
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
+
     implementation(project(":shared:contracts"))
-    implementation(project(":apps:android:core:database"))
+    implementation(project(":apps:android:core:academic"))
+    implementation(project(":apps:android:core:common"))
     implementation(project(":apps:android:core:designsystem"))
+
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
+
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 

@@ -10,6 +10,7 @@ package org.companerodeescuela.core.navigation
  */
 sealed class Destination(val route: String) {
     data object Home : Destination("home")
+    data object Schedule : Destination("schedule")
     data object Profile : Destination("profile")
 
     /** Builds the route for a destination that takes an argument. */
@@ -29,5 +30,6 @@ enum class TopLevelDestination(
     val label: String,
 ) {
     Home(Destination.Home, "Inicio"),
+    Schedule(Destination.Schedule, "Horario"),
     Profile(Destination.Profile, "Perfil"),
 }

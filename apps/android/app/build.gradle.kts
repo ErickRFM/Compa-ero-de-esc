@@ -73,6 +73,7 @@ dependencies {
     implementation(project(":apps:android:core:security"))
     implementation(project(":apps:android:feature:auth"))
     implementation(project(":apps:android:feature:home"))
+    implementation(project(":apps:android:feature:schedule"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

@@ -23,6 +23,7 @@ import org.companerodeescuela.feature.auth.LoginScreen
 import org.companerodeescuela.feature.auth.SessionViewModel
 import org.companerodeescuela.feature.home.HomeScreen
 import org.companerodeescuela.feature.profile.ProfileScreen
+import org.companerodeescuela.feature.schedule.ScheduleScreen
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -58,6 +59,7 @@ class MainActivity : ComponentActivity() {
                         else -> {
                             CompaneroScaffold {
                                 composable(Destination.Home.route) { HomeScreen() }
+                                composable(Destination.Schedule.route) { ScheduleScreen() }
                                 composable(Destination.Profile.route) { ProfileScreen() }
                             }
                         }

@@ -11,6 +11,7 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 
@@ -48,6 +49,7 @@ fun CompaneroBottomBar(
                     Icon(
                         imageVector = when (topLevel) {
                             TopLevelDestination.Home -> Icons.Filled.Home
+                            TopLevelDestination.Schedule -> Icons.Filled.DateRange
                             TopLevelDestination.Profile -> Icons.Filled.Person
                         },
                         contentDescription = topLevel.label,

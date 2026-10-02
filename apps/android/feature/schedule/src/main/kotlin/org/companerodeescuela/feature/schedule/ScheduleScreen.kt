@@ -1,24 +1,40 @@
 package org.companerodeescuela.feature.schedule
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.time.LocalDate
+import org.companerodeescuela.core.ui.component.AcademicTimelineItem
+import org.companerodeescuela.core.ui.component.NoticeTone
+import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ScheduleEntry
+
+private enum class AgendaMode {
+    DAY,
+    WEEK,
+}
 
 @Composable
 fun ScheduleScreen(
@@ -27,7 +43,7 @@ fun ScheduleScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    if (state.loading) {
+    if (state.loading && state.entries.isEmpty()) {
         Column(
             modifier = modifier.fillMaxSize(),
             verticalArrangement = Arrangement.Center,
@@ -38,40 +54,168 @@ fun ScheduleScreen(
         return
     }
 
+    var mode by remember { mutableStateOf(AgendaMode.DAY) }
+    var selectedDay by remember { mutableStateOf(LocalDate.now().dayOfWeek.name) }
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Horario", style = MaterialTheme.typography.headlineMedium)
-        state.errorMessage?.let {
-            Text(it, color = MaterialTheme.colorScheme.error)
+        Text(
+            text = "Agenda",
+            style = MaterialTheme.typography.headlineMedium,
+        )
+        Text(
+            text = "Tu horario académico, disponible incluso cuando pierdes conexión.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+                selected = mode == AgendaMode.DAY,
+                onClick = { mode = AgendaMode.DAY },
+                label = { Text("Día") },
+            )
+            FilterChip(
+                selected = mode == AgendaMode.WEEK,
+                onClick = { mode = AgendaMode.WEEK },
+                label = { Text("Semana") },
+            )
         }
+
+        if (state.fromCache) {
+            StatusNotice(
+                title = "Agenda guardada",
+                message = "Estás viendo la última versión disponible en este dispositivo.",
+                tone = NoticeTone.WARNING,
+            )
+        }
+
+        state.errorMessage?.let {
+            StatusNotice(
+                title = "No pudimos actualizar la agenda",
+                message = it,
+                tone = NoticeTone.ERROR,
+            )
+            Button(onClick = viewModel::load) {
+                Text("Reintentar")
+            }
+        }
+
         if (state.entries.isEmpty() && state.errorMessage == null) {
-            Text("Aún no hay un horario guardado. Abre Inicio con conexión para sincronizarlo.")
+            StatusNotice(
+                title = "Horario pendiente",
+                message = "Todavía no recibimos un horario para tu cuenta.",
+            )
         } else {
-            state.entries.groupBy { it.dayOfWeek }.forEach { (day, entries) ->
-                Text(dayLabel(day), style = MaterialTheme.typography.titleLarge)
-                entries.forEach { ScheduleCard(it) }
+            when (mode) {
+                AgendaMode.DAY -> DayAgenda(
+                    entries = state.entries,
+                    selectedDay = selectedDay,
+                    onSelectedDay = { selectedDay = it },
+                )
+                AgendaMode.WEEK -> WeekAgenda(state.entries)
+            }
+        }
+
+        if (state.entries.isNotEmpty()) {
+            TextButton(
+                onClick = viewModel::load,
+                enabled = !state.loading,
+                modifier = Modifier.align(Alignment.End),
+            ) {
+                Text(if (state.loading) "Actualizando…" else "Actualizar")
             }
         }
     }
 }
 
 @Composable
-private fun ScheduleCard(entry: ScheduleEntry) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(entry.subjectName, style = MaterialTheme.typography.titleLarge)
-            Text(entry.startsAt + " – " + entry.endsAt)
-            Text((entry.classroomName ?: "Aula por confirmar") + " · " + entry.teacherName)
+private fun DayAgenda(
+    entries: List<ScheduleEntry>,
+    selectedDay: String,
+    onSelectedDay: (String) -> Unit,
+) {
+    val days = entries.map { it.dayOfWeek }.distinct()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        days.forEach { day ->
+            FilterChip(
+                selected = selectedDay == day,
+                onClick = { onSelectedDay(day) },
+                label = { Text(dayShortLabel(day)) },
+            )
         }
     }
+
+    val dayEntries = entries.filter { it.dayOfWeek == selectedDay }
+    if (dayEntries.isEmpty()) {
+        StatusNotice(
+            title = dayLabel(selectedDay),
+            message = "No tienes clases programadas este día.",
+        )
+    } else {
+        Text(
+            text = dayLabel(selectedDay),
+            style = MaterialTheme.typography.titleLarge,
+        )
+        dayEntries.forEach { entry ->
+            AcademicTimelineItem(
+                time = entry.startsAt,
+                title = entry.subjectName,
+                subtitle = locationAndTeacher(entry),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 5.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun WeekAgenda(entries: List<ScheduleEntry>) {
+    entries.groupBy { it.dayOfWeek }.forEach { (day, dayEntries) ->
+        Text(
+            text = dayLabel(day),
+            style = MaterialTheme.typography.titleLarge,
+        )
+        dayEntries.forEach { entry ->
+            AcademicTimelineItem(
+                time = entry.startsAt,
+                title = entry.subjectName,
+                subtitle = locationAndTeacher(entry),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 5.dp),
+            )
+        }
+    }
+}
+
+private fun locationAndTeacher(entry: ScheduleEntry): String {
+    val location = listOfNotNull(entry.classroomName, entry.buildingName)
+        .joinToString(" · ")
+        .ifBlank { "Aula por confirmar" }
+    return "$location · ${entry.teacherName}"
+}
+
+private fun dayShortLabel(day: String): String = when (day) {
+    "MONDAY" -> "Lun"
+    "TUESDAY" -> "Mar"
+    "WEDNESDAY" -> "Mié"
+    "THURSDAY" -> "Jue"
+    "FRIDAY" -> "Vie"
+    "SATURDAY" -> "Sáb"
+    "SUNDAY" -> "Dom"
+    else -> day.take(3)
 }
 
 private fun dayLabel(day: String): String = when (day) {

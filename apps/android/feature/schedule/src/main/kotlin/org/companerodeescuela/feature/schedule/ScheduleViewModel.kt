@@ -8,6 +8,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.companerodeescuela.core.academic.AcademicRepository
+import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.shared.contracts.ScheduleEntry
 
 data class ScheduleUiState(
@@ -18,7 +20,7 @@ data class ScheduleUiState(
 
 @HiltViewModel
 class ScheduleViewModel @Inject constructor(
-    private val repository: ScheduleRepository,
+    private val repository: AcademicRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ScheduleUiState())
     val state: StateFlow<ScheduleUiState> = _state.asStateFlow()
@@ -27,16 +29,19 @@ class ScheduleViewModel @Inject constructor(
 
     fun load() {
         viewModelScope.launch {
-            try {
-                _state.value = ScheduleUiState(
-                    loading = false,
-                    entries = repository.readWeeklySchedule(),
-                )
-            } catch (_: Exception) {
-                _state.value = ScheduleUiState(
-                    loading = false,
-                    errorMessage = "No pudimos abrir el horario guardado.",
-                )
+            when (val result = repository.readWeeklySchedule()) {
+                is Outcome.Success -> {
+                    _state.value = ScheduleUiState(
+                        loading = false,
+                        entries = WeeklySchedule.order(result.value),
+                    )
+                }
+                is Outcome.Failure -> {
+                    _state.value = ScheduleUiState(
+                        loading = false,
+                        errorMessage = result.error.userMessage,
+                    )
+                }
             }
         }
     }

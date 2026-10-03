@@ -17,16 +17,15 @@
         android:theme="@style/Theme.Companero"
         android:networkSecurityConfig="@xml/network_security_config">
 
+        <!--
+             WorkManager is initialized on demand by CompaneroApp through
+             Configuration.Provider + HiltWorkerFactory. This app has no other
+             AndroidX Startup initializer, so remove the provider entirely.
+        -->
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
-            android:exported="false"
-            tools:node="merge">
-            <meta-data
-                android:name="androidx.work.WorkManagerInitializer"
-                android:value="androidx.startup"
-                tools:node="remove" />
-        </provider>
+            tools:node="remove" />
 
         <activity
             android:name=".MainActivity"

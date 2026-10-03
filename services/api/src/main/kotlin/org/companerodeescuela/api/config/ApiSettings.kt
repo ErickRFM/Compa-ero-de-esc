@@ -124,10 +124,10 @@ class SettingsLoader(
         val portText = env("API_PORT")?.trim()
         val databaseName = env("MONGODB_DATABASE")?.trim().orEmpty()
         val mongoUri = env("MONGODB_URI")?.trim().orEmpty()
-        val jwtSecret = env("JWT_SECRET")
+        val jwtSecret = env("JWT_SECRET")?.takeIf { it.isNotBlank() }
         val jwtIssuer = env("JWT_ISSUER")?.trim().orEmpty().ifEmpty { DEFAULT_JWT_ISSUER }
         val jwtAudience = env("JWT_AUDIENCE")?.trim().orEmpty().ifEmpty { DEFAULT_JWT_AUDIENCE }
-        val attendanceQrSecret = env("ATTENDANCE_QR_SECRET")
+        val attendanceQrSecret = env("ATTENDANCE_QR_SECRET")?.takeIf { it.isNotBlank() }
 
         val results = listOf(
             Validators.port(ENV_API_PORT, portText),

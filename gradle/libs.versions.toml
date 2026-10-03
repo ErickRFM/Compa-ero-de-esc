@@ -19,6 +19,7 @@ androidxDataStore = "1.1.7"
 androidxRoom = "2.8.5"
 androidxWork = "2.11.0"
 androidxHiltNavigationCompose = "1.3.0"
+googleCodeScanner = "16.1.0"
 
 # DI
 hilt = "2.57.2"
@@ -75,6 +76,9 @@ hilt-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", v
 androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "androidxHiltNavigationCompose" }
 androidx-hilt-work = { group = "androidx.hilt", name = "hilt-work", version.ref = "androidxHiltNavigationCompose" }
 androidx-hilt-compiler = { group = "androidx.hilt", name = "hilt-compiler", version.ref = "androidxHiltNavigationCompose" }
+
+# --- Google Play services ---
+google-code-scanner = { group = "com.google.android.gms", name = "play-services-code-scanner", version.ref = "googleCodeScanner" }
 
 # --- Kotlin ecosystem ---
 kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }

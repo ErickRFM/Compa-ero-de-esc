@@ -27,8 +27,8 @@ fun AttendanceQrCode(
         QRCodeWriter().encode(
             token,
             BarcodeFormat.QR_CODE,
-            QR_SIZE,
-            QR_SIZE,
+            1,
+            1,
             mapOf(
                 EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M,
                 EncodeHintType.MARGIN to 2,
@@ -67,4 +67,3 @@ fun AttendanceQrCode(
     }
 }
 
-private const val QR_SIZE = 320

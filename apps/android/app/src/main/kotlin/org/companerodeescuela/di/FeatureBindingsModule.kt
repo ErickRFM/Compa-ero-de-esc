@@ -12,7 +12,6 @@ import org.companerodeescuela.core.attendance.AttendanceSyncScheduler
 import org.companerodeescuela.core.database.AcademicSnapshotCache
 import org.companerodeescuela.core.database.AttendanceLocalStore
 import org.companerodeescuela.core.security.SessionTokenStore
-import org.companerodeescuela.core.network.PlatformApiClient
 import org.companerodeescuela.feature.auth.AuthRepository
 
 @Module
@@ -22,7 +21,7 @@ object FeatureBindingsModule {
     @Provides
     @Singleton
     fun provideAuthRepository(
-        @PlatformApiClient client: HttpClient,
+        client: HttpClient,
         tokenStore: SessionTokenStore,
     ): AuthRepository = AuthRepository(
         client = client,

@@ -41,6 +41,7 @@ fun Application.module(
 
     val healthService = HealthService(settings = settings, mongoConnection = mongoConnection)
     val attendanceRepository = when {
+        !settings.hasAuthentication -> InMemoryAttendanceRepository()
         settings.mongo.isConfigured -> MongoAttendanceRepository(mongoConnection.database())
         settings.environment == Environment.LOCAL -> InMemoryAttendanceRepository()
         else -> error("Attendance requires MONGODB_URI outside local development")

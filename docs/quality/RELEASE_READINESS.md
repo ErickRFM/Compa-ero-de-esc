@@ -2,81 +2,111 @@
 
 ## Verdict
 
-**Not releasable to real students yet. Product-foundation candidate in progress.**
+**Internal product foundation is merged and reproducibly green. Real-student pilot remains blocked by external institutional integrations and physical acceptance evidence.**
 
-The repository now contains substantially more than the original foundation,
-but two external requirements still block a real pilot: real institutional
-providers and reproducible execution evidence for the current candidate.
+## Main baseline
 
-## Main
+`main@61a01cb29592a988f97700772674637eedeb843d`
 
-`main` contains the verified technical foundation.
+Merged product foundation includes:
 
-## Active candidate
-
-`feat/product-foundation-v2` currently contains:
-
-- platform authentication routes and JWT issuance;
+- platform authentication and short-lived JWT issuance;
 - encrypted Android access-token storage;
 - local expiry/subject inspection;
 - observable session invalidation;
-- student-scoped academic Room cache;
-- one academic repository for remote + offline reads;
+- student-scoped Room academic cache;
+- canonical remote/offline academic repository;
 - Hoy;
 - Agenda day/week modes;
-- profile and logout;
-- first reusable academic UX components.
+- profile/logout;
+- reusable academic UI components.
 
-## Current external blocker
+## Verified CI evidence
 
-GitHub Actions workflow runs are being created for the branch, but the latest
-runs remain `pending` with no jobs materialized. That is not a passing or
-failing build result and must not be represented as either.
+The merged candidate passed both required workflows before merge:
 
-Until Actions execute, the candidate requires an independent clean local build
-before merge/release.
+### API
 
-## Blocking items before pilot
+- compile backend/shared: PASS;
+- backend/shared tests: PASS;
+- test-execution verification: PASS;
+- runnable service assembly: PASS;
+- smoke test: PASS;
+- secret scan: PASS;
+- secret-scan self-test: PASS.
+
+### Android
+
+- compile Android sources: PASS;
+- Android unit tests: PASS;
+- test-execution verification: PASS;
+- lint: PASS;
+- lint errors: 0;
+- debug APK build: PASS;
+- minified release APK build: PASS;
+- release artifact validation: PASS;
+- secret scan: PASS.
+
+The Android suite executed 36 tests across 9 report suites with 0 failures and 0 errors in the product-foundation closure run.
+
+## Security / isolation evidence
+
+Automated tests cover:
+
+- expired access token returning to authentication;
+- 401 session invalidation;
+- cache ownership isolation between students;
+- remote academic response ownership matching the JWT subject;
+- offline fallback only for the authenticated student;
+- no institutional password persistence in the Android session store.
+
+## Internal hardening in progress
+
+Login abuse controls are being landed directly on top of main:
+
+- bounded attempt window;
+- normalized username + source-address bucket;
+- Retry-After on 429;
+- successful-login reset;
+- deterministic limiter tests.
+
+This protects a first single-instance pilot API. A multi-replica deployment requires a shared limiter or gateway enforcement.
+
+## External blockers before real-student pilot
 
 | Area | Status |
 |---|---|
 | Real IdentityProvider | BLOCKED externally / not configured |
 | Real AcademicProvider | BLOCKED externally / not configured |
-| Candidate clean build | REQUIRED |
-| Candidate Android unit tests | REQUIRED |
-| Candidate API tests | REQUIRED |
-| Candidate lint | REQUIRED |
-| Compose UI tests | Not yet implemented |
-| Accessibility audit | Not yet performed on candidate UX |
-| Rate limiting | Still required before public auth exposure |
-| Signing/versioning | Internal release work remains |
-| Privacy/legal review | Required before real student pilot |
+| Real school test accounts | BLOCKED externally |
+| Compose device/UI acceptance | REQUIRED |
+| Accessibility physical audit | REQUIRED |
+| Internal signing/version policy | REQUIRED before distribution |
+| Privacy/legal review | REQUIRED before real-student pilot |
+| Rate limiting | CODED / merging after product-foundation squash |
+| Attendance | NEXT PRODUCT PHASE |
+| Dynamic QR | LATER, after attendance correctness |
 
-## Candidate acceptance scenarios
+## M1 acceptance status
 
-The candidate should not merge as pilot-ready until all of these are
-demonstrated:
+| Scenario | Automated / build evidence | Physical / external evidence |
+|---|---|---|
+| valid login survives process restart while token remains valid | PASS | physical confirmation pending |
+| expiry returns to login | PASS | physical confirmation pending |
+| 401 clears platform session | PASS | physical confirmation pending |
+| student A cannot expose student B cache | PASS | — |
+| Hoy works remote + same-student cache | PASS | real provider pending |
+| Agenda refresh/fallback independently | PASS | real provider pending |
+| logout returns to authentication | PASS | physical confirmation pending |
+| institutional password is not persisted | PASS | — |
+| real timetable on real school account | — | BLOCKED by provider integration |
 
-1. valid login survives process restart while the token is valid;
-2. expiry transitions back to login;
-3. a 401 clears the local platform session;
-4. student A cannot expose cached data to student B;
-5. Hoy works from remote data and from the same student's cache;
-6. Agenda can be opened first and performs its own refresh/fallback;
-7. logout returns to authentication;
-8. no institutional password is persisted.
+## Release classification
 
-## Release evidence format
+Current classification:
 
-For the merge/release record capture:
+`INTERNAL_FOUNDATION_READY / PILOT_BLOCKED_EXTERNALLY`
 
-- exact HEAD SHA;
-- clean build command and result;
-- test suites / executed / failed / skipped counts;
-- lint errors/warnings;
-- debug/release artifact result;
-- API smoke result;
-- Git status/diff cleanliness;
-- known external blockers.
+Do not label the app production-ready for real students until the real institutional providers and physical pilot acceptance are complete.
 
-See [Master Plan](../product/MASTER_PLAN.md).
+See [Master Plan](../product/MASTER_PLAN.md) and [Execution Plan](../product/EXECUTION_PLAN.md).

@@ -53,6 +53,11 @@ interface AttendanceLocalStore {
 
     suspend fun markAuthRequired(operationId: String)
 
+    suspend fun markRejected(
+        operationId: String,
+        reasonCode: AttendanceReasonCode,
+    )
+
     suspend fun markSynced(
         operationId: String,
         response: AttendanceRecordResponse,
@@ -141,6 +146,22 @@ internal class RoomAttendanceLocalStore(
                 updatedAtEpochSeconds = clock.instant().epochSecond,
             ),
         )
+    }
+
+    override suspend fun markRejected(
+        operationId: String,
+        reasonCode: AttendanceReasonCode,
+    ) {
+        val existing = dao.findLocal(operationId) ?: return
+        dao.upsertLocal(
+            existing.copy(
+                syncState = LocalAttendanceSyncState.REJECTED.name,
+                attendanceStatus = AttendanceStatus.REJECTED.name,
+                reasonCode = reasonCode.name,
+                updatedAtEpochSeconds = clock.instant().epochSecond,
+            ),
+        )
+        dao.deleteOutbox(operationId)
     }
 
     override suspend fun markSynced(

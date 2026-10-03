@@ -7,13 +7,7 @@ import dagger.hilt.components.SingletonComponent
 import io.ktor.client.HttpClient
 import org.companerodeescuela.core.network.ApiEnvironment
 import org.companerodeescuela.core.network.createApiClient
-import javax.inject.Qualifier
 import javax.inject.Singleton
-
-/** Distinguishes the API client from any other [HttpClient] in the graph. */
-@Qualifier
-@Retention(AnnotationRetention.BINARY)
-annotation class ApiClient
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -33,7 +27,6 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    @ApiClient
     fun provideApiClient(environment: ApiEnvironment): HttpClient =
         createApiClient(environment)
 }

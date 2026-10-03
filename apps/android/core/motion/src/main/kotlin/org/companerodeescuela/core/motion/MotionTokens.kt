@@ -32,7 +32,7 @@ object CompaneroMotion {
 
     fun <T> snappySpring(): SpringSpec<T> = spring(
         dampingRatio = 0.88f,
-        stiffness = Spring.StiffnessMediumHigh,
+        stiffness = Spring.StiffnessHigh,
     )
 
     fun <T> standardSpring(): SpringSpec<T> = spring(

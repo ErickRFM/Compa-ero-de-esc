@@ -37,6 +37,10 @@ Teacher:
 
 These fixtures are rejected outside local development by the existing mock-provider production guard.
 
+## Local QR setup
+
+Set a local-only `ATTENDANCE_QR_SECRET` with at least 32 characters before running the teacher QR flow. Do not reuse `JWT_SECRET`.
+
 ## Teacher acceptance
 
 1. Sign in as the teacher.

@@ -32,7 +32,7 @@ interface AttendanceSyncEnqueuer {
 @Singleton
 class AttendanceSyncScheduler @Inject constructor(
     @ApplicationContext context: Context,
-) {
+) : AttendanceSyncEnqueuer {
     private val workManager = WorkManager.getInstance(context)
 
     override fun schedule() {

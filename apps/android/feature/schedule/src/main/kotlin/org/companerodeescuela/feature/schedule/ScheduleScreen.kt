@@ -1,5 +1,12 @@
 package org.companerodeescuela.feature.schedule
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -26,7 +33,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.LocalDate
+import org.companerodeescuela.core.motion.CompaneroMotionDuration
+import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 import org.companerodeescuela.core.ui.component.AcademicTimelineItem
+import org.companerodeescuela.core.ui.component.ExpressiveSegmentedControl
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ScheduleEntry
@@ -74,18 +84,13 @@ fun ScheduleScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
-                selected = mode == AgendaMode.DAY,
-                onClick = { mode = AgendaMode.DAY },
-                label = { Text("Día") },
-            )
-            FilterChip(
-                selected = mode == AgendaMode.WEEK,
-                onClick = { mode = AgendaMode.WEEK },
-                label = { Text("Semana") },
-            )
-        }
+        ExpressiveSegmentedControl(
+            options = listOf("Día", "Semana"),
+            selectedIndex = if (mode == AgendaMode.DAY) 0 else 1,
+            onSelected = { index ->
+                mode = if (index == 0) AgendaMode.DAY else AgendaMode.WEEK
+            },
+        )
 
         if (state.fromCache) {
             StatusNotice(
@@ -112,13 +117,39 @@ fun ScheduleScreen(
                 message = "Todavía no recibimos un horario para tu cuenta.",
             )
         } else {
-            when (mode) {
-                AgendaMode.DAY -> DayAgenda(
-                    entries = state.entries,
-                    selectedDay = selectedDay,
-                    onSelectedDay = { selectedDay = it },
-                )
-                AgendaMode.WEEK -> WeekAgenda(state.entries)
+            val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
+            AnimatedContent(
+                targetState = mode,
+                transitionSpec = {
+                    val duration = if (reducedMotion) {
+                        CompaneroMotionDuration.FAST
+                    } else {
+                        CompaneroMotionDuration.STANDARD
+                    }
+                    val enter = fadeIn(tween(duration)) +
+                        if (reducedMotion) {
+                            slideInHorizontally(tween(0)) { 0 }
+                        } else {
+                            slideInHorizontally(tween(duration)) { it / 8 }
+                        }
+                    val exit = fadeOut(tween(duration)) +
+                        if (reducedMotion) {
+                            slideOutHorizontally(tween(0)) { 0 }
+                        } else {
+                            slideOutHorizontally(tween(duration)) { -it / 8 }
+                        }
+                    enter.togetherWith(exit)
+                },
+                label = "agendaMode",
+            ) { currentMode ->
+                when (currentMode) {
+                    AgendaMode.DAY -> DayAgenda(
+                        entries = state.entries,
+                        selectedDay = selectedDay,
+                        onSelectedDay = { selectedDay = it },
+                    )
+                    AgendaMode.WEEK -> WeekAgenda(state.entries)
+                }
             }
         }
 

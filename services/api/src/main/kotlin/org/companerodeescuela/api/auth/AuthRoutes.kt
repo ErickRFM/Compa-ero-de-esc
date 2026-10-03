@@ -1,10 +1,12 @@
 package org.companerodeescuela.api.auth
 
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
+import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -26,6 +28,7 @@ import org.companerodeescuela.shared.contracts.LoginRequest
 fun Route.authRoutes(
     settings: ApiSettings,
     identityProvider: IdentityProvider,
+    loginAttemptLimiter: LoginAttemptLimiter = LoginAttemptLimiter(),
 ) {
     val tokenService = settings.jwtSecret?.let { AuthTokenService(settings) }
 
@@ -41,10 +44,19 @@ fun Route.authRoutes(
                     throw ApiException.Validation("Invalid login request")
                 }
 
+            val clientAddress = call.request.local.remoteAddress
+            loginAttemptLimiter.acquire(request.username, clientAddress)?.let { retryAfter ->
+                call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
+                throw ApiException.RateLimited()
+            }
+
+            val result = service.login(request)
+            loginAttemptLimiter.reset(request.username, clientAddress)
+
             call.respond(
                 status = HttpStatusCode.OK,
                 message = ApiResponse(
-                    data = service.login(request),
+                    data = result,
                     requestId = call.requestId(),
                 ),
             )

@@ -58,6 +58,14 @@ sealed class ApiException(
         userMessage = message,
     )
 
+    class RateLimited(
+        message: String = "Too many authentication attempts",
+    ) : ApiException(
+        httpStatus = HttpStatusCode.TooManyRequests,
+        errorCode = ApiErrorCode.RATE_LIMITED,
+        userMessage = message,
+    )
+
     /**
      * A dependency the request needs is unreachable. The client may retry, so
      * this maps to 503 rather than 500.

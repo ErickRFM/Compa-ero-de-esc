@@ -101,6 +101,18 @@ class SettingsLoaderTest {
     }
 
     @Test
+    @DisplayName("Blank JWT_SECRET is treated as unconfigured in local development")
+    fun blankSecretIsNull() {
+        val settings = loader(
+            "API_PORT" to "8080",
+            "MONGODB_DATABASE" to "c",
+            "JWT_SECRET" to "   ",
+        ).load()
+        assertNull(settings.jwtSecret)
+        assertFalse(settings.hasAuthentication)
+    }
+
+    @Test
     @DisplayName("Absent JWT_SECRET yields null rather than an empty array")
     fun absentSecretIsNull() {
         val settings = loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c").load()

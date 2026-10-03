@@ -101,6 +101,35 @@ class SettingsLoaderTest {
     }
 
     @Test
+    @DisplayName("QR signing secret is optional, validated, and never logged")
+    fun attendanceQrSecretIsProtected() {
+        val secret = "q".repeat(48)
+        val settings = loader(
+            "API_PORT" to "8080",
+            "MONGODB_DATABASE" to "c",
+            "ATTENDANCE_QR_SECRET" to secret,
+        ).load()
+
+        assertTrue(settings.hasAttendanceQrSigning)
+        assertEquals(secret, settings.attendanceQrSecret?.concatToString())
+        assertFalse(settings.toString().contains(secret))
+        assertContains(settings.toString(), "attendanceQrSigningConfigured=true")
+    }
+
+    @Test
+    @DisplayName("Short QR signing secret is rejected")
+    fun rejectsShortAttendanceQrSecret() {
+        val error = assertFailsWith<ConfigurationException> {
+            loader(
+                "API_PORT" to "8080",
+                "MONGODB_DATABASE" to "c",
+                "ATTENDANCE_QR_SECRET" to "too-short",
+            ).load()
+        }
+        assertContains(error.message!!, "ATTENDANCE_QR_SECRET")
+    }
+
+    @Test
     @DisplayName("Absent JWT_SECRET yields null rather than an empty array")
     fun absentSecretIsNull() {
         val settings = loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c").load()

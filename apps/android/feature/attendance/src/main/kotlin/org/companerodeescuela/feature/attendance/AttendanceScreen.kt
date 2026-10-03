@@ -651,27 +651,19 @@ private fun UnsupportedAttendance(
 
 private fun localStatusLabel(
     record: LocalAttendanceRecord,
-): Pair<String, NoticeTone> = when (record.syncState) {
-    LocalAttendanceSyncState.PENDING ->
+): Pair<String, NoticeTone> = when (attendanceClientVerdict(record)) {
+    AttendanceClientVerdict.PENDING ->
         "Pendiente de sincronizar" to NoticeTone.WARNING
-    LocalAttendanceSyncState.AUTH_REQUIRED ->
+    AttendanceClientVerdict.AUTH_REQUIRED ->
         "Guardado · requiere sesión" to NoticeTone.WARNING
-    LocalAttendanceSyncState.REVIEW_REQUIRED ->
+    AttendanceClientVerdict.SERVER_RECEIVED ->
+        "Recibida por el servidor" to NoticeTone.SUCCESS
+    AttendanceClientVerdict.SERVER_VERIFIED ->
+        "Verificada por el servidor" to NoticeTone.SUCCESS
+    AttendanceClientVerdict.REVIEW_REQUIRED ->
         "En revisión por el docente" to NoticeTone.WARNING
-    LocalAttendanceSyncState.REJECTED ->
-        "Rechazado por el servidor" to NoticeTone.ERROR
-    LocalAttendanceSyncState.SYNCED -> when (record.attendanceStatus) {
-        AttendanceStatus.VERIFIED ->
-            "Verificada por el servidor" to NoticeTone.SUCCESS
-        AttendanceStatus.LIKELY ->
-            "Recibida por el servidor" to NoticeTone.SUCCESS
-        AttendanceStatus.REVIEW_REQUIRED ->
-            "En revisión por el docente" to NoticeTone.WARNING
-        AttendanceStatus.REJECTED ->
-            "Rechazada por el servidor" to NoticeTone.ERROR
-        null ->
-            "Sincronizada" to NoticeTone.SUCCESS
-    }
+    AttendanceClientVerdict.SERVER_REJECTED ->
+        "Rechazada por el servidor" to NoticeTone.ERROR
 }
 
 private fun attendanceStatusLabel(status: AttendanceStatus): String = when (status) {

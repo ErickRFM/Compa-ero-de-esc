@@ -91,14 +91,13 @@ class AttendanceQrService(
             return QrEvidenceResult.Invalid
         }
 
-        val sessionId = decodeText(parts[1]) ?: return QrEvidenceResult.Invalid
-        if (sessionId != expectedSessionId) {
-            return QrEvidenceResult.WrongSession
-        }
-
         val issuedAt = parts[3].toLongOrNull() ?: return QrEvidenceResult.Invalid
         val expiresAt = parts[4].toLongOrNull() ?: return QrEvidenceResult.Invalid
-        if (expiresAt <= issuedAt || expiresAt - issuedAt > TOKEN_TTL.seconds) {
+        if (
+            expiresAt <= issuedAt ||
+            expiresAt - issuedAt > TOKEN_TTL.seconds ||
+            issuedAt > receivedAtEpochSeconds + MAX_CLOCK_SKEW_SECONDS
+        ) {
             return QrEvidenceResult.Invalid
         }
 
@@ -107,6 +106,11 @@ class AttendanceQrService(
             ?: return QrEvidenceResult.Invalid
         if (!MessageDigest.isEqual(sign(prefix), supplied)) {
             return QrEvidenceResult.Invalid
+        }
+
+        val sessionId = decodeText(parts[1]) ?: return QrEvidenceResult.Invalid
+        if (sessionId != expectedSessionId) {
+            return QrEvidenceResult.WrongSession
         }
 
         return if (receivedAtEpochSeconds > expiresAt) {
@@ -136,6 +140,7 @@ class AttendanceQrService(
         private const val HMAC_ALGORITHM = "HmacSHA256"
         private const val NONCE_BYTES = 16
         private const val TOKEN_PARTS = 6
+        private const val MAX_CLOCK_SKEW_SECONDS = 5L
         private val TOKEN_TTL: Duration = Duration.ofSeconds(25)
         private val ROTATE_AFTER: Duration = Duration.ofSeconds(15)
         private val encoder: Base64.Encoder = Base64.getUrlEncoder().withoutPadding()

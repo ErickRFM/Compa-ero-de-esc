@@ -15,7 +15,7 @@ class AttendanceRepository(
     private val tokenStore: SessionTokenStore,
     private val localStore: AttendanceLocalStore,
     private val scheduler: AttendanceSyncEnqueuer,
-    private val remoteClient: AttendanceRemoteClient,
+    private val remoteClient: AttendanceSessionSource,
     private val clock: Clock = Clock.systemUTC(),
     private val newOperationId: () -> String = { UUID.randomUUID().toString() },
 ) {

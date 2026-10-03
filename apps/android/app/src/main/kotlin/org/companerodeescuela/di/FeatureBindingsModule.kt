@@ -9,6 +9,7 @@ import javax.inject.Singleton
 import org.companerodeescuela.core.academic.AcademicRepository
 import org.companerodeescuela.core.database.AcademicSnapshotCache
 import org.companerodeescuela.core.security.SessionTokenStore
+import org.companerodeescuela.core.network.PlatformApiClient
 import org.companerodeescuela.feature.auth.AuthRepository
 
 @Module
@@ -18,7 +19,7 @@ object FeatureBindingsModule {
     @Provides
     @Singleton
     fun provideAuthRepository(
-        @ApiClient client: HttpClient,
+        @PlatformApiClient client: HttpClient,
         tokenStore: SessionTokenStore,
     ): AuthRepository = AuthRepository(
         client = client,
@@ -28,7 +29,7 @@ object FeatureBindingsModule {
     @Provides
     @Singleton
     fun provideAcademicRepository(
-        @ApiClient client: HttpClient,
+        @PlatformApiClient client: HttpClient,
         tokenStore: SessionTokenStore,
         cache: AcademicSnapshotCache,
     ): AcademicRepository = AcademicRepository(

@@ -11,6 +11,8 @@ import org.companerodeescuela.core.database.AcademicSnapshotCache
 import org.companerodeescuela.core.database.AcademicSnapshotCacheFactory
 import org.companerodeescuela.core.database.CompaneroDatabase
 import org.companerodeescuela.core.database.CompaneroDatabaseFactory
+import org.companerodeescuela.core.database.AttendanceLocalStore
+import org.companerodeescuela.core.database.AttendanceLocalStoreFactory
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -21,6 +23,12 @@ object DatabaseModule {
     fun provideDatabase(
         @ApplicationContext context: Context,
     ): CompaneroDatabase = CompaneroDatabaseFactory.create(context)
+
+    @Provides
+    @Singleton
+    fun provideAttendanceLocalStore(
+        database: CompaneroDatabase,
+    ): AttendanceLocalStore = AttendanceLocalStoreFactory.create(database)
 
     @Provides
     @Singleton

@@ -32,6 +32,7 @@ dependencies {
     val composeBom = platform(libs.androidx.compose.bom)
     api(composeBom)
     api(project(":apps:android:core:designsystem"))
+    api(project(":apps:android:core:motion"))
     api(project(":apps:android:core:common"))
 
     testImplementation(libs.junit.jupiter)

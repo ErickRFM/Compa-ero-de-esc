@@ -51,9 +51,13 @@ data class ApiSettings(
     val jwtSecret: CharArray?,
     val jwtIssuer: String,
     val jwtAudience: String,
+    val attendanceQrSecret: CharArray? = null,
 ) {
     val hasAuthentication: Boolean
         get() = jwtSecret != null
+
+    val hasAttendanceQrSigning: Boolean
+        get() = attendanceQrSecret != null
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -67,7 +71,8 @@ data class ApiSettings(
             mongo == other.mongo &&
             jwtIssuer == other.jwtIssuer &&
             jwtAudience == other.jwtAudience &&
-            hasAuthentication == other.hasAuthentication
+            hasAuthentication == other.hasAuthentication &&
+            hasAttendanceQrSigning == other.hasAttendanceQrSigning
     }
 
     override fun hashCode(): Int {
@@ -81,6 +86,7 @@ data class ApiSettings(
         result = 31 * result + jwtIssuer.hashCode()
         result = 31 * result + jwtAudience.hashCode()
         result = 31 * result + hasAuthentication.hashCode()
+        result = 31 * result + hasAttendanceQrSigning.hashCode()
         return result
     }
 
@@ -97,7 +103,8 @@ data class ApiSettings(
             "apiVersion=$apiVersion, " +
             "mongoConfigured=${mongo.isConfigured}, " +
             "mongoDatabase=${mongo.databaseName}, " +
-            "authenticationConfigured=$hasAuthentication" +
+            "authenticationConfigured=$hasAuthentication, " +
+            "attendanceQrSigningConfigured=$hasAttendanceQrSigning" +
             ")"
 }
 
@@ -117,9 +124,10 @@ class SettingsLoader(
         val portText = env("API_PORT")?.trim()
         val databaseName = env("MONGODB_DATABASE")?.trim().orEmpty()
         val mongoUri = env("MONGODB_URI")?.trim().orEmpty()
-        val jwtSecret = env("JWT_SECRET")
+        val jwtSecret = env("JWT_SECRET")?.takeIf { it.isNotBlank() }
         val jwtIssuer = env("JWT_ISSUER")?.trim().orEmpty().ifEmpty { DEFAULT_JWT_ISSUER }
         val jwtAudience = env("JWT_AUDIENCE")?.trim().orEmpty().ifEmpty { DEFAULT_JWT_AUDIENCE }
+        val attendanceQrSecret = env("ATTENDANCE_QR_SECRET")?.takeIf { it.isNotBlank() }
 
         val results = listOf(
             Validators.port(ENV_API_PORT, portText),
@@ -134,6 +142,7 @@ class SettingsLoader(
         }
 
         validateSecret(environment, jwtSecret)
+        validateOptionalSecret("ATTENDANCE_QR_SECRET", attendanceQrSecret)
 
         return ApiSettings(
             serviceName = DEFAULT_SERVICE_NAME,
@@ -157,7 +166,14 @@ class SettingsLoader(
             jwtSecret = jwtSecret?.toCharArray(),
             jwtIssuer = jwtIssuer,
             jwtAudience = jwtAudience,
+            attendanceQrSecret = attendanceQrSecret?.toCharArray(),
         )
+    }
+
+    private fun validateOptionalSecret(name: String, secret: String?) {
+        if (!secret.isNullOrBlank() && secret.length < MIN_SECRET_LENGTH) {
+            throw ConfigurationException("$name must be at least $MIN_SECRET_LENGTH characters long")
+        }
     }
 
     private fun validateSecret(environment: Environment, jwtSecret: String?) {

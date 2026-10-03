@@ -25,13 +25,17 @@ import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.shared.contracts.ApiErrorCode
 import org.companerodeescuela.shared.contracts.AttendanceReasonCode
 
+interface AttendanceSyncEnqueuer {
+    fun schedule()
+}
+
 @Singleton
 class AttendanceSyncScheduler @Inject constructor(
     @ApplicationContext context: Context,
 ) {
     private val workManager = WorkManager.getInstance(context)
 
-    fun schedule() {
+    override fun schedule() {
         val request = OneTimeWorkRequestBuilder<AttendanceSyncWorker>()
             .setConstraints(
                 Constraints.Builder()

@@ -64,6 +64,7 @@ dependencies {
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
 
+    implementation(project(":shared:contracts"))
     implementation(project(":apps:android:core:academic"))
     implementation(project(":apps:android:core:attendance"))
     implementation(project(":apps:android:core:common"))

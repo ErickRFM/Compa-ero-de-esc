@@ -82,6 +82,16 @@ class AttendanceService(
         }
     }
 
+    suspend fun activeForTeacher(teacherId: String): List<AttendanceSessionResponse> {
+        val now = clock.instant().epochSecond
+        return repository.findOpenSessions()
+            .filter { session ->
+                session.openedBy == teacherId &&
+                    session.closesAtEpochSeconds > now
+            }
+            .sortedBy { it.closesAtEpochSeconds }
+    }
+
     suspend fun activeFor(studentId: String): List<AttendanceSessionResponse> {
         val load = academicLoad(studentId)
         val enrolled = load.enrollments

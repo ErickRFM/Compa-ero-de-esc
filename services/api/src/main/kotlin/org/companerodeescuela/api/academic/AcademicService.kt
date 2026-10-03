@@ -1,9 +1,6 @@
 package org.companerodeescuela.api.academic
 
-import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
 import java.time.LocalDate
-import java.time.temporal.TemporalAdjusters
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.integrations.IntegrationException
 import org.companerodeescuela.api.integrations.academic.AcademicProvider
@@ -15,7 +12,6 @@ import org.companerodeescuela.shared.contracts.AcademicWeekResponse
 import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
 import org.companerodeescuela.shared.contracts.ClassOccurrenceStatusContract
 import org.companerodeescuela.shared.contracts.ScheduleEntry
-import org.companerodeescuela.shared.model.AcademicId
 import org.companerodeescuela.shared.model.ClassOccurrence
 import org.companerodeescuela.shared.model.ClassOccurrenceStatus
 import org.companerodeescuela.shared.model.PersonId
@@ -89,33 +85,8 @@ class AcademicService(
                 slots = load.schedule,
                 coursesById = coursesById,
             )
-            val weekStart = weekOf.with(TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
-            val occurrences = schedule.slots
-                .map { slot ->
-                    val date = weekStart.plusDays((slot.dayOfWeek.value - 1).toLong())
-                    val patternId = AcademicId(
-                        stableId(
-                            "pattern",
-                            slot.group.course.id.value,
-                            slot.group.name,
-                            slot.dayOfWeek.name,
-                            slot.startsAt.toString(),
-                            slot.endsAt.toString(),
-                        ),
-                    )
-                    ClassOccurrence(
-                        id = AcademicId(stableId("occurrence", patternId.value, date.toString())),
-                        patternId = patternId,
-                        group = slot.group,
-                        date = date,
-                        startsAt = slot.startsAt,
-                        endsAt = slot.endsAt,
-                        classroom = slot.classroom,
-                        teacher = slot.group.course.teacher,
-                        status = ClassOccurrenceStatus.SCHEDULED,
-                    )
-                }
-                .sortedWith(compareBy({ it.date }, { it.startsAt }))
+            val weekStart = AcademicOccurrenceProjection.weekStart(weekOf)
+            val occurrences = AcademicOccurrenceProjection.project(schedule, weekOf)
 
             AcademicWeekResponse(
                 ownerId = externalId,
@@ -147,13 +118,6 @@ class AcademicService(
             buildingName = occurrence.classroom?.building?.name,
             campusName = occurrence.classroom?.building?.campus?.name,
         )
-
-    private fun stableId(vararg parts: String): String {
-        val input = parts.joinToString("|")
-        val bytes = MessageDigest.getInstance("SHA-256")
-            .digest(input.toByteArray(StandardCharsets.UTF_8))
-        return bytes.take(16).joinToString("") { byte -> "%02x".format(byte) }
-    }
 
     private suspend fun <T> translateIntegrationFailure(block: suspend () -> T): T =
         try {

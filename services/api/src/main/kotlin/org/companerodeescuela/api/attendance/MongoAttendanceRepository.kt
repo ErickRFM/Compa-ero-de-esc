@@ -41,11 +41,11 @@ class MongoAttendanceRepository(
         return try {
             sessions.insertOne(session.toDocument())
             SessionWriteResult.Created(session)
-        } catch (_: MongoWriteException) {
+        } catch (error: MongoWriteException) {
             val existing = sessions.find(eq("occurrenceId", session.occurrenceId))
                 .firstOrNull()
                 ?.toSession()
-                ?: throw
+                ?: throw error
             SessionWriteResult.Existing(existing)
         }
     }
@@ -67,7 +67,7 @@ class MongoAttendanceRepository(
         return sessions
             .find(eq("status", AttendanceSessionStatus.OPEN.name))
             .toList()
-            .map(Document::toSession)
+            .map { it.toSession() }
     }
 
     override suspend fun replaceSession(session: AttendanceSessionResponse) {
@@ -104,14 +104,14 @@ class MongoAttendanceRepository(
         return try {
             records.insertOne(record.toDocument())
             AttemptWriteResult.Created(record)
-        } catch (_: MongoWriteException) {
+        } catch (error: MongoWriteException) {
             val afterRace = records.find(eq("_id", record.id))
                 .firstOrNull()
                 ?.toRecord()
                 ?: records.find(eq("operationId", record.operationId))
                     .firstOrNull()
                     ?.toRecord()
-                ?: throw
+                ?: throw error
 
             if (
                 afterRace.sessionId == record.sessionId &&
@@ -126,7 +126,7 @@ class MongoAttendanceRepository(
 
     override suspend fun recordsForSession(sessionId: String): List<AttendanceRecordResponse> {
         ensureIndexes()
-        return records.find(eq("sessionId", sessionId)).toList().map(Document::toRecord)
+        return records.find(eq("sessionId", sessionId)).toList().map { it.toRecord() }
     }
 
     override suspend fun replaceRecord(record: AttendanceRecordResponse) {

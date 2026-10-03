@@ -104,6 +104,8 @@ class SessionViewModel @Inject constructor(
                         checking = false,
                         authenticated = false,
                         submitting = false,
+                        displayName = null,
+                        roles = emptySet(),
                         errorMessage = result.error.userMessage,
                     )
                 }

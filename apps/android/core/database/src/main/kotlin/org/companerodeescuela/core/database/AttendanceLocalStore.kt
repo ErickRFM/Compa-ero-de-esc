@@ -186,7 +186,7 @@ internal class RoomAttendanceLocalStore(
         dao.findLocal(operationId)?.toDomain()
 
     override fun observe(ownerId: String): Flow<List<LocalAttendanceRecord>> =
-        dao.observeLocal(ownerId).map { rows -> rows.map(AttendanceLocalRecordEntity::toDomain) }
+        dao.observeLocal(ownerId).map { rows -> rows.map { it.toDomain() } }
 
     override suspend fun clearOwner(ownerId: String) {
         dao.clearOutbox(ownerId)

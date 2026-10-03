@@ -43,7 +43,7 @@ object FeatureBindingsModule {
     @Provides
     @Singleton
     fun provideAcademicRepository(
-        @PlatformApiClient client: HttpClient,
+        client: HttpClient,
         tokenStore: SessionTokenStore,
         cache: AcademicSnapshotCache,
     ): AcademicRepository = AcademicRepository(

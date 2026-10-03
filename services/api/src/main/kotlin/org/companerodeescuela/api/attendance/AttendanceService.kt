@@ -110,10 +110,19 @@ class AttendanceService(
         val session = repository.findSession(sessionId)
             ?: throw ApiException.NotFound("Attendance session was not found")
         val now = clock.instant()
-        if (
-            session.status != AttendanceSessionStatus.OPEN ||
-            session.closesAtEpochSeconds <= now.epochSecond
-        ) {
+        val effectiveClose = session.closedAtEpochSeconds ?: session.closesAtEpochSeconds
+        val currentlyOpen =
+            session.status == AttendanceSessionStatus.OPEN &&
+                session.closesAtEpochSeconds > now.epochSecond
+        val attemptWasInsideWindow =
+            request.deviceTimestampEpochSeconds >= session.openedAtEpochSeconds &&
+                request.deviceTimestampEpochSeconds <= effectiveClose
+        val lateSyncEligible =
+            !currentlyOpen &&
+                attemptWasInsideWindow &&
+                now.epochSecond <= effectiveClose + LATE_SYNC_REVIEW_WINDOW_SECONDS
+
+        if (!currentlyOpen && !lateSyncEligible) {
             throw ApiException.Domain(
                 status = HttpStatusCode.Conflict,
                 code = ApiErrorCode.ATTENDANCE_SESSION_CLOSED,
@@ -140,8 +149,16 @@ class AttendanceService(
             sessionId = session.id,
             occurrenceId = session.occurrenceId,
             studentId = studentId,
-            status = AttendanceStatus.LIKELY,
-            reasonCode = AttendanceReasonCode.IDENTITY_SESSION_TIME,
+            status = if (lateSyncEligible) {
+                AttendanceStatus.REVIEW_REQUIRED
+            } else {
+                AttendanceStatus.LIKELY
+            },
+            reasonCode = if (lateSyncEligible) {
+                AttendanceReasonCode.OFFLINE_LATE_SYNC
+            } else {
+                AttendanceReasonCode.IDENTITY_SESSION_TIME
+            },
             attemptedAtEpochSeconds = request.deviceTimestampEpochSeconds,
             receivedAtEpochSeconds = now.epochSecond,
         )
@@ -252,5 +269,6 @@ class AttendanceService(
         const val MIN_DURATION_MINUTES = 1
         const val MAX_DURATION_MINUTES = 15
         const val MAX_OPERATION_ID_LENGTH = 128
+        const val LATE_SYNC_REVIEW_WINDOW_SECONDS = 24L * 60L * 60L
     }
 }

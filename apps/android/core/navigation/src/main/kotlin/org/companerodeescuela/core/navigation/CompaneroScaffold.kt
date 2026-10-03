@@ -29,12 +29,18 @@ fun CompaneroScaffold(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
     val onProfile = currentDestination?.route == Destination.Profile.route
+    val title = when (currentDestination?.route) {
+        Destination.Schedule.route -> "Agenda"
+        Destination.Attendance.route -> "Asistencia"
+        Destination.Profile.route -> "Perfil"
+        else -> "Compañero"
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(if (onProfile) "Perfil" else "Compañero")
+                    Text(title)
                 },
                 navigationIcon = {
                     if (onProfile) {

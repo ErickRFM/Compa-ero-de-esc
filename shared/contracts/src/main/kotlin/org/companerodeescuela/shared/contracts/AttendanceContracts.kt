@@ -52,6 +52,15 @@ enum class AttendanceReasonCode {
 
     @SerialName("wrong_session")
     WRONG_SESSION,
+
+    @SerialName("qr_valid")
+    QR_VALID,
+
+    @SerialName("qr_expired")
+    QR_EXPIRED,
+
+    @SerialName("qr_invalid")
+    QR_INVALID,
 }
 
 @Serializable
@@ -81,6 +90,15 @@ data class AttendanceSessionResponse(
 data class AttendanceAttemptRequest(
     val operationId: String,
     val deviceTimestampEpochSeconds: Long,
+    val qrToken: String? = null,
+)
+
+@Serializable
+data class AttendanceQrResponse(
+    val token: String,
+    val issuedAtEpochSeconds: Long,
+    val expiresAtEpochSeconds: Long,
+    val rotateAfterSeconds: Long,
 )
 
 @Serializable

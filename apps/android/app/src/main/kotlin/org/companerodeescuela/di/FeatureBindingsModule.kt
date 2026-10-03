@@ -8,6 +8,7 @@ import io.ktor.client.HttpClient
 import javax.inject.Singleton
 import org.companerodeescuela.core.academic.AcademicRepository
 import org.companerodeescuela.core.attendance.AttendanceRepository
+import org.companerodeescuela.core.attendance.AttendanceRemoteClient
 import org.companerodeescuela.core.attendance.AttendanceSyncScheduler
 import org.companerodeescuela.core.database.AcademicSnapshotCache
 import org.companerodeescuela.core.database.AttendanceLocalStore
@@ -34,10 +35,12 @@ object FeatureBindingsModule {
         tokenStore: SessionTokenStore,
         localStore: AttendanceLocalStore,
         scheduler: AttendanceSyncScheduler,
+        remoteClient: AttendanceRemoteClient,
     ): AttendanceRepository = AttendanceRepository(
         tokenStore = tokenStore,
         localStore = localStore,
         scheduler = scheduler,
+        remoteClient = remoteClient,
     )
 
     @Provides

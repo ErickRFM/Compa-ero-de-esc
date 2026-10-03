@@ -10,7 +10,6 @@ import kotlinx.serialization.json.Json
 import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.database.PendingAttendanceOperation
-import org.companerodeescuela.core.network.PlatformApiClient
 import org.companerodeescuela.core.network.apiCall
 import org.companerodeescuela.core.network.requireBody
 import org.companerodeescuela.shared.contracts.ApiError
@@ -20,7 +19,7 @@ import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
 
 class AttendanceRemoteClient @Inject constructor(
-    @PlatformApiClient private val client: HttpClient,
+    private val client: HttpClient,
 ) {
     suspend fun submit(
         token: String,

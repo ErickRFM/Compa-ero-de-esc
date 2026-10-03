@@ -209,7 +209,7 @@ class AttendanceServiceTest {
 
         clock.advance(Duration.ofMinutes(2))
 
-        assertFailsWith<ApiException.Conflict> {
+        assertFailsWith<ApiException.Domain> {
             service.register(
                 "2020-10455",
                 session.id,

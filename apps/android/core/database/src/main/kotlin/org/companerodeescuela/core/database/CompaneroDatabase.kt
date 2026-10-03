@@ -12,7 +12,7 @@ import androidx.room.RoomDatabase
         AttendanceOutboxEntity::class,
         AttendanceLocalRecordEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class CompaneroDatabase : RoomDatabase() {

@@ -23,6 +23,7 @@ import org.companerodeescuela.shared.contracts.UserRole
 fun Route.attendanceRoutes(
     settings: ApiSettings,
     service: AttendanceService,
+    qrService: AttendanceQrService? = null,
 ) {
     route("/attendance") {
         if (!settings.hasAuthentication) {
@@ -52,6 +53,27 @@ fun Route.attendanceRoutes(
                         data = service.openSession(
                             teacherId = principal.subject(),
                             request = call.receive<CreateAttendanceSessionRequest>(),
+                        ),
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
+
+            post("/sessions/{sessionId}/qr") {
+                val principal = call.requirePrincipal()
+                principal.requireStaffRole()
+                val sessionId = call.parameters["sessionId"]
+                    ?: throw ApiException.Validation("sessionId is required")
+                val serviceQr = qrService
+                    ?: throw ApiException.DependencyUnavailable(
+                        "Attendance QR signing is not configured",
+                    )
+                call.respond(
+                    ApiResponse(
+                        data = serviceQr.issue(
+                            actorId = principal.subject(),
+                            sessionId = sessionId,
+                            allowCrossOwner = principal.roles().any(UserRole::isAdministrative),
                         ),
                         requestId = call.requestId(),
                     ),

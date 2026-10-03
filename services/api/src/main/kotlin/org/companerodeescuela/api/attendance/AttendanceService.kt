@@ -25,6 +25,7 @@ class AttendanceService(
     private val academicProvider: AcademicProvider,
     private val occurrenceResolver: AttendanceOccurrenceResolver =
         ProviderAttendanceOccurrenceResolver(academicProvider),
+    private val qrService: AttendanceQrService? = null,
     private val clock: Clock = Clock.systemUTC(),
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) {
@@ -143,22 +144,21 @@ class AttendanceService(
             )
         }
 
+        val evidence = classifyEvidence(
+            request = request,
+            sessionId = session.id,
+            lateSyncEligible = lateSyncEligible,
+            receivedAtEpochSeconds = now.epochSecond,
+        )
+
         val candidate = AttendanceRecordResponse(
             id = session.id + ":" + studentId,
             operationId = operationId,
             sessionId = session.id,
             occurrenceId = session.occurrenceId,
             studentId = studentId,
-            status = if (lateSyncEligible) {
-                AttendanceStatus.REVIEW_REQUIRED
-            } else {
-                AttendanceStatus.LIKELY
-            },
-            reasonCode = if (lateSyncEligible) {
-                AttendanceReasonCode.OFFLINE_LATE_SYNC
-            } else {
-                AttendanceReasonCode.IDENTITY_SESSION_TIME
-            },
+            status = evidence.first,
+            reasonCode = evidence.second,
             attemptedAtEpochSeconds = request.deviceTimestampEpochSeconds,
             receivedAtEpochSeconds = now.epochSecond,
         )
@@ -229,6 +229,61 @@ class AttendanceService(
         )
         repository.replaceRecord(reviewed)
         return reviewed
+    }
+
+    private fun classifyEvidence(
+        request: AttendanceAttemptRequest,
+        sessionId: String,
+        lateSyncEligible: Boolean,
+        receivedAtEpochSeconds: Long,
+    ): Pair<AttendanceStatus, AttendanceReasonCode> {
+        val qrToken = request.qrToken?.trim()?.takeIf(String::isNotEmpty)
+        if (qrToken == null) {
+            return if (lateSyncEligible) {
+                AttendanceStatus.REVIEW_REQUIRED to AttendanceReasonCode.OFFLINE_LATE_SYNC
+            } else {
+                AttendanceStatus.LIKELY to AttendanceReasonCode.IDENTITY_SESSION_TIME
+            }
+        }
+
+        val verifier = qrService
+            ?: throw ApiException.DependencyUnavailable("Attendance QR verification is not configured")
+        return when (
+            val qr = verifier.verify(
+                token = qrToken,
+                expectedSessionId = sessionId,
+                receivedAtEpochSeconds = receivedAtEpochSeconds,
+            )
+        ) {
+            is QrEvidenceResult.Valid -> {
+                if (
+                    request.deviceTimestampEpochSeconds in
+                    qr.issuedAtEpochSeconds..qr.expiresAtEpochSeconds
+                ) {
+                    if (lateSyncEligible) {
+                        AttendanceStatus.REVIEW_REQUIRED to AttendanceReasonCode.OFFLINE_LATE_SYNC
+                    } else {
+                        AttendanceStatus.VERIFIED to AttendanceReasonCode.QR_VALID
+                    }
+                } else {
+                    AttendanceStatus.REJECTED to AttendanceReasonCode.QR_EXPIRED
+                }
+            }
+            is QrEvidenceResult.Expired -> {
+                if (
+                    request.deviceTimestampEpochSeconds in
+                    qr.issuedAtEpochSeconds..qr.expiresAtEpochSeconds
+                ) {
+                    AttendanceStatus.REVIEW_REQUIRED to AttendanceReasonCode.OFFLINE_LATE_SYNC
+                } else {
+                    AttendanceStatus.REJECTED to AttendanceReasonCode.QR_EXPIRED
+                }
+            }
+            QrEvidenceResult.WrongSession ->
+                AttendanceStatus.REJECTED to AttendanceReasonCode.WRONG_SESSION
+            QrEvidenceResult.Invalid ->
+                AttendanceStatus.REJECTED to AttendanceReasonCode.QR_INVALID
+        }
     }
 
     private fun requireOwnerOrAdministrative(

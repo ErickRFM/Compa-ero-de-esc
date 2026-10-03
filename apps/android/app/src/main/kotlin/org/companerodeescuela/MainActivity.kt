@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -16,7 +17,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.composable
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
+import org.companerodeescuela.core.attendance.AttendanceSyncScheduler
 import org.companerodeescuela.core.navigation.CompaneroScaffold
 import org.companerodeescuela.core.navigation.Destination
 import org.companerodeescuela.feature.auth.LoginScreen
@@ -27,6 +30,9 @@ import org.companerodeescuela.feature.schedule.ScheduleScreen
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var attendanceSyncScheduler: AttendanceSyncScheduler
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -40,6 +46,12 @@ class MainActivity : ComponentActivity() {
                 ) {
                     val sessionViewModel: SessionViewModel = hiltViewModel()
                     val session by sessionViewModel.state.collectAsStateWithLifecycle()
+
+                    LaunchedEffect(session.authenticated) {
+                        if (session.authenticated) {
+                            attendanceSyncScheduler.schedule()
+                        }
+                    }
 
                     when {
                         session.checking -> {

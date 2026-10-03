@@ -20,6 +20,7 @@ import org.companerodeescuela.core.database.PendingAttendanceOperation
 import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.shared.contracts.AttendanceReasonCode
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
+import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 
 class AttendanceRepositoryTest {
     private val clock = Clock.fixed(
@@ -35,6 +36,7 @@ class AttendanceRepositoryTest {
             tokenStore = FakeTokenStore(token("student-1", 2_000_000_000L)),
             localStore = store,
             scheduler = scheduler,
+            remoteClient = FakeSessionSource(),
             clock = clock,
             newOperationId = { "op-1" },
         )
@@ -58,6 +60,7 @@ class AttendanceRepositoryTest {
             tokenStore = FakeTokenStore(token("student-1", 1L)),
             localStore = store,
             scheduler = scheduler,
+            remoteClient = FakeSessionSource(),
             clock = clock,
         )
 
@@ -92,6 +95,14 @@ class AttendanceRepositoryTest {
         val encoded = Base64.getUrlEncoder().withoutPadding()
             .encodeToString(payload.toByteArray())
         return "e30.$encoded.signature"
+    }
+
+    private class FakeSessionSource(
+        private val result: Outcome<List<AttendanceSessionResponse>> = Outcome.Success(emptyList()),
+    ) : AttendanceSessionSource {
+        override suspend fun activeSessions(
+            token: String,
+        ): Outcome<List<AttendanceSessionResponse>> = result
     }
 
     private class FakeScheduler : AttendanceSyncEnqueuer {

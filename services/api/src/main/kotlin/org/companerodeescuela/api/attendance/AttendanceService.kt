@@ -4,9 +4,11 @@ import java.time.Clock
 import java.time.Duration
 import java.time.LocalDate
 import java.util.UUID
+import io.ktor.http.HttpStatusCode
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.integrations.IntegrationException
 import org.companerodeescuela.api.integrations.academic.AcademicProvider
+import org.companerodeescuela.shared.contracts.ApiErrorCode
 import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
 import org.companerodeescuela.shared.contracts.AttendanceReasonCode
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
@@ -112,7 +114,11 @@ class AttendanceService(
             session.status != AttendanceSessionStatus.OPEN ||
             session.closesAtEpochSeconds <= now.epochSecond
         ) {
-            throw ApiException.Conflict("Attendance session is closed")
+            throw ApiException.Domain(
+                status = HttpStatusCode.Conflict,
+                code = ApiErrorCode.ATTENDANCE_SESSION_CLOSED,
+                message = "Attendance session is closed",
+            )
         }
 
         val load = academicLoad(studentId)
@@ -121,7 +127,11 @@ class AttendanceService(
                 it.course.groupName.trim() == session.groupName
         }
         if (!enrolled) {
-            throw ApiException.Forbidden("You are not enrolled in this class")
+            throw ApiException.Domain(
+                status = HttpStatusCode.Forbidden,
+                code = ApiErrorCode.ATTENDANCE_NOT_ENROLLED,
+                message = "You are not enrolled in this class",
+            )
         }
 
         val candidate = AttendanceRecordResponse(
@@ -140,7 +150,11 @@ class AttendanceService(
             is AttemptWriteResult.Created -> result.record
             is AttemptWriteResult.Existing -> result.record
             AttemptWriteResult.OperationConflict ->
-                throw ApiException.Conflict("operationId was already used for another attendance")
+                throw ApiException.Domain(
+                    status = HttpStatusCode.Conflict,
+                    code = ApiErrorCode.ATTENDANCE_OPERATION_CONFLICT,
+                    message = "operationId was already used for another attendance",
+                )
         }
     }
 

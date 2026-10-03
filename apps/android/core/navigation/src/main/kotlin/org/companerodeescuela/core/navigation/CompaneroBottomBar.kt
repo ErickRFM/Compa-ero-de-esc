@@ -1,18 +1,37 @@
 package org.companerodeescuela.core.navigation
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import org.companerodeescuela.core.motion.CompaneroMotion
+import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 
 @Composable
 fun CompaneroBottomBar(
@@ -20,34 +39,104 @@ fun CompaneroBottomBar(
     currentDestination: NavDestination?,
     modifier: Modifier = Modifier,
 ) {
-    NavigationBar(modifier = modifier) {
-        TopLevelDestination.entries.forEach { topLevel ->
-            val selected = currentDestination
-                ?.hierarchy
-                ?.any { it.route == topLevel.destination.route } == true
+    val destinations = TopLevelDestination.entries
+    val selectedIndex = destinations.indexOfFirst { topLevel ->
+        currentDestination
+            ?.hierarchy
+            ?.any { it.route == topLevel.destination.route } == true
+    }.coerceAtLeast(0)
+    val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
 
-            NavigationBarItem(
-                selected = selected,
-                onClick = {
-                    navController.navigate(topLevel.destination.route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
-                        }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
+    Surface(
+        modifier = modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 8.dp,
+        shadowElevation = 10.dp,
+    ) {
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .padding(4.dp),
+        ) {
+            val itemWidth = maxWidth / destinations.size
+            val targetOffset = itemWidth * selectedIndex
+            val pillOffset by animateDpAsState(
+                targetValue = targetOffset,
+                animationSpec = if (reducedMotion) {
+                    CompaneroMotion.fast()
+                } else {
+                    CompaneroMotion.snappySpring()
                 },
-                icon = {
-                    Icon(
-                        imageVector = when (topLevel) {
-                            TopLevelDestination.Home -> Icons.Filled.Home
-                            TopLevelDestination.Schedule -> Icons.Filled.DateRange
-                        },
-                        contentDescription = topLevel.label,
-                    )
-                },
-                label = { Text(topLevel.label) },
+                label = "navPillOffset",
             )
+
+            Box(
+                modifier = Modifier
+                    .offset(x = pillOffset)
+                    .width(itemWidth)
+                    .height(56.dp)
+                    .clip(MaterialTheme.shapes.extraLarge)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+            )
+
+            Row(modifier = Modifier.fillMaxWidth()) {
+                destinations.forEachIndexed { index, topLevel ->
+                    val selected = index == selectedIndex
+                    val scale by animateFloatAsState(
+                        targetValue = if (selected && !reducedMotion) 1.06f else 1f,
+                        animationSpec = CompaneroMotion.fast(),
+                        label = "navItemScale",
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .width(itemWidth)
+                            .height(56.dp)
+                            .clip(MaterialTheme.shapes.extraLarge)
+                            .clickable {
+                                navController.navigate(topLevel.destination.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                            },
+                        ) {
+                            Icon(
+                                imageVector = when (topLevel) {
+                                    TopLevelDestination.Home -> Icons.Filled.Home
+                                    TopLevelDestination.Schedule -> Icons.Filled.DateRange
+                                },
+                                contentDescription = topLevel.label,
+                                tint = if (selected) {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
+                            if (selected) {
+                                Text(
+                                    text = topLevel.label,
+                                    modifier = Modifier.padding(start = 8.dp),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

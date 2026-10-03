@@ -36,6 +36,7 @@ dependencies {
     api(libs.androidx.compose.material3)
     implementation(project(":apps:android:core:designsystem"))
     implementation(project(":apps:android:core:ui"))
+    implementation(project(":apps:android:core:motion"))
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlin.test)

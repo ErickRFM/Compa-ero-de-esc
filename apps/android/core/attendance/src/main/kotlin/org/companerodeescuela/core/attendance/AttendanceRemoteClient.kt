@@ -2,6 +2,7 @@ package org.companerodeescuela.core.attendance
 
 import io.ktor.client.HttpClient
 import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import javax.inject.Inject
@@ -17,10 +18,18 @@ import org.companerodeescuela.shared.contracts.ApiErrorCode
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
+import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 
 class AttendanceRemoteClient @Inject constructor(
     private val client: HttpClient,
 ) {
+    suspend fun activeSessions(token: String): Outcome<List<AttendanceSessionResponse>> =
+        apiCall {
+            client.get("attendance/sessions/active") {
+                bearerAuth(token)
+            }.requireBody<ApiResponse<List<AttendanceSessionResponse>>>()
+        }.map { it.data }
+
     suspend fun submit(
         token: String,
         operation: PendingAttendanceOperation,

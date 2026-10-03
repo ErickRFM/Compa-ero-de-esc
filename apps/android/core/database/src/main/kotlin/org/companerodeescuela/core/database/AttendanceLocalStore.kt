@@ -135,11 +135,6 @@ internal class RoomAttendanceLocalStore(
 
     override suspend fun markAuthRequired(operationId: String) {
         val existing = dao.findLocal(operationId) ?: return
-        dao.updateState(
-            operationId = operationId,
-            state = LocalAttendanceSyncState.AUTH_REQUIRED.name,
-            errorCode = "AUTH_REQUIRED",
-        )
         dao.upsertLocal(
             existing.copy(
                 syncState = LocalAttendanceSyncState.AUTH_REQUIRED.name,

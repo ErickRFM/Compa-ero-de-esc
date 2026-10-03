@@ -17,10 +17,20 @@ class AttendanceRepository(
     private val clock: Clock = Clock.systemUTC(),
     private val newOperationId: () -> String = { UUID.randomUUID().toString() },
 ) {
-    suspend fun enqueueAttempt(sessionId: String): Outcome<LocalAttendanceRecord> {
+    suspend fun enqueueAttempt(
+        sessionId: String,
+        qrToken: String? = null,
+    ): Outcome<LocalAttendanceRecord> {
         if (sessionId.isBlank()) {
             return Outcome.Failure(
                 AppError.Serialization("Attendance session id was blank"),
+            )
+        }
+
+        val normalizedQrToken = qrToken?.trim()?.takeIf(String::isNotEmpty)
+        if (normalizedQrToken != null && normalizedQrToken.length > MAX_QR_TOKEN_LENGTH) {
+            return Outcome.Failure(
+                AppError.Serialization("Attendance QR token was too long"),
             )
         }
 
@@ -40,6 +50,7 @@ class AttendanceRepository(
                 ownerId = claims.userId,
                 sessionId = sessionId,
                 deviceTimestampEpochSeconds = clock.instant().epochSecond,
+                qrToken = normalizedQrToken,
             )
             scheduler.schedule()
             Outcome.Success(local)
@@ -61,4 +72,8 @@ class AttendanceRepository(
 
     fun observe(ownerId: String): Flow<List<LocalAttendanceRecord>> =
         localStore.observe(ownerId)
+
+    private companion object {
+        const val MAX_QR_TOKEN_LENGTH = 2_048
+    }
 }

@@ -39,13 +39,14 @@ class AttendanceRepositoryTest {
             newOperationId = { "op-1" },
         )
 
-        val result = repository.enqueueAttempt("session-1")
+        val result = repository.enqueueAttempt("session-1", qrToken = "signed-qr")
 
         val success = assertIs<Outcome.Success<LocalAttendanceRecord>>(result)
         assertEquals("op-1", success.value.operationId)
         assertEquals("student-1", success.value.ownerId)
         assertEquals("session-1", success.value.sessionId)
         assertEquals("op-1", store.lastOperationId)
+        assertEquals("signed-qr", store.lastQrToken)
         assertEquals(1, scheduler.calls)
     }
 
@@ -114,14 +115,17 @@ class AttendanceRepositoryTest {
 
     private class FakeStore : AttendanceLocalStore {
         var lastOperationId: String? = null
+        var lastQrToken: String? = null
 
         override suspend fun enqueue(
             operationId: String,
             ownerId: String,
             sessionId: String,
             deviceTimestampEpochSeconds: Long,
+            qrToken: String?,
         ): LocalAttendanceRecord {
             lastOperationId = operationId
+            lastQrToken = qrToken
             return LocalAttendanceRecord(
                 operationId = operationId,
                 ownerId = ownerId,

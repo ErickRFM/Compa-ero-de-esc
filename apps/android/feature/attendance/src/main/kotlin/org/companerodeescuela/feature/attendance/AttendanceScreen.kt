@@ -35,6 +35,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.Instant
@@ -59,12 +61,19 @@ fun AttendanceScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     if (state.scannerSessionId != null) {
-        AttendanceQrScanner(
-            onToken = viewModel::submitScannedQr,
-            onClose = viewModel::dismissScanner,
-            modifier = modifier,
-        )
-        return
+        Dialog(
+            onDismissRequest = viewModel::dismissScanner,
+            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
+        ) {
+            AttendanceQrScanner(
+                onToken = viewModel::submitScannedQr,
+                onClose = viewModel::dismissScanner,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 
     when (state.mode) {

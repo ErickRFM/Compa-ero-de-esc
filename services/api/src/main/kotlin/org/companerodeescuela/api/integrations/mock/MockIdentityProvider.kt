@@ -23,33 +23,44 @@ class MockIdentityProvider : IdentityProvider, MockIntegrationProvider {
     override val id: String = "mock-identity"
     override val displayName: String = "Mock identity source (development only)"
 
-    override suspend fun authenticate(credentials: InstitutionalCredentials): AuthenticatedAccount? {
-        val matches = credentials.username == MOCK_USERNAME &&
-            credentials.password == MOCK_PASSWORD
-        if (!matches) return null
-        return MOCK_ACCOUNT
-    }
+    override suspend fun authenticate(credentials: InstitutionalCredentials): AuthenticatedAccount? =
+        when {
+            credentials.username == MOCK_USERNAME &&
+                credentials.password == MOCK_PASSWORD -> MOCK_ACCOUNT
+            credentials.username == MOCK_TEACHER_USERNAME &&
+                credentials.password == MOCK_TEACHER_PASSWORD -> MOCK_TEACHER_ACCOUNT
+            else -> null
+        }
 
-    override suspend fun refreshRoles(externalId: String): Set<UserRole> {
-        if (externalId != MOCK_ACCOUNT.externalId) {
-            throw IntegrationException(
+    override suspend fun refreshRoles(externalId: String): Set<UserRole> =
+        when (externalId) {
+            MOCK_ACCOUNT.externalId -> MOCK_ACCOUNT.roles
+            MOCK_TEACHER_ACCOUNT.externalId -> MOCK_TEACHER_ACCOUNT.roles
+            else -> throw IntegrationException(
                 providerId = id,
                 category = IntegrationException.Category.NOT_FOUND,
                 message = "No account for '$externalId'",
             )
         }
-        return MOCK_ACCOUNT.roles
-    }
 
     companion object {
         const val MOCK_USERNAME = "ana.lopez"
         const val MOCK_PASSWORD = "development-only"
+        const val MOCK_TEACHER_USERNAME = "elena.rios"
+        const val MOCK_TEACHER_PASSWORD = "development-only-teacher"
 
         val MOCK_ACCOUNT = AuthenticatedAccount(
             externalId = MockFixtures.STUDENT_ID,
             displayName = "Ana López Hernández",
             email = "ana.lopez@escuela.edu",
             roles = setOf(UserRole.STUDENT),
+        )
+
+        val MOCK_TEACHER_ACCOUNT = AuthenticatedAccount(
+            externalId = "T-0001",
+            displayName = "Mtra. Elena Ríos Salgado",
+            email = "elena.rios@escuela.edu",
+            roles = setOf(UserRole.TEACHER),
         )
     }
 }

@@ -13,7 +13,7 @@ import org.companerodeescuela.core.security.SessionTokenStore
 class AttendanceRepository(
     private val tokenStore: SessionTokenStore,
     private val localStore: AttendanceLocalStore,
-    private val scheduler: AttendanceSyncScheduler,
+    private val scheduler: AttendanceSyncEnqueuer,
     private val clock: Clock = Clock.systemUTC(),
     private val newOperationId: () -> String = { UUID.randomUUID().toString() },
 ) {

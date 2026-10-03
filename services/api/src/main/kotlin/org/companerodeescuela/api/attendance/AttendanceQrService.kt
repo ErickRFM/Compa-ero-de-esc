@@ -102,8 +102,12 @@ class AttendanceQrService(
         }
 
         val prefix = parts.take(TOKEN_PARTS - 1).joinToString(".")
-        val supplied = runCatching { decoder.decode(parts.last()) }.getOrNull()
+        val encodedSignature = parts.last()
+        val supplied = runCatching { decoder.decode(encodedSignature) }.getOrNull()
             ?: return QrEvidenceResult.Invalid
+        if (encoder.encodeToString(supplied) != encodedSignature) {
+            return QrEvidenceResult.Invalid
+        }
         if (!MessageDigest.isEqual(sign(prefix), supplied)) {
             return QrEvidenceResult.Invalid
         }

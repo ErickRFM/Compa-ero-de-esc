@@ -97,9 +97,11 @@ fun AttendanceQrScanner(
         }
         val scanner = remember { BarcodeScanning.getClient(options) }
         val accepted = remember { AtomicBoolean(false) }
+        var boundCameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
 
         DisposableEffect(scanner) {
             onDispose {
+                boundCameraProvider?.unbindAll()
                 scanner.close()
             }
         }
@@ -117,6 +119,7 @@ fun AttendanceQrScanner(
                         cameraProviderFuture.addListener(
                             {
                                 val cameraProvider = cameraProviderFuture.get()
+                                boundCameraProvider = cameraProvider
                                 val preview = Preview.Builder().build().also {
                                     it.surfaceProvider = surfaceProvider
                                 }

@@ -219,6 +219,31 @@ class AttendanceServiceTest {
     }
 
     @Test
+    fun `teacher active sessions only include own open windows`() = runTest {
+        val repository = InMemoryAttendanceRepository()
+        val service = service(repository = repository)
+        val own = service.openSession("T-0001", requestFor(teacherOccurrence()))
+
+        repository.createSession(
+            AttendanceSessionResponse(
+                id = "other-teacher",
+                occurrenceId = "other-occurrence",
+                courseId = "C-9001",
+                groupName = "101-A",
+                occurrenceDate = occurrenceDate.toString(),
+                scheduledStartsAt = "08:00",
+                scheduledEndsAt = "09:00",
+                openedBy = "T-OTHER",
+                openedAtEpochSeconds = initialInstant.epochSecond,
+                closesAtEpochSeconds = initialInstant.plusSeconds(600).epochSecond,
+                status = AttendanceSessionStatus.OPEN,
+            ),
+        )
+
+        assertEquals(listOf(own.id), service.activeForTeacher("T-0001").map { it.id })
+    }
+
+    @Test
     fun `active sessions are filtered by student enrollment`() = runTest {
         val repository = InMemoryAttendanceRepository()
         val service = service(repository = repository)

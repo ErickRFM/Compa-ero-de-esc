@@ -177,6 +177,28 @@ class AttendanceServiceTest {
     }
 
     @Test
+    fun `offline attempt captured inside window syncs later as review required`() = runTest {
+        val clock = MutableClock(initialInstant)
+        val service = service(clock = clock)
+        val session = service.openSession(
+            "T-0001",
+            requestFor(teacherOccurrence()).copy(durationMinutes = 1),
+        )
+        val capturedAt = initialInstant.plusSeconds(30).epochSecond
+
+        clock.advance(Duration.ofMinutes(2))
+
+        val record = service.register(
+            "2020-10455",
+            session.id,
+            AttendanceAttemptRequest("op-offline", capturedAt),
+        )
+
+        assertEquals(AttendanceStatus.REVIEW_REQUIRED, record.status)
+        assertEquals(AttendanceReasonCode.OFFLINE_LATE_SYNC, record.reasonCode)
+    }
+
+    @Test
     fun `expired server window rejects a late direct attempt`() = runTest {
         val clock = MutableClock(initialInstant)
         val service = service(clock = clock)

@@ -5,6 +5,7 @@ import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import javax.inject.Inject
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome

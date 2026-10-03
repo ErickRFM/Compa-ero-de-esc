@@ -4,6 +4,7 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.routing.routing
 import org.companerodeescuela.api.academic.academicRoutes
+import org.companerodeescuela.api.attendance.AttendanceQrService
 import org.companerodeescuela.api.attendance.AttendanceService
 import org.companerodeescuela.api.attendance.InMemoryAttendanceRepository
 import org.companerodeescuela.api.attendance.MongoAttendanceRepository
@@ -45,9 +46,16 @@ fun Application.module(
         settings.environment == Environment.LOCAL -> InMemoryAttendanceRepository()
         else -> error("Attendance requires MONGODB_URI outside local development")
     }
+    val attendanceQrService = settings.attendanceQrSecret?.let { secret ->
+        AttendanceQrService(
+            secret = secret,
+            repository = attendanceRepository,
+        )
+    }
     val attendanceService = AttendanceService(
         repository = attendanceRepository,
         academicProvider = providerRegistry.academic,
+        qrService = attendanceQrService,
     )
 
     monitor.subscribe(ApplicationStopped) {
@@ -59,6 +67,10 @@ fun Application.module(
         healthRoutes(settings = settings, healthService = healthService)
         authRoutes(settings = settings, identityProvider = providerRegistry.identity)
         academicRoutes(settings = settings, academicProvider = providerRegistry.academic)
-        attendanceRoutes(settings = settings, service = attendanceService)
+        attendanceRoutes(
+            settings = settings,
+            service = attendanceService,
+            qrService = attendanceQrService,
+        )
     }
 }

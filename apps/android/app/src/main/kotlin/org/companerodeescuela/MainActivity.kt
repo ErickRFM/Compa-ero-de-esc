@@ -23,6 +23,7 @@ import org.companerodeescuela.core.attendance.AttendanceSyncScheduler
 import org.companerodeescuela.core.navigation.CompaneroScaffold
 import org.companerodeescuela.core.navigation.Destination
 import org.companerodeescuela.feature.auth.LoginScreen
+import org.companerodeescuela.feature.attendance.AttendanceScreen
 import org.companerodeescuela.feature.auth.SessionViewModel
 import org.companerodeescuela.feature.home.HomeScreen
 import org.companerodeescuela.feature.profile.ProfileScreen
@@ -72,6 +73,7 @@ class MainActivity : ComponentActivity() {
                             CompaneroScaffold {
                                 composable(Destination.Home.route) { HomeScreen() }
                                 composable(Destination.Schedule.route) { ScheduleScreen() }
+                                composable(Destination.Attendance.route) { AttendanceScreen() }
                                 composable(Destination.Profile.route) {
                                     ProfileScreen(
                                         displayName = session.displayName,

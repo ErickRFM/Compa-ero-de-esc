@@ -278,7 +278,7 @@ class AttendanceViewModel @Inject constructor(
             val week = repository.academicWeek(LocalDate.now().toString())
             val sessions = repository.activeStudentSessions()
 
-            val occurrences = (week as? Outcome.Success)?.value?.occurrences.orEmpty()
+            val occurrences = week.valueOrNull()?.occurrences.orEmpty()
             when (sessions) {
                 is Outcome.Success -> _state.update {
                     it.copy(
@@ -304,14 +304,15 @@ class AttendanceViewModel @Inject constructor(
             val week = repository.academicWeek(LocalDate.now().toString())
             val active = repository.activeTeacherSessions()
 
-            val occurrences = (week as? Outcome.Success)?.value?.occurrences.orEmpty()
-            val activeSession = (active as? Outcome.Success)?.value?.firstOrNull()
+            val occurrences = week.valueOrNull()?.occurrences.orEmpty()
+            val activeSessions = active.valueOrNull().orEmpty()
+            val activeSession = activeSessions.firstOrNull()
 
             _state.update {
                 it.copy(
                     loading = false,
                     occurrences = occurrences,
-                    activeSessions = (active as? Outcome.Success)?.value.orEmpty(),
+                    activeSessions = activeSessions,
                     teacherSession = activeSession,
                     errorMessage = when {
                         week is Outcome.Failure -> week.error.userMessage

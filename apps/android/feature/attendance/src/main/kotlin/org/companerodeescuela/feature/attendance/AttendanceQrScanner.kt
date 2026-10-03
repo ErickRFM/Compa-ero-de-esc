@@ -240,7 +240,7 @@ private class QrAnalyzer(
     private val onToken: (String) -> Unit,
 ) : ImageAnalysis.Analyzer {
 
-    @OptIn(ExperimentalGetImage::class)
+    @ExperimentalGetImage
     override fun analyze(imageProxy: androidx.camera.core.ImageProxy) {
         val mediaImage = imageProxy.image
         if (mediaImage == null || accepted.get()) {

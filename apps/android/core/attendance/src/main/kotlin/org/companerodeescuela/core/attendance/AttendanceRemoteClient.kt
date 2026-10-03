@@ -20,10 +20,14 @@ import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 
+interface AttendanceSessionSource {
+    suspend fun activeSessions(token: String): Outcome<List<AttendanceSessionResponse>>
+}
+
 class AttendanceRemoteClient @Inject constructor(
     private val client: HttpClient,
-) {
-    suspend fun activeSessions(token: String): Outcome<List<AttendanceSessionResponse>> =
+) : AttendanceSessionSource {
+    override suspend fun activeSessions(token: String): Outcome<List<AttendanceSessionResponse>> =
         apiCall {
             client.get("attendance/sessions/active") {
                 bearerAuth(token)

@@ -24,6 +24,7 @@ import androidx.navigation.compose.rememberNavController
 fun CompaneroScaffold(
     navController: NavHostController = rememberNavController(),
     startDestination: Destination = Destination.Home,
+    topLevelDestinations: List<TopLevelDestination> = TopLevelDestination.entries,
     destinations: NavGraphBuilder.() -> Unit,
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -75,6 +76,7 @@ fun CompaneroScaffold(
                 CompaneroBottomBar(
                     navController = navController,
                     currentDestination = currentDestination,
+                    destinations = topLevelDestinations,
                 )
             }
         },

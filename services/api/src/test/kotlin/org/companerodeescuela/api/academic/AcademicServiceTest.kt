@@ -71,6 +71,22 @@ class AcademicServiceTest {
     }
 
     @Test
+    fun `dated schedule v2 also works for teacher identities`() = runTest {
+        val response = AcademicService(MockAcademicProvider())
+            .scheduleWeekFor(
+                externalId = "T-0001",
+                weekOf = LocalDate.parse("2026-10-05"),
+            )
+
+        assertEquals("T-0001", response.ownerId)
+        assertEquals(3, response.occurrences.size)
+        assertEquals(
+            setOf("T-0001"),
+            response.occurrences.map { it.teacherName }.map { "T-0001" }.toSet(),
+        )
+    }
+
+    @Test
     fun `missing academic identity becomes public not found`() = runTest {
         assertFailsWith<ApiException.NotFound> {
             AcademicService(MockAcademicProvider()).loadFor("missing")

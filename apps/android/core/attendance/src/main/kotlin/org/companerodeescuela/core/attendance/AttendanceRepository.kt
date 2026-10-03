@@ -9,14 +9,35 @@ import org.companerodeescuela.core.database.AttendanceLocalStore
 import org.companerodeescuela.core.database.LocalAttendanceRecord
 import org.companerodeescuela.core.security.SessionTokenInspector
 import org.companerodeescuela.core.security.SessionTokenStore
+import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 
 class AttendanceRepository(
     private val tokenStore: SessionTokenStore,
     private val localStore: AttendanceLocalStore,
     private val scheduler: AttendanceSyncEnqueuer,
+    private val remoteClient: AttendanceRemoteClient,
     private val clock: Clock = Clock.systemUTC(),
     private val newOperationId: () -> String = { UUID.randomUUID().toString() },
 ) {
+    suspend fun loadActiveSessions(): Outcome<List<AttendanceSessionResponse>> {
+        val token = runCatching { tokenStore.readAccessToken() }.getOrNull()
+            ?.takeIf(String::isNotBlank)
+            ?: return Outcome.Failure(AppError.Http(status = 401))
+        if (!SessionTokenInspector.isUsable(token, clock)) {
+            runCatching { tokenStore.clear() }
+            return Outcome.Failure(AppError.Http(status = 401))
+        }
+        return when (val result = remoteClient.activeSessions(token)) {
+            is Outcome.Success -> result
+            is Outcome.Failure -> {
+                if ((result.error as? AppError.Http)?.status == 401) {
+                    runCatching { tokenStore.clear() }
+                }
+                result
+            }
+        }
+    }
+
     suspend fun enqueueAttempt(
         sessionId: String,
         qrToken: String? = null,

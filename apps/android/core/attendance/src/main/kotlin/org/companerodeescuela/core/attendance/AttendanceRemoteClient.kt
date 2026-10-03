@@ -32,6 +32,7 @@ class AttendanceRemoteClient @Inject constructor(
                     AttendanceAttemptRequest(
                         operationId = operation.operationId,
                         deviceTimestampEpochSeconds = operation.deviceTimestampEpochSeconds,
+                        qrToken = operation.qrToken,
                     ),
                 )
             }.requireBody<ApiResponse<AttendanceRecordResponse>>()

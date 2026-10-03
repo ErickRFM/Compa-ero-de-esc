@@ -20,6 +20,7 @@ data class PendingAttendanceOperation(
     val ownerId: String,
     val sessionId: String,
     val deviceTimestampEpochSeconds: Long,
+    val qrToken: String?,
     val attemptCount: Int,
     val nextAttemptAtEpochSeconds: Long,
     val lastErrorCode: String?,
@@ -41,6 +42,7 @@ interface AttendanceLocalStore {
         ownerId: String,
         sessionId: String,
         deviceTimestampEpochSeconds: Long,
+        qrToken: String? = null,
     ): LocalAttendanceRecord
 
     suspend fun nextReady(nowEpochSeconds: Long): PendingAttendanceOperation?
@@ -80,6 +82,7 @@ internal class RoomAttendanceLocalStore(
         ownerId: String,
         sessionId: String,
         deviceTimestampEpochSeconds: Long,
+        qrToken: String?,
     ): LocalAttendanceRecord {
         require(operationId.isNotBlank()) { "operationId must not be blank" }
         require(ownerId.isNotBlank()) { "ownerId must not be blank" }
@@ -92,6 +95,7 @@ internal class RoomAttendanceLocalStore(
                 ownerId = ownerId,
                 sessionId = sessionId,
                 deviceTimestampEpochSeconds = deviceTimestampEpochSeconds,
+                qrToken = qrToken,
                 createdAtEpochSeconds = now,
                 attemptCount = 0,
                 nextAttemptAtEpochSeconds = now,
@@ -119,6 +123,7 @@ internal class RoomAttendanceLocalStore(
                 ownerId = entity.ownerId,
                 sessionId = entity.sessionId,
                 deviceTimestampEpochSeconds = entity.deviceTimestampEpochSeconds,
+                qrToken = entity.qrToken,
                 attemptCount = entity.attemptCount,
                 nextAttemptAtEpochSeconds = entity.nextAttemptAtEpochSeconds,
                 lastErrorCode = entity.lastErrorCode,

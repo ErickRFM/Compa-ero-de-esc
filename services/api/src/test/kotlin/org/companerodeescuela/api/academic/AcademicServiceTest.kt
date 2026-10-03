@@ -81,8 +81,8 @@ class AcademicServiceTest {
         assertEquals("T-0001", response.ownerId)
         assertEquals(3, response.occurrences.size)
         assertEquals(
-            setOf("T-0001"),
-            response.occurrences.map { it.teacherName }.map { "T-0001" }.toSet(),
+            setOf("Mtra. Elena Ríos Salgado"),
+            response.occurrences.map { it.teacherName }.toSet(),
         )
     }
 

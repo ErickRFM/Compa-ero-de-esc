@@ -4,6 +4,10 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.Base64
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respondError
+import io.ktor.http.HttpStatusCode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -35,6 +39,7 @@ class AttendanceRepositoryTest {
             tokenStore = FakeTokenStore(token("student-1", 2_000_000_000L)),
             localStore = store,
             scheduler = scheduler,
+            remoteClient = unusedRemoteClient(),
             clock = clock,
             newOperationId = { "op-1" },
         )
@@ -58,6 +63,7 @@ class AttendanceRepositoryTest {
             tokenStore = FakeTokenStore(token("student-1", 1L)),
             localStore = store,
             scheduler = scheduler,
+            remoteClient = unusedRemoteClient(),
             clock = clock,
         )
 
@@ -86,6 +92,15 @@ class AttendanceRepositoryTest {
         assertEquals(false, AttendanceRetryPolicy.isRetryableHttp(401))
         assertEquals(false, AttendanceRetryPolicy.isRetryableHttp(409))
     }
+
+    private fun unusedRemoteClient(): AttendanceRemoteClient =
+        AttendanceRemoteClient(
+            HttpClient(
+                MockEngine {
+                    respondError(HttpStatusCode.InternalServerError)
+                },
+            ),
+        )
 
     private fun token(subject: String, expiresAt: Long): String {
         val payload = """{"sub":"$subject","exp":$expiresAt}"""

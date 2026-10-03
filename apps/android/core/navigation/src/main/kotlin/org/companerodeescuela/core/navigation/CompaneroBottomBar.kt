@@ -19,10 +19,11 @@ import androidx.navigation.NavHostController
 fun CompaneroBottomBar(
     navController: NavHostController,
     currentDestination: NavDestination?,
+    destinations: List<TopLevelDestination> = TopLevelDestination.entries,
     modifier: Modifier = Modifier,
 ) {
     NavigationBar(modifier = modifier) {
-        TopLevelDestination.entries.forEach { topLevel ->
+        destinations.forEach { topLevel ->
             val selected = currentDestination
                 ?.hierarchy
                 ?.any { it.route == topLevel.destination.route } == true

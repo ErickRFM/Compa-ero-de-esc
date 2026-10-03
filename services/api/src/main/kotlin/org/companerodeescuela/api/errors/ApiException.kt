@@ -58,6 +58,16 @@ sealed class ApiException(
         userMessage = message,
     )
 
+    class Domain(
+        status: HttpStatusCode,
+        code: ApiErrorCode,
+        message: String,
+    ) : ApiException(
+        httpStatus = status,
+        errorCode = code,
+        userMessage = message,
+    )
+
     class RateLimited(
         message: String = "Too many authentication attempts",
     ) : ApiException(

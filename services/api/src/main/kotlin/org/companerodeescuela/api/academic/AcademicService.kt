@@ -1,5 +1,9 @@
 package org.companerodeescuela.api.academic
 
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
+import java.time.LocalDate
+import java.time.temporal.TemporalAdjusters
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.integrations.IntegrationException
 import org.companerodeescuela.api.integrations.academic.AcademicProvider
@@ -7,11 +11,21 @@ import org.companerodeescuela.api.integrations.academic.mapper.AcademicMappers
 import org.companerodeescuela.shared.contracts.AcademicLoadResponse
 import org.companerodeescuela.shared.contracts.AcademicProfile
 import org.companerodeescuela.shared.contracts.AcademicScheduleResponse
+import org.companerodeescuela.shared.contracts.AcademicWeekResponse
+import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
+import org.companerodeescuela.shared.contracts.ClassOccurrenceStatusContract
 import org.companerodeescuela.shared.contracts.ScheduleEntry
+import org.companerodeescuela.shared.model.AcademicId
+import org.companerodeescuela.shared.model.ClassOccurrence
+import org.companerodeescuela.shared.model.ClassOccurrenceStatus
 import org.companerodeescuela.shared.model.PersonId
 
 /**
- * Converts one institution-specific academic load into the platform contract.
+ * Converts institution-specific academic data into stable platform contracts.
+ *
+ * The legacy weekly schedule remains available for the current Android client.
+ * The v2 weekly projection adds deterministic dated class occurrences so
+ * attendance can bind to a real meeting instead of a loose course/group pair.
  */
 class AcademicService(
     private val provider: AcademicProvider,
@@ -60,6 +74,86 @@ class AcademicService(
 
     suspend fun scheduleFor(externalId: String): AcademicScheduleResponse =
         loadFor(externalId).schedule
+
+    suspend fun scheduleWeekFor(
+        externalId: String,
+        weekOf: LocalDate,
+    ): AcademicWeekResponse =
+        translateIntegrationFailure {
+            val load = provider.getAcademicLoad(externalId)
+            val coursesById = load.enrollments.associate { enrollment ->
+                enrollment.course.externalId to enrollment.course
+            }
+            val schedule = AcademicMappers.toSchedule(
+                ownerId = PersonId(externalId),
+                slots = load.schedule,
+                coursesById = coursesById,
+            )
+            val weekStart = weekOf.with(TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+            val occurrences = schedule.slots
+                .map { slot ->
+                    val date = weekStart.plusDays((slot.dayOfWeek.value - 1).toLong())
+                    val patternId = AcademicId(
+                        stableId(
+                            "pattern",
+                            slot.group.course.id.value,
+                            slot.group.name,
+                            slot.dayOfWeek.name,
+                            slot.startsAt.toString(),
+                            slot.endsAt.toString(),
+                        ),
+                    )
+                    ClassOccurrence(
+                        id = AcademicId(stableId("occurrence", patternId.value, date.toString())),
+                        patternId = patternId,
+                        group = slot.group,
+                        date = date,
+                        startsAt = slot.startsAt,
+                        endsAt = slot.endsAt,
+                        classroom = slot.classroom,
+                        teacher = slot.group.course.teacher,
+                        status = ClassOccurrenceStatus.SCHEDULED,
+                    )
+                }
+                .sortedWith(compareBy({ it.date }, { it.startsAt }))
+
+            AcademicWeekResponse(
+                ownerId = externalId,
+                weekStartsOn = weekStart.toString(),
+                weekEndsOn = weekStart.plusDays(6).toString(),
+                occurrences = occurrences.map(::toContract),
+            )
+        }
+
+    private fun toContract(occurrence: ClassOccurrence): ClassOccurrenceContract =
+        ClassOccurrenceContract(
+            id = occurrence.id.value,
+            patternId = occurrence.patternId?.value,
+            courseId = occurrence.group.course.id.value,
+            groupName = occurrence.group.name,
+            subjectCode = occurrence.group.course.subject.code,
+            subjectName = occurrence.group.course.subject.name,
+            teacherName = occurrence.teacher.person.displayName,
+            date = occurrence.date.toString(),
+            startsAt = occurrence.startsAt.toString(),
+            endsAt = occurrence.endsAt.toString(),
+            status = when (occurrence.status) {
+                ClassOccurrenceStatus.SCHEDULED -> ClassOccurrenceStatusContract.SCHEDULED
+                ClassOccurrenceStatus.CANCELLED -> ClassOccurrenceStatusContract.CANCELLED
+                ClassOccurrenceStatus.RESCHEDULED -> ClassOccurrenceStatusContract.RESCHEDULED
+                ClassOccurrenceStatus.ONLINE -> ClassOccurrenceStatusContract.ONLINE
+            },
+            classroomName = occurrence.classroom?.name,
+            buildingName = occurrence.classroom?.building?.name,
+            campusName = occurrence.classroom?.building?.campus?.name,
+        )
+
+    private fun stableId(vararg parts: String): String {
+        val input = parts.joinToString("|")
+        val bytes = MessageDigest.getInstance("SHA-256")
+            .digest(input.toByteArray(StandardCharsets.UTF_8))
+        return bytes.take(16).joinToString("") { byte -> "%02x".format(byte) }
+    }
 
     private suspend fun <T> translateIntegrationFailure(block: suspend () -> T): T =
         try {

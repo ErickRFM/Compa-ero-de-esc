@@ -1,8 +1,8 @@
 # Execution Plan — Compañero de Escuela
 
-Status: **living execution document**
-Baseline reviewed: `feat/foundation` @ `03429e397c5b9b79d56f889c104df205db39c5d8`
-Date: 2026-10-01
+Status: **living execution document — F0 and internal F1 merged**
+Baseline reviewed: `main` @ `61a01cb29592a988f97700772674637eedeb843d`
+Date: 2026-10-02
 
 ## Rule of execution
 
@@ -247,17 +247,19 @@ Every PR must include:
 
 | Priority | Work | Initial state |
 |---|---|---|
-| P0 | CI diagnosis / rerun | ACTIVE |
-| P0 | Clean local foundation validation | NEXT |
-| P0 | Merge foundation to main | BLOCKED until gates pass |
-| P1 | Identity/security | NEXT AFTER F0 |
-| P1 | Real AcademicProvider | NEXT AFTER F0 |
-| P1 | Home/Today + offline timetable | AFTER identity/provider |
-| P2 | Attendance domain | AFTER M1 |
+| P0 | CI diagnosis / rerun | DONE |
+| P0 | Foundation validation and merge | DONE |
+| P1 | Identity/security platform slice | DONE |
+| P1 | Home/Today + Agenda + offline timetable | DONE internally |
+| P1 | Login abuse controls | ACTIVE / PR after squash cleanup |
+| P1 | Real IdentityProvider | BLOCKED externally |
+| P1 | Real AcademicProvider | BLOCKED externally |
+| P1 | Academic model v2 | NEXT |
+| P2 | Attendance domain | NEXT after academic model contract |
 | P2 | Offline attendance | AFTER M2 basic |
 | P2 | Dynamic QR | AFTER offline correctness |
 | P3 | Notifications | AFTER attendance is stable |
-| P3 | Pilot | AFTER MVP |
+| P3 | Pilot | AFTER real providers + MVP |
 
 ## Definition of done
 

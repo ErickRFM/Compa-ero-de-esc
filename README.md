@@ -4,23 +4,22 @@ A school companion app: one place to see today's classes, attendance,
 timetable and institutional notices, designed for the network and hardware
 realities of a public school rather than for a campus with fibre.
 
-This repository is at the **foundation** stage. There is a working build, a
-working API, a runnable Android app and a test suite, but no product feature
-is implemented yet. See [Roadmap](docs/product/ROADMAP.md).
+The technical foundation is merged and the first student product slice is implemented: secure platform authentication, **Hoy**, **Agenda** and student-scoped offline academic cache. Real-school identity and academic providers are still required before a student pilot. See [Roadmap](docs/product/ROADMAP.md).
 
 ---
 
 ## Status
 
-| | |
+| Area | Status |
 |---|---|
-| Branch | `feat/foundation` |
-| Tests | 92 distinct across 14 suites (118 executions: Android suites run per variant) |
-| Android | debug APK 20.0 MB, minified release APK 1.5 MB |
-| API | `/health` 200, `/ready` 503 while no database is configured |
-| Lint | 0 errors |
-
----
+| Technical foundation | merged to `main` |
+| Student product foundation | implemented in the product-foundation line |
+| Android | Compose app with auth, Hoy, Agenda, profile/logout and encrypted session storage |
+| API | Ktor auth + academic endpoints behind provider boundaries |
+| Offline | Room snapshot cache scoped by authenticated student id |
+| Real institutional identity | pending external provider integration |
+| Real institutional schedule | pending external provider integration |
+| Attendance / QR | intentionally follows academic-model stabilization |
 
 ## What is here
 
@@ -52,14 +51,16 @@ companero-de-escuela/
 └── docs/                        # Architecture, security, privacy, quality
 ```
 
-### Modules that deliberately do not exist yet
+### Product modules now present
 
-`core:database`, `core:datastore`, `core:security`, `core:location`,
-`core:notifications` and every `feature:*` module are **not** in
-`settings.gradle.kts`. They are documented as target state in
-[ADR-001](docs/architecture/ADR-001-MODULE-BOUNDARIES.md) and each one is
-created when it takes on real responsibility. An empty module reads as
-finished in review, so none are included as placeholders.
+The repository creates modules only when they have real responsibility. The current student slice includes:
+
+- `core:security` for encrypted platform-session storage and token inspection;
+- `core:database` for student-scoped Room academic snapshots;
+- `core:academic` as the canonical remote/cache academic repository;
+- `feature:auth`, `feature:home` and `feature:schedule`.
+
+Future modules such as attendance, notifications and optional location evidence are still created only when their product phase starts. See [ADR-001](docs/architecture/ADR-001-MODULE-BOUNDARIES.md).
 
 ---
 

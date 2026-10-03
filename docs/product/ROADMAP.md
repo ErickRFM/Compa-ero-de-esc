@@ -10,11 +10,9 @@
 - tested liveness/readiness behavior
 - mock providers blocked from staging/production
 
-## Product Foundation — active candidate
+## Product Foundation — merged to main
 
-Branch: `feat/product-foundation-v2`
-
-Implemented in the candidate:
+Merged in PR #3:
 
 1. platform login and short-lived JWT;
 2. encrypted Android token storage;
@@ -26,24 +24,67 @@ Implemented in the candidate:
 8. Hoy contextual experience;
 9. Agenda day/week experience;
 10. profile/logout;
-11. reusable academic UI components.
+11. reusable academic UI components;
+12. reproducible Android/API CI;
+13. debug + minified release APK packaging gates.
 
-External blockers before a real-user pilot:
+## Immediate hardening
+
+- login abuse limiting before public auth exposure;
+- keep single-instance limiter explicit until shared gateway/storage exists;
+- keep mocks locked out of staging/production;
+- update release docs with exact CI evidence.
+
+## External integration track
+
+Before a real-user pilot:
 
 - real pilot-school IdentityProvider;
 - real pilot-school AcademicProvider;
-- working GitHub Actions execution or equivalent reproducible verification.
+- real school test accounts;
+- real timetable validation against source-of-truth data.
 
-## Next — Academic model v2
+These are external integration tasks, not reasons to block internal domain work.
 
-- terms, courses and groups;
+## Academic model v2
+
+Next domain refinement:
+
+- terms;
+- courses;
+- groups;
 - recurring schedule patterns;
 - dated class occurrences;
 - schedule overrides;
 - cancelled/rescheduled/online states;
 - room/teacher/time change metadata.
 
-## Then — Due work and notices
+This model becomes the canonical base for attendance so attendance sessions bind to a real class occurrence instead of a loose course/group string.
+
+## Attendance
+
+Build in this order:
+
+1. attendance domain and contracts;
+2. teacher session lifecycle;
+3. student attendance attempt;
+4. idempotent record creation;
+5. offline outbox/reconciliation;
+6. signed dynamic QR evidence;
+7. teacher roster/review.
+
+Core state remains:
+
+- VERIFIED
+- LIKELY
+- REVIEW_REQUIRED
+- REJECTED
+
+Location, Wi-Fi or BLE evidence is optional and requires a separate privacy/product decision.
+
+## Due work and notices
+
+After academic identity/schedule stability:
 
 - tasks;
 - due/overdue/completed states;
@@ -51,32 +92,37 @@ External blockers before a real-user pilot:
 - calendar/events;
 - LMS links/summary.
 
-## Then — Attendance
+## Notifications
 
-Build in this order:
+After attendance state transitions are stable:
 
-1. attendance domain;
-2. teacher session lifecycle;
-3. student attendance attempt;
-4. idempotency;
-5. offline outbox/reconciliation;
-6. signed dynamic QR evidence;
-7. teacher roster/review.
+- internal notification center;
+- local reminders;
+- server-generated events;
+- optional push.
 
-Location, Wi-Fi or BLE evidence is optional and requires a separate privacy and
-product decision.
+## Pilot
+
+Pilot acceptance measures:
+
+- median/p95 attendance time;
+- VERIFIED rate;
+- REVIEW_REQUIRED rate;
+- false rejection rate;
+- offline share;
+- prevented duplicate retries;
+- battery/camera failures;
+- disputes;
+- QR reuse/screenshot patterns.
 
 ## Later
 
 - adaptive tablet layout;
-- notification center and local reminders;
-- optional push;
 - parent view;
 - additional institutional adapters;
-- real pilot and store-distribution work.
+- optional proximity evidence;
+- store-distribution hardening.
 
 ## Release rule
 
-No phase is complete because code exists. It is complete when it is merged,
-built reproducibly, tests genuinely execute, accessibility/offline/error
-states are covered and the acceptance scenario is demonstrated.
+No phase is complete because code exists. It is complete when it is merged, built reproducibly, tests genuinely execute, error/offline states are covered and its acceptance scenario is demonstrated.

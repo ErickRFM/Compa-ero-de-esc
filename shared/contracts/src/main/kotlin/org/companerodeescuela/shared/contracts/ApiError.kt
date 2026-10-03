@@ -32,6 +32,15 @@ enum class ApiErrorCode {
     @SerialName("dependency_unavailable")
     DEPENDENCY_UNAVAILABLE,
 
+    @SerialName("attendance_session_closed")
+    ATTENDANCE_SESSION_CLOSED,
+
+    @SerialName("attendance_operation_conflict")
+    ATTENDANCE_OPERATION_CONFLICT,
+
+    @SerialName("attendance_not_enrolled")
+    ATTENDANCE_NOT_ENROLLED,
+
     @SerialName("internal_error")
     INTERNAL_ERROR,
 }

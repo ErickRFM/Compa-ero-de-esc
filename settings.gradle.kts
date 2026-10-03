@@ -44,6 +44,7 @@ include(":apps:android:feature:home")
 include(":apps:android:feature:schedule")
 
 include(":apps:android:core:academic")
+include(":apps:android:core:attendance")
 include(":apps:android:core:common")
 include(":apps:android:core:database")
 include(":apps:android:core:designsystem")

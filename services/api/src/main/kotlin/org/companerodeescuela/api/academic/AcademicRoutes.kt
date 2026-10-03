@@ -7,6 +7,7 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.route
+import java.time.LocalDate
 import org.companerodeescuela.api.auth.AuthTokenService
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
@@ -26,6 +27,9 @@ fun Route.academicRoutes(
             get("/schedule") {
                 throw ApiException.DependencyUnavailable("Authentication is not configured")
             }
+            get("/schedule/v2") {
+                throw ApiException.DependencyUnavailable("Authentication is not configured")
+            }
         } else {
             authenticate(AuthTokenService.PROVIDER_NAME) {
                 get("/load") {
@@ -42,6 +46,25 @@ fun Route.academicRoutes(
                     call.respond(
                         ApiResponse(
                             data = AcademicService(academicProvider).scheduleFor(externalId),
+                            requestId = call.requestId(),
+                        ),
+                    )
+                }
+                get("/schedule/v2") {
+                    val externalId = call.requireSubject()
+                    val weekOf = call.request.queryParameters["weekOf"]
+                        ?.let { raw ->
+                            runCatching { LocalDate.parse(raw) }
+                                .getOrElse { throw ApiException.Validation("weekOf must be YYYY-MM-DD") }
+                        }
+                        ?: throw ApiException.Validation("weekOf is required")
+
+                    call.respond(
+                        ApiResponse(
+                            data = AcademicService(academicProvider).scheduleWeekFor(
+                                externalId = externalId,
+                                weekOf = weekOf,
+                            ),
                             requestId = call.requestId(),
                         ),
                     )

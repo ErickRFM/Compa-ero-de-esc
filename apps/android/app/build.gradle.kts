@@ -65,6 +65,7 @@ dependencies {
     implementation(composeBom)
 
     implementation(project(":apps:android:core:academic"))
+    implementation(project(":apps:android:core:attendance"))
     implementation(project(":apps:android:core:common"))
     implementation(project(":apps:android:core:database"))
     implementation(project(":apps:android:core:designsystem"))
@@ -89,6 +90,7 @@ dependencies {
 
     implementation(libs.hilt.android)
     implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.hilt.work)
     ksp(libs.hilt.compiler)
 
     testImplementation(libs.junit.jupiter)

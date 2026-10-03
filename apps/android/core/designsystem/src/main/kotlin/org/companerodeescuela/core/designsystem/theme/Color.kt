@@ -19,6 +19,22 @@ internal object CompanionPalette {
     val Indigo80 = Color(0xFFBBC3FF)
     val Indigo90 = Color(0xFFE0E0FF)
 
+    // Expressive V4 accents. These are intentionally deeper than the previous
+    // palette so hero surfaces and dark mode can carry stronger identity
+    // without sacrificing readable foregrounds.
+    val Violet30 = Color(0xFF4430B8)
+    val Violet40 = Color(0xFF5B43D6)
+    val Violet80 = Color(0xFFC9BFFF)
+    val Violet90 = Color(0xFFE8E0FF)
+
+    val Cyan30 = Color(0xFF005B67)
+    val Cyan40 = Color(0xFF007987)
+    val Cyan80 = Color(0xFF5DD7E7)
+    val Cyan90 = Color(0xFFA8EEFA)
+
+    val DeepNavy = Color(0xFF0A1020)
+    val DeepNavyRaised = Color(0xFF121A2E)
+
     // Secondary: teal, used for confirmations and "on time" states.
     val Teal20 = Color(0xFF00363C)
     val Teal40 = Color(0xFF00696F)
@@ -38,15 +54,15 @@ internal object CompanionPalette {
     val Red80 = Color(0xFFFFB4AB)
     val Red90 = Color(0xFFFFDAD6)
 
-    val NeutralBackgroundLight = Color(0xFFFBF8FF)
-    val NeutralSurfaceLight = Color(0xFFFBF8FF)
+    val NeutralBackgroundLight = Color(0xFFF8F7FF)
+    val NeutralSurfaceLight = Color(0xFFFFFBFF)
     val NeutralSurfaceVariantLight = Color(0xFFE2E1EC)
     val NeutralOnSurfaceLight = Color(0xFF1B1B21)
     val NeutralOnSurfaceVariantLight = Color(0xFF45464F)
     val NeutralOutlineLight = Color(0xFF767680)
 
-    val NeutralBackgroundDark = Color(0xFF131316)
-    val NeutralSurfaceDark = Color(0xFF131316)
+    val NeutralBackgroundDark = DeepNavy
+    val NeutralSurfaceDark = DeepNavyRaised
     val NeutralSurfaceVariantDark = Color(0xFF45464F)
     val NeutralOnSurfaceDark = Color(0xFFE5E1E9)
     val NeutralOnSurfaceVariantDark = Color(0xFFC6C5D0)

@@ -12,14 +12,14 @@ import androidx.compose.ui.platform.LocalContext
 import org.companerodeescuela.core.designsystem.theme.CompanionPalette as P
 
 private val LightColors = lightColorScheme(
-    primary = P.Indigo40,
+    primary = P.Violet40,
     onPrimary = androidx.compose.ui.graphics.Color.White,
-    primaryContainer = P.Indigo90,
-    onPrimaryContainer = P.Indigo10,
-    secondary = P.Teal40,
+    primaryContainer = P.Violet90,
+    onPrimaryContainer = P.Violet30,
+    secondary = P.Cyan40,
     onSecondary = androidx.compose.ui.graphics.Color.White,
-    secondaryContainer = P.Teal90,
-    onSecondaryContainer = P.Teal20,
+    secondaryContainer = P.Cyan90,
+    onSecondaryContainer = P.Cyan30,
     tertiary = P.Amber40,
     onTertiary = androidx.compose.ui.graphics.Color.White,
     tertiaryContainer = P.Amber90,
@@ -38,14 +38,14 @@ private val LightColors = lightColorScheme(
 )
 
 private val DarkColors = darkColorScheme(
-    primary = P.Indigo80,
-    onPrimary = P.Indigo10,
-    primaryContainer = P.Indigo20,
-    onPrimaryContainer = P.Indigo90,
-    secondary = P.Teal80,
-    onSecondary = P.Teal20,
-    secondaryContainer = P.Teal20,
-    onSecondaryContainer = P.Teal90,
+    primary = P.Violet80,
+    onPrimary = P.Violet30,
+    primaryContainer = P.Violet30,
+    onPrimaryContainer = P.Violet90,
+    secondary = P.Cyan80,
+    onSecondary = P.Cyan30,
+    secondaryContainer = P.Cyan30,
+    onSecondaryContainer = P.Cyan90,
     tertiary = P.Amber80,
     onTertiary = P.Amber20,
     tertiaryContainer = P.Amber20,

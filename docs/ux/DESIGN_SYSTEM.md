@@ -1,8 +1,9 @@
 # Design system
 
-Status: the foundation layer exists and is in use by the two placeholder
-screens. Component and pattern work happens with the first real feature, not
-before.
+Status: V4 expressive evolution in progress. The foundation is already used by
+Login, Hoy and Agenda; V4 keeps the existing accessibility/offline principles
+while adding a stronger brand palette, expressive shape scale, semantic spacing
+and shared gradient tokens. Motion is defined separately in MOTION_MATRIX_V4.md.
 
 ## Principles
 
@@ -26,8 +27,8 @@ Defined in `apps/android/core/designsystem/.../theme/Color.kt` and applied in
 
 | Role | Light | Dark | Used for |
 |---|---|---|---|
-| Primary | Indigo | Indigo light | Navigation, primary actions |
-| Secondary | Teal | Teal light | Confirmation, "on time" |
+| Primary | Electric violet | Violet light | Navigation, hero actions |
+| Secondary | Cyan | Cyan light | Active/supporting surfaces |
 | Tertiary | Amber | Amber light | Warnings, late arrival |
 | Error | Red | Red light | Destructive, failures |
 
@@ -60,10 +61,10 @@ sizes on a low-density screen, heavy weights look blurry.
 
 | Role | Radius | Use |
 |---|---|---|
-| `small` | 8dp | Chips, list items |
-| `medium` | 14dp | Cards, dialogs |
-| `large` | 20dp | Sheets, bottom bars |
-| `extraLarge` | 28dp | Full-screen surfaces |
+| `small` | 10dp | Compact controls, list items |
+| `medium` | 18dp | Standard cards, dialogs |
+| `large` | 24dp | Prominent cards, sheets |
+| `extraLarge` | 32dp | Hero surfaces, floating navigation |
 
 Slightly rounder than Material's default. The tone is a study companion, not
 a bank.
@@ -76,7 +77,9 @@ more than usual for a student tapping quickly between classes.
 
 ## Shared components
 
-Only what more than one screen will need exists now.
+Shared components and tokens are promoted only when more than one surface needs
+them. V4 adds public spacing and gradient tokens so feature modules do not
+invent raw visual values.
 
 | Component | Purpose |
 |---|---|
@@ -106,7 +109,6 @@ slipping into user-facing copy.
 
 ## Not decided yet
 
-Deliberately unspecified until the first feature forces the question: icon
-set, custom illustration, motion and transition duration, dark-mode-specific
-layouts, tablet layout, localisation. Deciding these now would produce
-decisions with no evidence behind them.
+Still gated by implementation evidence: final icon family, Rive/Lottie asset
+scope, tablet composition, localisation and motion tuning on physical low-end
+devices. These are intentionally not hard-coded into feature modules.

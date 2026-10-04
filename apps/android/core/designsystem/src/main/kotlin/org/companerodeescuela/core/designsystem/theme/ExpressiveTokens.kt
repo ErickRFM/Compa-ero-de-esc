@@ -21,6 +21,11 @@ object CompaneroSpacing {
     val xxl = 32.dp
 }
 
+object CompaneroElevation {
+    val raised = 8.dp
+    val immersive = 12.dp
+}
+
 object CompaneroExpressive {
     @Composable
     fun heroBrush(): Brush = Brush.linearGradient(

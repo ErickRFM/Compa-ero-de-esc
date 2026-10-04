@@ -13,10 +13,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -42,6 +45,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.CompaneroExpressive
+import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.motion.CompaneroMotionDuration
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
@@ -74,11 +78,15 @@ fun LoginScreen(
         modifier = modifier
             .fillMaxSize()
             .background(CompaneroExpressive.subduedHeroBrush())
+            .imePadding()
             .padding(CompaneroSpacing.lg),
         contentAlignment = Alignment.Center,
     ) {
         AnimatedVisibility(
             visible = entered,
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
             enter = fadeIn(
                 tween(
                     if (reducedMotion) {
@@ -97,8 +105,8 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.extraLarge,
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-                tonalElevation = 10.dp,
-                shadowElevation = 12.dp,
+                tonalElevation = CompaneroElevation.raised,
+                shadowElevation = CompaneroElevation.immersive,
             ) {
                 Column(
                     modifier = Modifier.padding(CompaneroSpacing.xl),
@@ -106,17 +114,17 @@ fun LoginScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
-                        text = "COMPAÑERO",
+                        text = "UPTx",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary,
                     )
                     Text(
-                        text = "Tu escuela, en el momento correcto.",
+                        text = "Compañero de Clase",
                         modifier = Modifier.padding(top = CompaneroSpacing.xs),
                         style = MaterialTheme.typography.headlineMedium,
                     )
                     Text(
-                        text = "Entra con tu cuenta institucional.",
+                        text = "Tu escuela, en el momento correcto.",
                         modifier = Modifier.padding(
                             top = CompaneroSpacing.xs,
                             bottom = CompaneroSpacing.xl,
@@ -209,6 +217,13 @@ fun LoginScreen(
                             }
                         }
                     }
+
+                    Text(
+                        text = "Universidad Politécnica de Tlaxcala",
+                        modifier = Modifier.padding(top = CompaneroSpacing.xl),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }

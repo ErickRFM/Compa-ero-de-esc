@@ -19,6 +19,8 @@ import org.companerodeescuela.shared.contracts.ApiError
 import org.companerodeescuela.shared.contracts.ApiErrorCode
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
+import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
+import org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse
 import org.companerodeescuela.shared.contracts.AttendanceQrResponse
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
 import org.companerodeescuela.shared.contracts.AttendanceRosterResponse
@@ -76,6 +78,17 @@ class AttendanceRemoteClient @Inject constructor(
             client.post("attendance/sessions/$sessionId/qr") {
                 bearerAuth(token)
             }.requireBody<ApiResponse<AttendanceQrResponse>>()
+        }.map { it.data }
+
+    suspend fun inspectQr(
+        token: String,
+        request: AttendanceQrInspectionRequest,
+    ): Outcome<AttendanceQrInspectionResponse> =
+        apiCall {
+            client.post("attendance/qr/inspect") {
+                bearerAuth(token)
+                setBody(request)
+            }.requireBody<ApiResponse<AttendanceQrInspectionResponse>>()
         }.map { it.data }
 
     suspend fun closeSession(

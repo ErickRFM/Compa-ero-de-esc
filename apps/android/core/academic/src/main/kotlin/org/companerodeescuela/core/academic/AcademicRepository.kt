@@ -7,6 +7,8 @@ import java.time.Clock
 import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.database.AcademicSnapshotCache
+import org.companerodeescuela.core.database.PersonalScheduleItem
+import org.companerodeescuela.core.database.PersonalScheduleStore
 import org.companerodeescuela.core.network.apiCall
 import org.companerodeescuela.core.network.requireBody
 import org.companerodeescuela.core.security.PlatformSessionClaims
@@ -23,16 +25,16 @@ data class AcademicContent(
 )
 
 /**
- * Single owner of academic network + cache behavior.
+ * Single owner of academic network + institutional cache behavior.
  *
- * Features never decide independently which student's cache to read. The
- * active platform session scopes every lookup, and Room remains available when
- * the institutional dependency or network is temporarily unavailable.
+ * Personal schedule rows are stored separately and merged only for presentation.
+ * They never become institutional enrollment and never grant attendance authority.
  */
 class AcademicRepository(
     private val client: HttpClient,
     private val tokenStore: SessionTokenStore,
     private val cache: AcademicSnapshotCache,
+    private val personalScheduleStore: PersonalScheduleStore? = null,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     suspend fun load(): Outcome<AcademicContent> {
@@ -58,11 +60,11 @@ class AcademicRepository(
                     try {
                         cache.write(value)
                     } catch (_: Exception) {
-                        // Fresh remote data is still usable when a cache write fails.
+                        // Fresh institutional data remains usable when cache write fails.
                     }
                     Outcome.Success(
                         AcademicContent(
-                            academic = value,
+                            academic = mergePersonal(value, claims.userId),
                             fromCache = false,
                             updatedAtEpochSeconds = clock.instant().epochSecond,
                         ),
@@ -79,7 +81,7 @@ class AcademicRepository(
                     if (cached != null) {
                         Outcome.Success(
                             AcademicContent(
-                                academic = cached.value,
+                                academic = mergePersonal(cached.value, claims.userId),
                                 fromCache = true,
                                 updatedAtEpochSeconds = cached.updatedAtEpochSeconds,
                             ),
@@ -103,7 +105,44 @@ class AcademicRepository(
                 )
             }
 
-        return Outcome.Success(cached?.value?.schedule?.entries.orEmpty())
+        val institutional = cached?.value?.schedule?.entries.orEmpty()
+        val personal = personalEntries(session.second.userId)
+        return Outcome.Success(mergeEntries(institutional, personal))
+    }
+
+    private suspend fun mergePersonal(
+        value: AcademicLoadResponse,
+        ownerId: String,
+    ): AcademicLoadResponse {
+        val personal = personalEntries(ownerId)
+        if (personal.isEmpty()) return value
+        return value.copy(
+            schedule = value.schedule.copy(
+                entries = mergeEntries(value.schedule.entries, personal),
+            ),
+        )
+    }
+
+    private suspend fun personalEntries(ownerId: String): List<ScheduleEntry> {
+        val store = personalScheduleStore ?: return emptyList()
+        return runCatching {
+            store.list(ownerId).map(PersonalScheduleItem::toScheduleEntry)
+        }.getOrDefault(emptyList())
+    }
+
+    private fun mergeEntries(
+        institutional: List<ScheduleEntry>,
+        personal: List<ScheduleEntry>,
+    ): List<ScheduleEntry> {
+        val institutionalKeys = institutional.map(::scheduleKey).toSet()
+        return (institutional + personal.filter { scheduleKey(it) !in institutionalKeys })
+            .sortedWith(
+                compareBy<ScheduleEntry>(
+                    { dayOrder(it.dayOfWeek) },
+                    { it.startsAt },
+                    { it.subjectName },
+                ),
+            )
     }
 
     private suspend fun activeSession(): Pair<String, PlatformSessionClaims>? {
@@ -120,4 +159,38 @@ class AcademicRepository(
         }
         return token to claims
     }
+}
+
+private fun PersonalScheduleItem.toScheduleEntry(): ScheduleEntry =
+    ScheduleEntry(
+        courseId = id,
+        subjectCode = subjectCode.ifBlank { "PERSONAL" },
+        subjectName = subjectName,
+        groupName = groupName,
+        teacherName = teacherName,
+        dayOfWeek = dayOfWeek,
+        startsAt = startsAt,
+        endsAt = endsAt,
+        classroomName = classroomName,
+        buildingName = buildingName,
+        source = source,
+    )
+
+private fun scheduleKey(entry: ScheduleEntry): String =
+    listOf(
+        entry.dayOfWeek.trim().uppercase(),
+        entry.startsAt.trim(),
+        entry.endsAt.trim(),
+        entry.subjectName.trim().lowercase(),
+    ).joinToString("|")
+
+private fun dayOrder(day: String): Int = when (day) {
+    "MONDAY" -> 1
+    "TUESDAY" -> 2
+    "WEDNESDAY" -> 3
+    "THURSDAY" -> 4
+    "FRIDAY" -> 5
+    "SATURDAY" -> 6
+    "SUNDAY" -> 7
+    else -> 8
 }

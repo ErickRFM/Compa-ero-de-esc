@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
@@ -19,21 +20,26 @@ import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
-import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
 import org.companerodeescuela.core.attendance.AttendanceSyncScheduler
+import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
+import org.companerodeescuela.core.motion.ProvideCompaneroMotionPreferences
 import org.companerodeescuela.core.navigation.CompaneroScaffold
 import org.companerodeescuela.core.navigation.Destination
 import org.companerodeescuela.core.navigation.TopLevelDestination
+import org.companerodeescuela.feature.attendance.AttendanceScreen
 import org.companerodeescuela.feature.auth.LoginScreen
 import org.companerodeescuela.feature.auth.RegistrationScreen
-import org.companerodeescuela.feature.attendance.AttendanceScreen
 import org.companerodeescuela.feature.auth.SessionViewModel
 import org.companerodeescuela.feature.designsystem.DesignSystemCatalogScreen
 import org.companerodeescuela.feature.home.HomeScreen
 import org.companerodeescuela.feature.profile.ProfileScreen
 import org.companerodeescuela.feature.schedule.ScheduleScreen
+import org.companerodeescuela.feature.settings.AppThemeMode
+import org.companerodeescuela.feature.settings.AppearancePreferences
+import org.companerodeescuela.feature.settings.AppearanceSettingsScreen
 import org.companerodeescuela.shared.contracts.UserRole
 
 @AndroidEntryPoint
@@ -42,82 +48,133 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var attendanceSyncScheduler: AttendanceSyncScheduler
 
+    @Inject
+    lateinit var appearancePreferences: AppearancePreferences
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         setContent {
-            CompaneroTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background,
+            val appearance by appearancePreferences.state.collectAsStateWithLifecycle()
+            val systemDark = isSystemInDarkTheme()
+            val darkTheme = when (appearance.themeMode) {
+                AppThemeMode.SYSTEM -> systemDark
+                AppThemeMode.LIGHT -> false
+                AppThemeMode.DARK -> true
+            }
+
+            CompaneroTheme(
+                darkTheme = darkTheme,
+                fontScaleMultiplier = appearance.textScale,
+                highContrast = appearance.highContrast,
+            ) {
+                ProvideCompaneroMotionPreferences(
+                    reducedMotion = appearance.reducedMotion,
                 ) {
-                    val sessionViewModel: SessionViewModel = hiltViewModel()
-                    val session by sessionViewModel.state.collectAsStateWithLifecycle()
-                    var activatingAccess by remember { mutableStateOf(false) }
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background,
+                    ) {
+                        val sessionViewModel: SessionViewModel = hiltViewModel()
+                        val session by sessionViewModel.state.collectAsStateWithLifecycle()
+                        var activatingAccess by remember { mutableStateOf(false) }
 
-                    LaunchedEffect(session.authenticated) {
-                        if (session.authenticated) {
-                            activatingAccess = false
-                            attendanceSyncScheduler.schedule()
-                        }
-                    }
-
-                    when {
-                        session.checking -> {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                CircularProgressIndicator()
+                        LaunchedEffect(session.authenticated) {
+                            if (session.authenticated) {
+                                activatingAccess = false
+                                attendanceSyncScheduler.schedule()
                             }
                         }
-                        !session.authenticated -> {
-                            if (activatingAccess) {
-                                RegistrationScreen(
-                                    state = session,
-                                    onActivate = sessionViewModel::login,
-                                    onBackToLogin = { activatingAccess = false },
-                                )
-                            } else {
-                                LoginScreen(
-                                    state = session,
-                                    onLogin = sessionViewModel::login,
-                                    onCreateAccount = { activatingAccess = true },
-                                )
-                            }
-                        }
-                        else -> {
-                            val teacherOnly =
-                                UserRole.TEACHER in session.roles &&
-                                    UserRole.STUDENT !in session.roles
-                            val startDestination =
-                                if (teacherOnly) Destination.Attendance else Destination.Home
-                            val topLevelDestinations =
-                                if (teacherOnly) {
-                                    listOf(TopLevelDestination.Attendance)
-                                } else {
-                                    TopLevelDestination.entries
+
+                        when {
+                            session.checking -> {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    CircularProgressIndicator()
                                 }
-
-                            CompaneroScaffold(
-                                startDestination = startDestination,
-                                topLevelDestinations = topLevelDestinations,
-                                showDebugCatalog = BuildConfig.DEBUG,
-                            ) {
-                                composable(Destination.Home.route) { HomeScreen() }
-                                composable(Destination.Schedule.route) { ScheduleScreen() }
-                                composable(Destination.Attendance.route) { AttendanceScreen() }
-                                composable(Destination.Profile.route) {
-                                    ProfileScreen(
-                                        displayName = session.displayName,
-                                        roles = session.roles,
-                                        onLogout = sessionViewModel::logout,
+                            }
+                            !session.authenticated -> {
+                                if (activatingAccess) {
+                                    RegistrationScreen(
+                                        state = session,
+                                        onActivate = sessionViewModel::login,
+                                        onBackToLogin = { activatingAccess = false },
+                                    )
+                                } else {
+                                    LoginScreen(
+                                        state = session,
+                                        onLogin = sessionViewModel::login,
+                                        onCreateAccount = { activatingAccess = true },
                                     )
                                 }
-                                if (BuildConfig.DEBUG) {
-                                    composable(Destination.DesignSystemCatalog.route) {
-                                        DesignSystemCatalogScreen()
+                            }
+                            else -> {
+                                val teacherOnly =
+                                    UserRole.TEACHER in session.roles &&
+                                        UserRole.STUDENT !in session.roles
+                                val startDestination =
+                                    if (teacherOnly) Destination.Attendance else Destination.Home
+                                val topLevelDestinations =
+                                    if (teacherOnly) {
+                                        listOf(TopLevelDestination.Attendance)
+                                    } else {
+                                        TopLevelDestination.entries
+                                    }
+                                val navController = rememberNavController()
+
+                                CompaneroScaffold(
+                                    navController = navController,
+                                    startDestination = startDestination,
+                                    topLevelDestinations = topLevelDestinations,
+                                ) {
+                                    composable(Destination.Home.route) {
+                                        HomeScreen(
+                                            onOpenSchedule = {
+                                                navController.navigate(Destination.Schedule.route) {
+                                                    launchSingleTop = true
+                                                }
+                                            },
+                                        )
+                                    }
+                                    composable(Destination.Schedule.route) { ScheduleScreen() }
+                                    composable(Destination.Attendance.route) { AttendanceScreen() }
+                                    composable(Destination.Profile.route) {
+                                        ProfileScreen(
+                                            displayName = session.displayName,
+                                            roles = session.roles,
+                                            onAppearance = {
+                                                navController.navigate(
+                                                    Destination.AppearanceSettings.route,
+                                                )
+                                            },
+                                            onLogout = sessionViewModel::logout,
+                                        )
+                                    }
+                                    composable(Destination.AppearanceSettings.route) {
+                                        AppearanceSettingsScreen(
+                                            settings = appearance,
+                                            onThemeMode = appearancePreferences::setThemeMode,
+                                            onTextScale = appearancePreferences::setTextScale,
+                                            onReducedMotion = appearancePreferences::setReducedMotion,
+                                            onHighContrast = appearancePreferences::setHighContrast,
+                                            onOpenDebugCatalog = if (BuildConfig.DEBUG) {
+                                                {
+                                                    navController.navigate(
+                                                        Destination.DesignSystemCatalog.route,
+                                                    )
+                                                }
+                                            } else {
+                                                null
+                                            },
+                                        )
+                                    }
+                                    if (BuildConfig.DEBUG) {
+                                        composable(Destination.DesignSystemCatalog.route) {
+                                            DesignSystemCatalogScreen()
+                                        }
                                     }
                                 }
                             }

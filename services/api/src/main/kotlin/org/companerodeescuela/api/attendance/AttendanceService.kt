@@ -10,6 +10,9 @@ import org.companerodeescuela.api.integrations.IntegrationException
 import org.companerodeescuela.api.integrations.academic.AcademicProvider
 import org.companerodeescuela.shared.contracts.ApiErrorCode
 import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
+import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
+import org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse
+import org.companerodeescuela.shared.contracts.AttendanceQrInspectionStatus
 import org.companerodeescuela.shared.contracts.AttendanceReasonCode
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
 import org.companerodeescuela.shared.contracts.AttendanceRosterResponse
@@ -102,6 +105,71 @@ class AttendanceService(
         return repository.findOpenSessions().filter { session ->
             session.closesAtEpochSeconds > now &&
                 (session.courseId to session.groupName) in enrolled
+        }
+    }
+
+    suspend fun inspectQr(
+        studentId: String,
+        request: AttendanceQrInspectionRequest,
+    ): AttendanceQrInspectionResponse {
+        val sessionId = request.sessionId.trim()
+        val token = request.token.trim()
+        if (sessionId.isBlank() || token.isBlank() || token.length > MAX_QR_TOKEN_LENGTH) {
+            throw ApiException.Validation("QR inspection payload is invalid")
+        }
+
+        val session = repository.findSession(sessionId)
+            ?: return AttendanceQrInspectionResponse(
+                status = AttendanceQrInspectionStatus.INVALID,
+            )
+
+        val load = academicLoad(studentId)
+        val enrolled = load.enrollments.any {
+            it.course.externalId == session.courseId &&
+                it.course.groupName.trim() == session.groupName
+        }
+        if (!enrolled) {
+            return AttendanceQrInspectionResponse(
+                status = AttendanceQrInspectionStatus.NOT_ENROLLED,
+            )
+        }
+
+        val now = clock.instant().epochSecond
+        if (
+            session.status != AttendanceSessionStatus.OPEN ||
+            session.closesAtEpochSeconds <= now
+        ) {
+            return AttendanceQrInspectionResponse(
+                status = AttendanceQrInspectionStatus.SESSION_CLOSED,
+                session = session,
+            )
+        }
+
+        val verifier = qrService
+            ?: throw ApiException.DependencyUnavailable("Attendance QR verification is not configured")
+        return when (
+            val result = verifier.verify(
+                token = token,
+                expectedSessionId = session.id,
+                receivedAtEpochSeconds = now,
+            )
+        ) {
+            is QrEvidenceResult.Valid -> AttendanceQrInspectionResponse(
+                status = AttendanceQrInspectionStatus.VALID,
+                session = session,
+                expiresAtEpochSeconds = result.expiresAtEpochSeconds,
+            )
+            is QrEvidenceResult.Expired -> AttendanceQrInspectionResponse(
+                status = AttendanceQrInspectionStatus.EXPIRED,
+                session = session,
+                expiresAtEpochSeconds = result.expiresAtEpochSeconds,
+            )
+            QrEvidenceResult.WrongSession -> AttendanceQrInspectionResponse(
+                status = AttendanceQrInspectionStatus.WRONG_SESSION,
+            )
+            QrEvidenceResult.Invalid -> AttendanceQrInspectionResponse(
+                status = AttendanceQrInspectionStatus.INVALID,
+            )
         }
     }
 
@@ -334,6 +402,7 @@ class AttendanceService(
         const val MIN_DURATION_MINUTES = 1
         const val MAX_DURATION_MINUTES = 15
         const val MAX_OPERATION_ID_LENGTH = 128
+        const val MAX_QR_TOKEN_LENGTH = 2_048
         const val LATE_SYNC_REVIEW_WINDOW_SECONDS = 24L * 60L * 60L
     }
 }

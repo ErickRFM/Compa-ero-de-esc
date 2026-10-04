@@ -11,6 +11,8 @@ import org.companerodeescuela.core.security.PlatformSessionClaims
 import org.companerodeescuela.core.security.SessionTokenInspector
 import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.shared.contracts.AcademicWeekResponse
+import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
+import org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse
 import org.companerodeescuela.shared.contracts.AttendanceQrResponse
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
 import org.companerodeescuela.shared.contracts.AttendanceRosterResponse
@@ -50,6 +52,11 @@ class AttendanceRepository(
 
     suspend fun issueQr(sessionId: String): Outcome<AttendanceQrResponse> =
         withToken { token -> remoteClient.issueQr(token, sessionId) }
+
+    suspend fun inspectQr(
+        request: AttendanceQrInspectionRequest,
+    ): Outcome<AttendanceQrInspectionResponse> =
+        withToken { token -> remoteClient.inspectQr(token, request) }
 
     suspend fun closeSession(sessionId: String): Outcome<AttendanceSessionResponse> =
         withToken { token -> remoteClient.closeSession(token, sessionId) }

@@ -16,6 +16,8 @@ import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.integrations.academic.mapper.AcademicMappers
 import org.companerodeescuela.api.integrations.mock.MockAcademicProvider
 import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
+import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
+import org.companerodeescuela.shared.contracts.AttendanceQrInspectionStatus
 import org.companerodeescuela.shared.contracts.AttendanceReasonCode
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
@@ -86,6 +88,37 @@ class AttendanceServiceTest {
         assertEquals(AttendanceStatus.LIKELY, record.status)
         assertEquals(AttendanceReasonCode.IDENTITY_SESSION_TIME, record.reasonCode)
         assertEquals(session.occurrenceId, record.occurrenceId)
+    }
+
+    @Test
+    fun `QR inspection validates evidence without creating attendance`() = runTest {
+        val repository = InMemoryAttendanceRepository()
+        val qrService = AttendanceQrService(
+            secret = "0123456789abcdef0123456789abcdef".toCharArray(),
+            repository = repository,
+            clock = Clock.fixed(initialInstant, ZoneOffset.UTC),
+        )
+        val service = AttendanceService(
+            repository = repository,
+            academicProvider = provider,
+            qrService = qrService,
+            clock = Clock.fixed(initialInstant, ZoneOffset.UTC),
+            newId = { "session-inspect" },
+        )
+        val session = service.openSession("T-0001", requestFor(teacherOccurrence()))
+        val token = qrService.issue("T-0001", session.id).token
+
+        val result = service.inspectQr(
+            studentId = "2020-10455",
+            request = AttendanceQrInspectionRequest(
+                sessionId = session.id,
+                token = token,
+            ),
+        )
+
+        assertEquals(AttendanceQrInspectionStatus.VALID, result.status)
+        assertEquals(session.id, result.session?.id)
+        assertEquals(0, repository.recordsForSession(session.id).size)
     }
 
     @Test

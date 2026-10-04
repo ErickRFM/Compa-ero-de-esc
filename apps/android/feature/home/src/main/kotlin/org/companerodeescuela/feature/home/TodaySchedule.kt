@@ -7,6 +7,7 @@ import org.companerodeescuela.shared.contracts.ScheduleEntry
 
 data class TodayOverview(
     val studentName: String,
+    val hasSchedule: Boolean,
     val current: ScheduleEntry?,
     val next: ScheduleEntry?,
     val classes: List<ScheduleEntry>,
@@ -17,7 +18,8 @@ object TodaySchedule {
         load: AcademicLoadResponse,
         now: LocalDateTime = LocalDateTime.now(),
     ): TodayOverview {
-        val today = load.schedule.entries
+        val allEntries = load.schedule.entries
+        val today = allEntries
             .filter { it.dayOfWeek == now.dayOfWeek.name }
             .mapNotNull { entry ->
                 val start = runCatching { LocalTime.parse(entry.startsAt) }.getOrNull()
@@ -34,6 +36,7 @@ object TodaySchedule {
 
         return TodayOverview(
             studentName = load.student.displayName,
+            hasSchedule = allEntries.isNotEmpty(),
             current = current?.entry,
             next = next?.entry,
             classes = today.map { it.entry },

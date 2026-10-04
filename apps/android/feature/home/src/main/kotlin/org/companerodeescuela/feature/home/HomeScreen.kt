@@ -1,12 +1,12 @@
 package org.companerodeescuela.feature.home
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -32,8 +32,8 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
+import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
 import org.companerodeescuela.core.motion.CompaneroMotionDuration
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
@@ -47,6 +47,7 @@ import org.companerodeescuela.shared.contracts.ScheduleEntry
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
+    onOpenSchedule: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -98,7 +99,7 @@ fun HomeScreen(
 
             state.errorMessage?.let { message ->
                 StatusNotice(
-                    title = "No pudimos actualizar",
+                    title = "No pudimos actualizar UPTlax",
                     message = message,
                     tone = NoticeTone.ERROR,
                 )
@@ -108,28 +109,55 @@ fun HomeScreen(
             }
 
             overview?.let { day ->
-                if (splitLayout) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
-                        verticalAlignment = Alignment.Top,
-                    ) {
-                        CurrentClassPanel(
-                            day = day,
-                            reducedMotion = reducedMotion,
-                            modifier = Modifier.weight(1.2f),
+                when {
+                    !day.hasSchedule -> {
+                        StatusNotice(
+                            title = "Aún no tienes un horario",
+                            message = "Tu cuenta UPTlax está activa, pero todavía no hay clases en tu agenda.",
                         )
-                        NextClassPanel(
-                            day = day,
-                            modifier = Modifier.weight(1f),
+                        Button(
+                            onClick = onOpenSchedule,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Preparar mi agenda")
+                        }
+                        Text(
+                            text = "En Agenda puedes sincronizar UPTlax, importar un PDF o imagen, o crear un horario personal.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                } else {
-                    CurrentClassPanel(day = day, reducedMotion = reducedMotion)
-                    NextClassPanel(day = day)
+                    day.classes.isEmpty() -> {
+                        StatusNotice(
+                            title = "Hoy no tienes clases",
+                            message = "Tu agenda de hoy está libre. Consulta Agenda para revisar el resto de la semana.",
+                            tone = NoticeTone.SUCCESS,
+                        )
+                    }
+                    else -> {
+                        if (splitLayout) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
+                                verticalAlignment = Alignment.Top,
+                            ) {
+                                TodayContextPanel(
+                                    day = day,
+                                    reducedMotion = reducedMotion,
+                                    modifier = Modifier.weight(1.2f),
+                                )
+                                NextClassPanel(
+                                    day = day,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        } else {
+                            TodayContextPanel(day = day, reducedMotion = reducedMotion)
+                            NextClassPanel(day = day)
+                        }
+                        DayTimeline(day)
+                    }
                 }
-
-                DayTimeline(day)
 
                 TextButton(
                     onClick = viewModel::refresh,
@@ -144,14 +172,29 @@ fun HomeScreen(
 }
 
 @Composable
-private fun CurrentClassPanel(
+private fun TodayContextPanel(
     day: TodayOverview,
     reducedMotion: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val current = day.current
+    if (current == null) {
+        val next = day.next
+        StatusNotice(
+            title = if (next != null) "Entre clases" else "Terminaste tus clases de hoy",
+            message = if (next != null) {
+                "Tu siguiente clase comienza a las " + next.startsAt + "."
+            } else {
+                "No tienes más clases programadas hoy."
+            },
+            modifier = modifier,
+        )
+        return
+    }
+
     AnimatedContent(
         modifier = modifier,
-        targetState = day.current,
+        targetState = current,
         transitionSpec = {
             val duration = if (reducedMotion) {
                 CompaneroMotionDuration.FAST
@@ -173,24 +216,15 @@ private fun CurrentClassPanel(
                 )
         },
         label = "currentClassHero",
-    ) { current ->
-        if (current != null) {
-            HeroAcademicCard(
-                subject = current.subjectName,
-                time = "${current.startsAt} – ${current.endsAt}",
-                location = locationLabel(current),
-                teacher = current.teacherName,
-                progress = classProgress(current),
-                supportingText = remainingLabel(current.endsAt, "Termina"),
-            )
-        } else {
-            StatusNotice(
-                title = "Sin clase en este momento",
-                message = day.next?.let {
-                    "Tu siguiente clase comienza a las ${it.startsAt}."
-                } ?: "Tu jornada académica de hoy no tiene otra clase programada.",
-            )
-        }
+    ) { classEntry ->
+        HeroAcademicCard(
+            subject = classEntry.subjectName,
+            time = classEntry.startsAt + " – " + classEntry.endsAt,
+            location = locationLabel(classEntry),
+            teacher = classEntry.teacherName,
+            progress = classProgress(classEntry),
+            supportingText = remainingLabel(classEntry.endsAt, "Termina"),
+        )
     }
 }
 
@@ -199,20 +233,7 @@ private fun NextClassPanel(
     day: TodayOverview,
     modifier: Modifier = Modifier,
 ) {
-    val next = day.next?.takeIf { it != day.current }
-    if (next == null) {
-        StatusNotice(
-            title = if (day.classes.isEmpty()) "Sin clases programadas" else "Sin clases posteriores",
-            message = if (day.classes.isEmpty()) {
-                "Tu jornada académica de hoy está libre."
-            } else {
-                "No tienes otra clase después de la actual."
-            },
-            modifier = modifier,
-        )
-        return
-    }
-
+    val next = day.next?.takeIf { it != day.current } ?: return
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
@@ -223,7 +244,7 @@ private fun NextClassPanel(
         )
         AcademicClassCard(
             subject = next.subjectName,
-            time = "${next.startsAt} – ${next.endsAt}",
+            time = next.startsAt + " – " + next.endsAt,
             location = locationLabel(next),
             teacher = next.teacherName,
             supportingText = remainingLabel(next.startsAt, "Comienza"),
@@ -237,24 +258,16 @@ private fun DayTimeline(day: TodayOverview) {
         text = "Tu día",
         style = MaterialTheme.typography.titleLarge,
     )
-
-    if (day.classes.isEmpty()) {
-        StatusNotice(
-            title = "Día libre",
-            message = "No tienes clases programadas para hoy.",
+    day.classes.forEach { entry ->
+        val status = classStatus(entry, day.current, day.next)
+        AcademicTimelineItem(
+            time = entry.startsAt,
+            title = entry.subjectName,
+            subtitle = locationLabel(entry),
+            status = status.label,
+            highlighted = status.highlighted,
+            modifier = Modifier.fillMaxWidth(),
         )
-    } else {
-        day.classes.forEach { entry ->
-            val status = classStatus(entry, day.current, day.next)
-            AcademicTimelineItem(
-                time = entry.startsAt,
-                title = entry.subjectName,
-                subtitle = locationLabel(entry),
-                status = status.label,
-                highlighted = status.highlighted,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
     }
 }
 
@@ -288,9 +301,9 @@ private fun remainingLabel(time: String, verb: String): String? {
     val target = runCatching { LocalTime.parse(time) }.getOrNull() ?: return null
     val minutes = java.time.Duration.between(LocalTime.now(), target).toMinutes()
     return when {
-        minutes > 1 -> "$verb en $minutes min"
-        minutes == 1L -> "$verb en 1 min"
-        minutes == 0L -> "$verb ahora"
+        minutes > 1 -> verb + " en " + minutes + " min"
+        minutes == 1L -> verb + " en 1 min"
+        minutes == 0L -> verb + " ahora"
         else -> null
     }
 }

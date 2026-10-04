@@ -15,6 +15,9 @@ import kotlinx.coroutines.launch
 import org.companerodeescuela.core.attendance.AttendanceRepository
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.database.LocalAttendanceRecord
+import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
+import org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse
+import org.companerodeescuela.shared.contracts.AttendanceQrInspectionStatus
 import org.companerodeescuela.shared.contracts.AttendanceQrResponse
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
 import org.companerodeescuela.shared.contracts.AttendanceRosterResponse
@@ -43,7 +46,10 @@ data class AttendanceUiState(
     val qr: AttendanceQrResponse? = null,
     val roster: AttendanceRosterResponse? = null,
     val localRecords: List<LocalAttendanceRecord> = emptyList(),
-    val scannerSessionId: String? = null,
+    val scannerOpen: Boolean = false,
+    val scannerSessionHint: String? = null,
+    val pendingQrToken: String? = null,
+    val qrInspection: AttendanceQrInspectionResponse? = null,
     val successMessage: String? = null,
     val errorMessage: String? = null,
 )
@@ -72,32 +78,99 @@ class AttendanceViewModel @Inject constructor(
         }
     }
 
-    fun openScanner(sessionId: String) {
+    fun openScanner(sessionId: String? = null) {
         _state.update {
             it.copy(
-                scannerSessionId = sessionId,
+                scannerOpen = true,
+                scannerSessionHint = sessionId,
+                qrInspection = null,
+                pendingQrToken = null,
                 successMessage = null,
                 errorMessage = null,
             )
         }
     }
 
-    fun dismissScanner() {
-        _state.update { it.copy(scannerSessionId = null) }
+    fun openGenericScanner() {
+        openScanner(null)
     }
 
-    fun submitScannedQr(rawToken: String) {
-        val sessionId = _state.value.scannerSessionId ?: return
+    fun dismissScanner() {
+        _state.update { it.copy(scannerOpen = false, scannerSessionHint = null) }
+    }
+
+    fun inspectQr(rawToken: String) {
+        val token = rawToken.trim()
+        val sessionId = _state.value.scannerSessionHint
+            ?: AttendanceQrTokenParser.sessionId(token)
+        if (sessionId.isNullOrBlank()) {
+            _state.update {
+                it.copy(
+                    scannerOpen = false,
+                    scannerSessionHint = null,
+                    qrInspection = null,
+                    pendingQrToken = null,
+                    errorMessage = "No reconocimos un código QR de asistencia válido.",
+                )
+            }
+            return
+        }
+
         viewModelScope.launch {
             _state.update { it.copy(actionInProgress = true, errorMessage = null) }
-            when (val result = repository.enqueueAttempt(sessionId, rawToken)) {
+            when (
+                val result = repository.inspectQr(
+                    AttendanceQrInspectionRequest(
+                        sessionId = sessionId,
+                        token = token,
+                    ),
+                )
+            ) {
                 is Outcome.Success -> {
                     _state.update {
                         it.copy(
                             actionInProgress = false,
-                            scannerSessionId = null,
+                            scannerOpen = false,
+                            scannerSessionHint = null,
+                            pendingQrToken = token,
+                            qrInspection = result.value,
+                            errorMessage = null,
+                        )
+                    }
+                }
+                is Outcome.Failure -> {
+                    _state.update {
+                        it.copy(
+                            actionInProgress = false,
+                            scannerOpen = false,
+                            scannerSessionHint = null,
+                            qrInspection = null,
+                            pendingQrToken = null,
+                            errorMessage = result.error.userMessage,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun submitInspectedQr() {
+        val inspection = _state.value.qrInspection ?: return
+        val token = _state.value.pendingQrToken ?: return
+        val session = inspection.session ?: return
+        if (inspection.status != AttendanceQrInspectionStatus.VALID) return
+
+        viewModelScope.launch {
+            _state.update { it.copy(actionInProgress = true, errorMessage = null) }
+            when (val result = repository.enqueueAttempt(session.id, token)) {
+                is Outcome.Success -> {
+                    _state.update {
+                        it.copy(
+                            actionInProgress = false,
+                            qrInspection = null,
+                            pendingQrToken = null,
                             successMessage =
-                                "Pase guardado en este dispositivo. La app espera confirmación del servidor.",
+                                "Pase guardado en este dispositivo. El servidor confirmará el resultado.",
                         )
                     }
                 }
@@ -110,6 +183,15 @@ class AttendanceViewModel @Inject constructor(
                     }
                 }
             }
+        }
+    }
+
+    fun clearQrInspection() {
+        _state.update {
+            it.copy(
+                qrInspection = null,
+                pendingQrToken = null,
+            )
         }
     }
 

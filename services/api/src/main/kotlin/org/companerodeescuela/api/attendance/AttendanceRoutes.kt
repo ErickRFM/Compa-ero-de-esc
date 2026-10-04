@@ -16,6 +16,7 @@ import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
+import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
 import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
 import org.companerodeescuela.shared.contracts.UserRole
@@ -40,6 +41,20 @@ fun Route.attendanceRoutes(
                 call.respond(
                     ApiResponse(
                         data = service.activeFor(principal.subject()),
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
+
+            post("/qr/inspect") {
+                val principal = call.requirePrincipal()
+                principal.requireStudentRole()
+                call.respond(
+                    ApiResponse(
+                        data = service.inspectQr(
+                            studentId = principal.subject(),
+                            request = call.receive<AttendanceQrInspectionRequest>(),
+                        ),
                         requestId = call.requestId(),
                     ),
                 )

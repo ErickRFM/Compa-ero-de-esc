@@ -8,23 +8,27 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 
 private val LightColors = lightColorScheme(
     primary = CompanionColors.crimson,
-    onPrimary = androidx.compose.ui.graphics.Color.White,
+    onPrimary = Color.White,
     primaryContainer = CompanionColors.crimsonContainer,
     onPrimaryContainer = CompanionColors.crimson,
     secondary = CompanionColors.semanticBlue,
-    onSecondary = androidx.compose.ui.graphics.Color.White,
+    onSecondary = Color.White,
     secondaryContainer = CompanionColors.semanticBlueContainer,
     onSecondaryContainer = CompanionColors.semanticBlue,
     tertiary = CompanionColors.semanticAmber,
-    onTertiary = androidx.compose.ui.graphics.Color.White,
+    onTertiary = Color.White,
     tertiaryContainer = CompanionColors.semanticAmberContainer,
     onTertiaryContainer = CompanionColors.semanticAmber,
     error = CompanionColors.semanticRed,
-    onError = androidx.compose.ui.graphics.Color.White,
+    onError = Color.White,
     errorContainer = CompanionColors.semanticRedContainer,
     onErrorContainer = CompanionColors.semanticRed,
     background = CompanionColors.warmBackground,
@@ -63,32 +67,48 @@ private val DarkColors = darkColorScheme(
 )
 
 /**
- * App theme.
+ * App theme with product-level accessibility preferences.
  *
- * Dynamic colour is opt-in rather than the default: attendance and schedule
- * screens are shared on school projectors, and Material You wallpaper
- * extraction makes those screens unreadable on some devices.
+ * Android's system font scale remains authoritative; [fontScaleMultiplier]
+ * adjusts relative size without changing dp touch targets.
  */
 @Composable
 fun CompaneroTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
+    fontScaleMultiplier: Float = 1f,
+    highContrast: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val colorScheme = when {
+    val baseScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-
         darkTheme -> DarkColors
         else -> LightColors
     }
+    val colorScheme = if (highContrast) {
+        baseScheme.copy(
+            outline = baseScheme.onSurfaceVariant,
+            outlineVariant = baseScheme.onSurface.copy(alpha = 0.35f),
+        )
+    } else {
+        baseScheme
+    }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = CompanionTypography,
-        shapes = CompanionShapes,
-        content = content,
+    val density = LocalDensity.current
+    val adjustedDensity = Density(
+        density = density.density,
+        fontScale = density.fontScale * fontScaleMultiplier.coerceIn(0.9f, 1.2f),
     )
+
+    CompositionLocalProvider(LocalDensity provides adjustedDensity) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = CompanionTypography,
+            shapes = CompanionShapes,
+            content = content,
+        )
+    }
 }

@@ -3,7 +3,6 @@ package org.companerodeescuela.core.navigation
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -26,27 +25,23 @@ fun CompaneroScaffold(
     navController: NavHostController = rememberNavController(),
     startDestination: Destination = Destination.Home,
     topLevelDestinations: List<TopLevelDestination> = TopLevelDestination.entries,
-    showDebugCatalog: Boolean = false,
     destinations: NavGraphBuilder.() -> Unit,
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
-    val onProfile = currentDestination?.route == Destination.Profile.route
-    val onCatalog = currentDestination?.route == Destination.DesignSystemCatalog.route
-    val onSecondaryScreen = onProfile || onCatalog
     val secondaryTitle = when (currentDestination?.route) {
         Destination.Profile.route -> "Perfil"
+        Destination.AppearanceSettings.route -> "Tema y accesibilidad"
         Destination.DesignSystemCatalog.route -> "Sistema visual"
-        else -> ""
+        else -> null
     }
+    val onSecondaryScreen = secondaryTitle != null
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    if (onSecondaryScreen) {
-                        Text(secondaryTitle)
-                    }
+                    secondaryTitle?.let { Text(it) }
                 },
                 navigationIcon = {
                     if (onSecondaryScreen) {
@@ -59,20 +54,6 @@ fun CompaneroScaffold(
                     }
                 },
                 actions = {
-                    if (showDebugCatalog && !onSecondaryScreen) {
-                        IconButton(
-                            onClick = {
-                                navController.navigate(Destination.DesignSystemCatalog.route) {
-                                    launchSingleTop = true
-                                }
-                            },
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Palette,
-                                contentDescription = "Abrir catálogo del sistema visual",
-                            )
-                        }
-                    }
                     if (!onSecondaryScreen) {
                         IconButton(
                             onClick = {

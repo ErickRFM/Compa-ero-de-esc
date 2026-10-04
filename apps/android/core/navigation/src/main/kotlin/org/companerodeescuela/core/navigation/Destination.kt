@@ -8,6 +8,7 @@ sealed class Destination(val route: String) {
     data object Schedule : Destination("schedule")
     data object Attendance : Destination("attendance")
     data object Profile : Destination("profile")
+    data object AppearanceSettings : Destination("appearance-settings")
     data object DesignSystemCatalog : Destination("design-system-catalog")
 
     fun createRoute(vararg arguments: Any): String =
@@ -16,8 +17,7 @@ sealed class Destination(val route: String) {
 }
 
 /**
- * Only high-frequency student destinations belong in the persistent bottom
- * navigation. Profile is deliberately secondary and is opened from the app bar.
+ * Only high-frequency student destinations belong in persistent navigation.
  */
 enum class TopLevelDestination(
     val destination: Destination,

@@ -18,9 +18,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.CircleShape
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
+import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.shared.contracts.UserRole
@@ -63,7 +63,7 @@ fun ProfileScreen(
                     horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
                 ) {
                     Surface(
-                        modifier = Modifier.size(48.dp),
+                        modifier = Modifier.size(CompaneroSize.avatar),
                         shape = CircleShape,
                         color = CompanionColors.crimson,
                     ) {

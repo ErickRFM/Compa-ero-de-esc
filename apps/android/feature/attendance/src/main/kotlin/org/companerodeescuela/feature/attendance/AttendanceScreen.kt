@@ -38,7 +38,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -51,7 +50,9 @@ import kotlinx.coroutines.delay
 import org.companerodeescuela.core.database.LocalAttendanceRecord
 import org.companerodeescuela.core.database.LocalAttendanceSyncState
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
+import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
+import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
@@ -281,7 +282,7 @@ private fun LocalAttendanceRow(record: LocalAttendanceRecord) {
         color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(CompaneroSpacing.md),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -388,7 +389,7 @@ private fun TeacherActiveSession(
     var showCloseConfirmation by remember { mutableStateOf(false) }
 
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        if (maxWidth >= 720.dp) {
+        if (maxWidth >= CompaneroWindowBreakpoints.expanded) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
@@ -514,7 +515,7 @@ private fun TeacherSessionCard(
                     token = qrToken,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .widthIn(max = 340.dp),
+                        .widthIn(max = CompaneroSize.qrMaxWidth),
                 )
                 QrCountdown(qrExpiresAt)
                 Text(
@@ -583,8 +584,8 @@ private fun RosterRecord(
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(CompaneroSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -624,7 +625,7 @@ private fun RosterRecord(
             )
 
             if (record.status == AttendanceStatus.REVIEW_REQUIRED) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
                     FilledTonalButton(
                         onClick = { onReview(record, AttendanceStatus.VERIFIED) },
                         enabled = !busy,
@@ -669,8 +670,8 @@ private fun TeacherOccurrenceList(
     visible.forEach { occurrence ->
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(CompaneroSpacing.md),
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
             ) {
                 Text(
                     text = occurrence.subjectName,
@@ -714,7 +715,7 @@ private fun AttendanceHeader(
     ) {
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
         ) {
             Text(
                 text = title,
@@ -767,7 +768,7 @@ private fun LoadingAttendance(modifier: Modifier) {
         CircularProgressIndicator()
         Text(
             text = "Preparando asistencia…",
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier.padding(top = CompaneroSpacing.sm),
         )
     }
 }
@@ -781,7 +782,7 @@ private fun UnsupportedAttendance(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(20.dp),
+            .padding(CompaneroSpacing.lg),
         verticalArrangement = Arrangement.Center,
     ) {
         StatusNotice(
@@ -791,7 +792,7 @@ private fun UnsupportedAttendance(
         )
         Button(
             onClick = onRetry,
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier.padding(top = CompaneroSpacing.sm),
         ) {
             Text("Reintentar")
         }

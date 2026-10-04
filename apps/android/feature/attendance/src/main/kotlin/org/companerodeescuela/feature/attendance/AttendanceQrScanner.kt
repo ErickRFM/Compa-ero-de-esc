@@ -44,7 +44,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.barcode.BarcodeScanner
@@ -53,6 +52,7 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.atomic.AtomicBoolean
+import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 
 @Composable
@@ -160,10 +160,10 @@ fun AttendanceQrScanner(
             Canvas(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .size(270.dp),
+                    .size(CompaneroSize.scannerFrame),
             ) {
                 val length = size.minDimension * 0.22f
-                val strokeWidth = 4.dp.toPx()
+                val strokeWidth = CompaneroSize.scannerFrameStroke.toPx()
                 val right = size.width
                 val bottom = size.height
 
@@ -258,7 +258,10 @@ private fun CameraPermissionRequired(
         )
         Text(
             text = "La cámara se usa únicamente para leer el QR de asistencia. Puedes volver sin concederla.",
-            modifier = Modifier.padding(top = 12.dp, bottom = 20.dp),
+            modifier = Modifier.padding(
+                top = CompaneroSpacing.sm,
+                bottom = CompaneroSpacing.lg,
+            ),
             style = MaterialTheme.typography.bodyLarge,
             color = Color.White.copy(alpha = 0.8f),
         )
@@ -267,7 +270,7 @@ private fun CameraPermissionRequired(
         }
         Button(
             onClick = onClose,
-            modifier = Modifier.padding(top = 8.dp),
+            modifier = Modifier.padding(top = CompaneroSpacing.xs),
         ) {
             Text("Volver")
         }

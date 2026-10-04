@@ -19,11 +19,29 @@ object CompaneroSpacing {
     val lg = 20.dp
     val xl = 24.dp
     val xxl = 32.dp
+    val hero = 40.dp
 }
 
 object CompaneroElevation {
     val raised = 8.dp
     val immersive = 12.dp
+}
+
+object CompaneroSize {
+    val avatar = 48.dp
+    val indicator = 20.dp
+    val indicatorStroke = 2.dp
+    val loginContentMaxWidth = 520.dp
+    val homeContentMaxWidth = 1120.dp
+    val agendaRailWidth = 168.dp
+    val scannerFrame = 270.dp
+    val scannerFrameStroke = 4.dp
+    val qrMaxWidth = 340.dp
+}
+
+object CompaneroWindowBreakpoints {
+    val medium = 600.dp
+    val expanded = 840.dp
 }
 
 object CompaneroExpressive {

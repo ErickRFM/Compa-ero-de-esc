@@ -31,11 +31,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.LocalDate
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
+import org.companerodeescuela.core.designsystem.theme.CompaneroSize
+import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
 import org.companerodeescuela.core.motion.CompaneroMotionDuration
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 import org.companerodeescuela.core.ui.component.AcademicTimelineItem
@@ -178,14 +179,14 @@ private fun DayAgenda(
     val dayEntries = entries.filter { it.dayOfWeek == selectedDay }
 
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        if (maxWidth >= 600.dp) {
+        if (maxWidth >= CompaneroWindowBreakpoints.medium) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
                 verticalAlignment = Alignment.Top,
             ) {
                 Column(
-                    modifier = Modifier.width(168.dp),
+                    modifier = Modifier.width(CompaneroSize.agendaRailWidth),
                     verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
                 ) {
                     days.forEach { day ->

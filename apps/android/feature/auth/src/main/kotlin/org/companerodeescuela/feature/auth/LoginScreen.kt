@@ -10,9 +10,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -45,10 +47,10 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.theme.CompaneroExpressive
 import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
+import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.motion.CompaneroMotionDuration
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
@@ -77,7 +79,7 @@ fun LoginScreen(
         onLogin(username.trim(), password)
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(CompaneroExpressive.subduedHeroBrush())
@@ -85,10 +87,12 @@ fun LoginScreen(
             .padding(CompaneroSpacing.lg),
         contentAlignment = Alignment.Center,
     ) {
+        val viewportHeight = maxHeight
         AnimatedVisibility(
             visible = entered,
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .heightIn(min = viewportHeight, max = viewportHeight)
                 .verticalScroll(rememberScrollState()),
             enter = fadeIn(
                 tween(
@@ -107,8 +111,12 @@ fun LoginScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .widthIn(max = 520.dp),
-                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
+                    .widthIn(max = CompaneroSize.loginContentMaxWidth)
+                    .heightIn(min = viewportHeight),
+                verticalArrangement = Arrangement.spacedBy(
+                    CompaneroSpacing.md,
+                    Alignment.CenterVertically,
+                ),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
@@ -221,8 +229,8 @@ fun LoginScreen(
                         ) { submitting ->
                             if (submitting) {
                                 CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp,
+                                    modifier = Modifier.size(CompaneroSize.indicator),
+                                    strokeWidth = CompaneroSize.indicatorStroke,
                                     color = MaterialTheme.colorScheme.onPrimary,
                                 )
                             } else {

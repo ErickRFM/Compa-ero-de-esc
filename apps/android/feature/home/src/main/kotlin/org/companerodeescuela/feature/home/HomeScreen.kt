@@ -26,7 +26,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.LocalDate
@@ -34,6 +33,8 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
+import org.companerodeescuela.core.designsystem.theme.CompaneroSize
+import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
 import org.companerodeescuela.core.motion.CompaneroMotionDuration
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 import org.companerodeescuela.core.ui.component.AcademicClassCard
@@ -64,11 +65,11 @@ fun HomeScreen(
     val overview = state.overview
     val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val splitLayout = maxWidth >= 720.dp
+        val splitLayout = maxWidth >= CompaneroWindowBreakpoints.medium
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .widthIn(max = 1120.dp)
+                .widthIn(max = CompaneroSize.homeContentMaxWidth)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md)
                 .align(Alignment.TopCenter),

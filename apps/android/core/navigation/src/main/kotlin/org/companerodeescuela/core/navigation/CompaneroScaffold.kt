@@ -34,19 +34,19 @@ fun CompaneroScaffold(
     val onProfile = currentDestination?.route == Destination.Profile.route
     val onCatalog = currentDestination?.route == Destination.DesignSystemCatalog.route
     val onSecondaryScreen = onProfile || onCatalog
-    val title = when (currentDestination?.route) {
-        Destination.Schedule.route -> "Agenda"
-        Destination.Attendance.route -> "Asistencia"
+    val secondaryTitle = when (currentDestination?.route) {
         Destination.Profile.route -> "Perfil"
         Destination.DesignSystemCatalog.route -> "Sistema visual"
-        else -> "Compañero"
+        else -> ""
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(title)
+                    if (onSecondaryScreen) {
+                        Text(secondaryTitle)
+                    }
                 },
                 navigationIcon = {
                     if (onSecondaryScreen) {

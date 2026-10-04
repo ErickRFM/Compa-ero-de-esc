@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
@@ -27,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -93,7 +95,7 @@ fun CompaneroBottomBar(
                 destinations.forEachIndexed { index, topLevel ->
                     val selected = index == selectedIndex
                     val scale by animateFloatAsState(
-                        targetValue = if (selected && !reducedMotion) 1.06f else 1f,
+                        targetValue = if (selected && !reducedMotion) 1.04f else 1f,
                         animationSpec = CompaneroMotion.fast(),
                         label = "navItemScale",
                     )
@@ -116,10 +118,12 @@ fun CompaneroBottomBar(
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.graphicsLayer {
-                                scaleX = scale
-                                scaleY = scale
-                            },
+                            modifier = Modifier
+                                .padding(horizontal = 8.dp)
+                                .graphicsLayer {
+                                    scaleX = scale
+                                    scaleY = scale
+                                },
                         ) {
                             Icon(
                                 imageVector = when (topLevel) {
@@ -128,6 +132,7 @@ fun CompaneroBottomBar(
                                     TopLevelDestination.Attendance -> Icons.Filled.QrCodeScanner
                                 },
                                 contentDescription = topLevel.label,
+                                modifier = Modifier.size(22.dp),
                                 tint = if (selected) {
                                     Color.White
                                 } else {
@@ -137,9 +142,11 @@ fun CompaneroBottomBar(
                             if (selected) {
                                 Text(
                                     text = topLevel.label,
-                                    modifier = Modifier.padding(start = CompaneroSpacing.xs),
-                                    style = MaterialTheme.typography.labelLarge,
+                                    modifier = Modifier.padding(start = 6.dp),
+                                    style = MaterialTheme.typography.labelMedium,
                                     color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
                         }

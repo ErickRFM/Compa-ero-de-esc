@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -19,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.foundation.shape.CircleShape
+import org.companerodeescuela.core.designsystem.brand.UptlaxBrand
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
@@ -53,10 +55,11 @@ fun ProfileScreen(
                 modifier = Modifier.padding(CompaneroSpacing.xl),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
-                Text(
-                    text = "UPTx",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = CompanionColors.crimsonContainer,
+                UptlaxBrand(
+                    modifier = Modifier
+                        .fillMaxWidth(0.58f)
+                        .height(CompaneroSize.brandLogoCompactHeight),
+                    tint = CompanionColors.onDarkSurface,
                 )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -95,7 +98,7 @@ fun ProfileScreen(
         ProfileRow(
             title = "Institución",
             detail = "Universidad Politécnica de Tlaxcala",
-            trailingLabel = "UPTx",
+            trailingLabel = "UPTlax",
         )
         ProfileRow(title = "Sesión", detail = "Institucional activa")
         ProfileRow(

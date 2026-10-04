@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
@@ -37,20 +38,26 @@ internal class EncryptedSessionTokenStore(
     private val cipher: TokenCipher,
 ) : SessionTokenStore {
 
-    override suspend fun readAccessToken(): String? {
-        val preferences = dataStore.data.first()
-        return try {
-            decodeToken(preferences)
+    override suspend fun readAccessToken(): String? =
+        try {
+            decodeToken(dataStore.data.first())
         } catch (_: Exception) {
-            clear()
+            // A corrupt preference file, stale IV or invalid keystore key must
+            // never trap the app on startup. Best-effort cleanup is enough.
+            runCatching { clear() }
             null
         }
-    }
 
     override fun observeAccessToken(): Flow<String?> =
-        dataStore.data.map { preferences ->
-            runCatching { decodeToken(preferences) }.getOrNull()
-        }
+        dataStore.data
+            .map { preferences ->
+                runCatching { decodeToken(preferences) }.getOrNull()
+            }
+            .catch {
+                // DataStore itself can fail while reading a corrupt file.
+                // Emit signed-out state rather than cancelling session observation.
+                emit(null)
+            }
 
     override suspend fun writeAccessToken(token: String) {
         require(token.isNotBlank()) { "access token must not be blank" }

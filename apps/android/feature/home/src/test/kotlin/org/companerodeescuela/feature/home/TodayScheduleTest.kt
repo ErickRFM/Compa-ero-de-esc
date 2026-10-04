@@ -30,6 +30,23 @@ class TodayScheduleTest {
         assertEquals(3, result.classes.size)
     }
 
+    @Test
+    fun `empty institutional schedule is identified separately from a free day`() {
+        val result = TodaySchedule.calculate(
+            load = AcademicLoadResponse(
+                student = AcademicProfile("student-1", "Ana"),
+                schedule = AcademicScheduleResponse(
+                    ownerId = "student-1",
+                    entries = emptyList(),
+                ),
+            ),
+            now = LocalDateTime.of(2026, 10, 5, 8, 20),
+        )
+
+        assertEquals(false, result.hasSchedule)
+        assertEquals(0, result.classes.size)
+    }
+
     private fun entry(name: String, start: String, end: String) = ScheduleEntry(
         courseId = name,
         subjectCode = name,

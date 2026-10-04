@@ -58,6 +58,7 @@ class MainActivity : ComponentActivity() {
 
                     LaunchedEffect(session.authenticated) {
                         if (session.authenticated) {
+                            activatingAccess = false
                             attendanceSyncScheduler.schedule()
                         }
                     }

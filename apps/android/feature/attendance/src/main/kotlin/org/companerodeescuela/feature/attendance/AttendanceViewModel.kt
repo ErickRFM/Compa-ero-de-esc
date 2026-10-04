@@ -57,7 +57,6 @@ data class AttendanceUiState(
     val localRecords: List<LocalAttendanceRecord> = emptyList(),
     val scannerOpen: Boolean = false,
     val scannerSessionHint: String? = null,
-    val pendingQrToken: String? = null,
     val qrInspection: AttendanceQrInspectionResponse? = null,
     val successMessage: String? = null,
     val errorMessage: String? = null,
@@ -78,6 +77,57 @@ class AttendanceViewModel @Inject constructor(
         bootstrap()
     }
 
+    fun selectMode(requestedMode: AttendanceMode) {
+        if (requestedMode !in setOf(AttendanceMode.STUDENT, AttendanceMode.TEACHER)) return
+
+        viewModelScope.launch {
+            when (val claimsResult = repository.localSessionClaims()) {
+                is Outcome.Success -> {
+                    val claims = claimsResult.value
+                    val allowed = when (requestedMode) {
+                        AttendanceMode.STUDENT -> UserRole.STUDENT in claims.roles
+                        AttendanceMode.TEACHER -> UserRole.TEACHER in claims.roles
+                        else -> false
+                    }
+                    if (!allowed) {
+                        _state.update {
+                            it.copy(
+                                mode = AttendanceMode.UNSUPPORTED,
+                                loading = false,
+                                errorMessage = "Tu cuenta no tiene acceso a este modo de asistencia.",
+                            )
+                        }
+                        return@launch
+                    }
+
+                    _state.update {
+                        it.copy(
+                            mode = requestedMode,
+                            userId = claims.userId,
+                            loading = false,
+                            errorMessage = null,
+                        )
+                    }
+                    observeLocalRecords(claims.userId)
+                    when (requestedMode) {
+                        AttendanceMode.STUDENT -> refreshStudent()
+                        AttendanceMode.TEACHER -> refreshTeacher()
+                        else -> Unit
+                    }
+                }
+                is Outcome.Failure -> {
+                    _state.update {
+                        it.copy(
+                            mode = AttendanceMode.UNSUPPORTED,
+                            loading = false,
+                            errorMessage = claimsResult.error.userMessage,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     fun refresh() {
         when (_state.value.mode) {
             AttendanceMode.STUDENT -> refreshStudent()
@@ -94,7 +144,6 @@ class AttendanceViewModel @Inject constructor(
                 scannerOpen = true,
                 scannerSessionHint = sessionId,
                 qrInspection = null,
-                pendingQrToken = null,
                 successMessage = null,
                 errorMessage = null,
             )
@@ -119,7 +168,6 @@ class AttendanceViewModel @Inject constructor(
                     scannerOpen = false,
                     scannerSessionHint = null,
                     qrInspection = null,
-                    pendingQrToken = null,
                     errorMessage = "No reconocimos un código QR de asistencia válido.",
                 )
             }
@@ -127,60 +175,29 @@ class AttendanceViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            _state.update { it.copy(actionInProgress = true, errorMessage = null) }
-            when (
-                val result = repository.inspectQr(
-                    AttendanceQrInspectionRequest(
-                        sessionId = sessionId,
-                        token = token,
-                    ),
+            _state.update {
+                it.copy(
+                    actionInProgress = true,
+                    errorMessage = null,
+                    successMessage = null,
                 )
-            ) {
-                is Outcome.Success -> {
-                    _state.update {
-                        it.copy(
-                            actionInProgress = false,
-                            scannerOpen = false,
-                            scannerSessionHint = null,
-                            pendingQrToken = token,
-                            qrInspection = result.value,
-                            errorMessage = null,
-                        )
-                    }
-                }
-                is Outcome.Failure -> {
-                    _state.update {
-                        it.copy(
-                            actionInProgress = false,
-                            scannerOpen = false,
-                            scannerSessionHint = null,
-                            qrInspection = null,
-                            pendingQrToken = null,
-                            errorMessage = result.error.userMessage,
-                        )
-                    }
-                }
             }
-        }
-    }
 
-    fun submitInspectedQr() {
-        val inspection = _state.value.qrInspection ?: return
-        val token = _state.value.pendingQrToken ?: return
-        val session = inspection.session ?: return
-        if (inspection.status != AttendanceQrInspectionStatus.VALID) return
-
-        viewModelScope.launch {
-            _state.update { it.copy(actionInProgress = true, errorMessage = null) }
-            when (val result = repository.enqueueAttempt(session.id, token)) {
+            when (val captured = repository.captureQrEvidence(sessionId, token)) {
                 is Outcome.Success -> {
+                    val inspection = captured.value.inspection
                     _state.update {
                         it.copy(
                             actionInProgress = false,
-                            qrInspection = null,
-                            pendingQrToken = null,
-                            successMessage =
-                                "Pase guardado en este dispositivo. El servidor confirmará el resultado.",
+                            scannerOpen = false,
+                            scannerSessionHint = null,
+                            qrInspection = inspection,
+                            errorMessage = null,
+                            successMessage = if (inspection == null) {
+                                "QR guardado. No pudimos comprobarlo ahora; se verificará automáticamente cuando haya conexión."
+                            } else {
+                                "QR guardado en este dispositivo. El servidor confirmará el resultado final."
+                            },
                         )
                     }
                 }
@@ -188,7 +205,10 @@ class AttendanceViewModel @Inject constructor(
                     _state.update {
                         it.copy(
                             actionInProgress = false,
-                            errorMessage = result.error.userMessage,
+                            scannerOpen = false,
+                            scannerSessionHint = null,
+                            qrInspection = null,
+                            errorMessage = captured.error.userMessage,
                         )
                     }
                 }
@@ -200,7 +220,6 @@ class AttendanceViewModel @Inject constructor(
         _state.update {
             it.copy(
                 qrInspection = null,
-                pendingQrToken = null,
             )
         }
     }
@@ -327,8 +346,8 @@ class AttendanceViewModel @Inject constructor(
                 is Outcome.Success -> {
                     val claims = claimsResult.value
                     val mode = when {
-                        UserRole.TEACHER in claims.roles -> AttendanceMode.TEACHER
                         UserRole.STUDENT in claims.roles -> AttendanceMode.STUDENT
+                        UserRole.TEACHER in claims.roles -> AttendanceMode.TEACHER
                         else -> AttendanceMode.UNSUPPORTED
                     }
                     _state.update {

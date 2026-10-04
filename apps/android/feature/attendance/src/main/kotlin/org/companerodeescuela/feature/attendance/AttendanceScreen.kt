@@ -72,9 +72,14 @@ import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
 @Composable
 fun AttendanceScreen(
     modifier: Modifier = Modifier,
+    requestedMode: AttendanceMode? = null,
     viewModel: AttendanceViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+
+    LaunchedEffect(requestedMode) {
+        requestedMode?.let(viewModel::selectMode)
+    }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val imageReader = remember(context) { AttendanceQrImageReader(context) }
@@ -117,7 +122,6 @@ fun AttendanceScreen(
             onGenericScan = viewModel::openGenericScanner,
             onPickImage = { imageLauncher.launch(arrayOf("image/*")) },
             onInspectToken = viewModel::inspectQr,
-            onRegister = viewModel::submitInspectedQr,
             onDismissInspection = viewModel::clearQrInspection,
             modifier = modifier,
         )
@@ -146,7 +150,6 @@ private fun StudentAttendance(
     onGenericScan: () -> Unit,
     onPickImage: () -> Unit,
     onInspectToken: (String) -> Unit,
-    onRegister: () -> Unit,
     onDismissInspection: () -> Unit,
     modifier: Modifier,
 ) {
@@ -164,7 +167,7 @@ private fun StudentAttendance(
     ) {
         AttendanceHeader(
             title = "Asistencia",
-            subtitle = "El QR es una evidencia. Puedes comprobarlo primero; el servidor decide el estado final.",
+            subtitle = "Al escanear guardamos la evidencia primero. El servidor confirma después el estado final.",
             loading = state.loading,
             onRefresh = onRefresh,
         )
@@ -189,7 +192,6 @@ private fun StudentAttendance(
                 inspection = inspection,
                 occurrence = inspection.session?.occurrenceId?.let(occurrenceById::get),
                 busy = state.actionInProgress,
-                onRegister = onRegister,
                 onDismiss = onDismissInspection,
             )
         }
@@ -333,7 +335,7 @@ private fun QrCenterCard(
         ) {
             Text("Comprobar un código QR", style = MaterialTheme.typography.titleLarge)
             Text(
-                text = "Escanéalo, elige una captura o pega el código. Comprobar no registra asistencia.",
+                text = "Escanéalo, elige una captura o pega el código. La evidencia se guarda primero y se verifica después.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -374,7 +376,7 @@ private fun QrPasteDialog(
             TextButton(
                 onClick = { onInspect(token) },
                 enabled = token.isNotBlank(),
-            ) { Text("Comprobar") }
+            ) { Text("Guardar evidencia") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancelar") }
@@ -387,7 +389,6 @@ private fun QrInspectionCard(
     inspection: AttendanceQrInspectionResponse,
     occurrence: ClassOccurrenceContract?,
     busy: Boolean,
-    onRegister: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val valid = inspection.status == AttendanceQrInspectionStatus.VALID
@@ -408,7 +409,7 @@ private fun QrInspectionCard(
                 subject + " · " +
                     session.scheduledStartsAt + "–" +
                     session.scheduledEndsAt +
-                    ". Aún no se ha registrado asistencia."
+                    ". La evidencia ya quedó guardada; el servidor confirmará el resultado."
             }
             inspection.status == AttendanceQrInspectionStatus.EXPIRED ->
                 "El código fue reconocido, pero su ventana de validez terminó."
@@ -421,26 +422,12 @@ private fun QrInspectionCard(
         },
         tone = if (valid) NoticeTone.SUCCESS else NoticeTone.WARNING,
     )
-    Row(
+    OutlinedButton(
+        onClick = onDismiss,
+        enabled = !busy,
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
     ) {
-        if (valid) {
-            Button(
-                onClick = onRegister,
-                enabled = !busy,
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(if (busy) "Guardando…" else "Registrar asistencia")
-            }
-        }
-        OutlinedButton(
-            onClick = onDismiss,
-            enabled = !busy,
-            modifier = Modifier.weight(1f),
-        ) {
-            Text("Cerrar")
-        }
+        Text("Cerrar")
     }
 }
 

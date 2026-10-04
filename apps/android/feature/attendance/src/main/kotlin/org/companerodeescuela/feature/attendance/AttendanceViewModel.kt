@@ -48,7 +48,6 @@ data class AttendanceUiState(
     val localRecords: List<LocalAttendanceRecord> = emptyList(),
     val scannerOpen: Boolean = false,
     val scannerSessionHint: String? = null,
-    val pendingQrToken: String? = null,
     val qrInspection: AttendanceQrInspectionResponse? = null,
     val successMessage: String? = null,
     val errorMessage: String? = null,
@@ -84,7 +83,6 @@ class AttendanceViewModel @Inject constructor(
                 scannerOpen = true,
                 scannerSessionHint = sessionId,
                 qrInspection = null,
-                pendingQrToken = null,
                 successMessage = null,
                 errorMessage = null,
             )
@@ -109,7 +107,6 @@ class AttendanceViewModel @Inject constructor(
                     scannerOpen = false,
                     scannerSessionHint = null,
                     qrInspection = null,
-                    pendingQrToken = null,
                     errorMessage = "No reconocimos un código QR de asistencia válido.",
                 )
             }
@@ -117,9 +114,43 @@ class AttendanceViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            _state.update { it.copy(actionInProgress = true, errorMessage = null) }
+            _state.update {
+                it.copy(
+                    actionInProgress = true,
+                    errorMessage = null,
+                    successMessage = null,
+                )
+            }
+
+            // Offline-first invariant: persist the evidence before any network inspection.
+            when (val captured = repository.enqueueAttempt(sessionId, token)) {
+                is Outcome.Failure -> {
+                    _state.update {
+                        it.copy(
+                            actionInProgress = false,
+                            scannerOpen = false,
+                            scannerSessionHint = null,
+                            qrInspection = null,
+                            errorMessage = captured.error.userMessage,
+                        )
+                    }
+                    return@launch
+                }
+                is Outcome.Success -> {
+                    _state.update {
+                        it.copy(
+                            scannerOpen = false,
+                            scannerSessionHint = null,
+                            successMessage =
+                                "QR guardado en este dispositivo. Se verificará automáticamente, incluso si pierdes conexión.",
+                        )
+                    }
+                }
+            }
+
+            // Best-effort immediate feedback. A failure here must never discard the queued evidence.
             when (
-                val result = repository.inspectQr(
+                val inspection = repository.inspectQr(
                     AttendanceQrInspectionRequest(
                         sessionId = sessionId,
                         token = token,
@@ -130,10 +161,7 @@ class AttendanceViewModel @Inject constructor(
                     _state.update {
                         it.copy(
                             actionInProgress = false,
-                            scannerOpen = false,
-                            scannerSessionHint = null,
-                            pendingQrToken = token,
-                            qrInspection = result.value,
+                            qrInspection = inspection.value,
                             errorMessage = null,
                         )
                     }
@@ -142,43 +170,10 @@ class AttendanceViewModel @Inject constructor(
                     _state.update {
                         it.copy(
                             actionInProgress = false,
-                            scannerOpen = false,
-                            scannerSessionHint = null,
                             qrInspection = null,
-                            pendingQrToken = null,
-                            errorMessage = result.error.userMessage,
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    fun submitInspectedQr() {
-        val inspection = _state.value.qrInspection ?: return
-        val token = _state.value.pendingQrToken ?: return
-        val session = inspection.session ?: return
-        if (inspection.status != AttendanceQrInspectionStatus.VALID) return
-
-        viewModelScope.launch {
-            _state.update { it.copy(actionInProgress = true, errorMessage = null) }
-            when (val result = repository.enqueueAttempt(session.id, token)) {
-                is Outcome.Success -> {
-                    _state.update {
-                        it.copy(
-                            actionInProgress = false,
-                            qrInspection = null,
-                            pendingQrToken = null,
+                            errorMessage = null,
                             successMessage =
-                                "Pase guardado en este dispositivo. El servidor confirmará el resultado.",
-                        )
-                    }
-                }
-                is Outcome.Failure -> {
-                    _state.update {
-                        it.copy(
-                            actionInProgress = false,
-                            errorMessage = result.error.userMessage,
+                                "QR guardado. No pudimos comprobarlo ahora; se verificará automáticamente cuando haya conexión.",
                         )
                     }
                 }
@@ -190,7 +185,6 @@ class AttendanceViewModel @Inject constructor(
         _state.update {
             it.copy(
                 qrInspection = null,
-                pendingQrToken = null,
             )
         }
     }

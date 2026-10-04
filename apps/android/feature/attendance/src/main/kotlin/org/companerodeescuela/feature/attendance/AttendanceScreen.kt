@@ -1,6 +1,7 @@
 package org.companerodeescuela.feature.attendance
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -27,13 +29,15 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -45,6 +49,10 @@ import java.util.Locale
 import kotlinx.coroutines.delay
 import org.companerodeescuela.core.database.LocalAttendanceRecord
 import org.companerodeescuela.core.database.LocalAttendanceSyncState
+import org.companerodeescuela.core.designsystem.theme.CompanionColors
+import org.companerodeescuela.core.designsystem.theme.CompaneroSize
+import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
+import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
@@ -115,8 +123,8 @@ private fun StudentAttendance(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md),
+        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
     ) {
         AttendanceHeader(
             title = "Asistencia",
@@ -180,57 +188,68 @@ private fun StudentSessionCard(
     local: LocalAttendanceRecord?,
     onScan: () -> Unit,
 ) {
-    Card(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ),
+        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
     ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = CompanionColors.graphite,
+                contentColor = CompanionColors.onDarkSurface,
+            ),
         ) {
-            Text(
-                text = occurrence?.subjectName ?: "Grupo ${session.groupName}",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = "${session.scheduledStartsAt} – ${session.scheduledEndsAt} · ${session.groupName}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            occurrence?.let {
-                val location = listOfNotNull(it.classroomName, it.buildingName)
-                    .joinToString(" · ")
-                    .ifBlank { "Aula por confirmar" }
-                Text(
-                    text = location,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            local?.let { LocalAttendanceStatus(it) }
-
-            Button(
-                onClick = onScan,
-                enabled = local == null,
-                modifier = Modifier.fillMaxWidth(),
+            Column(
+                modifier = Modifier.padding(CompaneroSpacing.lg),
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
-                Icon(
-                    imageVector = Icons.Filled.QrCodeScanner,
-                    contentDescription = null,
+                Text(
+                    text = "PASE ACTIVO",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = CompanionColors.crimsonContainer,
                 )
                 Text(
-                    text = if (local == null) {
-                        " Escanear QR"
-                    } else {
-                        " Pase ya registrado en este dispositivo"
-                    },
+                    text = occurrence?.subjectName ?: "Grupo ${session.groupName}",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
                 )
+                Text(
+                    text = "${session.scheduledStartsAt} – ${session.scheduledEndsAt} · ${session.groupName}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = CompanionColors.onDarkSurfaceVariant,
+                )
+                occurrence?.let {
+                    val location = listOfNotNull(it.classroomName, it.buildingName)
+                        .joinToString(" · ")
+                        .ifBlank { "Aula por confirmar" }
+                    Text(
+                        text = location,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = CompanionColors.onDarkSurfaceVariant,
+                    )
+                }
+
+                Button(
+                    onClick = onScan,
+                    enabled = local == null,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.QrCodeScanner,
+                        contentDescription = null,
+                    )
+                    Text(
+                        text = if (local == null) {
+                            " Escanear QR"
+                        } else {
+                            " Pase ya registrado en este dispositivo"
+                        },
+                    )
+                }
             }
         }
+
+        local?.let { LocalAttendanceStatus(it) }
     }
 }
 
@@ -263,7 +282,7 @@ private fun LocalAttendanceRow(record: LocalAttendanceRecord) {
         color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(CompaneroSpacing.md),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -282,7 +301,11 @@ private fun LocalAttendanceRow(record: LocalAttendanceRecord) {
                 Icon(
                     imageVector = Icons.Filled.CheckCircle,
                     contentDescription = "Sincronizado",
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = if (MaterialTheme.colorScheme.surfaceContainer.luminance() < 0.5f) {
+                        CompanionColors.semanticGreenDark
+                    } else {
+                        CompanionColors.semanticGreen
+                    },
                 )
             }
         }
@@ -303,8 +326,8 @@ private fun TeacherAttendance(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md),
+        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
     ) {
         AttendanceHeader(
             title = "Pase de lista",
@@ -363,17 +386,117 @@ private fun TeacherActiveSession(
     onRefreshRoster: () -> Unit,
     onReview: (AttendanceRecordResponse, AttendanceStatus) -> Unit,
 ) {
+    var showCloseConfirmation by remember { mutableStateOf(false) }
+
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        if (maxWidth >= CompaneroWindowBreakpoints.expanded) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(
+                    modifier = Modifier.weight(1.2f),
+                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
+                ) {
+                    TeacherSessionCard(
+                        session = session,
+                        occurrence = occurrence,
+                        qrToken = qrToken,
+                        qrExpiresAt = qrExpiresAt,
+                        busy = busy,
+                        onRefreshRoster = onRefreshRoster,
+                        onRequestClose = { showCloseConfirmation = true },
+                    )
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
+                ) {
+                    TeacherRosterPanel(
+                        roster = roster,
+                        busy = busy,
+                        onReview = onReview,
+                    )
+                }
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md)) {
+                TeacherSessionCard(
+                    session = session,
+                    occurrence = occurrence,
+                    qrToken = qrToken,
+                    qrExpiresAt = qrExpiresAt,
+                    busy = busy,
+                    onRefreshRoster = onRefreshRoster,
+                    onRequestClose = { showCloseConfirmation = true },
+                )
+                TeacherRosterPanel(
+                    roster = roster,
+                    busy = busy,
+                    onReview = onReview,
+                )
+            }
+        }
+    }
+
+    if (showCloseConfirmation) {
+        AlertDialog(
+            onDismissRequest = { if (!busy) showCloseConfirmation = false },
+            title = { Text("¿Cerrar el pase?") },
+            text = {
+                Text("El QR dejará de estar disponible y no se recibirán nuevos intentos.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCloseConfirmation = false
+                        onClose()
+                    },
+                    enabled = !busy,
+                ) {
+                    Text("Cerrar pase")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showCloseConfirmation = false },
+                    enabled = !busy,
+                ) {
+                    Text("Seguir con el pase")
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun TeacherSessionCard(
+    session: AttendanceSessionResponse,
+    occurrence: ClassOccurrenceContract?,
+    qrToken: String?,
+    qrExpiresAt: Long?,
+    busy: Boolean,
+    onRefreshRoster: () -> Unit,
+    onRequestClose: () -> Unit,
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            containerColor = CompanionColors.graphite,
+            contentColor = CompanionColors.onDarkSurface,
         ),
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(CompaneroSpacing.xl),
+            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            Text(
+                text = "PASE EN VIVO",
+                style = MaterialTheme.typography.labelLarge,
+                color = CompanionColors.crimsonContainer,
+            )
             Text(
                 text = occurrence?.subjectName ?: "Grupo ${session.groupName}",
                 style = MaterialTheme.typography.headlineSmall,
@@ -392,19 +515,19 @@ private fun TeacherActiveSession(
                     token = qrToken,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .widthIn(max = 340.dp),
+                        .widthIn(max = CompaneroSize.qrMaxWidth),
                 )
                 QrCountdown(qrExpiresAt)
                 Text(
                     text = "El QR cambia automáticamente. No contiene datos del alumno.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.74f),
+                    color = CompanionColors.onDarkSurfaceVariant,
                 )
             }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
             ) {
                 OutlinedButton(
                     onClick = onRefreshRoster,
@@ -415,7 +538,7 @@ private fun TeacherActiveSession(
                     Text(" Registros")
                 }
                 Button(
-                    onClick = onClose,
+                    onClick = onRequestClose,
                     enabled = !busy,
                     modifier = Modifier.weight(1f),
                 ) {
@@ -424,9 +547,16 @@ private fun TeacherActiveSession(
             }
         }
     }
+}
 
+@Composable
+private fun TeacherRosterPanel(
+    roster: List<AttendanceRecordResponse>,
+    busy: Boolean,
+    onReview: (AttendanceRecordResponse, AttendanceStatus) -> Unit,
+) {
     Text(
-        text = "Registros (${roster.size})",
+        text = "Registros recibidos (${roster.size})",
         style = MaterialTheme.typography.titleLarge,
     )
 
@@ -454,8 +584,8 @@ private fun RosterRecord(
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(CompaneroSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -469,10 +599,22 @@ private fun RosterRecord(
                     text = attendanceStatusLabel(record.status),
                     style = MaterialTheme.typography.labelLarge,
                     color = when (record.status) {
-                        AttendanceStatus.VERIFIED -> MaterialTheme.colorScheme.primary
+                        AttendanceStatus.VERIFIED -> if (
+                            MaterialTheme.colorScheme.surface.luminance() < 0.5f
+                        ) {
+                            CompanionColors.semanticGreenDark
+                        } else {
+                            CompanionColors.semanticGreen
+                        }
                         AttendanceStatus.REJECTED -> MaterialTheme.colorScheme.error
                         AttendanceStatus.REVIEW_REQUIRED -> MaterialTheme.colorScheme.tertiary
-                        AttendanceStatus.LIKELY -> MaterialTheme.colorScheme.onSurfaceVariant
+                        AttendanceStatus.LIKELY -> if (
+                            MaterialTheme.colorScheme.surface.luminance() < 0.5f
+                        ) {
+                            CompanionColors.semanticBlueDark
+                        } else {
+                            CompanionColors.semanticBlue
+                        }
                     },
                 )
             }
@@ -483,7 +625,7 @@ private fun RosterRecord(
             )
 
             if (record.status == AttendanceStatus.REVIEW_REQUIRED) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
                     FilledTonalButton(
                         onClick = { onReview(record, AttendanceStatus.VERIFIED) },
                         enabled = !busy,
@@ -528,8 +670,8 @@ private fun TeacherOccurrenceList(
     visible.forEach { occurrence ->
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(CompaneroSpacing.md),
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
             ) {
                 Text(
                     text = occurrence.subjectName,
@@ -573,7 +715,7 @@ private fun AttendanceHeader(
     ) {
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
         ) {
             Text(
                 text = title,
@@ -626,7 +768,7 @@ private fun LoadingAttendance(modifier: Modifier) {
         CircularProgressIndicator()
         Text(
             text = "Preparando asistencia…",
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier.padding(top = CompaneroSpacing.sm),
         )
     }
 }
@@ -640,7 +782,7 @@ private fun UnsupportedAttendance(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(20.dp),
+            .padding(CompaneroSpacing.lg),
         verticalArrangement = Arrangement.Center,
     ) {
         StatusNotice(
@@ -650,7 +792,7 @@ private fun UnsupportedAttendance(
         )
         Button(
             onClick = onRetry,
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier.padding(top = CompaneroSpacing.sm),
         ) {
             Text("Reintentar")
         }

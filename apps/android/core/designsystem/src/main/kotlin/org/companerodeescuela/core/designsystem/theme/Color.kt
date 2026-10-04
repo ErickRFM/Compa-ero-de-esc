@@ -10,61 +10,41 @@ import androidx.compose.ui.graphics.Color
  * ships no colours at all. Dark variants are defined here too: the app is
  * used in dim classrooms and outdoors, so light-only is not an option.
  */
-internal object CompanionPalette {
-    // Brand: a calm indigo that stays legible on the low-brightness screens
-    // common in school hardware.
-    val Indigo10 = Color(0xFF00005C)
-    val Indigo20 = Color(0xFF12177B)
-    val Indigo40 = Color(0xFF2E3BC6)
-    val Indigo80 = Color(0xFFBBC3FF)
-    val Indigo90 = Color(0xFFE0E0FF)
+object CompanionColors {
+    val crimson = Color(0xFF9B1C31)
+    val crimsonContainer = Color(0xFFF5DADF)
+    val crimsonSubtle = Color(0xFFFCEFF1)
 
-    // Expressive V4 accents. These are intentionally deeper than the previous
-    // palette so hero surfaces and dark mode can carry stronger identity
-    // without sacrificing readable foregrounds.
-    val Violet30 = Color(0xFF4430B8)
-    val Violet40 = Color(0xFF5B43D6)
-    val Violet80 = Color(0xFFC9BFFF)
-    val Violet90 = Color(0xFFE8E0FF)
+    val graphite = Color(0xFF242528)
+    val graphiteRaised = Color(0xFF34363A)
+    val graphiteSoft = Color(0xFF55585D)
 
-    val Cyan30 = Color(0xFF005B67)
-    val Cyan40 = Color(0xFF007987)
-    val Cyan80 = Color(0xFF5DD7E7)
-    val Cyan90 = Color(0xFFA8EEFA)
+    val warmBackground = Color(0xFFF6F4F1)
+    val warmSurface = Color(0xFFFFFCF9)
+    val warmSurfaceVariant = Color(0xFFEAE6E1)
 
-    val DeepNavy = Color(0xFF0A1020)
-    val DeepNavyRaised = Color(0xFF121A2E)
+    val institutionalGold = Color(0xFF765500)
 
-    // Secondary: teal, used for confirmations and "on time" states.
-    val Teal20 = Color(0xFF00363C)
-    val Teal40 = Color(0xFF00696F)
-    val Teal80 = Color(0xFF4FD8DF)
-    val Teal90 = Color(0xFFA8F2F6)
+    val semanticGreen = Color(0xFF2F6B48)
+    val semanticGreenContainer = Color(0xFFDCEFE2)
+    val semanticGreenDark = Color(0xFFA6D8B5)
+    val semanticGreenDarkContainer = Color(0xFF204C32)
+    val semanticBlue = Color(0xFF42627A)
+    val semanticBlueContainer = Color(0xFFDDEAF2)
+    val semanticBlueDark = Color(0xFFB0CDE0)
+    val semanticAmber = Color(0xFF8A5100)
+    val semanticAmberContainer = Color(0xFFFFDDB8)
+    val semanticRed = Color(0xFFBA1A1A)
+    val semanticRedContainer = Color(0xFFFFDAD6)
 
-    // Tertiary: amber, reserved for warnings such as a late arrival.
-    val Amber20 = Color(0xFF4A2800)
-    val Amber40 = Color(0xFF8A5100)
-    val Amber80 = Color(0xFFFFB871)
-    val Amber90 = Color(0xFFFFDDB8)
+    val onLightSurface = Color(0xFF211F1E)
+    val onLightSurfaceVariant = Color(0xFF514B49)
+    val lightOutline = Color(0xFF79716E)
 
-    // Error: kept close to the Material defaults so it stays recognisable as
-    // destructive even before the app adds its own iconography.
-    val Red30 = Color(0xFF93000A)
-    val Red40 = Color(0xFFBA1A1A)
-    val Red80 = Color(0xFFFFB4AB)
-    val Red90 = Color(0xFFFFDAD6)
-
-    val NeutralBackgroundLight = Color(0xFFF8F7FF)
-    val NeutralSurfaceLight = Color(0xFFFFFBFF)
-    val NeutralSurfaceVariantLight = Color(0xFFE2E1EC)
-    val NeutralOnSurfaceLight = Color(0xFF1B1B21)
-    val NeutralOnSurfaceVariantLight = Color(0xFF45464F)
-    val NeutralOutlineLight = Color(0xFF767680)
-
-    val NeutralBackgroundDark = DeepNavy
-    val NeutralSurfaceDark = DeepNavyRaised
-    val NeutralSurfaceVariantDark = Color(0xFF45464F)
-    val NeutralOnSurfaceDark = Color(0xFFE5E1E9)
-    val NeutralOnSurfaceVariantDark = Color(0xFFC6C5D0)
-    val NeutralOutlineDark = Color(0xFF90909A)
+    val darkBackground = Color(0xFF191A1C)
+    val darkSurface = Color(0xFF242528)
+    val darkSurfaceVariant = Color(0xFF45474A)
+    val onDarkSurface = Color(0xFFE9E6E3)
+    val onDarkSurfaceVariant = Color(0xFFC9C4C0)
+    val darkOutline = Color(0xFF938C88)
 }

@@ -17,7 +17,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.CompaneroExpressive
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.motion.CompaneroMotion
@@ -86,7 +85,7 @@ fun HeroAcademicCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = CompaneroSpacing.sm)
-                    .height(6.dp)
+                    .height(CompaneroSpacing.xxs)
                     .clip(RoundedCornerShape(percent = 50)),
                 color = Color.White,
                 trackColor = Color.White.copy(alpha = 0.24f),

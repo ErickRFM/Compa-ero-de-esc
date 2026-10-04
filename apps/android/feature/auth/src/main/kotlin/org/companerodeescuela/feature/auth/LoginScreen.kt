@@ -34,6 +34,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -70,6 +71,7 @@ private val UptlaxBorder = Color(0xFFD5D8DE)
 fun LoginScreen(
     state: SessionUiState,
     onLogin: (String, String) -> Unit,
+    onCreateAccount: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var username by remember { mutableStateOf("") }
@@ -297,6 +299,22 @@ fun LoginScreen(
                                 )
                             }
                         }
+                    }
+
+                    OutlinedButton(
+                        onClick = onCreateAccount,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp)
+                            .height(48.dp),
+                        enabled = !state.submitting,
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Text(
+                            text = "Activar acceso",
+                            color = UptlaxAccent,
+                            fontWeight = FontWeight.SemiBold,
+                        )
                     }
                 }
             }

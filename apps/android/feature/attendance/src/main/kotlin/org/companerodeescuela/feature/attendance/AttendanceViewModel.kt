@@ -15,7 +15,10 @@ import kotlinx.coroutines.launch
 import org.companerodeescuela.core.attendance.AttendanceRepository
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.database.LocalAttendanceRecord
-import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest\nimport org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse\nimport org.companerodeescuela.shared.contracts.AttendanceQrInspectionStatus\nimport org.companerodeescuela.shared.contracts.AttendanceQrResponse
+import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
+import org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse
+import org.companerodeescuela.shared.contracts.AttendanceQrInspectionStatus
+import org.companerodeescuela.shared.contracts.AttendanceQrResponse
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
 import org.companerodeescuela.shared.contracts.AttendanceRosterResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse

@@ -49,6 +49,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 import org.companerodeescuela.core.academic.PersonalScheduleDraft
+import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
@@ -411,7 +412,7 @@ private fun DayAgendaDetails(
                 message = "No tienes clases programadas este día.",
             )
         } else {
-            Text(dayLabel(day), style = MaterialTheme.typography.titleLarge)
+            Text(dayLabel(day), style = MaterialTheme.typography.titleMedium)
             entries.forEach { AgendaEntry(it, onEdit, onDelete) }
         }
     }
@@ -453,10 +454,12 @@ private fun AgendaEntry(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceVariant,
+        tonalElevation = CompaneroElevation.subtle,
+        shadowElevation = CompaneroElevation.card,
     ) {
         Column(
             modifier = Modifier.padding(
-                horizontal = CompaneroSpacing.md,
+                horizontal = CompaneroSpacing.card,
                 vertical = CompaneroSpacing.sm,
             ),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),

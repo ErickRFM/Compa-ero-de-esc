@@ -34,7 +34,7 @@ class AcademicRepository(
     private val client: HttpClient,
     private val tokenStore: SessionTokenStore,
     private val cache: AcademicSnapshotCache,
-    private val personalScheduleStore: PersonalScheduleStore,
+    private val personalScheduleStore: PersonalScheduleStore? = null,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     suspend fun load(): Outcome<AcademicContent> {
@@ -123,10 +123,12 @@ class AcademicRepository(
         )
     }
 
-    private suspend fun personalEntries(ownerId: String): List<ScheduleEntry> =
-        runCatching {
-            personalScheduleStore.list(ownerId).map(PersonalScheduleItem::toScheduleEntry)
+    private suspend fun personalEntries(ownerId: String): List<ScheduleEntry> {
+        val store = personalScheduleStore ?: return emptyList()
+        return runCatching {
+            store.list(ownerId).map(PersonalScheduleItem::toScheduleEntry)
         }.getOrDefault(emptyList())
+    }
 
     private fun mergeEntries(
         institutional: List<ScheduleEntry>,

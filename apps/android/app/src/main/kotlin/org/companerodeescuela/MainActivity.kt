@@ -130,7 +130,15 @@ class MainActivity : ComponentActivity() {
                                     startDestination = startDestination,
                                     topLevelDestinations = topLevelDestinations,
                                 ) {
-                                    composable(Destination.Home.route) { HomeScreen() }
+                                    composable(Destination.Home.route) {
+                                        HomeScreen(
+                                            onOpenSchedule = {
+                                                navController.navigate(Destination.Schedule.route) {
+                                                    launchSingleTop = true
+                                                }
+                                            },
+                                        )
+                                    }
                                     composable(Destination.Schedule.route) { ScheduleScreen() }
                                     composable(Destination.Attendance.route) { AttendanceScreen() }
                                     composable(Destination.Profile.route) {

@@ -47,6 +47,7 @@ import org.companerodeescuela.shared.contracts.ScheduleEntry
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
+    onOpenSchedule: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -112,7 +113,18 @@ fun HomeScreen(
                     !day.hasSchedule -> {
                         StatusNotice(
                             title = "Aún no tienes un horario",
-                            message = "Tu cuenta está activa, pero todavía no hay clases en tu agenda. Abre Agenda para sincronizar UPTlax, importar un PDF o imagen, o crear un horario personal.",
+                            message = "Tu cuenta UPTlax está activa, pero todavía no hay clases en tu agenda.",
+                        )
+                        Button(
+                            onClick = onOpenSchedule,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Preparar mi agenda")
+                        }
+                        Text(
+                            text = "En Agenda puedes sincronizar UPTlax, importar un PDF o imagen, o crear un horario personal.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     day.classes.isEmpty() -> {

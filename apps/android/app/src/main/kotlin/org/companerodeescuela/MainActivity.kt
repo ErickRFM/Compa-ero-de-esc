@@ -28,8 +28,8 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
 import org.companerodeescuela.core.motion.ProvideCompaneroMotionPreferences
 import org.companerodeescuela.core.navigation.CompaneroScaffold
 import org.companerodeescuela.core.navigation.Destination
-import org.companerodeescuela.core.navigation.TopLevelDestination
 import org.companerodeescuela.feature.attendance.AttendanceScreen
+import org.companerodeescuela.feature.attendance.TeacherHomeScreen
 import org.companerodeescuela.feature.auth.LoginScreen
 import org.companerodeescuela.feature.auth.RegistrationScreen
 import org.companerodeescuela.feature.auth.SessionViewModel
@@ -40,7 +40,6 @@ import org.companerodeescuela.feature.schedule.ScheduleScreen
 import org.companerodeescuela.feature.settings.AppThemeMode
 import org.companerodeescuela.feature.settings.AppearancePreferences
 import org.companerodeescuela.feature.settings.AppearanceSettingsScreen
-import org.companerodeescuela.shared.contracts.UserRole
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -112,17 +111,9 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             else -> {
-                                val teacherOnly =
-                                    UserRole.TEACHER in session.roles &&
-                                        UserRole.STUDENT !in session.roles
-                                val startDestination =
-                                    if (teacherOnly) Destination.Attendance else Destination.Home
-                                val topLevelDestinations =
-                                    if (teacherOnly) {
-                                        listOf(TopLevelDestination.Attendance)
-                                    } else {
-                                        TopLevelDestination.entries
-                                    }
+                                val navigation = RoleNavigationPolicy.resolve(session.roles)
+                                val startDestination = navigation.startDestination
+                                val topLevelDestinations = navigation.destinations
                                 val navController = rememberNavController()
 
                                 CompaneroScaffold(
@@ -134,6 +125,15 @@ class MainActivity : ComponentActivity() {
                                         HomeScreen(
                                             onOpenSchedule = {
                                                 navController.navigate(Destination.Schedule.route) {
+                                                    launchSingleTop = true
+                                                }
+                                            },
+                                        )
+                                    }
+                                    composable(Destination.TeacherHome.route) {
+                                        TeacherHomeScreen(
+                                            onOpenAttendance = {
+                                                navController.navigate(Destination.Attendance.route) {
                                                     launchSingleTop = true
                                                 }
                                             },

@@ -12,8 +12,41 @@ object CompaneroDatabaseFactory {
             CompaneroDatabase::class.java,
             "companero-cache.db",
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .build()
+
+    internal val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS personal_schedule_entries (
+                    id TEXT NOT NULL,
+                    ownerId TEXT NOT NULL,
+                    subjectCode TEXT NOT NULL,
+                    subjectName TEXT NOT NULL,
+                    groupName TEXT NOT NULL,
+                    teacherName TEXT NOT NULL,
+                    dayOfWeek TEXT NOT NULL,
+                    startsAt TEXT NOT NULL,
+                    endsAt TEXT NOT NULL,
+                    classroomName TEXT,
+                    buildingName TEXT,
+                    source TEXT NOT NULL,
+                    updatedAtEpochSeconds INTEGER NOT NULL,
+                    PRIMARY KEY(id)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_personal_schedule_entries_ownerId " +
+                    "ON personal_schedule_entries(ownerId)",
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_personal_schedule_entries_ownerId_dayOfWeek_startsAt " +
+                    "ON personal_schedule_entries(ownerId, dayOfWeek, startsAt)",
+            )
+        }
+    }
 
     internal val MIGRATION_2_3 = object : Migration(2, 3) {
         override fun migrate(db: SupportSQLiteDatabase) {

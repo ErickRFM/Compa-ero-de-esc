@@ -1,6 +1,19 @@
 package org.companerodeescuela.shared.contracts
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+
+@Serializable
+enum class ScheduleSource {
+    @SerialName("institutional")
+    INSTITUTIONAL,
+
+    @SerialName("manual")
+    MANUAL,
+
+    @SerialName("ocr_import")
+    OCR_IMPORT,
+}
 
 @Serializable
 data class AcademicProfile(
@@ -22,6 +35,7 @@ data class ScheduleEntry(
     val classroomName: String? = null,
     val buildingName: String? = null,
     val campusName: String? = null,
+    val source: ScheduleSource = ScheduleSource.INSTITUTIONAL,
 )
 
 @Serializable

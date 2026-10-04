@@ -9,10 +9,12 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 import org.companerodeescuela.core.database.AcademicSnapshotCache
 import org.companerodeescuela.core.database.AcademicSnapshotCacheFactory
-import org.companerodeescuela.core.database.CompaneroDatabase
-import org.companerodeescuela.core.database.CompaneroDatabaseFactory
 import org.companerodeescuela.core.database.AttendanceLocalStore
 import org.companerodeescuela.core.database.AttendanceLocalStoreFactory
+import org.companerodeescuela.core.database.CompaneroDatabase
+import org.companerodeescuela.core.database.CompaneroDatabaseFactory
+import org.companerodeescuela.core.database.PersonalScheduleStore
+import org.companerodeescuela.core.database.PersonalScheduleStoreFactory
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -35,4 +37,10 @@ object DatabaseModule {
     fun provideAcademicSnapshotCache(
         database: CompaneroDatabase,
     ): AcademicSnapshotCache = AcademicSnapshotCacheFactory.create(database)
+
+    @Provides
+    @Singleton
+    fun providePersonalScheduleStore(
+        database: CompaneroDatabase,
+    ): PersonalScheduleStore = PersonalScheduleStoreFactory.create(database)
 }

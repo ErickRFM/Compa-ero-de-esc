@@ -159,8 +159,8 @@ private fun StudentAttendance(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md),
-        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
+            .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
+        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
         AttendanceHeader(
             title = "Asistencia",
@@ -196,8 +196,8 @@ private fun StudentAttendance(
 
         if (!state.loading && state.activeSessions.isEmpty()) {
             StatusNotice(
-                title = "No hay pase activo",
-                message = "Cuando tu docente abra asistencia aparecerá aquí. Mientras tanto puedes comprobar un QR sin registrar asistencia.",
+                title = "Sin sesión activa",
+                message = "Cuando tu docente abra asistencia aparecerá aquí. También puedes comprobar un QR ahora.",
             )
         }
 
@@ -224,7 +224,7 @@ private fun StudentAttendance(
         if (state.localRecords.isNotEmpty()) {
             Text(
                 text = "Actividad reciente",
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
             )
             state.localRecords.take(5).forEach { record ->
                 LocalAttendanceRow(record)
@@ -910,7 +910,7 @@ private fun AttendanceHeader(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
             )
             Text(

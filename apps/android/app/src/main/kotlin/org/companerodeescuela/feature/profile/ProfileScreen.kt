@@ -1,5 +1,6 @@
 package org.companerodeescuela.feature.profile
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,23 +9,28 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
-import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
+import org.companerodeescuela.core.ui.component.CompaneroGroupedList
+import org.companerodeescuela.core.ui.component.CompaneroHeroSurface
 import org.companerodeescuela.shared.contracts.UserRole
 
 @Composable
@@ -38,19 +44,17 @@ fun ProfileScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .widthIn(max = CompaneroSize.homeContentMaxWidth)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
-        Surface(
+        CompaneroHeroSurface(
             modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.extraLarge,
-            color = CompanionColors.graphite,
-            tonalElevation = CompaneroElevation.raised,
-            shadowElevation = CompaneroElevation.raised,
+            containerColor = CompanionColors.graphite,
         ) {
             Row(
-                modifier = Modifier.padding(CompaneroSpacing.sm),
+                modifier = Modifier.padding(CompaneroSpacing.md),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
@@ -74,40 +78,53 @@ fun ProfileScreen(
                     Text(
                         text = displayName?.takeIf(String::isNotBlank)
                             ?: "Cuenta institucional",
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleLarge,
                         color = CompanionColors.onDarkSurface,
                     )
                     Text(
-                        text = roleSummary(roles) + " · UPTlax activa",
+                        text = roleSummary(roles),
                         style = MaterialTheme.typography.bodyMedium,
                         color = CompanionColors.onDarkSurfaceVariant,
+                    )
+                    Text(
+                        text = "UPTlax · Sesión institucional activa",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = CompanionColors.crimsonContainer,
                     )
                 }
             }
         }
 
-        Text("Cuenta", style = MaterialTheme.typography.titleMedium)
-        ProfileRow(
-            title = "Institución",
-            detail = "Universidad Politécnica de Tlaxcala",
-            trailingLabel = "UPTlax",
-        )
-        ProfileRow(title = "Sesión", detail = "Institucional activa")
-        ProfileRow(
-            title = "Privacidad",
-            detail = "Datos académicos separados por cuenta.",
-        )
+        ProfileGroup(title = "Cuenta") {
+            ProfileRow(
+                title = "Institución",
+                detail = "Universidad Politécnica de Tlaxcala",
+                trailingLabel = "UPTlax",
+            )
+            GroupDivider()
+            ProfileRow(
+                title = "Sesión",
+                detail = "Institucional activa",
+            )
+            GroupDivider()
+            ProfileRow(
+                title = "Privacidad",
+                detail = "Datos académicos separados por cuenta.",
+            )
+        }
 
-        Text("Aplicación", style = MaterialTheme.typography.titleMedium)
-        ProfileActionRow(
-            title = "Tema y accesibilidad",
-            detail = "Tema, texto, contraste y movimiento.",
-            onClick = onAppearance,
-        )
-        ProfileRow(
-            title = "Acerca de Compañero",
-            detail = "Compañero de Clase · UPTlax · UI V5.2",
-        )
+        ProfileGroup(title = "Aplicación") {
+            ProfileRow(
+                title = "Tema y accesibilidad",
+                detail = "Tema, texto, contraste y movimiento.",
+                onClick = onAppearance,
+            )
+            GroupDivider()
+            ProfileRow(
+                title = "Acerca de Compañero",
+                detail = "Compañero de Clase · UPTlax · UI V5.3",
+            )
+        }
 
         Button(
             onClick = onLogout,
@@ -119,37 +136,13 @@ fun ProfileScreen(
 }
 
 @Composable
-private fun ProfileActionRow(
+private fun ProfileGroup(
     title: String,
-    detail: String,
-    onClick: () -> Unit,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        tonalElevation = CompaneroElevation.subtle,
-        shadowElevation = CompaneroElevation.card,
-    ) {
-        Row(
-            modifier = Modifier.padding(CompaneroSpacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
-            ) {
-                Text(title, style = MaterialTheme.typography.titleSmall)
-                Text(
-                    detail,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            TextButton(onClick = onClick) {
-                Text("Abrir")
-            }
-        }
+    Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
+        Text(title, style = MaterialTheme.typography.titleMedium)
+        CompaneroGroupedList(content = content)
     }
 }
 
@@ -158,39 +151,55 @@ private fun ProfileRow(
     title: String,
     detail: String,
     trailingLabel: String? = null,
+    onClick: (() -> Unit)? = null,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        tonalElevation = CompaneroElevation.subtle,
-        shadowElevation = CompaneroElevation.card,
+    val rowModifier = Modifier
+        .fillMaxWidth()
+        .then(
+            if (onClick != null) {
+                Modifier.clickable(onClick = onClick)
+            } else {
+                Modifier
+            },
+        )
+        .padding(horizontal = CompaneroSpacing.sm, vertical = CompaneroSpacing.sm)
+
+    Row(
+        modifier = rowModifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
     ) {
-        Row(
-            modifier = Modifier.padding(CompaneroSpacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
         ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
-            ) {
-                Text(title, style = MaterialTheme.typography.titleSmall)
-                Text(
-                    detail,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            trailingLabel?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = CompanionColors.crimson,
-                )
-            }
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(
+                detail,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        trailingLabel?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.labelLarge,
+                color = CompanionColors.crimson,
+            )
+        }
+        if (onClick != null) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
+}
+
+@Composable
+private fun GroupDivider() {
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 }
 
 private fun roleSummary(roles: Set<UserRole>): String = roles

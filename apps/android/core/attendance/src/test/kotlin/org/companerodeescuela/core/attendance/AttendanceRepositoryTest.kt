@@ -56,6 +56,32 @@ class AttendanceRepositoryTest {
     }
 
     @Test
+    fun `QR capture remains successful when immediate inspection network fails`() = runTest {
+        val store = FakeStore()
+        val scheduler = FakeScheduler()
+        val repository = AttendanceRepository(
+            tokenStore = FakeTokenStore(token("student-1", 2_000_000_000L)),
+            localStore = store,
+            scheduler = scheduler,
+            remoteClient = unusedRemoteClient(),
+            clock = clock,
+            newOperationId = { "op-offline" },
+        )
+
+        val result = repository.captureQrEvidence(
+            sessionId = "session-offline",
+            qrToken = "signed-offline-qr",
+        )
+
+        val success = assertIs<Outcome.Success<QrEvidenceCapture>>(result)
+        assertEquals("op-offline", success.value.localRecord.operationId)
+        assertEquals("session-offline", success.value.localRecord.sessionId)
+        assertEquals("signed-offline-qr", store.lastQrToken)
+        assertNull(success.value.inspection)
+        assertEquals(1, scheduler.calls)
+    }
+
+    @Test
     fun `expired session does not create an outbox row`() = runTest {
         val store = FakeStore()
         val scheduler = FakeScheduler()

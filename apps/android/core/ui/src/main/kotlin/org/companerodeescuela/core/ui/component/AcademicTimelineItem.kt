@@ -26,14 +26,19 @@ fun AcademicTimelineItem(
     modifier: Modifier = Modifier,
     status: String? = null,
     highlighted: Boolean = false,
+    subjectKey: String = title,
 ) {
+    val accent = AcademicSubjectColors.accent(
+        key = subjectKey,
+        surface = MaterialTheme.colorScheme.surface,
+    )
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.Top,
     ) {
         Text(
             text = time,
-            modifier = Modifier.width(52.dp),
+            modifier = Modifier.width(48.dp),
             style = MaterialTheme.typography.labelMedium,
             maxLines = 1,
             color = if (highlighted) {
@@ -45,14 +50,14 @@ fun AcademicTimelineItem(
         Spacer(Modifier.width(6.dp))
         Box(
             modifier = Modifier
-                .width(4.dp)
+                .width(if (highlighted) 5.dp else 4.dp)
                 .height(48.dp)
                 .clip(MaterialTheme.shapes.extraSmall)
                 .background(
                     if (highlighted) {
                         MaterialTheme.colorScheme.primary
                     } else {
-                        MaterialTheme.colorScheme.outlineVariant
+                        accent
                     },
                 ),
         )
@@ -79,7 +84,7 @@ fun AcademicTimelineItem(
                 Text(
                     text = it,
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = if (highlighted) MaterialTheme.colorScheme.primary else accent,
                     maxLines = 1,
                 )
             }

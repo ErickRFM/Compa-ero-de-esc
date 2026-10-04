@@ -20,4 +20,20 @@ class LoginV5SmokeTest {
             assertTrue(device.hasObject(By.text("Acceso institucional")))
         }
     }
+
+    @Test
+    fun firstAccessOpensInstitutionalIdentityValidation() {
+        ActivityScenario.launch(MainActivity::class.java).use {
+            val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+
+            val activate = device.findObject(By.text("Activar acceso"))
+            assertTrue(activate != null)
+            activate.click()
+
+            device.waitForIdle()
+            assertTrue(device.hasObject(By.text("Activar acceso")))
+            assertTrue(device.hasObject(By.text("Identidad institucional")))
+            assertTrue(device.hasObject(By.text("Matrícula o ID institucional")))
+        }
+    }
 }

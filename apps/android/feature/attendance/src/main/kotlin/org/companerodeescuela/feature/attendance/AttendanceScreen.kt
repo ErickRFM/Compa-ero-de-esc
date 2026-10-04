@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -27,8 +28,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +50,7 @@ import kotlinx.coroutines.delay
 import org.companerodeescuela.core.database.LocalAttendanceRecord
 import org.companerodeescuela.core.database.LocalAttendanceSyncState
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
+import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
@@ -117,8 +121,8 @@ private fun StudentAttendance(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md),
+        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
     ) {
         AttendanceHeader(
             title = "Asistencia",
@@ -182,57 +186,68 @@ private fun StudentSessionCard(
     local: LocalAttendanceRecord?,
     onScan: () -> Unit,
 ) {
-    Card(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ),
+        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
     ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = CompanionColors.graphite,
+                contentColor = CompanionColors.onDarkSurface,
+            ),
         ) {
-            Text(
-                text = occurrence?.subjectName ?: "Grupo ${session.groupName}",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = "${session.scheduledStartsAt} – ${session.scheduledEndsAt} · ${session.groupName}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            occurrence?.let {
-                val location = listOfNotNull(it.classroomName, it.buildingName)
-                    .joinToString(" · ")
-                    .ifBlank { "Aula por confirmar" }
-                Text(
-                    text = location,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            local?.let { LocalAttendanceStatus(it) }
-
-            Button(
-                onClick = onScan,
-                enabled = local == null,
-                modifier = Modifier.fillMaxWidth(),
+            Column(
+                modifier = Modifier.padding(CompaneroSpacing.lg),
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
-                Icon(
-                    imageVector = Icons.Filled.QrCodeScanner,
-                    contentDescription = null,
+                Text(
+                    text = "PASE ACTIVO",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = CompanionColors.crimsonContainer,
                 )
                 Text(
-                    text = if (local == null) {
-                        " Escanear QR"
-                    } else {
-                        " Pase ya registrado en este dispositivo"
-                    },
+                    text = occurrence?.subjectName ?: "Grupo ${session.groupName}",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
                 )
+                Text(
+                    text = "${session.scheduledStartsAt} – ${session.scheduledEndsAt} · ${session.groupName}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = CompanionColors.onDarkSurfaceVariant,
+                )
+                occurrence?.let {
+                    val location = listOfNotNull(it.classroomName, it.buildingName)
+                        .joinToString(" · ")
+                        .ifBlank { "Aula por confirmar" }
+                    Text(
+                        text = location,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = CompanionColors.onDarkSurfaceVariant,
+                    )
+                }
+
+                Button(
+                    onClick = onScan,
+                    enabled = local == null,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.QrCodeScanner,
+                        contentDescription = null,
+                    )
+                    Text(
+                        text = if (local == null) {
+                            " Escanear QR"
+                        } else {
+                            " Pase ya registrado en este dispositivo"
+                        },
+                    )
+                }
             }
         }
+
+        local?.let { LocalAttendanceStatus(it) }
     }
 }
 
@@ -305,8 +320,8 @@ private fun TeacherAttendance(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md),
+        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
     ) {
         AttendanceHeader(
             title = "Pase de lista",
@@ -365,15 +380,18 @@ private fun TeacherActiveSession(
     onRefreshRoster: () -> Unit,
     onReview: (AttendanceRecordResponse, AttendanceStatus) -> Unit,
 ) {
+    var showCloseConfirmation by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            containerColor = CompanionColors.graphite,
+            contentColor = CompanionColors.onDarkSurface,
         ),
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(CompaneroSpacing.xl),
+            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
@@ -400,7 +418,7 @@ private fun TeacherActiveSession(
                 Text(
                     text = "El QR cambia automáticamente. No contiene datos del alumno.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.74f),
+                    color = CompanionColors.onDarkSurfaceVariant,
                 )
             }
 
@@ -417,7 +435,7 @@ private fun TeacherActiveSession(
                     Text(" Registros")
                 }
                 Button(
-                    onClick = onClose,
+                    onClick = { showCloseConfirmation = true },
                     enabled = !busy,
                     modifier = Modifier.weight(1f),
                 ) {
@@ -425,6 +443,35 @@ private fun TeacherActiveSession(
                 }
             }
         }
+    }
+
+    if (showCloseConfirmation) {
+        AlertDialog(
+            onDismissRequest = { if (!busy) showCloseConfirmation = false },
+            title = { Text("¿Cerrar el pase?") },
+            text = {
+                Text("El QR dejará de estar disponible y no se recibirán nuevos intentos.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCloseConfirmation = false
+                        onClose()
+                    },
+                    enabled = !busy,
+                ) {
+                    Text("Cerrar pase")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showCloseConfirmation = false },
+                    enabled = !busy,
+                ) {
+                    Text("Seguir con el pase")
+                }
+            },
+        )
     }
 
     Text(
@@ -480,7 +527,13 @@ private fun RosterRecord(
                         }
                         AttendanceStatus.REJECTED -> MaterialTheme.colorScheme.error
                         AttendanceStatus.REVIEW_REQUIRED -> MaterialTheme.colorScheme.tertiary
-                        AttendanceStatus.LIKELY -> MaterialTheme.colorScheme.onSurfaceVariant
+                        AttendanceStatus.LIKELY -> if (
+                            MaterialTheme.colorScheme.surface.luminance() < 0.5f
+                        ) {
+                            CompanionColors.semanticBlueDark
+                        } else {
+                            CompanionColors.semanticBlue
+                        }
                     },
                 )
             }

@@ -31,6 +31,7 @@ object CompanionColors {
     val semanticGreenDarkContainer = Color(0xFF204C32)
     val semanticBlue = Color(0xFF42627A)
     val semanticBlueContainer = Color(0xFFDDEAF2)
+    val semanticBlueDark = Color(0xFFB0CDE0)
     val semanticAmber = Color(0xFF8A5100)
     val semanticAmberContainer = Color(0xFFFFDDB8)
     val semanticRed = Color(0xFFBA1A1A)

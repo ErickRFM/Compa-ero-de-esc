@@ -36,6 +36,7 @@ dependencies {
     api(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(project(":apps:android:core:designsystem"))
+    implementation(project(":apps:android:core:motion"))
     implementation(project(":apps:android:core:ui"))
 
     testImplementation(libs.junit.jupiter)

@@ -122,8 +122,24 @@ class AttendanceViewModel @Inject constructor(
                 )
             }
 
-            // Offline-first invariant: persist the evidence before any network inspection.
-            when (val captured = repository.enqueueAttempt(sessionId, token)) {
+            when (val captured = repository.captureQrEvidence(sessionId, token)) {
+                is Outcome.Success -> {
+                    val inspection = captured.value.inspection
+                    _state.update {
+                        it.copy(
+                            actionInProgress = false,
+                            scannerOpen = false,
+                            scannerSessionHint = null,
+                            qrInspection = inspection,
+                            errorMessage = null,
+                            successMessage = if (inspection == null) {
+                                "QR guardado. No pudimos comprobarlo ahora; se verificará automáticamente cuando haya conexión."
+                            } else {
+                                "QR guardado en este dispositivo. El servidor confirmará el resultado final."
+                            },
+                        )
+                    }
+                }
                 is Outcome.Failure -> {
                     _state.update {
                         it.copy(
@@ -132,48 +148,6 @@ class AttendanceViewModel @Inject constructor(
                             scannerSessionHint = null,
                             qrInspection = null,
                             errorMessage = captured.error.userMessage,
-                        )
-                    }
-                    return@launch
-                }
-                is Outcome.Success -> {
-                    _state.update {
-                        it.copy(
-                            scannerOpen = false,
-                            scannerSessionHint = null,
-                            successMessage =
-                                "QR guardado en este dispositivo. Se verificará automáticamente, incluso si pierdes conexión.",
-                        )
-                    }
-                }
-            }
-
-            // Best-effort immediate feedback. A failure here must never discard the queued evidence.
-            when (
-                val inspection = repository.inspectQr(
-                    AttendanceQrInspectionRequest(
-                        sessionId = sessionId,
-                        token = token,
-                    ),
-                )
-            ) {
-                is Outcome.Success -> {
-                    _state.update {
-                        it.copy(
-                            actionInProgress = false,
-                            qrInspection = inspection.value,
-                            errorMessage = null,
-                        )
-                    }
-                }
-                is Outcome.Failure -> {
-                    _state.update {
-                        it.copy(
-                            actionInProgress = false,
-                            qrInspection = null,
-                            errorMessage = null,
-                            successMessage =
-                                "QR guardado. No pudimos comprobarlo ahora; se verificará automáticamente cuando haya conexión.",
                         )
                     }
                 }

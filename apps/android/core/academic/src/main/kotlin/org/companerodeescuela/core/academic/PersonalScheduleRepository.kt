@@ -67,6 +67,40 @@ class PersonalScheduleRepository(
         )
     }
 
+    suspend fun append(
+        source: ScheduleSource,
+        drafts: List<PersonalScheduleDraft>,
+    ): Outcome<Int> {
+        if (source == ScheduleSource.INSTITUTIONAL) {
+            return Outcome.Failure(AppError.Http(status = 422))
+        }
+        val ownerId = ownerId() ?: return Outcome.Failure(AppError.Http(status = 401))
+        val items = drafts.map {
+            normalize(ownerId, it.copy(source = source))
+                ?: return Outcome.Failure(AppError.Http(status = 422))
+        }
+        return runCatching {
+            val existingKeys = store.list(ownerId).map(::personalScheduleKey).toMutableSet()
+            var inserted = 0
+            items.forEach { item ->
+                if (existingKeys.add(personalScheduleKey(item))) {
+                    store.upsert(item)
+                    inserted += 1
+                }
+            }
+            inserted
+        }.fold(
+            onSuccess = { Outcome.Success(it) },
+            onFailure = {
+                Outcome.Failure(
+                    AppError.Storage(
+                        "Could not append personal schedule: " + it::class.simpleName,
+                    ),
+                )
+            },
+        )
+    }
+
     suspend fun replace(
         source: ScheduleSource,
         drafts: List<PersonalScheduleDraft>,
@@ -78,7 +112,7 @@ class PersonalScheduleRepository(
         val items = drafts.map {
             normalize(ownerId, it.copy(source = source))
                 ?: return Outcome.Failure(AppError.Http(status = 422))
-        }
+        }.distinctBy(::personalScheduleKey)
         return runCatching {
             store.replaceBySource(ownerId, source, items)
         }.fold(
@@ -178,3 +212,13 @@ private fun PersonalScheduleItem.toScheduleEntry(): ScheduleEntry =
         campusName = null,
         source = source,
     )
+
+
+private fun personalScheduleKey(item: PersonalScheduleItem): String =
+    listOf(
+        item.dayOfWeek.trim().uppercase(),
+        item.startsAt.trim(),
+        item.endsAt.trim(),
+        item.subjectName.trim().lowercase(),
+        item.groupName.trim().lowercase(),
+    ).joinToString("|")

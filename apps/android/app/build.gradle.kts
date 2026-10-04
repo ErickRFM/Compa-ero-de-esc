@@ -8,7 +8,7 @@ plugins {
 
 val companeroApiBaseUrl = providers
     .environmentVariable("COMPANERO_API_BASE_URL")
-    .orElse("http://10.0.2.2:8080/")
+    .orElse("https://compa-ero-de-esc.onrender.com/")
     .get()
 
 require(companeroApiBaseUrl.startsWith("http")) {

@@ -2,12 +2,10 @@ package org.companerodeescuela.feature.channel
 
 import io.ktor.client.HttpClient
 import io.ktor.client.request.bearerAuth
-import io.ktor.client.request.contentType
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
-import io.ktor.http.ContentType
 import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.network.apiCall
@@ -49,7 +47,6 @@ class ChannelRepository(
             apiCall {
                 client.post("channels/$channelId/posts") {
                     bearerAuth(token)
-                    contentType(ContentType.Application.Json)
                     setBody(request)
                 }.requireBody<ApiResponse<ChannelPost>>()
             }.map { it.data }
@@ -64,7 +61,6 @@ class ChannelRepository(
             apiCall {
                 client.put("channels/$channelId/posts/$postId/acknowledgement") {
                     bearerAuth(token)
-                    contentType(ContentType.Application.Json)
                     setBody(request)
                 }.requireBody<ApiResponse<ChannelAcknowledgement>>()
             }.map { it.data }
@@ -83,7 +79,7 @@ class ChannelRepository(
         }
 
         val result = block(token)
-        if (result is Outcome.Failure && result.error is AppError.Http && result.error.status == 401) {
+        if (result is Outcome.Failure && (result.error as? AppError.Http)?.status == 401) {
             runCatching { tokenStore.clear() }
         }
         return result

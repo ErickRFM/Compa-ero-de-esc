@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -34,12 +36,14 @@ import org.companerodeescuela.core.navigation.AppExperience
 import org.companerodeescuela.core.navigation.CompaneroScaffold
 import org.companerodeescuela.core.navigation.Destination
 import org.companerodeescuela.core.navigation.RoleExperienceResolver
+import org.companerodeescuela.feature.attendance.AttendanceMode
 import org.companerodeescuela.feature.attendance.AttendanceScreen
 import org.companerodeescuela.feature.auth.LoginScreen
 import org.companerodeescuela.feature.auth.RegistrationScreen
 import org.companerodeescuela.feature.auth.SessionViewModel
 import org.companerodeescuela.feature.designsystem.DesignSystemCatalogScreen
 import org.companerodeescuela.feature.home.HomeScreen
+import org.companerodeescuela.feature.profile.ActiveExperiencePreferences
 import org.companerodeescuela.feature.profile.ProfileScreen
 import org.companerodeescuela.feature.schedule.ScheduleScreen
 import org.companerodeescuela.feature.settings.AppThemeMode
@@ -54,6 +58,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var appearancePreferences: AppearancePreferences
+
+    @Inject
+    lateinit var activeExperiencePreferences: ActiveExperiencePreferences
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -116,63 +123,105 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             else -> {
-                                val roleConfig = remember(session.roles) {
-                                    RoleExperienceResolver.resolve(session.roles)
+                                val availableExperiences = remember(session.roles) {
+                                    RoleExperienceResolver.available(session.roles)
                                 }
-                                val navController = rememberNavController()
+                                val userId = session.userId
+                                var preferredExperience by remember(userId, session.roles) {
+                                    mutableStateOf(
+                                        userId
+                                            ?.let(activeExperiencePreferences::read)
+                                            ?.takeIf(availableExperiences::contains),
+                                    )
+                                }
 
-                                CompaneroScaffold(
-                                    navController = navController,
-                                    startDestination = roleConfig.startDestination,
-                                    topLevelDestinations = roleConfig.topLevelDestinations,
+                                if (
+                                    availableExperiences.size > 1 &&
+                                    preferredExperience == null &&
+                                    userId != null
                                 ) {
-                                    composable(Destination.Home.route) {
-                                        HomeScreen(
-                                            onOpenSchedule = {
-                                                navController.navigate(Destination.Schedule.route) {
-                                                    launchSingleTop = true
-                                                }
-                                            },
-                                        )
-                                    }
-                                    composable(Destination.Schedule.route) { ScheduleScreen() }
-                                    composable(Destination.Attendance.route) { AttendanceScreen() }
-                                    composable(Destination.RoleUnavailable.route) {
-                                        RoleUnavailableScreen(roleConfig.experience)
-                                    }
-                                    composable(Destination.Profile.route) {
-                                        ProfileScreen(
-                                            displayName = session.displayName,
+                                    ExperiencePickerScreen(
+                                        experiences = availableExperiences,
+                                        onSelect = { selected ->
+                                            activeExperiencePreferences.write(userId, selected)
+                                            preferredExperience = selected
+                                        },
+                                    )
+                                } else {
+                                    val roleConfig = remember(session.roles, preferredExperience) {
+                                        RoleExperienceResolver.resolve(
                                             roles = session.roles,
-                                            onAppearance = {
-                                                navController.navigate(
-                                                    Destination.AppearanceSettings.route,
-                                                )
-                                            },
-                                            onLogout = sessionViewModel::logout,
+                                            preferredExperience = preferredExperience,
                                         )
                                     }
-                                    composable(Destination.AppearanceSettings.route) {
-                                        AppearanceSettingsScreen(
-                                            settings = appearance,
-                                            onThemeMode = appearancePreferences::setThemeMode,
-                                            onTextScale = appearancePreferences::setTextScale,
-                                            onReducedMotion = appearancePreferences::setReducedMotion,
-                                            onHighContrast = appearancePreferences::setHighContrast,
-                                            onOpenDebugCatalog = if (BuildConfig.DEBUG) {
-                                                {
+                                    val navController = rememberNavController()
+
+                                    CompaneroScaffold(
+                                        navController = navController,
+                                        startDestination = roleConfig.startDestination,
+                                        topLevelDestinations = roleConfig.topLevelDestinations,
+                                    ) {
+                                        composable(Destination.Home.route) {
+                                            HomeScreen(
+                                                onOpenSchedule = {
+                                                    navController.navigate(Destination.Schedule.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                            )
+                                        }
+                                        composable(Destination.Schedule.route) { ScheduleScreen() }
+                                        composable(Destination.Attendance.route) {
+                                            AttendanceScreen(
+                                                requestedMode = when (roleConfig.experience) {
+                                                    AppExperience.STUDENT -> AttendanceMode.STUDENT
+                                                    AppExperience.TEACHER -> AttendanceMode.TEACHER
+                                                    else -> null
+                                                },
+                                            )
+                                        }
+                                        composable(Destination.RoleUnavailable.route) {
+                                            RoleUnavailableScreen(roleConfig.experience)
+                                        }
+                                        composable(Destination.Profile.route) {
+                                            ProfileScreen(
+                                                displayName = session.displayName,
+                                                roles = session.roles,
+                                                canSwitchExperience = availableExperiences.size > 1,
+                                                onSwitchExperience = {
+                                                    userId?.let(activeExperiencePreferences::clear)
+                                                    preferredExperience = null
+                                                },
+                                                onAppearance = {
                                                     navController.navigate(
-                                                        Destination.DesignSystemCatalog.route,
+                                                        Destination.AppearanceSettings.route,
                                                     )
-                                                }
-                                            } else {
-                                                null
-                                            },
-                                        )
-                                    }
-                                    if (BuildConfig.DEBUG) {
-                                        composable(Destination.DesignSystemCatalog.route) {
-                                            DesignSystemCatalogScreen()
+                                                },
+                                                onLogout = sessionViewModel::logout,
+                                            )
+                                        }
+                                        composable(Destination.AppearanceSettings.route) {
+                                            AppearanceSettingsScreen(
+                                                settings = appearance,
+                                                onThemeMode = appearancePreferences::setThemeMode,
+                                                onTextScale = appearancePreferences::setTextScale,
+                                                onReducedMotion = appearancePreferences::setReducedMotion,
+                                                onHighContrast = appearancePreferences::setHighContrast,
+                                                onOpenDebugCatalog = if (BuildConfig.DEBUG) {
+                                                    {
+                                                        navController.navigate(
+                                                            Destination.DesignSystemCatalog.route,
+                                                        )
+                                                    }
+                                                } else {
+                                                    null
+                                                },
+                                            )
+                                        }
+                                        if (BuildConfig.DEBUG) {
+                                            composable(Destination.DesignSystemCatalog.route) {
+                                                DesignSystemCatalogScreen()
+                                            }
                                         }
                                     }
                                 }
@@ -217,4 +266,51 @@ private fun RoleUnavailableScreen(experience: AppExperience) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+
+@androidx.compose.runtime.Composable
+private fun ExperiencePickerScreen(
+    experiences: List<AppExperience>,
+    onSelect: (AppExperience) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.page),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = "¿Cómo quieres usar Compañero?",
+            style = MaterialTheme.typography.headlineMedium,
+        )
+        Text(
+            text = "Tu cuenta tiene más de un perfil. Puedes cambiar de modo después desde Perfil.",
+            modifier = Modifier.padding(
+                top = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.xs,
+                bottom = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.md,
+            ),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        experiences.forEach { experience ->
+            Button(
+                onClick = { onSelect(experience) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.xs),
+            ) {
+                Text(experienceLabel(experience))
+            }
+        }
+    }
+}
+
+private fun experienceLabel(experience: AppExperience): String = when (experience) {
+    AppExperience.STUDENT -> "Continuar como estudiante"
+    AppExperience.TEACHER -> "Continuar como docente"
+    AppExperience.COORDINATOR -> "Continuar como coordinación"
+    AppExperience.ADMIN -> "Continuar como administración"
+    AppExperience.SUPER_ADMIN -> "Continuar como administración general"
+    AppExperience.UNSUPPORTED -> "Continuar"
 }

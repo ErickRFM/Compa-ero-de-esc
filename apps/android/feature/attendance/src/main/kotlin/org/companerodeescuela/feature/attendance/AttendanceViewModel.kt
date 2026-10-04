@@ -67,6 +67,57 @@ class AttendanceViewModel @Inject constructor(
         bootstrap()
     }
 
+    fun selectMode(requestedMode: AttendanceMode) {
+        if (requestedMode !in setOf(AttendanceMode.STUDENT, AttendanceMode.TEACHER)) return
+
+        viewModelScope.launch {
+            when (val claimsResult = repository.localSessionClaims()) {
+                is Outcome.Success -> {
+                    val claims = claimsResult.value
+                    val allowed = when (requestedMode) {
+                        AttendanceMode.STUDENT -> UserRole.STUDENT in claims.roles
+                        AttendanceMode.TEACHER -> UserRole.TEACHER in claims.roles
+                        else -> false
+                    }
+                    if (!allowed) {
+                        _state.update {
+                            it.copy(
+                                mode = AttendanceMode.UNSUPPORTED,
+                                loading = false,
+                                errorMessage = "Tu cuenta no tiene acceso a este modo de asistencia.",
+                            )
+                        }
+                        return@launch
+                    }
+
+                    _state.update {
+                        it.copy(
+                            mode = requestedMode,
+                            userId = claims.userId,
+                            loading = false,
+                            errorMessage = null,
+                        )
+                    }
+                    observeLocalRecords(claims.userId)
+                    when (requestedMode) {
+                        AttendanceMode.STUDENT -> refreshStudent()
+                        AttendanceMode.TEACHER -> refreshTeacher()
+                        else -> Unit
+                    }
+                }
+                is Outcome.Failure -> {
+                    _state.update {
+                        it.copy(
+                            mode = AttendanceMode.UNSUPPORTED,
+                            loading = false,
+                            errorMessage = claimsResult.error.userMessage,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     fun refresh() {
         when (_state.value.mode) {
             AttendanceMode.STUDENT -> refreshStudent()
@@ -283,8 +334,8 @@ class AttendanceViewModel @Inject constructor(
                 is Outcome.Success -> {
                     val claims = claimsResult.value
                     val mode = when {
-                        UserRole.TEACHER in claims.roles -> AttendanceMode.TEACHER
                         UserRole.STUDENT in claims.roles -> AttendanceMode.STUDENT
+                        UserRole.TEACHER in claims.roles -> AttendanceMode.TEACHER
                         else -> AttendanceMode.UNSUPPORTED
                     }
                     _state.update {

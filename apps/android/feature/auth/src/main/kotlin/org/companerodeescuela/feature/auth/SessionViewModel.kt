@@ -22,6 +22,7 @@ data class SessionUiState(
     val checking: Boolean = true,
     val authenticated: Boolean = false,
     val submitting: Boolean = false,
+    val userId: String? = null,
     val displayName: String? = null,
     val roles: Set<UserRole> = emptySet(),
     val errorMessage: String? = null,
@@ -55,6 +56,7 @@ class SessionViewModel @Inject constructor(
                             checking = false,
                             authenticated = false,
                             submitting = false,
+                            userId = null,
                             displayName = null,
                             roles = emptySet(),
                         )
@@ -67,6 +69,7 @@ class SessionViewModel @Inject constructor(
                         checking = false,
                         authenticated = true,
                         submitting = false,
+                        userId = claims.userId,
                         displayName = claims.displayName ?: it.displayName,
                         roles = claims.roles,
                         errorMessage = null,

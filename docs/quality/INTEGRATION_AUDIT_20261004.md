@@ -121,6 +121,21 @@ Fix:
 
 - release/readiness documentation is reconciled with V5, attendance, first-access activation and current blockers.
 
+### IA-004 — main branch has no protection/rules gate
+
+**Severity: High**  
+**Status: Open / repository administration required**
+
+GitHub reports `main` as unprotected with no required status checks. The CI workflows are strong, but they are advisory if a direct push can bypass them.
+
+Required repository policy:
+
+- require pull requests before merging;
+- require `ci-api` and `ci-android`;
+- require branches to be up to date before merge;
+- block force-pushes to `main`;
+- block deletion of `main`.
+
 ## Remaining blockers
 
 ### Product / role scope

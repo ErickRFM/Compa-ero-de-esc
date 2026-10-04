@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
+import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
@@ -38,18 +39,20 @@ fun ProfileScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md),
-        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
+            .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
+        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.extraLarge,
             color = CompanionColors.graphite,
+            tonalElevation = CompaneroElevation.raised,
+            shadowElevation = CompaneroElevation.raised,
         ) {
             Row(
-                modifier = Modifier.padding(CompaneroSpacing.lg),
+                modifier = Modifier.padding(CompaneroSpacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
+                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
                 Surface(
                     modifier = Modifier.size(CompaneroSize.avatar),
@@ -71,7 +74,7 @@ fun ProfileScreen(
                     Text(
                         text = displayName?.takeIf(String::isNotBlank)
                             ?: "Cuenta institucional",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         color = CompanionColors.onDarkSurface,
                     )
                     Text(
@@ -103,7 +106,7 @@ fun ProfileScreen(
         )
         ProfileRow(
             title = "Acerca de Compañero",
-            detail = "Compañero de Clase · UPTlax · UI V5.1",
+            detail = "Compañero de Clase · UPTlax · UI V5.2",
         )
 
         Button(
@@ -125,9 +128,11 @@ private fun ProfileActionRow(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceVariant,
+        tonalElevation = CompaneroElevation.subtle,
+        shadowElevation = CompaneroElevation.card,
     ) {
         Row(
-            modifier = Modifier.padding(CompaneroSpacing.md),
+            modifier = Modifier.padding(CompaneroSpacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(
@@ -158,11 +163,13 @@ private fun ProfileRow(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceVariant,
+        tonalElevation = CompaneroElevation.subtle,
+        shadowElevation = CompaneroElevation.card,
     ) {
         Row(
-            modifier = Modifier.padding(CompaneroSpacing.md),
+            modifier = Modifier.padding(CompaneroSpacing.sm),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
+            horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
         ) {
             Column(
                 modifier = Modifier.weight(1f),

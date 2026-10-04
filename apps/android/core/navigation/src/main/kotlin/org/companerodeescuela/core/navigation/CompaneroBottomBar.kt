@@ -56,8 +56,8 @@ fun CompaneroBottomBar(
 
     Surface(
         modifier = modifier.padding(
-            horizontal = CompaneroSpacing.md,
-            vertical = CompaneroSpacing.xs,
+            horizontal = CompaneroSpacing.sm,
+            vertical = CompaneroSpacing.xxs,
         ),
         shape = MaterialTheme.shapes.extraLarge,
         color = CompanionColors.graphite,
@@ -67,7 +67,7 @@ fun CompaneroBottomBar(
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp)
+                .height(56.dp)
                 .padding(CompaneroSpacing.xxs),
         ) {
             val itemWidth = maxWidth / destinations.size
@@ -86,7 +86,7 @@ fun CompaneroBottomBar(
                 modifier = Modifier
                     .offset(x = pillOffset)
                     .width(itemWidth)
-                    .height(56.dp)
+                    .height(48.dp)
                     .clip(MaterialTheme.shapes.extraLarge)
                     .background(CompanionColors.crimson),
             )
@@ -95,7 +95,7 @@ fun CompaneroBottomBar(
                 destinations.forEachIndexed { index, topLevel ->
                     val selected = index == selectedIndex
                     val scale by animateFloatAsState(
-                        targetValue = if (selected && !reducedMotion) 1.04f else 1f,
+                        targetValue = if (selected && !reducedMotion) 1.02f else 1f,
                         animationSpec = CompaneroMotion.fast(),
                         label = "navItemScale",
                     )
@@ -103,7 +103,7 @@ fun CompaneroBottomBar(
                     Box(
                         modifier = Modifier
                             .width(itemWidth)
-                            .height(56.dp)
+                            .height(48.dp)
                             .clip(MaterialTheme.shapes.extraLarge)
                             .clickable {
                                 navController.navigate(topLevel.destination.route) {
@@ -132,7 +132,7 @@ fun CompaneroBottomBar(
                                     TopLevelDestination.Attendance -> Icons.Filled.QrCodeScanner
                                 },
                                 contentDescription = topLevel.label,
-                                modifier = Modifier.size(22.dp),
+                                modifier = Modifier.size(20.dp),
                                 tint = if (selected) {
                                     Color.White
                                 } else {

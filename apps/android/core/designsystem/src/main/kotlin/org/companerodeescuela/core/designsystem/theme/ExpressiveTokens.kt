@@ -20,11 +20,19 @@ object CompaneroSpacing {
     val xl = 24.dp
     val xxl = 32.dp
     val hero = 40.dp
+
+    // V5.2 density roles. Prefer these semantic values in product surfaces.
+    val page = 16.dp
+    val section = 12.dp
+    val card = 14.dp
+    val compact = 8.dp
 }
 
 object CompaneroElevation {
-    val raised = 8.dp
-    val immersive = 12.dp
+    val subtle = 1.dp
+    val card = 3.dp
+    val raised = 6.dp
+    val immersive = 10.dp
 }
 
 object CompaneroSize {

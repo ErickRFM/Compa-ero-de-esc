@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
+import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 
 enum class NoticeTone {
@@ -52,12 +53,14 @@ fun StatusNotice(
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = container,
-        shape = MaterialTheme.shapes.medium,
+        shape = MaterialTheme.shapes.large,
+        tonalElevation = CompaneroElevation.subtle,
+        shadowElevation = CompaneroElevation.subtle,
     ) {
-        Column(modifier = Modifier.padding(CompaneroSpacing.md)) {
+        Column(modifier = Modifier.padding(CompaneroSpacing.sm)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
                 color = content,
             )
             Text(

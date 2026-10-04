@@ -11,6 +11,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -24,6 +27,7 @@ import org.companerodeescuela.core.navigation.CompaneroScaffold
 import org.companerodeescuela.core.navigation.Destination
 import org.companerodeescuela.core.navigation.TopLevelDestination
 import org.companerodeescuela.feature.auth.LoginScreen
+import org.companerodeescuela.feature.auth.RegistrationScreen
 import org.companerodeescuela.feature.attendance.AttendanceScreen
 import org.companerodeescuela.feature.auth.SessionViewModel
 import org.companerodeescuela.feature.designsystem.DesignSystemCatalogScreen
@@ -50,6 +54,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     val sessionViewModel: SessionViewModel = hiltViewModel()
                     val session by sessionViewModel.state.collectAsStateWithLifecycle()
+                    var activatingAccess by remember { mutableStateOf(false) }
 
                     LaunchedEffect(session.authenticated) {
                         if (session.authenticated) {
@@ -67,10 +72,19 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         !session.authenticated -> {
-                            LoginScreen(
-                                state = session,
-                                onLogin = sessionViewModel::login,
-                            )
+                            if (activatingAccess) {
+                                RegistrationScreen(
+                                    state = session,
+                                    onActivate = sessionViewModel::login,
+                                    onBackToLogin = { activatingAccess = false },
+                                )
+                            } else {
+                                LoginScreen(
+                                    state = session,
+                                    onLogin = sessionViewModel::login,
+                                    onCreateAccount = { activatingAccess = true },
+                                )
+                            }
                         }
                         else -> {
                             val teacherOnly =

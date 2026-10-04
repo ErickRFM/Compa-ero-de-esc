@@ -6,6 +6,18 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
+val companeroApiBaseUrl = providers
+    .environmentVariable("COMPANERO_API_BASE_URL")
+    .orElse("http://10.0.2.2:8080/")
+    .get()
+
+require(companeroApiBaseUrl.startsWith("http")) {
+    "COMPANERO_API_BASE_URL must be absolute"
+}
+require(companeroApiBaseUrl.endsWith("/")) {
+    "COMPANERO_API_BASE_URL must end with '/'"
+}
+
 android {
     namespace = "org.companerodeescuela"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -18,6 +30,8 @@ android {
         versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "API_BASE_URL", "\"$companeroApiBaseUrl\"")
     }
 
     buildTypes {
@@ -41,6 +55,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {

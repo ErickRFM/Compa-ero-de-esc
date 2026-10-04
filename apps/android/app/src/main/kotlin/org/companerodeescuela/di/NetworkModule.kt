@@ -5,6 +5,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.ktor.client.HttpClient
+import org.companerodeescuela.BuildConfig
 import org.companerodeescuela.core.network.ApiEnvironment
 import org.companerodeescuela.core.network.createApiClient
 import javax.inject.Singleton
@@ -14,16 +15,18 @@ import javax.inject.Singleton
 object NetworkModule {
 
     /**
-     * Base URL.
+     * Base URL embedded at build time.
      *
-     * The emulator reaches the host machine on 10.0.2.2. Release builds get the
-     * same value here only because there is no real deployment yet; that
-     * placeholder is deliberately visible in one obvious place instead of
-     * scattered through a resources file.
+     * Local builds default to the emulator host. Release/test builds can point
+     * to a deployed backend by exporting COMPANERO_API_BASE_URL before Gradle.
      */
     @Provides
     @Singleton
-    fun provideApiEnvironment(): ApiEnvironment = ApiEnvironment.Emulator
+    fun provideApiEnvironment(): ApiEnvironment =
+        ApiEnvironment(
+            baseUrl = BuildConfig.API_BASE_URL,
+            name = "build-config",
+        )
 
     @Provides
     @Singleton

@@ -16,7 +16,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
 import org.companerodeescuela.core.designsystem.theme.CompaneroExpressive
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.motion.CompaneroMotion
@@ -47,11 +49,16 @@ fun HeroAcademicCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
+            .shadow(
+                elevation = CompaneroElevation.raised,
+                shape = MaterialTheme.shapes.extraLarge,
+                clip = false,
+            )
             .clip(MaterialTheme.shapes.extraLarge)
             .background(CompaneroExpressive.heroBrush()),
     ) {
         Column(
-            modifier = Modifier.padding(CompaneroSpacing.xl),
+            modifier = Modifier.padding(CompaneroSpacing.lg),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
         ) {
             Text(
@@ -61,7 +68,7 @@ fun HeroAcademicCard(
             )
             Text(
                 text = subject,
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.headlineSmall,
                 color = Color.White,
             )
             Text(

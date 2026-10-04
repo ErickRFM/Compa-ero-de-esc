@@ -7,6 +7,7 @@ sealed class Destination(val route: String) {
     data object Home : Destination("home")
     data object Schedule : Destination("schedule")
     data object Attendance : Destination("attendance")
+    data object RoleUnavailable : Destination("role-unavailable")
     data object Profile : Destination("profile")
     data object AppearanceSettings : Destination("appearance-settings")
     data object DesignSystemCatalog : Destination("design-system-catalog")

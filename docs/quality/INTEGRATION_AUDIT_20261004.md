@@ -123,7 +123,7 @@ Fix:
 
 ### IA-004 — main branch has no protection/rules gate
 
-**Severity: High**  
+**Severity: High**
 **Status: Open / repository administration required**
 
 GitHub reports `main` as unprotected with no required status checks. The CI workflows are strong, but they are advisory if a direct push can bypass them.

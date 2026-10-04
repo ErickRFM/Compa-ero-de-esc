@@ -32,6 +32,8 @@ object CompaneroSize {
     val indicator = 20.dp
     val indicatorStroke = 2.dp
     val loginContentMaxWidth = 520.dp
+    val brandLogoHeight = 56.dp
+    val brandLogoCompactHeight = 36.dp
     val homeContentMaxWidth = 1120.dp
     val agendaRailWidth = 168.dp
     val scannerFrame = 270.dp

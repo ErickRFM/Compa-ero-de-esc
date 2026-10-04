@@ -11,7 +11,9 @@ import org.companerodeescuela.core.security.PlatformSessionClaims
 import org.companerodeescuela.core.security.SessionTokenInspector
 import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.shared.contracts.AcademicWeekResponse
-import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest\nimport org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse\nimport org.companerodeescuela.shared.contracts.AttendanceQrResponse
+import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
+import org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse
+import org.companerodeescuela.shared.contracts.AttendanceQrResponse
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
 import org.companerodeescuela.shared.contracts.AttendanceRosterResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse

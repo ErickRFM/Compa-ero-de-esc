@@ -5,6 +5,7 @@ package org.companerodeescuela.core.navigation
  */
 sealed class Destination(val route: String) {
     data object Home : Destination("home")
+    data object TeacherHome : Destination("teacher-home")
     data object Schedule : Destination("schedule")
     data object Attendance : Destination("attendance")
     data object Profile : Destination("profile")
@@ -24,6 +25,7 @@ enum class TopLevelDestination(
     val label: String,
 ) {
     Home(Destination.Home, "Hoy"),
+    TeacherHome(Destination.TeacherHome, "Hoy"),
     Schedule(Destination.Schedule, "Agenda"),
     Attendance(Destination.Attendance, "Asistencia"),
 }

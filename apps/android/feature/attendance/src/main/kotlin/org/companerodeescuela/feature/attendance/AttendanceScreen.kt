@@ -391,6 +391,7 @@ private fun QrInspectionCard(
     onDismiss: () -> Unit,
 ) {
     val valid = inspection.status == AttendanceQrInspectionStatus.VALID
+    val session = inspection.session
     StatusNotice(
         title = when (inspection.status) {
             AttendanceQrInspectionStatus.VALID -> "QR válido"
@@ -401,12 +402,12 @@ private fun QrInspectionCard(
             AttendanceQrInspectionStatus.NOT_ENROLLED -> "No corresponde a tu inscripción"
         },
         message = when {
-            valid && inspection.session != null -> {
+            valid && session != null -> {
                 val subject = occurrence?.subjectName
-                    ?: "Grupo " + inspection.session.groupName
+                    ?: "Grupo " + session.groupName
                 subject + " · " +
-                    inspection.session.scheduledStartsAt + "–" +
-                    inspection.session.scheduledEndsAt +
+                    session.scheduledStartsAt + "–" +
+                    session.scheduledEndsAt +
                     ". Aún no se ha registrado asistencia."
             }
             inspection.status == AttendanceQrInspectionStatus.EXPIRED ->

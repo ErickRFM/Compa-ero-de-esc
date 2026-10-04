@@ -9,11 +9,13 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -29,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.LocalDate
@@ -172,41 +175,90 @@ private fun DayAgenda(
     onSelectedDay: (String) -> Unit,
 ) {
     val days = entries.map { it.dayOfWeek }.distinct()
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
-    ) {
-        days.forEach { day ->
-            FilterChip(
-                selected = selectedDay == day,
-                onClick = { onSelectedDay(day) },
-                label = { Text(dayShortLabel(day)) },
-            )
+    val dayEntries = entries.filter { it.dayOfWeek == selectedDay }
+
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        if (maxWidth >= 600.dp) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(
+                    modifier = Modifier.width(168.dp),
+                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                ) {
+                    days.forEach { day ->
+                        FilterChip(
+                            selected = selectedDay == day,
+                            onClick = { onSelectedDay(day) },
+                            label = { Text(dayLabel(day)) },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+                DayAgendaDetails(
+                    day = selectedDay,
+                    entries = dayEntries,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                ) {
+                    days.forEach { day ->
+                        FilterChip(
+                            selected = selectedDay == day,
+                            onClick = { onSelectedDay(day) },
+                            label = { Text(dayShortLabel(day)) },
+                        )
+                    }
+                }
+                DayAgendaDetails(
+                    day = selectedDay,
+                    entries = dayEntries,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
+}
 
-    val dayEntries = entries.filter { it.dayOfWeek == selectedDay }
-    if (dayEntries.isEmpty()) {
-        StatusNotice(
-            title = dayLabel(selectedDay),
-            message = "No tienes clases programadas este día.",
-        )
-    } else {
-        Text(
-            text = dayLabel(selectedDay),
-            style = MaterialTheme.typography.titleLarge,
-        )
-        dayEntries.forEach { entry ->
-            AcademicTimelineItem(
-                time = entry.startsAt,
-                title = entry.subjectName,
-                subtitle = locationAndTeacher(entry),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = CompaneroSpacing.xxs),
+@Composable
+private fun DayAgendaDetails(
+    day: String,
+    entries: List<ScheduleEntry>,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+    ) {
+        if (entries.isEmpty()) {
+            StatusNotice(
+                title = dayLabel(day),
+                message = "No tienes clases programadas este día.",
             )
+        } else {
+            Text(
+                text = dayLabel(day),
+                style = MaterialTheme.typography.titleLarge,
+            )
+            entries.forEach { entry ->
+                AcademicTimelineItem(
+                    time = entry.startsAt,
+                    title = entry.subjectName,
+                    subtitle = locationAndTeacher(entry),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = CompaneroSpacing.xxs),
+                )
+            }
         }
     }
 }

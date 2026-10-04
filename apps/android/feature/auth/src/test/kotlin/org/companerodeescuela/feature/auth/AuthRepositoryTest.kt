@@ -11,6 +11,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlinx.coroutines.test.runTest
+import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.network.ApiEnvironment
 import org.companerodeescuela.core.network.createApiClient
@@ -59,6 +60,48 @@ class AuthRepositoryTest {
         assertEquals(validToken, tokenStore.token)
     }
 
+    @Test
+    fun `secure storage failure is classified instead of becoming unknown`() = runTest {
+        val validToken = platformToken("student-1", 4_102_444_800)
+        val engine = MockEngine {
+            respond(
+                content = """
+                    {
+                      "data": {
+                        "accessToken": "$validToken",
+                        "expiresAtEpochSeconds": 4102444800,
+                        "user": {
+                          "id": "student-1",
+                          "displayName": "Ana López",
+                          "email": "ana@example.edu",
+                          "roles": ["student"],
+                          "active": true
+                        }
+                      }
+                    }
+                """.trimIndent(),
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+            )
+        }
+        val repository = AuthRepository(
+            client = createApiClient(
+                environment = ApiEnvironment("https://example.test/", "test"),
+                engine = engine,
+            ),
+            tokenStore = FakeTokenStore(failOnWrite = true),
+        )
+
+        val result = repository.login("ana", "secret")
+
+        val failure = assertIs<Outcome.Failure>(result)
+        assertIs<AppError.Storage>(failure.error)
+        assertEquals(
+            "No pudimos guardar tu sesión de forma segura. Inténtalo nuevamente.",
+            failure.error.userMessage,
+        )
+    }
+
     private fun platformToken(userId: String, expiresAt: Long): String {
         val encoder = Base64.getUrlEncoder().withoutPadding()
         val payload = """{"sub":"$userId","display_name":"Ana López","exp":$expiresAt}"""
@@ -69,12 +112,15 @@ class AuthRepositoryTest {
         ).joinToString(".")
     }
 
-    private class FakeTokenStore : SessionTokenStore {
+    private class FakeTokenStore(
+        private val failOnWrite: Boolean = false,
+    ) : SessionTokenStore {
         var token: String? = null
 
         override suspend fun readAccessToken(): String? = token
 
         override suspend fun writeAccessToken(token: String) {
+            if (failOnWrite) error("simulated secure storage failure")
             this.token = token
         }
 

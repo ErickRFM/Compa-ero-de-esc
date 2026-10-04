@@ -55,7 +55,7 @@ class AuthRepository(
                         Outcome.Success(result.value.user)
                     } catch (error: Exception) {
                         Outcome.Failure(
-                            AppError.Unknown(
+                            AppError.Storage(
                                 technicalDetail = "Could not persist session: " + error::class.simpleName,
                             ),
                         )

@@ -38,6 +38,13 @@ internal class AndroidKeystoreTokenCipher : TokenCipher {
         return cipher.doFinal(encrypted).toString(Charsets.UTF_8)
     }
 
+    override fun reset() {
+        val keyStore = KeyStore.getInstance(ANDROID_KEY_STORE).apply { load(null) }
+        if (keyStore.containsAlias(KEY_ALIAS)) {
+            keyStore.deleteEntry(KEY_ALIAS)
+        }
+    }
+
     private fun getOrCreateKey(): SecretKey {
         val keyStore = KeyStore.getInstance(ANDROID_KEY_STORE).apply { load(null) }
         val existing = keyStore.getKey(KEY_ALIAS, null) as? SecretKey

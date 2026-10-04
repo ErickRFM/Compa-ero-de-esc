@@ -139,6 +139,7 @@ class AttendanceRemoteClient @Inject constructor(
             is AppError.Http -> "HTTP_" + error.status
             is AppError.Network -> "NETWORK"
             is AppError.Serialization -> "SERIALIZATION"
+            is AppError.Storage -> "STORAGE"
             is AppError.Unknown -> "UNKNOWN"
         }
     }

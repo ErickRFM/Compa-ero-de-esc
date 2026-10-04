@@ -121,6 +121,7 @@ class AttendanceSyncWorker @AssistedInject constructor(
                         is AppError.Network -> true
                         is AppError.Http -> AttendanceRetryPolicy.isRetryableHttp(error.status)
                         is AppError.Serialization,
+                        is AppError.Storage,
                         is AppError.Unknown,
                         -> false
                     }

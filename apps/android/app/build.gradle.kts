@@ -114,6 +114,10 @@ dependencies {
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlin.test)
     testImplementation(project(":apps:android:core:testing"))
+
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.uiautomator)
 }
 
 tasks.withType<Test>().configureEach {

@@ -102,6 +102,40 @@ data class AttendanceQrResponse(
 )
 
 @Serializable
+enum class AttendanceQrInspectionStatus {
+    @SerialName("valid")
+    VALID,
+
+    @SerialName("expired")
+    EXPIRED,
+
+    @SerialName("wrong_session")
+    WRONG_SESSION,
+
+    @SerialName("invalid")
+    INVALID,
+
+    @SerialName("session_closed")
+    SESSION_CLOSED,
+
+    @SerialName("not_enrolled")
+    NOT_ENROLLED,
+}
+
+@Serializable
+data class AttendanceQrInspectionRequest(
+    val sessionId: String,
+    val token: String,
+)
+
+@Serializable
+data class AttendanceQrInspectionResponse(
+    val status: AttendanceQrInspectionStatus,
+    val session: AttendanceSessionResponse? = null,
+    val expiresAtEpochSeconds: Long? = null,
+)
+
+@Serializable
 data class AttendanceRecordResponse(
     val id: String,
     val operationId: String,

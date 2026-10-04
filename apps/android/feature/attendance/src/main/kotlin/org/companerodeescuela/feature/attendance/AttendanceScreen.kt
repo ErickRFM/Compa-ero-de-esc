@@ -1,5 +1,8 @@
 package org.companerodeescuela.feature.attendance
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -12,10 +15,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Button
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -23,20 +27,22 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -47,6 +53,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.companerodeescuela.core.database.LocalAttendanceRecord
 import org.companerodeescuela.core.database.LocalAttendanceSyncState
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
@@ -55,6 +62,8 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
+import org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse
+import org.companerodeescuela.shared.contracts.AttendanceQrInspectionStatus
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.AttendanceStatus
@@ -66,8 +75,24 @@ fun AttendanceScreen(
     viewModel: AttendanceViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val imageReader = remember(context) { AttendanceQrImageReader(context) }
+    val imageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching { imageReader.read(uri) }
+                .onSuccess { token ->
+                    if (token.isNullOrBlank()) viewModel.inspectQr("")
+                    else viewModel.inspectQr(token)
+                }
+                .onFailure { viewModel.inspectQr("") }
+        }
+    }
 
-    if (state.scannerSessionId != null) {
+    if (state.scannerOpen) {
         Dialog(
             onDismissRequest = viewModel::dismissScanner,
             properties = DialogProperties(
@@ -76,7 +101,7 @@ fun AttendanceScreen(
             ),
         ) {
             AttendanceQrScanner(
-                onToken = viewModel::submitScannedQr,
+                onToken = viewModel::inspectQr,
                 onClose = viewModel::dismissScanner,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -89,6 +114,11 @@ fun AttendanceScreen(
             state = state,
             onRefresh = viewModel::refresh,
             onScan = viewModel::openScanner,
+            onGenericScan = viewModel::openGenericScanner,
+            onPickImage = { imageLauncher.launch(arrayOf("image/*")) },
+            onInspectToken = viewModel::inspectQr,
+            onRegister = viewModel::submitInspectedQr,
+            onDismissInspection = viewModel::clearQrInspection,
             modifier = modifier,
         )
         AttendanceMode.TEACHER -> TeacherAttendance(
@@ -112,12 +142,18 @@ fun AttendanceScreen(
 private fun StudentAttendance(
     state: AttendanceUiState,
     onRefresh: () -> Unit,
-    onScan: (String) -> Unit,
+    onScan: (String?) -> Unit,
+    onGenericScan: () -> Unit,
+    onPickImage: () -> Unit,
+    onInspectToken: (String) -> Unit,
+    onRegister: () -> Unit,
+    onDismissInspection: () -> Unit,
     modifier: Modifier,
 ) {
     val occurrenceById = remember(state.occurrences) {
         state.occurrences.associateBy { it.id }
     }
+    var showPasteDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -128,7 +164,7 @@ private fun StudentAttendance(
     ) {
         AttendanceHeader(
             title = "Asistencia",
-            subtitle = "Escanea el QR de tu clase. Primero se guarda en este teléfono y después el servidor decide el resultado.",
+            subtitle = "El QR es una evidencia. Puedes comprobarlo primero; el servidor decide el estado final.",
             loading = state.loading,
             onRefresh = onRefresh,
         )
@@ -142,16 +178,26 @@ private fun StudentAttendance(
         }
         state.errorMessage?.let {
             StatusNotice(
-                title = "No pudimos actualizar",
+                title = "No pudimos completar la acción",
                 message = it,
                 tone = NoticeTone.ERROR,
             )
         }
 
+        state.qrInspection?.let { inspection ->
+            QrInspectionCard(
+                inspection = inspection,
+                occurrence = inspection.session?.occurrenceId?.let(occurrenceById::get),
+                busy = state.actionInProgress,
+                onRegister = onRegister,
+                onDismiss = onDismissInspection,
+            )
+        }
+
         if (!state.loading && state.activeSessions.isEmpty()) {
             StatusNotice(
-                title = "Sin pase activo",
-                message = "Cuando tu docente abra asistencia para una clase inscrita aparecerá aquí.",
+                title = "No hay pase activo",
+                message = "Cuando tu docente abra asistencia aparecerá aquí. Mientras tanto puedes comprobar un QR sin registrar asistencia.",
             )
         }
 
@@ -169,6 +215,12 @@ private fun StudentAttendance(
             )
         }
 
+        QrCenterCard(
+            onScan = onGenericScan,
+            onImage = onPickImage,
+            onPaste = { showPasteDialog = true },
+        )
+
         if (state.localRecords.isNotEmpty()) {
             Text(
                 text = "Actividad reciente",
@@ -178,6 +230,16 @@ private fun StudentAttendance(
                 LocalAttendanceRow(record)
             }
         }
+    }
+
+    if (showPasteDialog) {
+        QrPasteDialog(
+            onDismiss = { showPasteDialog = false },
+            onInspect = {
+                showPasteDialog = false
+                onInspectToken(it)
+            },
+        )
     }
 }
 
@@ -209,12 +271,13 @@ private fun StudentSessionCard(
                     color = CompanionColors.crimsonContainer,
                 )
                 Text(
-                    text = occurrence?.subjectName ?: "Grupo ${session.groupName}",
+                    text = occurrence?.subjectName ?: "Grupo " + session.groupName,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    text = "${session.scheduledStartsAt} – ${session.scheduledEndsAt} · ${session.groupName}",
+                    text = session.scheduledStartsAt + " – " +
+                        session.scheduledEndsAt + " · " + session.groupName,
                     style = MaterialTheme.typography.bodyMedium,
                     color = CompanionColors.onDarkSurfaceVariant,
                 )
@@ -240,7 +303,7 @@ private fun StudentSessionCard(
                     )
                     Text(
                         text = if (local == null) {
-                            " Escanear QR"
+                            " Comprobar QR"
                         } else {
                             " Pase ya registrado en este dispositivo"
                         },
@@ -250,6 +313,133 @@ private fun StudentSessionCard(
         }
 
         local?.let { LocalAttendanceStatus(it) }
+    }
+}
+
+@Composable
+private fun QrCenterCard(
+    onScan: () -> Unit,
+    onImage: () -> Unit,
+    onPaste: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+    ) {
+        Column(
+            modifier = Modifier.padding(CompaneroSpacing.lg),
+            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+        ) {
+            Text("Comprobar un código QR", style = MaterialTheme.typography.titleLarge)
+            Text(
+                text = "Escanéalo, elige una captura o pega el código. Comprobar no registra asistencia.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(onClick = onScan, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Filled.QrCodeScanner, contentDescription = null)
+                Text(" Escanear con cámara")
+            }
+            OutlinedButton(onClick = onImage, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Filled.Image, contentDescription = null)
+                Text(" Elegir imagen")
+            }
+            OutlinedButton(onClick = onPaste, modifier = Modifier.fillMaxWidth()) {
+                Text("Pegar código")
+            }
+        }
+    }
+}
+
+@Composable
+private fun QrPasteDialog(
+    onDismiss: () -> Unit,
+    onInspect: (String) -> Unit,
+) {
+    var token by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Pegar código QR") },
+        text = {
+            OutlinedTextField(
+                value = token,
+                onValueChange = { token = it },
+                label = { Text("Código / token") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3,
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onInspect(token) },
+                enabled = token.isNotBlank(),
+            ) { Text("Comprobar") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancelar") }
+        },
+    )
+}
+
+@Composable
+private fun QrInspectionCard(
+    inspection: AttendanceQrInspectionResponse,
+    occurrence: ClassOccurrenceContract?,
+    busy: Boolean,
+    onRegister: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val valid = inspection.status == AttendanceQrInspectionStatus.VALID
+    StatusNotice(
+        title = when (inspection.status) {
+            AttendanceQrInspectionStatus.VALID -> "QR válido"
+            AttendanceQrInspectionStatus.EXPIRED -> "QR expirado"
+            AttendanceQrInspectionStatus.WRONG_SESSION -> "QR de otra sesión"
+            AttendanceQrInspectionStatus.INVALID -> "QR no válido"
+            AttendanceQrInspectionStatus.SESSION_CLOSED -> "El pase ya cerró"
+            AttendanceQrInspectionStatus.NOT_ENROLLED -> "No corresponde a tu inscripción"
+        },
+        message = when {
+            valid && inspection.session != null -> {
+                val subject = occurrence?.subjectName
+                    ?: "Grupo " + inspection.session.groupName
+                subject + " · " +
+                    inspection.session.scheduledStartsAt + "–" +
+                    inspection.session.scheduledEndsAt +
+                    ". Aún no se ha registrado asistencia."
+            }
+            inspection.status == AttendanceQrInspectionStatus.EXPIRED ->
+                "El código fue reconocido, pero su ventana de validez terminó."
+            inspection.status == AttendanceQrInspectionStatus.SESSION_CLOSED ->
+                "La sesión de asistencia ya no acepta nuevos registros."
+            inspection.status == AttendanceQrInspectionStatus.NOT_ENROLLED ->
+                "El servidor no reconoce esta sesión como parte de tus clases inscritas."
+            else ->
+                "No podemos usar este código para registrar asistencia."
+        },
+        tone = if (valid) NoticeTone.SUCCESS else NoticeTone.WARNING,
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+    ) {
+        if (valid) {
+            Button(
+                onClick = onRegister,
+                enabled = !busy,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(if (busy) "Guardando…" else "Registrar asistencia")
+            }
+        }
+        OutlinedButton(
+            onClick = onDismiss,
+            enabled = !busy,
+            modifier = Modifier.weight(1f),
+        ) {
+            Text("Cerrar")
+        }
     }
 }
 
@@ -288,7 +478,7 @@ private fun LocalAttendanceRow(record: LocalAttendanceRecord) {
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Sesión ${record.sessionId.take(8)}",
+                    text = "Sesión " + record.sessionId.take(8),
                     style = MaterialTheme.typography.titleSmall,
                 )
                 Text(

@@ -6,7 +6,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 
 /**
- * Public V4 tokens for feature modules.
+ * Public presentation tokens for feature modules.
  *
  * Features consume semantic roles instead of inventing raw dimensions or
  * gradient colors locally. This keeps the expressive layer replaceable.
@@ -25,8 +25,8 @@ object CompaneroExpressive {
     @Composable
     fun heroBrush(): Brush = Brush.linearGradient(
         colors = listOf(
-            MaterialTheme.colorScheme.primary,
-            MaterialTheme.colorScheme.secondary,
+            CompanionColors.graphite,
+            CompanionColors.crimson,
         ),
     )
 
@@ -41,8 +41,9 @@ object CompaneroExpressive {
     @Composable
     fun subduedHeroBrush(): Brush = Brush.linearGradient(
         colors = listOf(
-            MaterialTheme.colorScheme.primaryContainer,
-            MaterialTheme.colorScheme.secondaryContainer,
+            CompanionColors.graphite,
+            CompanionColors.graphiteRaised,
+            CompanionColors.crimson,
         ),
     )
 }

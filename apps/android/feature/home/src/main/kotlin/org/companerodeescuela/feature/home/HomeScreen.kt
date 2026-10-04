@@ -1,5 +1,12 @@
 package org.companerodeescuela.feature.home
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,15 +23,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
+import org.companerodeescuela.core.motion.CompaneroMotionDuration
+import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 import org.companerodeescuela.core.ui.component.AcademicClassCard
 import org.companerodeescuela.core.ui.component.AcademicTimelineItem
+import org.companerodeescuela.core.ui.component.HeroAcademicCard
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ScheduleEntry
@@ -48,12 +58,13 @@ fun HomeScreen(
     }
 
     val overview = state.overview
+    val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+            .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md),
+        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
     ) {
         Text(
             text = overview?.studentName
@@ -88,21 +99,48 @@ fun HomeScreen(
         }
 
         overview?.let { day ->
-            day.current?.let { current ->
-                AcademicClassCard(
-                    subject = current.subjectName,
-                    time = "${current.startsAt} – ${current.endsAt}",
-                    location = locationLabel(current),
-                    teacher = current.teacherName,
-                    eyebrow = "Ahora",
-                    supportingText = remainingLabel(current.endsAt, "Termina"),
-                    emphasized = true,
-                )
-            } ?: StatusNotice(
-                title = "Sin clase en este momento",
-                message = day.next?.let { "Tu siguiente clase comienza a las ${it.startsAt}." }
-                    ?: "Tu jornada académica de hoy no tiene otra clase programada.",
-            )
+            AnimatedContent(
+                targetState = day.current,
+                transitionSpec = {
+                    val duration = if (reducedMotion) {
+                        CompaneroMotionDuration.FAST
+                    } else {
+                        CompaneroMotionDuration.STANDARD
+                    }
+                    (
+                        fadeIn(tween(duration)) +
+                            scaleIn(
+                                initialScale = if (reducedMotion) 1f else 0.99f,
+                                animationSpec = tween(duration),
+                            )
+                        ).togetherWith(
+                            fadeOut(tween(duration)) +
+                                scaleOut(
+                                    targetScale = if (reducedMotion) 1f else 0.99f,
+                                    animationSpec = tween(duration),
+                                ),
+                        )
+                },
+                label = "currentClassHero",
+            ) { current ->
+                if (current != null) {
+                    HeroAcademicCard(
+                        subject = current.subjectName,
+                        time = "${current.startsAt} – ${current.endsAt}",
+                        location = locationLabel(current),
+                        teacher = current.teacherName,
+                        progress = classProgress(current),
+                        supportingText = remainingLabel(current.endsAt, "Termina"),
+                    )
+                } else {
+                    StatusNotice(
+                        title = "Sin clase en este momento",
+                        message = day.next?.let {
+                            "Tu siguiente clase comienza a las ${it.startsAt}."
+                        } ?: "Tu jornada académica de hoy no tiene otra clase programada.",
+                    )
+                }
+            }
 
             day.next?.takeIf { next -> next != day.current }?.let { next ->
                 Text(

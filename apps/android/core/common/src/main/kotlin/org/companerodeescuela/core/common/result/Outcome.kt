@@ -34,17 +34,20 @@ sealed interface AppError {
     /** The request never reached the server, or the connection dropped. */
     data class Network(override val technicalDetail: String? = null) : AppError {
         override val userMessage: String =
-            "No pudimos conectar. Revisa tu conexion a internet e intentalo de nuevo."
+            "No pudimos conectar. Revisa tu conexión a internet e inténtalo de nuevo."
     }
 
     /** The server answered with a non-success status. */
     data class Http(val status: Int, override val technicalDetail: String? = null) : AppError {
         override val userMessage: String = when (status) {
-            401 -> "Tu sesion expiro. Inicia sesion nuevamente."
-            403 -> "No tienes permiso para ver esta informacion."
-            404 -> "No encontramos la informacion que buscas."
-            in 500..599 -> "El servicio no esta disponible en este momento."
-            else -> "Ocurrio un error inesperado."
+            401 -> "Tu sesión expiró. Inicia sesión nuevamente."
+            403 -> "No tienes permiso para ver esta información."
+            404 -> "No encontramos la información que buscas."
+            409 -> "La operación entra en conflicto con el estado actual."
+            422 -> "Revisa la información enviada e inténtalo nuevamente."
+            429 -> "Demasiados intentos. Espera un momento e inténtalo de nuevo."
+            in 500..599 -> "El servicio no está disponible en este momento."
+            else -> "No pudimos completar la solicitud."
         }
     }
 
@@ -54,7 +57,14 @@ sealed interface AppError {
             "Recibimos una respuesta que no pudimos interpretar."
     }
 
+    /** Secure device storage/keystore could not persist the authenticated session. */
+    data class Storage(override val technicalDetail: String? = null) : AppError {
+        override val userMessage: String =
+            "No pudimos guardar tu sesión de forma segura. Inténtalo nuevamente."
+    }
+
     data class Unknown(override val technicalDetail: String? = null) : AppError {
-        override val userMessage: String = "Ocurrio un error inesperado."
+        override val userMessage: String =
+            "No pudimos completar la operación. Inténtalo nuevamente."
     }
 }

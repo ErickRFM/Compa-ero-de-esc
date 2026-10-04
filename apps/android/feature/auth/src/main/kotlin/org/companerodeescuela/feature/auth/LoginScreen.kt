@@ -32,6 +32,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -61,6 +62,7 @@ import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 fun LoginScreen(
     state: SessionUiState,
     onLogin: (String, String) -> Unit,
+    onCreateAccount: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var username by remember { mutableStateOf("") }
@@ -240,6 +242,17 @@ fun LoginScreen(
                                 Text("Iniciar sesión")
                             }
                         }
+                    }
+
+                    OutlinedButton(
+                        onClick = onCreateAccount,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = CompaneroSpacing.sm),
+                        enabled = !state.submitting,
+                        shape = MaterialTheme.shapes.extraLarge,
+                    ) {
+                        Text("Activar acceso")
                     }
                     }
                 }

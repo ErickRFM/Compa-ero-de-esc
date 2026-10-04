@@ -15,7 +15,8 @@ import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.shared.contracts.ApiResponse
-import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest\nimport org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
+import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
+import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
 import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
 import org.companerodeescuela.shared.contracts.UserRole

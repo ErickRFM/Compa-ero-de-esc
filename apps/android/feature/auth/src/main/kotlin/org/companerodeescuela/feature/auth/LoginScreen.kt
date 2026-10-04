@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -39,11 +40,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.theme.CompaneroExpressive
 import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
@@ -101,38 +104,48 @@ fun LoginScreen(
                 ),
             ) { height -> if (reducedMotion) 0 else height / 14 },
         ) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraLarge,
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-                tonalElevation = CompaneroElevation.raised,
-                shadowElevation = CompaneroElevation.immersive,
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 520.dp),
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Column(
-                    modifier = Modifier.padding(CompaneroSpacing.xl),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(
-                        text = "UPTx",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Text(
-                        text = "Compañero de Clase",
-                        modifier = Modifier.padding(top = CompaneroSpacing.xs),
-                        style = MaterialTheme.typography.headlineMedium,
-                    )
-                    Text(
-                        text = "Tu escuela, en el momento correcto.",
-                        modifier = Modifier.padding(
-                            top = CompaneroSpacing.xs,
-                            bottom = CompaneroSpacing.xl,
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                Text(
+                    text = "UPTx",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = CompanionColors.crimsonContainer,
+                )
+                Text(
+                    text = "Compañero de Clase",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = Color.White,
+                )
+                Text(
+                    text = "Tu escuela, en el momento correcto.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.82f),
+                )
 
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+                    tonalElevation = CompaneroElevation.raised,
+                    shadowElevation = CompaneroElevation.immersive,
+                ) {
+                    Column(
+                        modifier = Modifier.padding(CompaneroSpacing.xl),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            text = "Acceso institucional",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = CompaneroSpacing.sm),
+                            style = MaterialTheme.typography.titleLarge,
+                        )
                     OutlinedTextField(
                         value = username,
                         onValueChange = { username = it },
@@ -217,14 +230,14 @@ fun LoginScreen(
                             }
                         }
                     }
-
-                    Text(
-                        text = "Universidad Politécnica de Tlaxcala",
-                        modifier = Modifier.padding(top = CompaneroSpacing.xl),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    }
                 }
+
+                Text(
+                    text = "Universidad Politécnica de Tlaxcala",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White.copy(alpha = 0.72f),
+                )
             }
         }
     }

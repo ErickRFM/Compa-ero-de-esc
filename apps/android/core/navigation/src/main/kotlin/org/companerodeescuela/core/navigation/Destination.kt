@@ -8,6 +8,7 @@ sealed class Destination(val route: String) {
     data object Schedule : Destination("schedule")
     data object Attendance : Destination("attendance")
     data object Profile : Destination("profile")
+    data object DesignSystemCatalog : Destination("design-system-catalog")
 
     fun createRoute(vararg arguments: Any): String =
         if (arguments.isEmpty()) route

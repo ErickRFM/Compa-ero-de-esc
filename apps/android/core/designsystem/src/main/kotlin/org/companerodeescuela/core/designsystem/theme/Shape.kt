@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
  * preserve information density on small phones.
  */
 internal val CompanionShapes = Shapes(
-    extraSmall = RoundedCornerShape(6.dp),
+    extraSmall = RoundedCornerShape(10.dp),
     small = RoundedCornerShape(10.dp),
     medium = RoundedCornerShape(18.dp),
     large = RoundedCornerShape(24.dp),

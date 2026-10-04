@@ -19,7 +19,7 @@ The technical foundation is merged and the first student product slice is implem
 | Offline | Room snapshot cache scoped by authenticated student id |
 | Real institutional identity | pending external provider integration |
 | Real institutional schedule | pending external provider integration |
-| Attendance / QR | intentionally follows academic-model stabilization |
+| Attendance / QR | implemented: student/teacher UI, signed rotating QR, offline outbox and WorkManager reconciliation |
 
 ## What is here
 
@@ -60,7 +60,7 @@ The repository creates modules only when they have real responsibility. The curr
 - `core:academic` as the canonical remote/cache academic repository;
 - `feature:auth`, `feature:home` and `feature:schedule`.
 
-Future modules such as attendance, notifications and optional location evidence are still created only when their product phase starts. See [ADR-001](docs/architecture/ADR-001-MODULE-BOUNDARIES.md).
+Attendance is now an active product module. Notifications and optional additional evidence remain phase-gated and are created only when they have real responsibility. See [ADR-001](docs/architecture/ADR-001-MODULE-BOUNDARIES.md).
 
 ---
 
@@ -141,10 +141,7 @@ fabricated academic data can never reach a real user.
 ./gradlew :apps:android:app:installDebug
 ```
 
-The debug build targets `http://10.0.2.2:8080/`, which is the host machine as
-seen from the Android emulator. For a physical device, pass the machine's LAN
-address via `ApiEnvironment.lan(address)` in
-`apps/android/app/src/main/kotlin/org/companerodeescuela/di/NetworkModule.kt`.
+Android defaults to the deployed Render API (`https://compa-ero-de-esc.onrender.com/`). Override it at build time with `COMPANERO_API_BASE_URL` when local or LAN testing is required; the value must be absolute and end with `/`.
 
 ---
 

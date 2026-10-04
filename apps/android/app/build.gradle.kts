@@ -8,7 +8,7 @@ plugins {
 
 val companeroApiBaseUrl = providers
     .environmentVariable("COMPANERO_API_BASE_URL")
-    .orElse("http://10.0.2.2:8080/")
+    .orElse("https://compa-ero-de-esc.onrender.com/")
     .get()
 
 require(companeroApiBaseUrl.startsWith("http")) {
@@ -114,6 +114,10 @@ dependencies {
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlin.test)
     testImplementation(project(":apps:android:core:testing"))
+
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.uiautomator)
 }
 
 tasks.withType<Test>().configureEach {

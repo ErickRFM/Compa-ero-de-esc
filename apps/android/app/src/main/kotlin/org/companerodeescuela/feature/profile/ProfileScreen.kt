@@ -31,6 +31,8 @@ import org.companerodeescuela.shared.contracts.UserRole
 fun ProfileScreen(
     displayName: String?,
     roles: Set<UserRole>,
+    canSwitchExperience: Boolean = false,
+    onSwitchExperience: () -> Unit = {},
     onAppearance: () -> Unit,
     onLogout: () -> Unit,
     modifier: Modifier = Modifier,
@@ -97,6 +99,15 @@ fun ProfileScreen(
             title = "Privacidad",
             detail = "Datos académicos separados por cuenta.",
         )
+
+        if (canSwitchExperience) {
+            Text("Modo de uso", style = MaterialTheme.typography.titleMedium)
+            ProfileActionRow(
+                title = "Cambiar perfil activo",
+                detail = "Alterna entre tus experiencias autorizadas sin cerrar sesión.",
+                onClick = onSwitchExperience,
+            )
+        }
 
         Text("Aplicación", style = MaterialTheme.typography.titleMedium)
         ProfileActionRow(

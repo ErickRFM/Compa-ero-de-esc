@@ -1,6 +1,7 @@
 package org.companerodeescuela.feature.attendance
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -299,7 +300,11 @@ private fun LocalAttendanceRow(record: LocalAttendanceRecord) {
                 Icon(
                     imageVector = Icons.Filled.CheckCircle,
                     contentDescription = "Sincronizado",
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = if (MaterialTheme.colorScheme.surfaceContainer.luminance() < 0.5f) {
+                        CompanionColors.semanticGreenDark
+                    } else {
+                        CompanionColors.semanticGreen
+                    },
                 )
             }
         }
@@ -382,65 +387,54 @@ private fun TeacherActiveSession(
 ) {
     var showCloseConfirmation by remember { mutableStateOf(false) }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = CompanionColors.graphite,
-            contentColor = CompanionColors.onDarkSurface,
-        ),
-    ) {
-        Column(
-            modifier = Modifier.padding(CompaneroSpacing.xl),
-            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = occurrence?.subjectName ?: "Grupo ${session.groupName}",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = "${session.scheduledStartsAt} – ${session.scheduledEndsAt} · ${session.groupName}",
-                style = MaterialTheme.typography.bodyLarge,
-            )
-
-            if (qrToken == null) {
-                CircularProgressIndicator()
-                Text("Generando QR firmado…")
-            } else {
-                AttendanceQrCode(
-                    token = qrToken,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 340.dp),
-                )
-                QrCountdown(qrExpiresAt)
-                Text(
-                    text = "El QR cambia automáticamente. No contiene datos del alumno.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = CompanionColors.onDarkSurfaceVariant,
-                )
-            }
-
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        if (maxWidth >= 720.dp) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
+                verticalAlignment = Alignment.Top,
             ) {
-                OutlinedButton(
-                    onClick = onRefreshRoster,
-                    enabled = !busy,
-                    modifier = Modifier.weight(1f),
+                Column(
+                    modifier = Modifier.weight(1.2f),
+                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
                 ) {
-                    Icon(Icons.Filled.Refresh, contentDescription = null)
-                    Text(" Registros")
+                    TeacherSessionCard(
+                        session = session,
+                        occurrence = occurrence,
+                        qrToken = qrToken,
+                        qrExpiresAt = qrExpiresAt,
+                        busy = busy,
+                        onRefreshRoster = onRefreshRoster,
+                        onRequestClose = { showCloseConfirmation = true },
+                    )
                 }
-                Button(
-                    onClick = { showCloseConfirmation = true },
-                    enabled = !busy,
+                Column(
                     modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
                 ) {
-                    Text("Cerrar pase")
+                    TeacherRosterPanel(
+                        roster = roster,
+                        busy = busy,
+                        onReview = onReview,
+                    )
                 }
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md)) {
+                TeacherSessionCard(
+                    session = session,
+                    occurrence = occurrence,
+                    qrToken = qrToken,
+                    qrExpiresAt = qrExpiresAt,
+                    busy = busy,
+                    onRefreshRoster = onRefreshRoster,
+                    onRequestClose = { showCloseConfirmation = true },
+                )
+                TeacherRosterPanel(
+                    roster = roster,
+                    busy = busy,
+                    onReview = onReview,
+                )
             }
         }
     }
@@ -473,9 +467,95 @@ private fun TeacherActiveSession(
             },
         )
     }
+}
 
+@Composable
+private fun TeacherSessionCard(
+    session: AttendanceSessionResponse,
+    occurrence: ClassOccurrenceContract?,
+    qrToken: String?,
+    qrExpiresAt: Long?,
+    busy: Boolean,
+    onRefreshRoster: () -> Unit,
+    onRequestClose: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = CompanionColors.graphite,
+            contentColor = CompanionColors.onDarkSurface,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(CompaneroSpacing.xl),
+            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = "PASE EN VIVO",
+                style = MaterialTheme.typography.labelLarge,
+                color = CompanionColors.crimsonContainer,
+            )
+            Text(
+                text = occurrence?.subjectName ?: "Grupo ${session.groupName}",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = "${session.scheduledStartsAt} – ${session.scheduledEndsAt} · ${session.groupName}",
+                style = MaterialTheme.typography.bodyLarge,
+            )
+
+            if (qrToken == null) {
+                CircularProgressIndicator()
+                Text("Generando QR firmado…")
+            } else {
+                AttendanceQrCode(
+                    token = qrToken,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 340.dp),
+                )
+                QrCountdown(qrExpiresAt)
+                Text(
+                    text = "El QR cambia automáticamente. No contiene datos del alumno.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = CompanionColors.onDarkSurfaceVariant,
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+            ) {
+                OutlinedButton(
+                    onClick = onRefreshRoster,
+                    enabled = !busy,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(Icons.Filled.Refresh, contentDescription = null)
+                    Text(" Registros")
+                }
+                Button(
+                    onClick = onRequestClose,
+                    enabled = !busy,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Cerrar pase")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TeacherRosterPanel(
+    roster: List<AttendanceRecordResponse>,
+    busy: Boolean,
+    onReview: (AttendanceRecordResponse, AttendanceStatus) -> Unit,
+) {
     Text(
-        text = "Registros (${roster.size})",
+        text = "Registros recibidos (${roster.size})",
         style = MaterialTheme.typography.titleLarge,
     )
 

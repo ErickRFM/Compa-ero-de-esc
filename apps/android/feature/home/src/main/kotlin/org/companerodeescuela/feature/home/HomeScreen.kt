@@ -81,6 +81,7 @@ fun HomeScreen(
                     ?.substringBefore(" ")
                     ?.let { "Hola, $it" }
                     ?: "Hoy",
+                modifier = Modifier.padding(end = 52.dp),
                 style = MaterialTheme.typography.headlineSmall,
             )
             Text(
@@ -130,9 +131,26 @@ fun HomeScreen(
                     day.classes.isEmpty() -> {
                         StatusNotice(
                             title = "Día libre",
-                            message = "Hoy no tienes clases. Revisa Agenda para ver qué sigue en tu semana.",
-                            tone = NoticeTone.SUCCESS,
+                            message = "Hoy no tienes clases. Tu próxima actividad académica sigue visible abajo.",
                         )
+                        day.nextScheduled?.let { upcoming ->
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                            ) {
+                                Text(
+                                    text = "Próxima clase",
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                AcademicClassCard(
+                                    subject = upcoming.subjectName,
+                                    time = upcomingDayLabel(day.nextScheduledDaysAway) +
+                                        " · " + upcoming.startsAt + " – " + upcoming.endsAt,
+                                    location = locationLabel(upcoming),
+                                    teacher = upcoming.teacherName,
+                                    subjectKey = upcoming.subjectCode.ifBlank { upcoming.subjectName },
+                                )
+                            }
+                        }
                     }
                     else -> {
                         if (splitLayout) {
@@ -248,6 +266,7 @@ private fun NextClassPanel(
             location = locationLabel(next),
             teacher = next.teacherName,
             supportingText = remainingLabel(next.startsAt, "Comienza"),
+            subjectKey = next.subjectCode.ifBlank { next.subjectName },
         )
     }
 }
@@ -266,6 +285,7 @@ private fun DayTimeline(day: TodayOverview) {
             subtitle = locationLabel(entry),
             status = status.label,
             highlighted = status.highlighted,
+            subjectKey = entry.subjectCode.ifBlank { entry.subjectName },
             modifier = Modifier.fillMaxWidth(),
         )
     }
@@ -306,6 +326,17 @@ private fun remainingLabel(time: String, verb: String): String? {
         minutes == 0L -> verb + " ahora"
         else -> null
     }
+}
+
+private fun upcomingDayLabel(daysAway: Int?): String {
+    if (daysAway == null) return "Próximamente"
+    if (daysAway == 0) return "Hoy"
+    if (daysAway == 1) return "Mañana"
+    val formatter = DateTimeFormatter.ofPattern("EEEE", Locale("es", "MX"))
+    return LocalDate.now()
+        .plusDays(daysAway.toLong())
+        .format(formatter)
+        .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale("es", "MX")) else it.toString() }
 }
 
 private fun todayLabel(): String {

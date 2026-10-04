@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.security.SessionTokenInspector
 import org.companerodeescuela.core.security.SessionTokenStore
@@ -100,13 +101,21 @@ class SessionViewModel @Inject constructor(
                     )
                 }
                 is Outcome.Failure -> _state.update {
+                    val message = when (val error = result.error) {
+                        is AppError.Http -> if (error.status == 401) {
+                            "Usuario o contraseña incorrectos."
+                        } else {
+                            error.userMessage
+                        }
+                        else -> error.userMessage
+                    }
                     it.copy(
                         checking = false,
                         authenticated = false,
                         submitting = false,
                         displayName = null,
                         roles = emptySet(),
-                        errorMessage = result.error.userMessage,
+                        errorMessage = message,
                     )
                 }
             }

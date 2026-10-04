@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
@@ -47,6 +48,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import org.companerodeescuela.core.designsystem.brand.UptlaxBrand
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.theme.CompaneroExpressive
 import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
@@ -119,10 +121,11 @@ fun LoginScreen(
                 ),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text(
-                    text = "UPTx",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = CompanionColors.crimsonContainer,
+                UptlaxBrand(
+                    modifier = Modifier
+                        .fillMaxWidth(0.68f)
+                        .height(CompaneroSize.brandLogoHeight),
+                    tint = Color.White,
                 )
                 Text(
                     text = "Compañero de Clase",
@@ -161,7 +164,7 @@ fun LoginScreen(
                         enabled = !state.submitting,
                         singleLine = true,
                         shape = MaterialTheme.shapes.large,
-                        label = { Text("Usuario institucional") },
+                        label = { Text("Matrícula o ID institucional") },
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                     )
 
@@ -234,7 +237,7 @@ fun LoginScreen(
                                     color = MaterialTheme.colorScheme.onPrimary,
                                 )
                             } else {
-                                Text("Entrar")
+                                Text("Iniciar sesión")
                             }
                         }
                     }

@@ -69,5 +69,5 @@ fun AppError.isUnauthorized(): Boolean = this is AppError.Http && status == 401
 fun AppError.isRetryable(): Boolean = when (this) {
     is AppError.Network -> true
     is AppError.Http -> status >= 500
-    is AppError.Serialization, is AppError.Unknown -> false
+    is AppError.Serialization, is AppError.Storage, is AppError.Unknown -> false
 }

@@ -3,6 +3,7 @@ package org.companerodeescuela.core.navigation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.HowToReg
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -18,10 +19,11 @@ import androidx.navigation.NavHostController
 fun CompaneroBottomBar(
     navController: NavHostController,
     currentDestination: NavDestination?,
+    destinations: List<TopLevelDestination> = TopLevelDestination.entries,
     modifier: Modifier = Modifier,
 ) {
     NavigationBar(modifier = modifier) {
-        TopLevelDestination.entries.forEach { topLevel ->
+        destinations.forEach { topLevel ->
             val selected = currentDestination
                 ?.hierarchy
                 ?.any { it.route == topLevel.destination.route } == true
@@ -42,6 +44,7 @@ fun CompaneroBottomBar(
                         imageVector = when (topLevel) {
                             TopLevelDestination.Home -> Icons.Filled.Home
                             TopLevelDestination.Schedule -> Icons.Filled.DateRange
+                            TopLevelDestination.Attendance -> Icons.Filled.HowToReg
                         },
                         contentDescription = topLevel.label,
                     )

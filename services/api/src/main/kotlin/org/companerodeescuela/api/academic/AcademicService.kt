@@ -76,13 +76,10 @@ class AcademicService(
         weekOf: LocalDate,
     ): AcademicWeekResponse =
         translateIntegrationFailure {
-            val load = provider.getAcademicLoad(externalId)
-            val coursesById = load.enrollments.associate { enrollment ->
-                enrollment.course.externalId to enrollment.course
-            }
+            val coursesById = provider.listCourses().associateBy { it.externalId }
             val schedule = AcademicMappers.toSchedule(
                 ownerId = PersonId(externalId),
-                slots = load.schedule,
+                slots = provider.getSchedule(externalId, weekOf),
                 coursesById = coursesById,
             )
             val weekStart = AcademicOccurrenceProjection.weekStart(weekOf)

@@ -9,6 +9,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import org.companerodeescuela.shared.contracts.UserRole
 
 class SessionTokenInspectorTest {
 
@@ -18,12 +19,14 @@ class SessionTokenInspectorTest {
             userId = "student-1",
             displayName = "Ana López",
             expiresAt = 2_000_000_000,
+            roles = listOf("STUDENT"),
         )
 
         val claims = SessionTokenInspector.inspect(token)
 
         assertEquals("student-1", claims?.userId)
         assertEquals("Ana López", claims?.displayName)
+        assertEquals(setOf(UserRole.STUDENT), claims?.roles)
         assertEquals(2_000_000_000, claims?.expiresAtEpochSeconds)
     }
 
@@ -51,11 +54,13 @@ class SessionTokenInspectorTest {
         userId: String,
         displayName: String,
         expiresAt: Long,
+        roles: List<String> = emptyList(),
     ): String {
         val encoder = Base64.getUrlEncoder().withoutPadding()
         val header = encoder.encodeToString("{}".toByteArray())
+        val rolesJson = roles.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }
         val payload = encoder.encodeToString(
-            """{"sub":"$userId","display_name":"$displayName","exp":$expiresAt}"""
+            """{"sub":"$userId","display_name":"$displayName","roles":$rolesJson,"exp":$expiresAt}"""
                 .toByteArray(),
         )
         return listOf(header, payload, "test").joinToString(".")

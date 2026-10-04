@@ -79,6 +79,7 @@ dependencies {
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
 
+    implementation(project(":shared:contracts"))
     implementation(project(":apps:android:core:academic"))
     implementation(project(":apps:android:core:attendance"))
     implementation(project(":apps:android:core:common"))
@@ -91,6 +92,7 @@ dependencies {
     implementation(project(":apps:android:feature:auth"))
     implementation(project(":apps:android:feature:home"))
     implementation(project(":apps:android:feature:schedule"))
+    implementation(project(":apps:android:feature:attendance"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

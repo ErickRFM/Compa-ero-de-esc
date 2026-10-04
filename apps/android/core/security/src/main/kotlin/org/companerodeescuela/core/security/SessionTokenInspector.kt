@@ -7,10 +7,13 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.jsonArray
+import org.companerodeescuela.shared.contracts.UserRole
 
 data class PlatformSessionClaims(
     val userId: String,
     val displayName: String?,
+    val roles: Set<UserRole>,
     val expiresAtEpochSeconds: Long,
 )
 
@@ -38,10 +41,19 @@ object SessionTokenInspector {
         val expiresAt = json["exp"]?.jsonPrimitive?.longOrNull ?: return null
         val displayName = json["display_name"]?.jsonPrimitive?.contentOrNull
             ?.takeIf(String::isNotBlank)
+        val roles = json["roles"]
+            ?.jsonArray
+            ?.mapNotNull { entry ->
+                entry.jsonPrimitive.contentOrNull
+                    ?.let { encoded -> runCatching { UserRole.valueOf(encoded) }.getOrNull() }
+            }
+            ?.toSet()
+            .orEmpty()
 
         PlatformSessionClaims(
             userId = userId,
             displayName = displayName,
+            roles = roles,
             expiresAtEpochSeconds = expiresAt,
         )
     }.getOrNull()

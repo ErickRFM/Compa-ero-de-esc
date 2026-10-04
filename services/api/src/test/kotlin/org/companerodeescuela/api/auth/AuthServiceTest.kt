@@ -33,6 +33,19 @@ class AuthServiceTest {
     }
 
     @Test
+    fun `development teacher credentials expose teacher role`() = runTest {
+        val response = service().login(
+            LoginRequest(
+                username = MockIdentityProvider.MOCK_TEACHER_USERNAME,
+                password = MockIdentityProvider.MOCK_TEACHER_PASSWORD,
+            ),
+        )
+
+        assertEquals(MockIdentityProvider.MOCK_TEACHER_ACCOUNT.externalId, response.user.id)
+        assertEquals(setOf(UserRole.TEACHER), response.user.roles)
+    }
+
+    @Test
     fun `wrong password and unknown user share the same public error`() = runTest {
         val service = service()
 

@@ -2,7 +2,7 @@ package org.companerodeescuela.core.navigation
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -24,23 +24,30 @@ import androidx.navigation.compose.rememberNavController
 fun CompaneroScaffold(
     navController: NavHostController = rememberNavController(),
     startDestination: Destination = Destination.Home,
+    topLevelDestinations: List<TopLevelDestination> = TopLevelDestination.entries,
     destinations: NavGraphBuilder.() -> Unit,
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
     val onProfile = currentDestination?.route == Destination.Profile.route
+    val title = when (currentDestination?.route) {
+        Destination.Schedule.route -> "Agenda"
+        Destination.Attendance.route -> "Asistencia"
+        Destination.Profile.route -> "Perfil"
+        else -> "Compañero"
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(if (onProfile) "Perfil" else "Compañero")
+                    Text(title)
                 },
                 navigationIcon = {
                     if (onProfile) {
                         IconButton(onClick = { navController.popBackStack() }) {
                             Icon(
-                                imageVector = Icons.Filled.ArrowBack,
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Volver",
                             )
                         }
@@ -69,6 +76,7 @@ fun CompaneroScaffold(
                 CompaneroBottomBar(
                     navController = navController,
                     currentDestination = currentDestination,
+                    destinations = topLevelDestinations,
                 )
             }
         },

@@ -22,11 +22,14 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
 import org.companerodeescuela.core.attendance.AttendanceSyncScheduler
 import org.companerodeescuela.core.navigation.CompaneroScaffold
 import org.companerodeescuela.core.navigation.Destination
+import org.companerodeescuela.core.navigation.TopLevelDestination
 import org.companerodeescuela.feature.auth.LoginScreen
+import org.companerodeescuela.feature.attendance.AttendanceScreen
 import org.companerodeescuela.feature.auth.SessionViewModel
 import org.companerodeescuela.feature.home.HomeScreen
 import org.companerodeescuela.feature.profile.ProfileScreen
 import org.companerodeescuela.feature.schedule.ScheduleScreen
+import org.companerodeescuela.shared.contracts.UserRole
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -69,9 +72,25 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         else -> {
-                            CompaneroScaffold {
+                            val teacherOnly =
+                                UserRole.TEACHER in session.roles &&
+                                    UserRole.STUDENT !in session.roles
+                            val startDestination =
+                                if (teacherOnly) Destination.Attendance else Destination.Home
+                            val topLevelDestinations =
+                                if (teacherOnly) {
+                                    listOf(TopLevelDestination.Attendance)
+                                } else {
+                                    TopLevelDestination.entries
+                                }
+
+                            CompaneroScaffold(
+                                startDestination = startDestination,
+                                topLevelDestinations = topLevelDestinations,
+                            ) {
                                 composable(Destination.Home.route) { HomeScreen() }
                                 composable(Destination.Schedule.route) { ScheduleScreen() }
+                                composable(Destination.Attendance.route) { AttendanceScreen() }
                                 composable(Destination.Profile.route) {
                                     ProfileScreen(
                                         displayName = session.displayName,

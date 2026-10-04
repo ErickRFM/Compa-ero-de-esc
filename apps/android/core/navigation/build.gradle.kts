@@ -34,6 +34,7 @@ dependencies {
     api(libs.androidx.navigation.compose)
     api(libs.androidx.compose.ui)
     api(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
     implementation(project(":apps:android:core:designsystem"))
     implementation(project(":apps:android:core:ui"))
 

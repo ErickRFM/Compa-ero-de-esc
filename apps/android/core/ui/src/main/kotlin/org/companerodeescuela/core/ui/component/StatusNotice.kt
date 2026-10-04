@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 
 enum class NoticeTone {
     INFO,
+    SUCCESS,
     WARNING,
     ERROR,
 }
@@ -25,11 +26,13 @@ fun StatusNotice(
 ) {
     val container = when (tone) {
         NoticeTone.INFO -> MaterialTheme.colorScheme.secondaryContainer
+        NoticeTone.SUCCESS -> MaterialTheme.colorScheme.primaryContainer
         NoticeTone.WARNING -> MaterialTheme.colorScheme.tertiaryContainer
         NoticeTone.ERROR -> MaterialTheme.colorScheme.errorContainer
     }
     val content = when (tone) {
         NoticeTone.INFO -> MaterialTheme.colorScheme.onSecondaryContainer
+        NoticeTone.SUCCESS -> MaterialTheme.colorScheme.onPrimaryContainer
         NoticeTone.WARNING -> MaterialTheme.colorScheme.onTertiaryContainer
         NoticeTone.ERROR -> MaterialTheme.colorScheme.onErrorContainer
     }

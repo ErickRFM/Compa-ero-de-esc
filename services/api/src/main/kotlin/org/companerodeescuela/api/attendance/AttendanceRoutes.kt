@@ -45,6 +45,17 @@ fun Route.attendanceRoutes(
                 )
             }
 
+            get("/sessions/mine") {
+                val principal = call.requirePrincipal()
+                principal.requireTeacherRole()
+                call.respond(
+                    ApiResponse(
+                        data = service.activeForTeacher(principal.subject()),
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
+
             post("/sessions") {
                 val principal = call.requirePrincipal()
                 principal.requireTeacherRole()

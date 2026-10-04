@@ -6,6 +6,7 @@ package org.companerodeescuela.core.navigation
 sealed class Destination(val route: String) {
     data object Home : Destination("home")
     data object Schedule : Destination("schedule")
+    data object Attendance : Destination("attendance")
     data object Profile : Destination("profile")
 
     fun createRoute(vararg arguments: Any): String =
@@ -23,4 +24,5 @@ enum class TopLevelDestination(
 ) {
     Home(Destination.Home, "Hoy"),
     Schedule(Destination.Schedule, "Agenda"),
+    Attendance(Destination.Attendance, "Asistencia"),
 }

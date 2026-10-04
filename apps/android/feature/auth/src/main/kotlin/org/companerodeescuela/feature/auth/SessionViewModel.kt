@@ -15,12 +15,14 @@ import kotlinx.coroutines.launch
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.security.SessionTokenInspector
 import org.companerodeescuela.core.security.SessionTokenStore
+import org.companerodeescuela.shared.contracts.UserRole
 
 data class SessionUiState(
     val checking: Boolean = true,
     val authenticated: Boolean = false,
     val submitting: Boolean = false,
     val displayName: String? = null,
+    val roles: Set<UserRole> = emptySet(),
     val errorMessage: String? = null,
 )
 
@@ -53,6 +55,7 @@ class SessionViewModel @Inject constructor(
                             authenticated = false,
                             submitting = false,
                             displayName = null,
+                            roles = emptySet(),
                         )
                     }
                     return@collectLatest
@@ -64,6 +67,7 @@ class SessionViewModel @Inject constructor(
                         authenticated = true,
                         submitting = false,
                         displayName = claims.displayName ?: it.displayName,
+                        roles = claims.roles,
                         errorMessage = null,
                     )
                 }
@@ -91,6 +95,7 @@ class SessionViewModel @Inject constructor(
                         authenticated = true,
                         submitting = false,
                         displayName = result.value.displayName,
+                        roles = result.value.roles,
                         errorMessage = null,
                     )
                 }
@@ -99,6 +104,8 @@ class SessionViewModel @Inject constructor(
                         checking = false,
                         authenticated = false,
                         submitting = false,
+                        displayName = null,
+                        roles = emptySet(),
                         errorMessage = result.error.userMessage,
                     )
                 }

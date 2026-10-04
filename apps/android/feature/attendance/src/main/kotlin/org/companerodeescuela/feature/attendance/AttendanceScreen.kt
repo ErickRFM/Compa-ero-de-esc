@@ -60,6 +60,9 @@ import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
+import org.companerodeescuela.core.ui.component.CompaneroHeroSurface
+import org.companerodeescuela.core.ui.component.CompaneroSurface
+import org.companerodeescuela.core.ui.component.CompaneroSurfaceRole
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse
@@ -158,6 +161,7 @@ private fun StudentAttendance(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .widthIn(max = CompaneroSize.homeContentMaxWidth)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
@@ -254,25 +258,22 @@ private fun StudentSessionCard(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
     ) {
-        Card(
+        CompaneroHeroSurface(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = CompanionColors.graphite,
-                contentColor = CompanionColors.onDarkSurface,
-            ),
+            containerColor = CompanionColors.graphite,
         ) {
             Column(
-                modifier = Modifier.padding(CompaneroSpacing.lg),
+                modifier = Modifier.padding(CompaneroSpacing.md),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
                 Text(
-                    text = "PASE ACTIVO",
+                    text = "EN VIVO  ●",
                     style = MaterialTheme.typography.labelLarge,
                     color = CompanionColors.crimsonContainer,
                 )
                 Text(
                     text = occurrence?.subjectName ?: "Grupo " + session.groupName,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
@@ -322,16 +323,15 @@ private fun QrCenterCard(
     onImage: () -> Unit,
     onPaste: () -> Unit,
 ) {
-    Surface(
+    CompaneroSurface(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        role = CompaneroSurfaceRole.CARD,
     ) {
         Column(
-            modifier = Modifier.padding(CompaneroSpacing.lg),
+            modifier = Modifier.padding(CompaneroSpacing.md),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
         ) {
-            Text("Comprobar un código QR", style = MaterialTheme.typography.titleLarge)
+            Text("Comprobar otro QR", style = MaterialTheme.typography.titleMedium)
             Text(
                 text = "Escanéalo, elige una captura o pega el código. Comprobar no registra asistencia.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -516,9 +516,10 @@ private fun TeacherAttendance(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .widthIn(max = CompaneroSize.homeContentMaxWidth)
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md),
-        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
+            .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
+        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
         AttendanceHeader(
             title = "Pase de lista",
@@ -671,16 +672,13 @@ private fun TeacherSessionCard(
     onRefreshRoster: () -> Unit,
     onRequestClose: () -> Unit,
 ) {
-    Card(
+    CompaneroHeroSurface(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = CompanionColors.graphite,
-            contentColor = CompanionColors.onDarkSurface,
-        ),
+        containerColor = CompanionColors.graphite,
     ) {
         Column(
-            modifier = Modifier.padding(CompaneroSpacing.xl),
-            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
+            modifier = Modifier.padding(CompaneroSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
@@ -748,7 +746,7 @@ private fun TeacherRosterPanel(
 ) {
     Text(
         text = "Registros recibidos (${roster.size})",
-        style = MaterialTheme.typography.titleLarge,
+        style = MaterialTheme.typography.titleMedium,
     )
 
     if (roster.isEmpty()) {
@@ -847,7 +845,7 @@ private fun TeacherOccurrenceList(
 
     Text(
         text = if (todayOccurrences.isNotEmpty()) "Clases de hoy" else "Clases de la semana",
-        style = MaterialTheme.typography.titleLarge,
+        style = MaterialTheme.typography.titleMedium,
     )
 
     if (visible.isEmpty()) {

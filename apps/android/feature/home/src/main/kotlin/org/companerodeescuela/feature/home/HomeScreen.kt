@@ -72,16 +72,16 @@ fun HomeScreen(
                 .fillMaxSize()
                 .widthIn(max = CompaneroSize.homeContentMaxWidth)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md)
+                .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm)
                 .align(Alignment.TopCenter),
-            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
         ) {
             Text(
                 text = overview?.studentName
                     ?.substringBefore(" ")
                     ?.let { "Hola, $it" }
                     ?: "Hoy",
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.headlineSmall,
             )
             Text(
                 text = todayLabel(),
@@ -129,8 +129,8 @@ fun HomeScreen(
                     }
                     day.classes.isEmpty() -> {
                         StatusNotice(
-                            title = "Hoy no tienes clases",
-                            message = "Tu agenda de hoy está libre. Consulta Agenda para revisar el resto de la semana.",
+                            title = "Día libre",
+                            message = "Hoy no tienes clases. Revisa Agenda para ver qué sigue en tu semana.",
                             tone = NoticeTone.SUCCESS,
                         )
                     }
@@ -138,7 +138,7 @@ fun HomeScreen(
                         if (splitLayout) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
+                                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
                                 verticalAlignment = Alignment.Top,
                             ) {
                                 TodayContextPanel(

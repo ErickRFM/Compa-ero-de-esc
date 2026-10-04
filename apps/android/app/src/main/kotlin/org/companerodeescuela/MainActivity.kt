@@ -94,6 +94,7 @@ class MainActivity : ComponentActivity() {
                                 composable(Destination.Profile.route) {
                                     ProfileScreen(
                                         displayName = session.displayName,
+                                        roles = session.roles,
                                         onLogout = sessionViewModel::logout,
                                     )
                                 }

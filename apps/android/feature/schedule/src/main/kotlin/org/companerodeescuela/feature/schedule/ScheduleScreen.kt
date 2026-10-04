@@ -118,12 +118,12 @@ fun ScheduleScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md),
-        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
+            .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
+        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
-        Text("Agenda", style = MaterialTheme.typography.headlineMedium)
+        Text("Agenda", style = MaterialTheme.typography.headlineSmall)
         Text(
-            text = "Clases y horarios. Disponible incluso cuando pierdes conexión.",
+            text = "Tu horario académico, incluso sin conexión.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

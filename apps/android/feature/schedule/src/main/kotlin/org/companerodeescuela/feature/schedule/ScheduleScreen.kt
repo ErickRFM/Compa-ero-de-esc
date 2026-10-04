@@ -1,5 +1,8 @@
 package org.companerodeescuela.feature.schedule
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -18,10 +21,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -29,12 +39,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.LocalDate
+import kotlinx.coroutines.launch
+import org.companerodeescuela.core.academic.PersonalScheduleDraft
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
@@ -45,6 +59,7 @@ import org.companerodeescuela.core.ui.component.ExpressiveSegmentedControl
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ScheduleEntry
+import org.companerodeescuela.shared.contracts.ScheduleSource
 
 private enum class AgendaMode {
     DAY,
@@ -57,6 +72,27 @@ fun ScheduleScreen(
     viewModel: ScheduleViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val importProcessor = remember(context) { ScheduleImportProcessor(context) }
+    var mode by remember { mutableStateOf(AgendaMode.DAY) }
+    var showEditor by remember { mutableStateOf(false) }
+    var editingEntry by remember { mutableStateOf<ScheduleEntry?>(null) }
+    var editingImportIndex by remember { mutableStateOf<Int?>(null) }
+    var importBusy by remember { mutableStateOf(false) }
+
+    val documentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            importBusy = true
+            runCatching { importProcessor.extractText(uri) }
+                .onSuccess(viewModel::stageImport)
+                .onFailure { viewModel.reportImportFailure() }
+            importBusy = false
+        }
+    }
 
     if (state.loading && state.entries.isEmpty()) {
         Column(
@@ -69,7 +105,6 @@ fun ScheduleScreen(
         return
     }
 
-    var mode by remember { mutableStateOf(AgendaMode.DAY) }
     var selectedDay by remember(state.entries) {
         val today = LocalDate.now().dayOfWeek.name
         mutableStateOf(
@@ -86,10 +121,7 @@ fun ScheduleScreen(
             .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
     ) {
-        Text(
-            text = "Agenda",
-            style = MaterialTheme.typography.headlineMedium,
-        )
+        Text("Agenda", style = MaterialTheme.typography.headlineMedium)
         Text(
             text = "Clases y horarios. Disponible incluso cuando pierdes conexión.",
             style = MaterialTheme.typography.bodyMedium,
@@ -99,9 +131,7 @@ fun ScheduleScreen(
         ExpressiveSegmentedControl(
             options = listOf("Día", "Semana"),
             selectedIndex = if (mode == AgendaMode.DAY) 0 else 1,
-            onSelected = { index ->
-                mode = if (index == 0) AgendaMode.DAY else AgendaMode.WEEK
-            },
+            onSelected = { mode = if (it == 0) AgendaMode.DAY else AgendaMode.WEEK },
         )
 
         if (state.fromCache) {
@@ -112,21 +142,34 @@ fun ScheduleScreen(
             )
         }
 
+        state.successMessage?.let {
+            StatusNotice(
+                title = "Listo",
+                message = it,
+                tone = NoticeTone.SUCCESS,
+            )
+        }
+
         state.errorMessage?.let {
             StatusNotice(
-                title = "No pudimos actualizar la agenda",
+                title = "No pudimos completar la acción",
                 message = it,
                 tone = NoticeTone.ERROR,
             )
-            Button(onClick = viewModel::load) {
-                Text("Reintentar")
-            }
         }
 
-        if (state.entries.isEmpty() && state.errorMessage == null) {
-            StatusNotice(
-                title = "Aún no tienes un horario",
-                message = "No encontramos clases asociadas a tu cuenta. Puedes volver a sincronizar o agregar un horario personal.",
+        if (state.entries.isEmpty()) {
+            EmptyScheduleActions(
+                loading = state.loading || state.actionInProgress || importBusy,
+                onSync = viewModel::load,
+                onImport = {
+                    documentLauncher.launch(arrayOf("application/pdf", "image/*"))
+                },
+                onManual = {
+                    editingEntry = null
+                    editingImportIndex = null
+                    showEditor = true
+                },
             )
         } else {
             val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
@@ -139,17 +182,11 @@ fun ScheduleScreen(
                         CompaneroMotionDuration.STANDARD
                     }
                     val enter = fadeIn(tween(duration)) +
-                        if (reducedMotion) {
-                            slideInHorizontally(tween(0)) { 0 }
-                        } else {
-                            slideInHorizontally(tween(duration)) { it / 8 }
-                        }
+                        if (reducedMotion) slideInHorizontally(tween(0)) { 0 }
+                        else slideInHorizontally(tween(duration)) { it / 8 }
                     val exit = fadeOut(tween(duration)) +
-                        if (reducedMotion) {
-                            slideOutHorizontally(tween(0)) { 0 }
-                        } else {
-                            slideOutHorizontally(tween(duration)) { -it / 8 }
-                        }
+                        if (reducedMotion) slideOutHorizontally(tween(0)) { 0 }
+                        else slideOutHorizontally(tween(duration)) { -it / 8 }
                     enter.togetherWith(exit)
                 },
                 label = "agendaMode",
@@ -159,19 +196,133 @@ fun ScheduleScreen(
                         entries = state.entries,
                         selectedDay = selectedDay,
                         onSelectedDay = { selectedDay = it },
+                        onEdit = {
+                            editingEntry = it
+                            editingImportIndex = null
+                            showEditor = true
+                        },
+                        onDelete = viewModel::deletePersonal,
                     )
-                    AgendaMode.WEEK -> WeekAgenda(state.entries)
+                    AgendaMode.WEEK -> WeekAgenda(
+                        entries = state.entries,
+                        onEdit = {
+                            editingEntry = it
+                            editingImportIndex = null
+                            showEditor = true
+                        },
+                        onDelete = viewModel::deletePersonal,
+                    )
                 }
             }
-        }
 
-        TextButton(
-            onClick = viewModel::load,
-            enabled = !state.loading,
-            modifier = Modifier.align(Alignment.End),
-        ) {
-            Text(if (state.loading) "Actualizando…" else "Actualizar")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        documentLauncher.launch(arrayOf("application/pdf", "image/*"))
+                    },
+                    modifier = Modifier.weight(1f),
+                    enabled = !importBusy && !state.actionInProgress,
+                ) {
+                    Icon(Icons.Filled.Description, contentDescription = null)
+                    Text(" Importar")
+                }
+                Button(
+                    onClick = {
+                        editingEntry = null
+                        editingImportIndex = null
+                        showEditor = true
+                    },
+                    modifier = Modifier.weight(1f),
+                    enabled = !state.actionInProgress,
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = null)
+                    Text(" Clase")
+                }
+            }
+
+            TextButton(
+                onClick = viewModel::load,
+                enabled = !state.loading,
+                modifier = Modifier.align(Alignment.End),
+            ) {
+                Text(if (state.loading) "Actualizando…" else "Sincronizar UPTlax")
+            }
         }
+    }
+
+    if (showEditor) {
+        val initial = editingEntry?.toDraft()
+            ?: editingImportIndex?.let { state.importCandidates.getOrNull(it) }
+        ScheduleEditorDialog(
+            initial = initial,
+            onDismiss = {
+                showEditor = false
+                editingEntry = null
+                editingImportIndex = null
+            },
+            onSave = { draft ->
+                val importIndex = editingImportIndex
+                if (importIndex != null) {
+                    viewModel.updateImportCandidate(importIndex, draft)
+                } else {
+                    viewModel.savePersonal(draft)
+                }
+                showEditor = false
+                editingEntry = null
+                editingImportIndex = null
+            },
+        )
+    }
+
+    if (state.importCandidates.isNotEmpty()) {
+        ImportReviewDialog(
+            candidates = state.importCandidates,
+            busy = state.actionInProgress,
+            onEdit = { index ->
+                editingImportIndex = index
+                editingEntry = null
+                showEditor = true
+            },
+            onDismiss = viewModel::discardImport,
+            onConfirm = viewModel::confirmImport,
+        )
+    }
+}
+
+@Composable
+private fun EmptyScheduleActions(
+    loading: Boolean,
+    onSync: () -> Unit,
+    onImport: () -> Unit,
+    onManual: () -> Unit,
+) {
+    StatusNotice(
+        title = "Aún no tienes un horario",
+        message = "No encontramos clases asociadas a tu cuenta. UPTlax sigue siendo la fuente oficial; también puedes agregar una copia personal.",
+    )
+    Button(
+        onClick = onSync,
+        enabled = !loading,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text("Sincronizar con UPTlax")
+    }
+    OutlinedButton(
+        onClick = onImport,
+        enabled = !loading,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text("Importar PDF o imagen")
+    }
+    OutlinedButton(
+        onClick = onManual,
+        enabled = !loading,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text("Crear horario manualmente")
     }
 }
 
@@ -180,6 +331,8 @@ private fun DayAgenda(
     entries: List<ScheduleEntry>,
     selectedDay: String,
     onSelectedDay: (String) -> Unit,
+    onEdit: (ScheduleEntry) -> Unit,
+    onDelete: (ScheduleEntry) -> Unit,
 ) {
     val days = entries.map { it.dayOfWeek }.distinct()
     val dayEntries = entries.filter { it.dayOfWeek == selectedDay }
@@ -207,6 +360,8 @@ private fun DayAgenda(
                 DayAgendaDetails(
                     day = selectedDay,
                     entries = dayEntries,
+                    onEdit = onEdit,
+                    onDelete = onDelete,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -229,6 +384,8 @@ private fun DayAgenda(
                 DayAgendaDetails(
                     day = selectedDay,
                     entries = dayEntries,
+                    onEdit = onEdit,
+                    onDelete = onDelete,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -240,6 +397,8 @@ private fun DayAgenda(
 private fun DayAgendaDetails(
     day: String,
     entries: List<ScheduleEntry>,
+    onEdit: (ScheduleEntry) -> Unit,
+    onDelete: (ScheduleEntry) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -252,23 +411,21 @@ private fun DayAgendaDetails(
                 message = "No tienes clases programadas este día.",
             )
         } else {
-            Text(
-                text = dayLabel(day),
-                style = MaterialTheme.typography.titleLarge,
-            )
-            entries.forEach { entry ->
-                AgendaEntry(entry)
-            }
+            Text(dayLabel(day), style = MaterialTheme.typography.titleLarge)
+            entries.forEach { AgendaEntry(it, onEdit, onDelete) }
         }
     }
 }
 
 @Composable
-private fun WeekAgenda(entries: List<ScheduleEntry>) {
-    val orderedDays = entries
-        .groupBy { it.dayOfWeek }
+private fun WeekAgenda(
+    entries: List<ScheduleEntry>,
+    onEdit: (ScheduleEntry) -> Unit,
+    onDelete: (ScheduleEntry) -> Unit,
+) {
+    val orderedDays = entries.groupBy { it.dayOfWeek }
         .toList()
-        .sortedBy { (day, _) -> dayOrder(day) }
+        .sortedBy { dayOrder(it.first) }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -279,12 +436,49 @@ private fun WeekAgenda(entries: List<ScheduleEntry>) {
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
-                Text(
-                    text = dayLabel(day),
-                    style = MaterialTheme.typography.titleLarge,
-                )
-                dayEntries.forEach { entry ->
-                    AgendaEntry(entry)
+                Text(dayLabel(day), style = MaterialTheme.typography.titleLarge)
+                dayEntries.forEach { AgendaEntry(it, onEdit, onDelete) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AgendaEntry(
+    entry: ScheduleEntry,
+    onEdit: (ScheduleEntry) -> Unit,
+    onDelete: (ScheduleEntry) -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+    ) {
+        Column(
+            modifier = Modifier.padding(
+                horizontal = CompaneroSpacing.md,
+                vertical = CompaneroSpacing.sm,
+            ),
+            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+        ) {
+            AcademicTimelineItem(
+                time = entry.startsAt,
+                title = entry.subjectName,
+                subtitle = locationAndTeacher(entry),
+                status = when (entry.source) {
+                    ScheduleSource.INSTITUTIONAL -> null
+                    ScheduleSource.MANUAL -> "Horario personal"
+                    ScheduleSource.OCR_IMPORT -> "Importado · revisado"
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (entry.source != ScheduleSource.INSTITUTIONAL) {
+                Row(
+                    modifier = Modifier.align(Alignment.End),
+                    horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                ) {
+                    TextButton(onClick = { onEdit(entry) }) { Text("Editar") }
+                    TextButton(onClick = { onDelete(entry) }) { Text("Eliminar") }
                 }
             }
         }
@@ -292,23 +486,202 @@ private fun WeekAgenda(entries: List<ScheduleEntry>) {
 }
 
 @Composable
-private fun AgendaEntry(entry: ScheduleEntry) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceVariant,
-    ) {
-        AcademicTimelineItem(
-            time = entry.startsAt,
-            title = entry.subjectName,
-            subtitle = locationAndTeacher(entry),
-            modifier = Modifier.padding(
-                horizontal = CompaneroSpacing.md,
-                vertical = CompaneroSpacing.sm,
-            ),
-        )
-    }
+private fun ScheduleEditorDialog(
+    initial: PersonalScheduleDraft?,
+    onDismiss: () -> Unit,
+    onSave: (PersonalScheduleDraft) -> Unit,
+) {
+    var subject by remember(initial) { mutableStateOf(initial?.subjectName.orEmpty()) }
+    var teacher by remember(initial) { mutableStateOf(initial?.teacherName.orEmpty()) }
+    var room by remember(initial) { mutableStateOf(initial?.classroomName.orEmpty()) }
+    var group by remember(initial) { mutableStateOf(initial?.groupName.orEmpty()) }
+    var start by remember(initial) { mutableStateOf(initial?.startsAt ?: "08:00") }
+    var end by remember(initial) { mutableStateOf(initial?.endsAt ?: "10:00") }
+    var day by remember(initial) { mutableStateOf(initial?.dayOfWeek ?: "MONDAY") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (initial == null) "Nueva clase" else "Editar clase") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+            ) {
+                OutlinedTextField(
+                    value = subject,
+                    onValueChange = { subject = it },
+                    label = { Text("Materia") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                ) {
+                    listOf(
+                        "MONDAY" to "Lun",
+                        "TUESDAY" to "Mar",
+                        "WEDNESDAY" to "Mié",
+                        "THURSDAY" to "Jue",
+                        "FRIDAY" to "Vie",
+                        "SATURDAY" to "Sáb",
+                    ).forEach { (value, label) ->
+                        FilterChip(
+                            selected = day == value,
+                            onClick = { day = value },
+                            label = { Text(label) },
+                        )
+                    }
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+                ) {
+                    OutlinedTextField(
+                        value = start,
+                        onValueChange = { start = it },
+                        label = { Text("Inicio") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                    )
+                    OutlinedTextField(
+                        value = end,
+                        onValueChange = { end = it },
+                        label = { Text("Fin") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                    )
+                }
+                OutlinedTextField(
+                    value = room,
+                    onValueChange = { room = it },
+                    label = { Text("Aula / laboratorio") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = teacher,
+                    onValueChange = { teacher = it },
+                    label = { Text("Docente") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = group,
+                    onValueChange = { group = it },
+                    label = { Text("Grupo") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    text = "Este horario es personal y no habilita asistencia ni cambia tu inscripción oficial.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onSave(
+                        PersonalScheduleDraft(
+                            id = initial?.id,
+                            subjectCode = initial?.subjectCode.orEmpty(),
+                            subjectName = subject,
+                            groupName = group,
+                            teacherName = teacher,
+                            dayOfWeek = day,
+                            startsAt = start,
+                            endsAt = end,
+                            classroomName = room,
+                            buildingName = initial?.buildingName,
+                            source = initial?.source ?: ScheduleSource.MANUAL,
+                        ),
+                    )
+                },
+                enabled = subject.isNotBlank() && start.isNotBlank() && end.isNotBlank(),
+            ) {
+                Text("Guardar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancelar") }
+        },
+    )
 }
+
+@Composable
+private fun ImportReviewDialog(
+    candidates: List<PersonalScheduleDraft>,
+    busy: Boolean,
+    onEdit: (Int) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        title = { Text("Revisa tu horario") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+            ) {
+                Text(
+                    "Detectamos " + candidates.size + " clases. Corrige cualquier dato antes de guardar.",
+                )
+                candidates.forEachIndexed { index, draft ->
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(CompaneroSpacing.sm),
+                            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                        ) {
+                            Text(
+                                dayShortLabel(draft.dayOfWeek) + " · " +
+                                    draft.startsAt + "–" + draft.endsAt,
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                            Text(draft.subjectName, style = MaterialTheme.typography.titleMedium)
+                            TextButton(onClick = { onEdit(index) }) { Text("Editar") }
+                        }
+                    }
+                }
+                Text(
+                    text = "El OCR nunca guarda automáticamente: tú confirmas el resultado.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = !busy) {
+                Text(if (busy) "Guardando…" else "Confirmar horario")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !busy) { Text("Descartar") }
+        },
+    )
+}
+
+private fun ScheduleEntry.toDraft(): PersonalScheduleDraft =
+    PersonalScheduleDraft(
+        id = courseId,
+        subjectCode = subjectCode,
+        subjectName = subjectName,
+        groupName = groupName,
+        teacherName = teacherName,
+        dayOfWeek = dayOfWeek,
+        startsAt = startsAt,
+        endsAt = endsAt,
+        classroomName = classroomName,
+        buildingName = buildingName,
+        source = source,
+    )
 
 private fun locationAndTeacher(entry: ScheduleEntry): String {
     val location = listOfNotNull(entry.classroomName, entry.buildingName)

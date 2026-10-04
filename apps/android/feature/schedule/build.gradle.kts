@@ -28,16 +28,16 @@ dependencies {
 
     implementation(project(":shared:contracts"))
     implementation(project(":apps:android:core:academic"))
-    implementation(project(":apps:android:core:common"))
+    implementation(project(":apps:android:core:common"))\n    implementation(project(":apps:android:core:database"))
     implementation(project(":apps:android:core:designsystem"))
     implementation(project(":apps:android:core:motion"))
     implementation(project(":apps:android:core:ui"))
 
-    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.activity.compose)\n    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material3)\n    implementation(libs.androidx.compose.material.icons.extended)\n    implementation(libs.mlkit.text.recognition)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

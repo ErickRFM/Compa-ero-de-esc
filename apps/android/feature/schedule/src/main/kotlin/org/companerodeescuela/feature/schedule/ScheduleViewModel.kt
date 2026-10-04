@@ -9,19 +9,26 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.companerodeescuela.core.academic.AcademicRepository
+import org.companerodeescuela.core.academic.PersonalScheduleDraft
+import org.companerodeescuela.core.academic.PersonalScheduleRepository
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.shared.contracts.ScheduleEntry
+import org.companerodeescuela.shared.contracts.ScheduleSource
 
 data class ScheduleUiState(
     val loading: Boolean = true,
+    val actionInProgress: Boolean = false,
     val entries: List<ScheduleEntry> = emptyList(),
     val fromCache: Boolean = false,
+    val importCandidates: List<PersonalScheduleDraft> = emptyList(),
+    val successMessage: String? = null,
     val errorMessage: String? = null,
 )
 
 @HiltViewModel
 class ScheduleViewModel @Inject constructor(
     private val repository: AcademicRepository,
+    private val personalRepository: PersonalScheduleRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ScheduleUiState())
     val state: StateFlow<ScheduleUiState> = _state.asStateFlow()
@@ -33,10 +40,11 @@ class ScheduleViewModel @Inject constructor(
             _state.value = _state.value.copy(loading = true, errorMessage = null)
             when (val result = repository.load()) {
                 is Outcome.Success -> {
-                    _state.value = ScheduleUiState(
+                    _state.value = _state.value.copy(
                         loading = false,
                         entries = WeeklySchedule.order(result.value.academic.schedule.entries),
                         fromCache = result.value.fromCache,
+                        errorMessage = null,
                     )
                 }
                 is Outcome.Failure -> {
@@ -47,5 +55,105 @@ class ScheduleViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    fun savePersonal(draft: PersonalScheduleDraft) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(actionInProgress = true, errorMessage = null)
+            when (val result = personalRepository.save(draft.copy(source = ScheduleSource.MANUAL))) {
+                is Outcome.Success -> {
+                    _state.value = _state.value.copy(
+                        actionInProgress = false,
+                        successMessage = "Horario personal actualizado.",
+                    )
+                    load()
+                }
+                is Outcome.Failure -> {
+                    _state.value = _state.value.copy(
+                        actionInProgress = false,
+                        errorMessage = result.error.userMessage,
+                    )
+                }
+            }
+        }
+    }
+
+    fun deletePersonal(entry: ScheduleEntry) {
+        if (entry.source == ScheduleSource.INSTITUTIONAL) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(actionInProgress = true, errorMessage = null)
+            when (val result = personalRepository.delete(entry.courseId)) {
+                is Outcome.Success -> {
+                    _state.value = _state.value.copy(
+                        actionInProgress = false,
+                        successMessage = "Clase eliminada del horario personal.",
+                    )
+                    load()
+                }
+                is Outcome.Failure -> {
+                    _state.value = _state.value.copy(
+                        actionInProgress = false,
+                        errorMessage = result.error.userMessage,
+                    )
+                }
+            }
+        }
+    }
+
+    fun stageImport(recognizedText: String) {
+        val candidates = ScheduleOcrParser.parse(recognizedText)
+        _state.value = _state.value.copy(
+            importCandidates = candidates,
+            errorMessage = if (candidates.isEmpty()) {
+                "No pudimos detectar clases automáticamente. Puedes crear el horario manualmente."
+            } else {
+                null
+            },
+        )
+    }
+
+    fun updateImportCandidate(index: Int, draft: PersonalScheduleDraft) {
+        val current = _state.value.importCandidates.toMutableList()
+        if (index !in current.indices) return
+        current[index] = draft.copy(source = ScheduleSource.OCR_IMPORT)
+        _state.value = _state.value.copy(importCandidates = current)
+    }
+
+    fun discardImport() {
+        _state.value = _state.value.copy(importCandidates = emptyList())
+    }
+
+    fun confirmImport() {
+        val candidates = _state.value.importCandidates
+        if (candidates.isEmpty()) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(actionInProgress = true, errorMessage = null)
+            when (val result = personalRepository.replace(ScheduleSource.OCR_IMPORT, candidates)) {
+                is Outcome.Success -> {
+                    _state.value = _state.value.copy(
+                        actionInProgress = false,
+                        importCandidates = emptyList(),
+                        successMessage = "Horario importado y guardado en este dispositivo.",
+                    )
+                    load()
+                }
+                is Outcome.Failure -> {
+                    _state.value = _state.value.copy(
+                        actionInProgress = false,
+                        errorMessage = result.error.userMessage,
+                    )
+                }
+            }
+        }
+    }
+
+    fun reportImportFailure() {
+        _state.value = _state.value.copy(
+            errorMessage = "No pudimos leer ese archivo. Prueba con una imagen más clara o crea el horario manualmente.",
+        )
+    }
+
+    fun clearMessage() {
+        _state.value = _state.value.copy(successMessage = null)
     }
 }

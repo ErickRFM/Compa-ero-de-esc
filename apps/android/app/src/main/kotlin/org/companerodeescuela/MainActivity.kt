@@ -26,6 +26,7 @@ import org.companerodeescuela.core.navigation.TopLevelDestination
 import org.companerodeescuela.feature.auth.LoginScreen
 import org.companerodeescuela.feature.attendance.AttendanceScreen
 import org.companerodeescuela.feature.auth.SessionViewModel
+import org.companerodeescuela.feature.designsystem.DesignSystemCatalogScreen
 import org.companerodeescuela.feature.home.HomeScreen
 import org.companerodeescuela.feature.profile.ProfileScreen
 import org.companerodeescuela.feature.schedule.ScheduleScreen
@@ -87,6 +88,7 @@ class MainActivity : ComponentActivity() {
                             CompaneroScaffold(
                                 startDestination = startDestination,
                                 topLevelDestinations = topLevelDestinations,
+                                showDebugCatalog = BuildConfig.DEBUG,
                             ) {
                                 composable(Destination.Home.route) { HomeScreen() }
                                 composable(Destination.Schedule.route) { ScheduleScreen() }
@@ -97,6 +99,11 @@ class MainActivity : ComponentActivity() {
                                         roles = session.roles,
                                         onLogout = sessionViewModel::logout,
                                     )
+                                }
+                                if (BuildConfig.DEBUG) {
+                                    composable(Destination.DesignSystemCatalog.route) {
+                                        DesignSystemCatalogScreen()
+                                    }
                                 }
                             }
                         }

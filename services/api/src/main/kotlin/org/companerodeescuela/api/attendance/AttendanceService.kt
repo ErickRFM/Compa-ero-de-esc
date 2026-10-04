@@ -398,7 +398,8 @@ class AttendanceService(
     private companion object {
         const val MIN_DURATION_MINUTES = 1
         const val MAX_DURATION_MINUTES = 15
-        const val MAX_OPERATION_ID_LENGTH = 128\n        const val MAX_QR_TOKEN_LENGTH = 2_048
+        const val MAX_OPERATION_ID_LENGTH = 128
+        const val MAX_QR_TOKEN_LENGTH = 2_048
         const val LATE_SYNC_REVIEW_WINDOW_SECONDS = 24L * 60L * 60L
     }
 }

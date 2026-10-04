@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -54,6 +55,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.companerodeescuela.core.designsystem.brand.UptlaxBrand
+import org.companerodeescuela.core.designsystem.theme.CompaneroSize
+import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.motion.CompaneroMotionDuration
 
 private val UptlaxBackground = Color(0xFF090D13)
@@ -106,10 +109,15 @@ fun LoginScreen(
 
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .widthIn(max = CompaneroSize.loginContentMaxWidth)
+                .align(Alignment.TopCenter)
                 .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 18.dp),
+                .padding(
+                    horizontal = CompaneroSpacing.page,
+                    vertical = CompaneroSpacing.sm,
+                ),
         ) {
             UptlaxBrand(
                 modifier = Modifier
@@ -123,7 +131,7 @@ fun LoginScreen(
             Text(
                 text = "Compañero de Clase",
                 color = Color.White,
-                fontSize = 30.sp,
+                fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
             )
             Text(

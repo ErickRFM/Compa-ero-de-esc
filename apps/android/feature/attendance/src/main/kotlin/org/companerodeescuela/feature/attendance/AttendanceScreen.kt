@@ -32,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -45,6 +46,7 @@ import java.util.Locale
 import kotlinx.coroutines.delay
 import org.companerodeescuela.core.database.LocalAttendanceRecord
 import org.companerodeescuela.core.database.LocalAttendanceSyncState
+import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
@@ -469,7 +471,13 @@ private fun RosterRecord(
                     text = attendanceStatusLabel(record.status),
                     style = MaterialTheme.typography.labelLarge,
                     color = when (record.status) {
-                        AttendanceStatus.VERIFIED -> MaterialTheme.colorScheme.primary
+                        AttendanceStatus.VERIFIED -> if (
+                            MaterialTheme.colorScheme.surface.luminance() < 0.5f
+                        ) {
+                            CompanionColors.semanticGreenDark
+                        } else {
+                            CompanionColors.semanticGreen
+                        }
                         AttendanceStatus.REJECTED -> MaterialTheme.colorScheme.error
                         AttendanceStatus.REVIEW_REQUIRED -> MaterialTheme.colorScheme.tertiary
                         AttendanceStatus.LIKELY -> MaterialTheme.colorScheme.onSurfaceVariant

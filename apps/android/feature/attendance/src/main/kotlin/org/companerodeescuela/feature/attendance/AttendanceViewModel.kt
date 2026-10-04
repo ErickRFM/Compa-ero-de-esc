@@ -35,6 +35,14 @@ enum class AttendanceMode {
     UNSUPPORTED,
 }
 
+enum class QrVisualState {
+    IDLE,
+    LOADING,
+    ACTIVE,
+    RENEWING,
+    UNAVAILABLE,
+}
+
 data class AttendanceUiState(
     val mode: AttendanceMode = AttendanceMode.LOADING,
     val loading: Boolean = true,
@@ -44,6 +52,7 @@ data class AttendanceUiState(
     val occurrences: List<ClassOccurrenceContract> = emptyList(),
     val teacherSession: AttendanceSessionResponse? = null,
     val qr: AttendanceQrResponse? = null,
+    val qrVisualState: QrVisualState = QrVisualState.IDLE,
     val roster: AttendanceRosterResponse? = null,
     val localRecords: List<LocalAttendanceRecord> = emptyList(),
     val scannerOpen: Boolean = false,
@@ -63,6 +72,7 @@ class AttendanceViewModel @Inject constructor(
 
     private var localRecordsJob: Job? = null
     private var qrRotationJob: Job? = null
+    private var rosterPollingJob: Job? = null
 
     init {
         bootstrap()
@@ -218,7 +228,7 @@ class AttendanceViewModel @Inject constructor(
                         )
                     }
                     startQrRotation(result.value.id)
-                    refreshRoster()
+                    startRosterPolling(result.value.id)
                 }
                 is Outcome.Failure -> {
                     _state.update {
@@ -239,11 +249,13 @@ class AttendanceViewModel @Inject constructor(
             when (val result = repository.closeSession(sessionId)) {
                 is Outcome.Success -> {
                     qrRotationJob?.cancel()
+                    rosterPollingJob?.cancel()
                     _state.update {
                         it.copy(
                             actionInProgress = false,
                             teacherSession = null,
                             qr = null,
+                            qrVisualState = QrVisualState.IDLE,
                             roster = null,
                             successMessage = "Pase cerrado.",
                         )
@@ -406,7 +418,7 @@ class AttendanceViewModel @Inject constructor(
 
             if (activeSession != null) {
                 startQrRotation(activeSession.id)
-                refreshRoster()
+                startRosterPolling(activeSession.id)
             }
         }
     }
@@ -415,13 +427,34 @@ class AttendanceViewModel @Inject constructor(
         qrRotationJob?.cancel()
         qrRotationJob = viewModelScope.launch {
             while (_state.value.teacherSession?.id == sessionId) {
+                _state.update {
+                    it.copy(
+                        qrVisualState = if (it.qr == null) {
+                            QrVisualState.LOADING
+                        } else {
+                            QrVisualState.RENEWING
+                        },
+                    )
+                }
                 when (val result = repository.issueQr(sessionId)) {
                     is Outcome.Success -> {
-                        _state.update { it.copy(qr = result.value, errorMessage = null) }
+                        _state.update {
+                            it.copy(
+                                qr = result.value,
+                                qrVisualState = QrVisualState.ACTIVE,
+                                errorMessage = null,
+                            )
+                        }
                         delay(result.value.rotateAfterSeconds.coerceAtLeast(5) * 1_000L)
                     }
                     is Outcome.Failure -> {
-                        _state.update { it.copy(errorMessage = result.error.userMessage) }
+                        _state.update {
+                            it.copy(
+                                qr = null,
+                                qrVisualState = QrVisualState.UNAVAILABLE,
+                                errorMessage = result.error.userMessage,
+                            )
+                        }
                         delay(QR_RETRY_DELAY_MS)
                     }
                 }
@@ -429,13 +462,28 @@ class AttendanceViewModel @Inject constructor(
         }
     }
 
+    private fun startRosterPolling(sessionId: String) {
+        rosterPollingJob?.cancel()
+        rosterPollingJob = viewModelScope.launch {
+            while (_state.value.teacherSession?.id == sessionId) {
+                when (val result = repository.roster(sessionId)) {
+                    is Outcome.Success -> _state.update { it.copy(roster = result.value) }
+                    is Outcome.Failure -> Unit
+                }
+                delay(ROSTER_POLL_INTERVAL_MS)
+            }
+        }
+    }
+
     override fun onCleared() {
         qrRotationJob?.cancel()
+        rosterPollingJob?.cancel()
         localRecordsJob?.cancel()
         super.onCleared()
     }
 
     private companion object {
         const val QR_RETRY_DELAY_MS = 5_000L
+        const val ROSTER_POLL_INTERVAL_MS = 4_000L
     }
 }

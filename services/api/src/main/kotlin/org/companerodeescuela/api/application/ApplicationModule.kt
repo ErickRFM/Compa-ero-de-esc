@@ -10,6 +10,11 @@ import org.companerodeescuela.api.attendance.InMemoryAttendanceRepository
 import org.companerodeescuela.api.attendance.MongoAttendanceRepository
 import org.companerodeescuela.api.attendance.attendanceRoutes
 import org.companerodeescuela.api.auth.authRoutes
+import org.companerodeescuela.api.channel.ChannelAccessPolicy
+import org.companerodeescuela.api.channel.ChannelService
+import org.companerodeescuela.api.channel.InMemoryChannelRepository
+import org.companerodeescuela.api.channel.MongoChannelRepository
+import org.companerodeescuela.api.channel.channelRoutes
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.database.MongoConnection
@@ -34,7 +39,6 @@ fun Application.module(
     mongoConnection: MongoConnection,
     providerRegistry: ProviderRegistry = ProviderRegistry.mocks(),
 ) {
-    // Fails the boot rather than serving fabricated academic data to real users.
     ProviderRegistry.requireEnvironmentSatisfied(providerRegistry, settings.environment)
 
     configurePlugins(settings)
@@ -46,6 +50,12 @@ fun Application.module(
         settings.environment == Environment.LOCAL -> InMemoryAttendanceRepository()
         else -> error("Attendance requires MONGODB_URI outside local development")
     }
+    val channelRepository = when {
+        !settings.hasAuthentication -> InMemoryChannelRepository()
+        settings.mongo.isConfigured -> MongoChannelRepository(mongoConnection.database())
+        settings.environment == Environment.LOCAL -> InMemoryChannelRepository()
+        else -> error("Class channels require MONGODB_URI outside local development")
+    }
     val attendanceQrService = settings.attendanceQrSecret?.let { secret ->
         AttendanceQrService(
             secret = secret,
@@ -56,6 +66,10 @@ fun Application.module(
         repository = attendanceRepository,
         academicProvider = providerRegistry.academic,
         qrService = attendanceQrService,
+    )
+    val channelService = ChannelService(
+        repository = channelRepository,
+        accessPolicy = ChannelAccessPolicy(providerRegistry.academic),
     )
 
     monitor.subscribe(ApplicationStopped) {
@@ -72,5 +86,6 @@ fun Application.module(
             service = attendanceService,
             qrService = attendanceQrService,
         )
+        channelRoutes(settings = settings, service = channelService)
     }
 }

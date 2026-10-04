@@ -33,6 +33,7 @@ import org.companerodeescuela.feature.attendance.AttendanceScreen
 import org.companerodeescuela.feature.auth.LoginScreen
 import org.companerodeescuela.feature.auth.RegistrationScreen
 import org.companerodeescuela.feature.auth.SessionViewModel
+import org.companerodeescuela.feature.channel.ChannelScreen
 import org.companerodeescuela.feature.designsystem.DesignSystemCatalogScreen
 import org.companerodeescuela.feature.home.HomeScreen
 import org.companerodeescuela.feature.profile.ProfileScreen
@@ -116,10 +117,10 @@ class MainActivity : ComponentActivity() {
                                     UserRole.TEACHER in session.roles &&
                                         UserRole.STUDENT !in session.roles
                                 val startDestination =
-                                    if (teacherOnly) Destination.Attendance else Destination.Home
+                                    if (teacherOnly) Destination.Channel else Destination.Home
                                 val topLevelDestinations =
                                     if (teacherOnly) {
-                                        listOf(TopLevelDestination.Attendance)
+                                        listOf(TopLevelDestination.Channel, TopLevelDestination.Attendance)
                                     } else {
                                         TopLevelDestination.entries
                                     }
@@ -141,6 +142,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                     composable(Destination.Schedule.route) { ScheduleScreen() }
                                     composable(Destination.Attendance.route) { AttendanceScreen() }
+                                    composable(Destination.Channel.route) { ChannelScreen() }
                                     composable(Destination.Profile.route) {
                                         ProfileScreen(
                                             displayName = session.displayName,

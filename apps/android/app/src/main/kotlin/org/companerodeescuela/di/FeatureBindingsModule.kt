@@ -16,6 +16,7 @@ import org.companerodeescuela.core.database.AttendanceLocalStore
 import org.companerodeescuela.core.database.PersonalScheduleStore
 import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.feature.auth.AuthRepository
+import org.companerodeescuela.feature.channel.ChannelRepository
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -57,6 +58,16 @@ object FeatureBindingsModule {
         tokenStore = tokenStore,
         cache = cache,
         personalScheduleStore = personalScheduleStore,
+    )
+
+    @Provides
+    @Singleton
+    fun provideChannelRepository(
+        client: HttpClient,
+        tokenStore: SessionTokenStore,
+    ): ChannelRepository = ChannelRepository(
+        client = client,
+        tokenStore = tokenStore,
     )
 
     @Provides

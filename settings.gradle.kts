@@ -43,6 +43,7 @@ include(":apps:android:feature:auth")
 include(":apps:android:feature:home")
 include(":apps:android:feature:schedule")
 include(":apps:android:feature:attendance")
+include(":apps:android:feature:channel")
 
 include(":apps:android:core:academic")
 include(":apps:android:core:attendance")

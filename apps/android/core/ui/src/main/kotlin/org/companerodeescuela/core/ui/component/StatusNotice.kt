@@ -7,8 +7,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import org.companerodeescuela.core.designsystem.theme.CompanionColors
+import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 
 enum class NoticeTone {
     INFO,
@@ -24,15 +27,24 @@ fun StatusNotice(
     modifier: Modifier = Modifier,
     tone: NoticeTone = NoticeTone.INFO,
 ) {
+    val darkSurface = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     val container = when (tone) {
         NoticeTone.INFO -> MaterialTheme.colorScheme.secondaryContainer
-        NoticeTone.SUCCESS -> MaterialTheme.colorScheme.primaryContainer
+        NoticeTone.SUCCESS -> if (darkSurface) {
+            CompanionColors.semanticGreenDarkContainer
+        } else {
+            CompanionColors.semanticGreenContainer
+        }
         NoticeTone.WARNING -> MaterialTheme.colorScheme.tertiaryContainer
         NoticeTone.ERROR -> MaterialTheme.colorScheme.errorContainer
     }
     val content = when (tone) {
         NoticeTone.INFO -> MaterialTheme.colorScheme.onSecondaryContainer
-        NoticeTone.SUCCESS -> MaterialTheme.colorScheme.onPrimaryContainer
+        NoticeTone.SUCCESS -> if (darkSurface) {
+            CompanionColors.semanticGreenDark
+        } else {
+            CompanionColors.semanticGreen
+        }
         NoticeTone.WARNING -> MaterialTheme.colorScheme.onTertiaryContainer
         NoticeTone.ERROR -> MaterialTheme.colorScheme.onErrorContainer
     }
@@ -42,7 +54,7 @@ fun StatusNotice(
         color = container,
         shape = MaterialTheme.shapes.medium,
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(CompaneroSpacing.md)) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
@@ -50,7 +62,7 @@ fun StatusNotice(
             )
             Text(
                 text = message,
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.padding(top = CompaneroSpacing.xxs),
                 style = MaterialTheme.typography.bodyMedium,
                 color = content,
             )

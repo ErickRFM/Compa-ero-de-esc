@@ -10,16 +10,18 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
@@ -37,10 +39,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.barcode.BarcodeScanner
@@ -49,6 +52,8 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.atomic.AtomicBoolean
+import org.companerodeescuela.core.designsystem.theme.CompaneroSize
+import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 
 @Composable
 fun AttendanceQrScanner(
@@ -151,48 +156,81 @@ fun AttendanceQrScanner(
                 },
             )
 
-            Surface(
+            val frameColor = MaterialTheme.colorScheme.primary
+            Canvas(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .size(270.dp),
-                shape = RoundedCornerShape(32.dp),
-                color = Color.Transparent,
-                border = BorderStroke(
-                    width = 3.dp,
-                    color = MaterialTheme.colorScheme.primary,
-                ),
-            ) {}
+                    .size(CompaneroSize.scannerFrame),
+            ) {
+                val length = size.minDimension * 0.22f
+                val strokeWidth = CompaneroSize.scannerFrameStroke.toPx()
+                val right = size.width
+                val bottom = size.height
+
+                drawLine(frameColor, Offset.Zero, Offset(length, 0f), strokeWidth, cap = StrokeCap.Round)
+                drawLine(frameColor, Offset.Zero, Offset(0f, length), strokeWidth, cap = StrokeCap.Round)
+                drawLine(frameColor, Offset(right - length, 0f), Offset(right, 0f), strokeWidth, cap = StrokeCap.Round)
+                drawLine(frameColor, Offset(right, 0f), Offset(right, length), strokeWidth, cap = StrokeCap.Round)
+                drawLine(frameColor, Offset(0f, bottom - length), Offset(0f, bottom), strokeWidth, cap = StrokeCap.Round)
+                drawLine(frameColor, Offset(0f, bottom), Offset(length, bottom), strokeWidth, cap = StrokeCap.Round)
+                drawLine(frameColor, Offset(right - length, bottom), Offset(right, bottom), strokeWidth, cap = StrokeCap.Round)
+                drawLine(frameColor, Offset(right, bottom - length), Offset(right, bottom), strokeWidth, cap = StrokeCap.Round)
+            }
 
             Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     .background(Color.Black.copy(alpha = 0.58f))
-                    .padding(horizontal = 20.dp, vertical = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                    .statusBarsPadding()
+                    .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md),
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
+                    ) {
+                        Text(
+                            text = "Escanear QR",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = Color.White,
+                        )
+                        Text(
+                            text = "Apunta al pase de tu docente",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.82f),
+                        )
+                    }
+                    IconButton(onClick = onClose) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "Cerrar escáner",
+                            tint = Color.White,
+                        )
+                    }
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.62f))
+                    .navigationBarsPadding()
+                    .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
             ) {
                 Text(
-                    text = "Escanea el QR del docente",
-                    style = MaterialTheme.typography.titleLarge,
+                    text = "Lectura segura · sin conexión",
+                    style = MaterialTheme.typography.labelLarge,
                     color = Color.White,
                 )
                 Text(
-                    text = "La lectura se guardará primero en tu dispositivo. Solo el servidor puede confirmar la asistencia.",
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = "El intento se guarda primero en este dispositivo; el servidor confirma el estado.",
+                    style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.82f),
-                )
-            }
-
-            IconButton(
-                onClick = onClose,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(12.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = "Cerrar escáner",
-                    tint = Color.White,
                 )
             }
         }
@@ -207,7 +245,9 @@ private fun CameraPermissionRequired(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(28.dp),
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(CompaneroSpacing.xl),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -218,7 +258,10 @@ private fun CameraPermissionRequired(
         )
         Text(
             text = "La cámara se usa únicamente para leer el QR de asistencia. Puedes volver sin concederla.",
-            modifier = Modifier.padding(top = 12.dp, bottom = 20.dp),
+            modifier = Modifier.padding(
+                top = CompaneroSpacing.sm,
+                bottom = CompaneroSpacing.lg,
+            ),
             style = MaterialTheme.typography.bodyLarge,
             color = Color.White.copy(alpha = 0.8f),
         )
@@ -227,7 +270,7 @@ private fun CameraPermissionRequired(
         }
         Button(
             onClick = onClose,
-            modifier = Modifier.padding(top = 8.dp),
+            modifier = Modifier.padding(top = CompaneroSpacing.xs),
         ) {
             Text("Volver")
         }

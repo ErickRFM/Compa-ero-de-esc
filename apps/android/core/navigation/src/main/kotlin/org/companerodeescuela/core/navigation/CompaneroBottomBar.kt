@@ -25,12 +25,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import org.companerodeescuela.core.designsystem.theme.CompanionColors
+import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
+import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.motion.CompaneroMotion
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 
@@ -49,17 +53,20 @@ fun CompaneroBottomBar(
     val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
 
     Surface(
-        modifier = modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+        modifier = modifier.padding(
+            horizontal = CompaneroSpacing.md,
+            vertical = CompaneroSpacing.xs,
+        ),
         shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 8.dp,
-        shadowElevation = 10.dp,
+        color = CompanionColors.graphite,
+        tonalElevation = CompaneroElevation.raised,
+        shadowElevation = CompaneroElevation.immersive,
     ) {
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(64.dp)
-                .padding(4.dp),
+                .padding(CompaneroSpacing.xxs),
         ) {
             val itemWidth = maxWidth / destinations.size
             val targetOffset = itemWidth * selectedIndex
@@ -79,7 +86,7 @@ fun CompaneroBottomBar(
                     .width(itemWidth)
                     .height(56.dp)
                     .clip(MaterialTheme.shapes.extraLarge)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                    .background(CompanionColors.crimson),
             )
 
             Row(modifier = Modifier.fillMaxWidth()) {
@@ -122,17 +129,17 @@ fun CompaneroBottomBar(
                                 },
                                 contentDescription = topLevel.label,
                                 tint = if (selected) {
-                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                    Color.White
                                 } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                    CompanionColors.onDarkSurfaceVariant
                                 },
                             )
                             if (selected) {
                                 Text(
                                     text = topLevel.label,
-                                    modifier = Modifier.padding(start = 8.dp),
+                                    modifier = Modifier.padding(start = CompaneroSpacing.xs),
                                     style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    color = Color.White,
                                 )
                             }
                         }

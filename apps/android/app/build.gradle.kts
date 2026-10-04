@@ -6,17 +6,27 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
-val companeroApiBaseUrl = providers
+val debugApiBaseUrl = providers
     .environmentVariable("COMPANERO_API_BASE_URL")
     .orElse("https://compa-ero-de-esc.onrender.com/")
     .get()
 
-require(companeroApiBaseUrl.startsWith("http")) {
-    "COMPANERO_API_BASE_URL must be absolute"
+val releaseApiBaseUrl = providers
+    .environmentVariable("COMPANERO_RELEASE_API_BASE_URL")
+    .orElse("https://invalid.invalid/")
+    .get()
+
+fun validateApiBaseUrl(name: String, value: String, requireHttps: Boolean = false) {
+    require(value.startsWith(if (requireHttps) "https://" else "http")) {
+        name + " must be an absolute " + (if (requireHttps) "HTTPS" else "HTTP(S)") + " URL"
+    }
+    require(value.endsWith("/")) {
+        name + " must end with '/'"
+    }
 }
-require(companeroApiBaseUrl.endsWith("/")) {
-    "COMPANERO_API_BASE_URL must end with '/'"
-}
+
+validateApiBaseUrl("COMPANERO_API_BASE_URL", debugApiBaseUrl)
+validateApiBaseUrl("COMPANERO_RELEASE_API_BASE_URL", releaseApiBaseUrl, requireHttps = true)
 
 android {
     namespace = "org.companerodeescuela"
@@ -31,15 +41,16 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "API_BASE_URL", "\"$companeroApiBaseUrl\"")
     }
 
     buildTypes {
         debug {
             isMinifyEnabled = false
+            buildConfigField("String", "API_BASE_URL", "\"$debugApiBaseUrl\"")
         }
         release {
             isMinifyEnabled = true
+            buildConfigField("String", "API_BASE_URL", "\"$releaseApiBaseUrl\"")
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

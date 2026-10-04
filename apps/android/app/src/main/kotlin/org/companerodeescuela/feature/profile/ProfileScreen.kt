@@ -128,6 +128,8 @@ private fun ProfileActionRow(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceVariant,
+        tonalElevation = CompaneroElevation.subtle,
+        shadowElevation = CompaneroElevation.card,
     ) {
         Row(
             modifier = Modifier.padding(CompaneroSpacing.sm),
@@ -161,11 +163,13 @@ private fun ProfileRow(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceVariant,
+        tonalElevation = CompaneroElevation.subtle,
+        shadowElevation = CompaneroElevation.card,
     ) {
         Row(
             modifier = Modifier.padding(CompaneroSpacing.sm),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
+            horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
         ) {
             Column(
                 modifier = Modifier.weight(1f),

@@ -72,9 +72,14 @@ import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
 @Composable
 fun AttendanceScreen(
     modifier: Modifier = Modifier,
+    requestedMode: AttendanceMode? = null,
     viewModel: AttendanceViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+
+    LaunchedEffect(requestedMode) {
+        requestedMode?.let(viewModel::selectMode)
+    }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val imageReader = remember(context) { AttendanceQrImageReader(context) }

@@ -897,29 +897,27 @@ private fun AttendanceHeader(
     loading: Boolean,
     onRefresh: () -> Unit,
 ) {
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top,
+        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
     ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Text(
+            text = title,
+            modifier = Modifier.padding(
+                end = CompaneroSpacing.hero + CompaneroSpacing.sm,
+            ),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         TextButton(
             onClick = onRefresh,
             enabled = !loading,
+            modifier = Modifier.align(Alignment.End),
         ) {
             Text(if (loading) "…" else "Actualizar")
         }

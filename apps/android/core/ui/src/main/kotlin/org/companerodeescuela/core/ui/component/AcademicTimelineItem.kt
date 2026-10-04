@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,6 +29,7 @@ fun AcademicTimelineItem(
     status: String? = null,
     highlighted: Boolean = false,
     subjectKey: String = title,
+    continuousRail: Boolean = false,
 ) {
     val accent = AcademicSubjectColors.accent(
         key = subjectKey,
@@ -49,17 +52,22 @@ fun AcademicTimelineItem(
         )
         Spacer(Modifier.width(6.dp))
         Box(
-            modifier = Modifier
-                .width(if (highlighted) 5.dp else 4.dp)
-                .height(48.dp)
-                .clip(MaterialTheme.shapes.extraSmall)
-                .background(
-                    if (highlighted) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        accent
-                    },
-                ),
+            modifier = if (continuousRail) {
+                Modifier
+                    .size(if (highlighted) 12.dp else 10.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (highlighted) MaterialTheme.colorScheme.primary else accent,
+                    )
+            } else {
+                Modifier
+                    .width(if (highlighted) 5.dp else 4.dp)
+                    .height(48.dp)
+                    .clip(MaterialTheme.shapes.extraSmall)
+                    .background(
+                        if (highlighted) MaterialTheme.colorScheme.primary else accent,
+                    )
+            },
         )
         Spacer(Modifier.width(10.dp))
         Column(

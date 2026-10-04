@@ -6,7 +6,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,15 +46,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.companerodeescuela.core.designsystem.brand.UptlaxBrand
 import org.companerodeescuela.core.motion.CompaneroMotionDuration
 
 private val UptlaxBackground = Color(0xFF090D13)
@@ -113,14 +111,11 @@ fun LoginScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 18.dp),
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.uptlax_logo),
-                contentDescription = "Universidad Politécnica de Tlaxcala",
+            UptlaxBrand(
                 modifier = Modifier
                     .fillMaxWidth(0.48f)
                     .height(52.dp),
-                alignment = Alignment.CenterStart,
-                contentScale = ContentScale.Fit,
+                tint = Color.White,
             )
 
             Spacer(modifier = Modifier.height(28.dp))

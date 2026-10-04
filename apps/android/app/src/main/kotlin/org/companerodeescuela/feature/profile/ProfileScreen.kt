@@ -201,7 +201,7 @@ private fun roleSummary(roles: Set<UserRole>): String = roles
 
 private fun initials(displayName: String?): String = displayName
     ?.trim()
-    ?.split(Regex("\s+"))
+    ?.split(Regex("\\s+"))
     ?.filter(String::isNotBlank)
     ?.take(2)
     ?.joinToString("") { it.first().uppercase() }

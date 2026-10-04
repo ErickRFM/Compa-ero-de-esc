@@ -20,7 +20,7 @@ error even when the API itself is healthy:
 
 ### AUTH-ERR-001 — secure-storage failures were classified as Unknown
 
-**Severity:** High  
+**Severity:** High
 **Status:** Fixed
 
 A successful `POST /auth/login` could still render "Ocurrió un error
@@ -36,7 +36,7 @@ Fix:
 
 ### AUTH-ERR-002 — Android Keystore encryption had no recovery path
 
-**Severity:** High  
+**Severity:** High
 **Status:** Fixed
 
 The AES key can become unusable after device-security changes, restore, or
@@ -52,7 +52,7 @@ Fix:
 
 ### AUTH-ERR-003 — stale encrypted session could break restoration
 
-**Severity:** High  
+**Severity:** High
 **Status:** Fixed
 
 If persisted ciphertext/IV no longer matched the current key, decrypting it
@@ -66,7 +66,7 @@ Fix:
 
 ### AUTH-ERR-004 — DataStore read failure could cancel session observation
 
-**Severity:** Medium  
+**Severity:** Medium
 **Status:** Fixed
 
 A DataStore read exception had no containment boundary at the session store.
@@ -78,7 +78,7 @@ Fix:
 
 ### AUTH-ERR-005 — login 401 used expired-session copy
 
-**Severity:** Medium  
+**Severity:** Medium
 **Status:** Fixed in the UPTLAX V5 auth pass
 
 A 401 returned by `POST /auth/login` was presented as "Tu sesión expiró",
@@ -118,4 +118,3 @@ This area is considered closed only when:
 5. logout clears the session;
 6. corrupt/invalid keystore state returns to login without app crash;
 7. no generic "unexpected" message is used for known auth/storage failures.
-

@@ -50,8 +50,11 @@ object RoleExperienceResolver {
             )
             AppExperience.TEACHER -> RoleExperienceConfig(
                 experience = selected,
-                startDestination = Destination.Attendance,
-                topLevelDestinations = emptyList(),
+                startDestination = Destination.Channel,
+                topLevelDestinations = listOf(
+                    TopLevelDestination.Channel,
+                    TopLevelDestination.Attendance,
+                ),
             )
             AppExperience.COORDINATOR,
             AppExperience.ADMIN,

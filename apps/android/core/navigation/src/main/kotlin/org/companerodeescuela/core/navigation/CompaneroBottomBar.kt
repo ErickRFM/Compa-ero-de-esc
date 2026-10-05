@@ -128,7 +128,7 @@ fun CompaneroBottomBar(
                         ) {
                             Icon(
                                 imageVector = when (topLevel) {
-                                    TopLevelDestination.Home -> Icons.Filled.Home
+                                    TopLevelDestination.Home,\n                                    TopLevelDestination.TeacherHome,\n                                    -> Icons.Filled.Home
                                     TopLevelDestination.Schedule -> Icons.Filled.DateRange
                                     TopLevelDestination.Channel -> Icons.Filled.Forum
                                     TopLevelDestination.Attendance -> Icons.Filled.QrCodeScanner

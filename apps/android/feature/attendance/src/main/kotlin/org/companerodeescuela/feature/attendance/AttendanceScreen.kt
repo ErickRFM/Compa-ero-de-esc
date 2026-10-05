@@ -72,9 +72,14 @@ import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
 @Composable
 fun AttendanceScreen(
     modifier: Modifier = Modifier,
+    requestedMode: AttendanceMode? = null,
     viewModel: AttendanceViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+
+    LaunchedEffect(requestedMode) {
+        requestedMode?.let(viewModel::selectMode)
+    }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val imageReader = remember(context) { AttendanceQrImageReader(context) }
@@ -117,7 +122,6 @@ fun AttendanceScreen(
             onGenericScan = viewModel::openGenericScanner,
             onPickImage = { imageLauncher.launch(arrayOf("image/*")) },
             onInspectToken = viewModel::inspectQr,
-            onRegister = viewModel::submitInspectedQr,
             onDismissInspection = viewModel::clearQrInspection,
             modifier = modifier,
         )
@@ -146,7 +150,6 @@ private fun StudentAttendance(
     onGenericScan: () -> Unit,
     onPickImage: () -> Unit,
     onInspectToken: (String) -> Unit,
-    onRegister: () -> Unit,
     onDismissInspection: () -> Unit,
     modifier: Modifier,
 ) {
@@ -164,7 +167,7 @@ private fun StudentAttendance(
     ) {
         AttendanceHeader(
             title = "Asistencia",
-            subtitle = "El QR es una evidencia. Puedes comprobarlo primero; el servidor decide el estado final.",
+            subtitle = "Al escanear guardamos la evidencia primero. El servidor confirma después el estado final.",
             loading = state.loading,
             onRefresh = onRefresh,
         )
@@ -189,7 +192,6 @@ private fun StudentAttendance(
                 inspection = inspection,
                 occurrence = inspection.session?.occurrenceId?.let(occurrenceById::get),
                 busy = state.actionInProgress,
-                onRegister = onRegister,
                 onDismiss = onDismissInspection,
             )
         }
@@ -333,7 +335,7 @@ private fun QrCenterCard(
         ) {
             Text("Comprobar un código QR", style = MaterialTheme.typography.titleLarge)
             Text(
-                text = "Escanéalo, elige una captura o pega el código. Comprobar no registra asistencia.",
+                text = "Escanéalo, elige una captura o pega el código. La evidencia se guarda primero y se verifica después.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -374,7 +376,7 @@ private fun QrPasteDialog(
             TextButton(
                 onClick = { onInspect(token) },
                 enabled = token.isNotBlank(),
-            ) { Text("Comprobar") }
+            ) { Text("Guardar evidencia") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancelar") }
@@ -387,7 +389,6 @@ private fun QrInspectionCard(
     inspection: AttendanceQrInspectionResponse,
     occurrence: ClassOccurrenceContract?,
     busy: Boolean,
-    onRegister: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val valid = inspection.status == AttendanceQrInspectionStatus.VALID
@@ -408,7 +409,7 @@ private fun QrInspectionCard(
                 subject + " · " +
                     session.scheduledStartsAt + "–" +
                     session.scheduledEndsAt +
-                    ". Aún no se ha registrado asistencia."
+                    ". La evidencia ya quedó guardada; el servidor confirmará el resultado."
             }
             inspection.status == AttendanceQrInspectionStatus.EXPIRED ->
                 "El código fue reconocido, pero su ventana de validez terminó."
@@ -421,26 +422,12 @@ private fun QrInspectionCard(
         },
         tone = if (valid) NoticeTone.SUCCESS else NoticeTone.WARNING,
     )
-    Row(
+    OutlinedButton(
+        onClick = onDismiss,
+        enabled = !busy,
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
     ) {
-        if (valid) {
-            Button(
-                onClick = onRegister,
-                enabled = !busy,
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(if (busy) "Guardando…" else "Registrar asistencia")
-            }
-        }
-        OutlinedButton(
-            onClick = onDismiss,
-            enabled = !busy,
-            modifier = Modifier.weight(1f),
-        ) {
-            Text("Cerrar")
-        }
+        Text("Cerrar")
     }
 }
 
@@ -549,6 +536,7 @@ private fun TeacherAttendance(
                 occurrence = state.occurrences.firstOrNull { it.id == active.occurrenceId },
                 qrToken = state.qr?.token,
                 qrExpiresAt = state.qr?.expiresAtEpochSeconds,
+                qrState = state.qrVisualState,
                 roster = state.roster?.records.orEmpty(),
                 busy = state.actionInProgress,
                 onClose = onClose,
@@ -571,6 +559,7 @@ private fun TeacherActiveSession(
     occurrence: ClassOccurrenceContract?,
     qrToken: String?,
     qrExpiresAt: Long?,
+    qrState: QrVisualState,
     roster: List<AttendanceRecordResponse>,
     busy: Boolean,
     onClose: () -> Unit,
@@ -595,6 +584,7 @@ private fun TeacherActiveSession(
                         occurrence = occurrence,
                         qrToken = qrToken,
                         qrExpiresAt = qrExpiresAt,
+                        qrState = qrState,
                         busy = busy,
                         onRefreshRoster = onRefreshRoster,
                         onRequestClose = { showCloseConfirmation = true },
@@ -618,6 +608,7 @@ private fun TeacherActiveSession(
                     occurrence = occurrence,
                     qrToken = qrToken,
                     qrExpiresAt = qrExpiresAt,
+                    qrState = qrState,
                     busy = busy,
                     onRefreshRoster = onRefreshRoster,
                     onRequestClose = { showCloseConfirmation = true },
@@ -667,6 +658,7 @@ private fun TeacherSessionCard(
     occurrence: ClassOccurrenceContract?,
     qrToken: String?,
     qrExpiresAt: Long?,
+    qrState: QrVisualState,
     busy: Boolean,
     onRefreshRoster: () -> Unit,
     onRequestClose: () -> Unit,
@@ -698,22 +690,42 @@ private fun TeacherSessionCard(
                 style = MaterialTheme.typography.bodyLarge,
             )
 
-            if (qrToken == null) {
-                CircularProgressIndicator()
-                Text("Generando QR firmado…")
-            } else {
-                AttendanceQrCode(
-                    token = qrToken,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = CompaneroSize.qrMaxWidth),
-                )
-                QrCountdown(qrExpiresAt)
-                Text(
-                    text = "El QR cambia automáticamente. No contiene datos del alumno.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = CompanionColors.onDarkSurfaceVariant,
-                )
+            when {
+                qrState == QrVisualState.ACTIVE && qrToken != null -> {
+                    AttendanceQrCode(
+                        token = qrToken,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = CompaneroSize.qrMaxWidth),
+                    )
+                    QrCountdown(qrExpiresAt)
+                    Text(
+                        text = "El QR cambia automáticamente. No contiene datos del alumno.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = CompanionColors.onDarkSurfaceVariant,
+                    )
+                }
+                qrState == QrVisualState.UNAVAILABLE -> {
+                    Text(
+                        text = "QR temporalmente no disponible",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = "Reconectando automáticamente. No uses un código anterior.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = CompanionColors.onDarkSurfaceVariant,
+                    )
+                }
+                else -> {
+                    CircularProgressIndicator()
+                    Text(
+                        if (qrState == QrVisualState.RENEWING) {
+                            "Renovando QR firmado…"
+                        } else {
+                            "Generando QR firmado…"
+                        },
+                    )
+                }
             }
 
             Row(

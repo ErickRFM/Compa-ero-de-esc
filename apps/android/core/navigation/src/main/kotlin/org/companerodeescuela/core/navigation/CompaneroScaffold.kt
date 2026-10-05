@@ -72,7 +72,7 @@ fun CompaneroScaffold(
             )
         },
         bottomBar = {
-            if (!onSecondaryScreen) {
+            if (!onSecondaryScreen && topLevelDestinations.isNotEmpty()) {
                 CompaneroBottomBar(
                     navController = navController,
                     currentDestination = currentDestination,

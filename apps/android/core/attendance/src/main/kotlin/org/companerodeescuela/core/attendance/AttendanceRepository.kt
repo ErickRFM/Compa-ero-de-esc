@@ -20,6 +20,11 @@ import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
 import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
 
+data class QrEvidenceCapture(
+    val localRecord: LocalAttendanceRecord,
+    val inspection: AttendanceQrInspectionResponse?,
+)
+
 class AttendanceRepository(
     private val tokenStore: SessionTokenStore,
     private val localStore: AttendanceLocalStore,
@@ -57,6 +62,39 @@ class AttendanceRepository(
         request: AttendanceQrInspectionRequest,
     ): Outcome<AttendanceQrInspectionResponse> =
         withToken { token -> remoteClient.inspectQr(token, request) }
+
+    /**
+     * Persists QR evidence before attempting any network inspection.
+     *
+     * Network failure after persistence is intentionally represented as a successful
+     * capture with a null inspection; WorkManager owns eventual delivery.
+     */
+    suspend fun captureQrEvidence(
+        sessionId: String,
+        qrToken: String,
+    ): Outcome<QrEvidenceCapture> {
+        val local = when (val captured = enqueueAttempt(sessionId, qrToken)) {
+            is Outcome.Success -> captured.value
+            is Outcome.Failure -> return captured
+        }
+        val inspection = when (
+            val inspected = inspectQr(
+                AttendanceQrInspectionRequest(
+                    sessionId = sessionId,
+                    token = qrToken,
+                ),
+            )
+        ) {
+            is Outcome.Success -> inspected.value
+            is Outcome.Failure -> null
+        }
+        return Outcome.Success(
+            QrEvidenceCapture(
+                localRecord = local,
+                inspection = inspection,
+            ),
+        )
+    }
 
     suspend fun closeSession(sessionId: String): Outcome<AttendanceSessionResponse> =
         withToken { token -> remoteClient.closeSession(token, sessionId) }

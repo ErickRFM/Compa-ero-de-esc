@@ -6,6 +6,8 @@ package org.companerodeescuela.core.navigation
 sealed class Destination(val route: String) {
     data object Home : Destination("home")
     data object TeacherHome : Destination("teacher-home")
+    data object CoordinatorHome : Destination("coordinator-home")
+    data object AdminHome : Destination("admin-home")
     data object Schedule : Destination("schedule")
     data object Attendance : Destination("attendance")
     data object Channel : Destination("channel")
@@ -28,6 +30,8 @@ enum class TopLevelDestination(
 ) {
     Home(Destination.Home, "Hoy"),
     TeacherHome(Destination.TeacherHome, "Hoy"),
+    CoordinatorHome(Destination.CoordinatorHome, "Gestión"),
+    AdminHome(Destination.AdminHome, "Administración"),
     Schedule(Destination.Schedule, "Agenda"),
     Channel(Destination.Channel, "Canal"),
     Attendance(Destination.Attendance, "Asistencia"),

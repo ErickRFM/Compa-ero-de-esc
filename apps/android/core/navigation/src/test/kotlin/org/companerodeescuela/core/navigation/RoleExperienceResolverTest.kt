@@ -2,7 +2,6 @@ package org.companerodeescuela.core.navigation
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import org.companerodeescuela.shared.contracts.UserRole
 
 class RoleExperienceResolverTest {
@@ -24,7 +23,7 @@ class RoleExperienceResolverTest {
     }
 
     @Test
-    fun `teacher gets channel and attendance workspace`() {
+    fun `teacher gets full teacher workspace`() {
         val config = RoleExperienceResolver.resolve(setOf(UserRole.TEACHER))
 
         assertEquals(AppExperience.TEACHER, config.experience)
@@ -32,11 +31,41 @@ class RoleExperienceResolverTest {
         assertEquals(
             listOf(
                 TopLevelDestination.TeacherHome,
-                TopLevelDestination.Channel,
+                TopLevelDestination.Schedule,
                 TopLevelDestination.Attendance,
+                TopLevelDestination.Channel,
             ),
             config.topLevelDestinations,
         )
+    }
+
+    @Test
+    fun `coordinator gets coordinator workspace`() {
+        val config = RoleExperienceResolver.resolve(setOf(UserRole.COORDINATOR))
+
+        assertEquals(AppExperience.COORDINATOR, config.experience)
+        assertEquals(Destination.CoordinatorHome, config.startDestination)
+        assertEquals(
+            listOf(
+                TopLevelDestination.CoordinatorHome,
+                TopLevelDestination.Schedule,
+                TopLevelDestination.Attendance,
+                TopLevelDestination.Channel,
+            ),
+            config.topLevelDestinations,
+        )
+    }
+
+    @Test
+    fun `admin and superAdmin get admin workspace`() {
+        val admin = RoleExperienceResolver.resolve(setOf(UserRole.ADMIN))
+        val superAdmin = RoleExperienceResolver.resolve(setOf(UserRole.SUPER_ADMIN))
+
+        assertEquals(AppExperience.ADMIN, admin.experience)
+        assertEquals(Destination.AdminHome, admin.startDestination)
+
+        assertEquals(AppExperience.SUPER_ADMIN, superAdmin.experience)
+        assertEquals(Destination.AdminHome, superAdmin.startDestination)
     }
 
     @Test
@@ -64,21 +93,6 @@ class RoleExperienceResolverTest {
         )
 
         assertEquals(AppExperience.STUDENT, config.experience)
-    }
-
-    @Test
-    fun `administrative roles never fall through to student shell`() {
-        val coordinator = RoleExperienceResolver.resolve(setOf(UserRole.COORDINATOR))
-        val admin = RoleExperienceResolver.resolve(setOf(UserRole.ADMIN))
-        val superAdmin = RoleExperienceResolver.resolve(setOf(UserRole.SUPER_ADMIN))
-
-        listOf(coordinator, admin, superAdmin).forEach { config ->
-            assertEquals(Destination.RoleUnavailable, config.startDestination)
-            assertTrue(config.topLevelDestinations.isEmpty())
-        }
-        assertEquals(AppExperience.COORDINATOR, coordinator.experience)
-        assertEquals(AppExperience.ADMIN, admin.experience)
-        assertEquals(AppExperience.SUPER_ADMIN, superAdmin.experience)
     }
 
     @Test

@@ -36,6 +36,7 @@ import org.companerodeescuela.core.navigation.AppExperience
 import org.companerodeescuela.core.navigation.CompaneroScaffold
 import org.companerodeescuela.core.navigation.Destination
 import org.companerodeescuela.core.navigation.RoleExperienceResolver
+import org.companerodeescuela.feature.admin.AdminHomeScreen
 import org.companerodeescuela.feature.attendance.AttendanceMode
 import org.companerodeescuela.feature.attendance.AttendanceScreen
 import org.companerodeescuela.feature.attendance.TeacherHomeScreen
@@ -43,6 +44,7 @@ import org.companerodeescuela.feature.auth.LoginScreen
 import org.companerodeescuela.feature.auth.RegistrationScreen
 import org.companerodeescuela.feature.auth.SessionViewModel
 import org.companerodeescuela.feature.channel.ChannelScreen
+import org.companerodeescuela.feature.coordinator.CoordinatorHomeScreen
 import org.companerodeescuela.feature.designsystem.DesignSystemCatalogScreen
 import org.companerodeescuela.feature.home.HomeScreen
 import org.companerodeescuela.feature.profile.ActiveExperiencePreferences
@@ -174,6 +176,44 @@ class MainActivity : ComponentActivity() {
                                         }
                                         composable(Destination.TeacherHome.route) {
                                             TeacherHomeScreen(
+                                                onOpenAttendance = {
+                                                    navController.navigate(Destination.Attendance.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                                onOpenChannel = {
+                                                    navController.navigate(Destination.Channel.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                            )
+                                        }
+                                        composable(Destination.CoordinatorHome.route) {
+                                            CoordinatorHomeScreen(
+                                                onOpenSchedule = {
+                                                    navController.navigate(Destination.Schedule.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                                onOpenAttendance = {
+                                                    navController.navigate(Destination.Attendance.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                                onOpenChannel = {
+                                                    navController.navigate(Destination.Channel.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                            )
+                                        }
+                                        composable(Destination.AdminHome.route) {
+                                            AdminHomeScreen(
+                                                onOpenSchedule = {
+                                                    navController.navigate(Destination.Schedule.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
                                                 onOpenAttendance = {
                                                     navController.navigate(Destination.Attendance.route) {
                                                         launchSingleTop = true

@@ -20,6 +20,12 @@ import org.companerodeescuela.api.channel.channelRoutes
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.database.MongoConnection
+import org.companerodeescuela.api.events.AcademicEventService
+import org.companerodeescuela.api.events.InMemoryAcademicEventRepository
+import org.companerodeescuela.api.events.MongoAcademicEventRepository
+import org.companerodeescuela.api.events.academicEventRoutes
+import org.companerodeescuela.api.devices.InMemoryDeviceTokenRepository
+import org.companerodeescuela.api.devices.deviceRoutes
 import org.companerodeescuela.api.health.HealthService
 import org.companerodeescuela.api.health.healthRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
@@ -79,6 +85,15 @@ fun Application.module(
         accessPolicy = ChannelAccessPolicy(providerRegistry.academic),
     )
 
+    val eventRepository = when {
+        !settings.hasAuthentication -> InMemoryAcademicEventRepository()
+        settings.mongo.isConfigured -> MongoAcademicEventRepository(mongoConnection.database())
+        settings.environment == Environment.LOCAL -> InMemoryAcademicEventRepository()
+        else -> error("Academic events require MONGODB_URI outside local development")
+    }
+    val eventService = AcademicEventService(repository = eventRepository)
+    val deviceTokenRepository = InMemoryDeviceTokenRepository()
+
     monitor.subscribe(ApplicationStopped) {
         providerRegistry.close()
         mongoConnection.close()
@@ -98,5 +113,7 @@ fun Application.module(
             qrService = attendanceQrService,
         )
         channelRoutes(settings = settings, service = channelService)
+        academicEventRoutes(settings = settings, service = eventService)
+        deviceRoutes(settings = settings, repository = deviceTokenRepository)
     }
 }

@@ -37,8 +37,13 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    fun provideClock(): java.time.Clock = java.time.Clock.systemUTC()
+
+    @Provides
+    @Singleton
     fun provideSessionRefreshCoordinator(
         client: HttpClient,
         tokenStore: SessionTokenStore,
-    ): SessionRefreshCoordinator = SessionRefreshCoordinator(client, tokenStore)
+        clock: java.time.Clock,
+    ): SessionRefreshCoordinator = SessionRefreshCoordinator(client, tokenStore, clock)
 }

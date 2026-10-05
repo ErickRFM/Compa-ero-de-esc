@@ -178,6 +178,11 @@ class MainActivity : ComponentActivity() {
                                                         launchSingleTop = true
                                                     }
                                                 },
+                                                onOpenChannel = {
+                                                    navController.navigate(Destination.Channel.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
                                             )
                                         }
                                         composable(Destination.Schedule.route) { ScheduleScreen() }

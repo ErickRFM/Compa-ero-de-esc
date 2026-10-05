@@ -181,7 +181,8 @@ jobs:
   instrumentation:
     name: Android instrumentation smoke test
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 15
+    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4

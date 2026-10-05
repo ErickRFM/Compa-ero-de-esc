@@ -70,9 +70,24 @@ class ChannelService(
         if (current.authorId != actorId && roles.none(UserRole::isAdministrative)) {
             throw ApiException.Forbidden("Only the author or an administrator can edit this post")
         }
+        // Copy public DTO properties to locals before branching. Kotlin cannot
+        // smart-cast properties from a different module because their getter
+        // could theoretically change between reads.
+        val requestedTitle = request.title
+        val requestedBody = request.body
         val updated = current.copy(
-            title = request.title?.trim()?.takeIf(String::isNotEmpty) ?: current.title,
-            body = request.body?.trim()?.takeIf(String::isNotEmpty) ?: current.body,
+            // null means "leave unchanged"; an explicit blank string means
+            // "clear this optional field".
+            title = if (requestedTitle != null) {
+                requestedTitle.trim().takeIf(String::isNotEmpty)
+            } else {
+                current.title
+            },
+            body = if (requestedBody != null) {
+                requestedBody.trim().takeIf(String::isNotEmpty)
+            } else {
+                current.body
+            },
             attachments = request.attachments ?: current.attachments,
             allowedResponses = request.allowedResponses ?: current.allowedResponses,
             pinned = request.pinned ?: current.pinned,

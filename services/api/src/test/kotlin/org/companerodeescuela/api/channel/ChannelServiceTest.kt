@@ -9,6 +9,7 @@ import org.companerodeescuela.api.integrations.mock.MockAcademicProvider
 import org.companerodeescuela.shared.contracts.ChannelAcknowledgementRequest
 import org.companerodeescuela.shared.contracts.ChannelPresetResponse
 import org.companerodeescuela.shared.contracts.CreateChannelPostRequest
+import org.companerodeescuela.shared.contracts.UpdateChannelPostRequest
 import org.companerodeescuela.shared.contracts.UserRole
 
 class ChannelServiceTest {
@@ -59,6 +60,52 @@ class ChannelServiceTest {
                 channelId = "C-9001",
                 postId = post.id,
                 request = ChannelAcknowledgementRequest(ChannelPresetResponse.WILL_ATTEND),
+            )
+        }
+    }
+
+
+    @Test
+    fun `teacher can explicitly clear an optional post field`() = runTest {
+        val post = service.createPost(
+            authorId = "T-0001",
+            authorDisplayName = "Mtra. Elena Ríos Salgado",
+            roles = setOf(UserRole.TEACHER),
+            channelId = "C-9001",
+            request = CreateChannelPostRequest(
+                title = "Laboratorio",
+                body = "Lleven bata.",
+            ),
+        )
+
+        val updated = service.updatePost(
+            actorId = "T-0001",
+            roles = setOf(UserRole.TEACHER),
+            channelId = "C-9001",
+            postId = post.id,
+            request = UpdateChannelPostRequest(body = "   "),
+        )
+
+        assertEquals("Laboratorio", updated.title)
+        assertEquals(null, updated.body)
+    }
+
+    @Test
+    fun `student cannot read teacher response statistics`() = runTest {
+        val post = service.createPost(
+            authorId = "T-0001",
+            authorDisplayName = "Mtra. Elena Ríos Salgado",
+            roles = setOf(UserRole.TEACHER),
+            channelId = "C-9001",
+            request = CreateChannelPostRequest(body = "Confirma que viste este aviso."),
+        )
+
+        assertFailsWith<ApiException.Forbidden> {
+            service.statsFor(
+                actorId = "2020-10455",
+                roles = setOf(UserRole.STUDENT),
+                channelId = "C-9001",
+                postId = post.id,
             )
         }
     }

@@ -144,6 +144,24 @@ jobs:
       - name: No secrets committed
         run: bash infrastructure/scripts/secret-scan.sh
 
+      - name: Stage traceable RC APKs
+        run: |
+          set -euo pipefail
+          short_sha="${GITHUB_SHA::7}"
+          out="build/rc-artifacts"
+          mkdir -p "$out"
+          cp apps/android/app/build/outputs/apk/debug/app-debug.apk \
+            "$out/companero-escuela-debug-$short_sha.apk"
+          cp apps/android/app/build/outputs/apk/release/app-release-unsigned.apk \
+            "$out/companero-escuela-release-unsigned-$short_sha.apk"
+          {
+            echo "commit=$GITHUB_SHA"
+            echo "ref=$GITHUB_REF"
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "run_attempt=$GITHUB_RUN_ATTEMPT"
+          } > "$out/BUILD_PROVENANCE.txt"
+          ls -lh "$out"
+
       # Artifact storage is useful for convenience, but quota exhaustion is
       # external to source correctness. Packaging is already proven above by
       # explicit file and size checks.
@@ -154,6 +172,7 @@ jobs:
         with:
           name: android-artifacts
           path: |
+            build/rc-artifacts/**
             apps/android/app/build/outputs/apk/**/*.apk
             apps/android/app/build/reports/lint-results*.html
             **/build/test-results/**/*.xml

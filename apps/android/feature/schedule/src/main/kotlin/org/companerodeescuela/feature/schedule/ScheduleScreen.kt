@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -43,19 +44,23 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.LocalDate
 import kotlinx.coroutines.launch
 import org.companerodeescuela.core.academic.PersonalScheduleDraft
-import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
 import org.companerodeescuela.core.motion.CompaneroMotionDuration
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 import org.companerodeescuela.core.ui.component.AcademicTimelineItem
+import org.companerodeescuela.core.ui.component.CompaneroSurface
+import org.companerodeescuela.core.ui.component.CompaneroSurfaceRole
 import org.companerodeescuela.core.ui.component.ExpressiveSegmentedControl
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
@@ -118,6 +123,7 @@ fun ScheduleScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .widthIn(max = CompaneroSize.homeContentMaxWidth)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
@@ -413,7 +419,11 @@ private fun DayAgendaDetails(
             )
         } else {
             Text(dayLabel(day), style = MaterialTheme.typography.titleMedium)
-            entries.forEach { AgendaEntry(it, onEdit, onDelete) }
+            AgendaTimeline(
+                entries = entries,
+                onEdit = onEdit,
+                onDelete = onDelete,
+            )
         }
     }
 }
@@ -430,59 +440,91 @@ private fun WeekAgenda(
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.lg),
+        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
         orderedDays.forEach { (day, dayEntries) ->
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
             ) {
-                Text(dayLabel(day), style = MaterialTheme.typography.titleLarge)
-                dayEntries.forEach { AgendaEntry(it, onEdit, onDelete) }
+                Text(dayLabel(day), style = MaterialTheme.typography.titleMedium)
+                AgendaTimeline(
+                    entries = dayEntries,
+                    onEdit = onEdit,
+                    onDelete = onDelete,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun AgendaEntry(
+private fun AgendaTimeline(
+    entries: List<ScheduleEntry>,
+    onEdit: (ScheduleEntry) -> Unit,
+    onDelete: (ScheduleEntry) -> Unit,
+) {
+    val railColor = MaterialTheme.colorScheme.outlineVariant
+    CompaneroSurface(
+        modifier = Modifier.fillMaxWidth(),
+        role = CompaneroSurfaceRole.INSET,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .drawBehind {
+                    val railX = 59.dp.toPx()
+                    drawLine(
+                        color = railColor,
+                        start = Offset(railX, 12.dp.toPx()),
+                        end = Offset(railX, size.height - 12.dp.toPx()),
+                        strokeWidth = 2.dp.toPx(),
+                    )
+                }
+                .padding(horizontal = CompaneroSpacing.card, vertical = CompaneroSpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+        ) {
+            entries.sortedBy { it.startsAt }.forEach { entry ->
+                AgendaTimelineEntry(
+                    entry = entry,
+                    onEdit = onEdit,
+                    onDelete = onDelete,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AgendaTimelineEntry(
     entry: ScheduleEntry,
     onEdit: (ScheduleEntry) -> Unit,
     onDelete: (ScheduleEntry) -> Unit,
 ) {
-    Surface(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        tonalElevation = CompaneroElevation.subtle,
-        shadowElevation = CompaneroElevation.card,
+        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
     ) {
-        Column(
-            modifier = Modifier.padding(
-                horizontal = CompaneroSpacing.card,
-                vertical = CompaneroSpacing.sm,
-            ),
-            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
-        ) {
-            AcademicTimelineItem(
-                time = entry.startsAt,
-                title = entry.subjectName,
-                subtitle = locationAndTeacher(entry),
-                status = when (entry.source) {
-                    ScheduleSource.INSTITUTIONAL -> null
-                    ScheduleSource.MANUAL -> "Horario personal"
-                    ScheduleSource.OCR_IMPORT -> "Importado · revisado"
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (entry.source != ScheduleSource.INSTITUTIONAL) {
-                Row(
-                    modifier = Modifier.align(Alignment.End),
-                    horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
-                ) {
-                    TextButton(onClick = { onEdit(entry) }) { Text("Editar") }
-                    TextButton(onClick = { onDelete(entry) }) { Text("Eliminar") }
-                }
+        AcademicTimelineItem(
+            time = entry.startsAt,
+            title = entry.subjectName,
+            subtitle = locationAndTeacher(entry),
+            status = when (entry.source) {
+                ScheduleSource.INSTITUTIONAL -> null
+                ScheduleSource.MANUAL -> "Horario personal"
+                ScheduleSource.OCR_IMPORT -> "Importado · revisado"
+            },
+            subjectKey = entry.subjectCode.ifBlank { entry.subjectName },
+            continuousRail = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (entry.source != ScheduleSource.INSTITUTIONAL) {
+            Row(
+                modifier = Modifier.align(Alignment.End),
+                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+            ) {
+                TextButton(onClick = { onEdit(entry) }) { Text("Editar") }
+                TextButton(onClick = { onDelete(entry) }) { Text("Eliminar") }
             }
         }
     }

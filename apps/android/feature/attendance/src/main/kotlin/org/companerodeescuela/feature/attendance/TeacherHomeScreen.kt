@@ -32,6 +32,7 @@ import org.companerodeescuela.shared.contracts.AttendanceStatus
 @Composable
 fun TeacherHomeScreen(
     onOpenAttendance: () -> Unit,
+    onOpenChannel: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: AttendanceViewModel = hiltViewModel(),
 ) {
@@ -124,6 +125,33 @@ fun TeacherHomeScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Ir a asistencia")
+            }
+        }
+
+        Text("Canal de clase", style = MaterialTheme.typography.titleMedium)
+        CompaneroSurface(
+            modifier = Modifier.fillMaxWidth(),
+            role = CompaneroSurfaceRole.CARD,
+        ) {
+            Column(
+                modifier = Modifier.padding(CompaneroSpacing.sm),
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+            ) {
+                Text(
+                    text = "Avisos y material del grupo",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    text = "Publica información, comparte contenido y mantén el canal docente separado de la mensajería privada.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(
+                    onClick = onOpenChannel,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Abrir canal")
+                }
             }
         }
 

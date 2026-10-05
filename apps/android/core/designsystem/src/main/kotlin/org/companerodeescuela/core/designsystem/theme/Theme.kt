@@ -61,9 +61,15 @@ private val DarkColors = darkColorScheme(
     onBackground = CompanionColors.onDarkSurface,
     surface = CompanionColors.darkSurface,
     onSurface = CompanionColors.onDarkSurface,
+    surfaceContainerLowest = CompanionColors.darkBackground,
+    surfaceContainerLow = CompanionColors.darkInset,
+    surfaceContainer = CompanionColors.darkRaised,
+    surfaceContainerHigh = CompanionColors.darkSurfaceVariant,
+    surfaceContainerHighest = CompanionColors.darkFloating,
     surfaceVariant = CompanionColors.darkSurfaceVariant,
     onSurfaceVariant = CompanionColors.onDarkSurfaceVariant,
     outline = CompanionColors.darkOutline,
+    outlineVariant = CompanionColors.darkSurfaceVariant,
 )
 
 /**

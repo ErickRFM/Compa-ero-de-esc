@@ -71,8 +71,19 @@ class ChannelService(
             throw ApiException.Forbidden("Only the author or an administrator can edit this post")
         }
         val updated = current.copy(
-            title = request.title?.trim()?.takeIf(String::isNotEmpty) ?: current.title,
-            body = request.body?.trim()?.takeIf(String::isNotEmpty) ?: current.body,
+            // null means "leave unchanged"; an explicit blank string means
+            // "clear this optional field". Using ?: here made it impossible
+            // for a teacher to remove an obsolete title/body from a post.
+            title = if (request.title != null) {
+                request.title.trim().takeIf(String::isNotEmpty)
+            } else {
+                current.title
+            },
+            body = if (request.body != null) {
+                request.body.trim().takeIf(String::isNotEmpty)
+            } else {
+                current.body
+            },
             attachments = request.attachments ?: current.attachments,
             allowedResponses = request.allowedResponses ?: current.allowedResponses,
             pinned = request.pinned ?: current.pinned,

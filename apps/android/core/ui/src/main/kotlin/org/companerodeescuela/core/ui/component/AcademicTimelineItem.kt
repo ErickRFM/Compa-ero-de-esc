@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,14 +28,20 @@ fun AcademicTimelineItem(
     modifier: Modifier = Modifier,
     status: String? = null,
     highlighted: Boolean = false,
+    subjectKey: String = title,
+    continuousRail: Boolean = false,
 ) {
+    val accent = AcademicSubjectColors.accent(
+        key = subjectKey,
+        surface = MaterialTheme.colorScheme.surface,
+    )
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.Top,
     ) {
         Text(
             text = time,
-            modifier = Modifier.width(52.dp),
+            modifier = Modifier.width(48.dp),
             style = MaterialTheme.typography.labelMedium,
             maxLines = 1,
             color = if (highlighted) {
@@ -44,17 +52,22 @@ fun AcademicTimelineItem(
         )
         Spacer(Modifier.width(6.dp))
         Box(
-            modifier = Modifier
-                .width(4.dp)
-                .height(48.dp)
-                .clip(MaterialTheme.shapes.extraSmall)
-                .background(
-                    if (highlighted) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.outlineVariant
-                    },
-                ),
+            modifier = if (continuousRail) {
+                Modifier
+                    .size(if (highlighted) 12.dp else 10.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (highlighted) MaterialTheme.colorScheme.primary else accent,
+                    )
+            } else {
+                Modifier
+                    .width(if (highlighted) 5.dp else 4.dp)
+                    .height(48.dp)
+                    .clip(MaterialTheme.shapes.extraSmall)
+                    .background(
+                        if (highlighted) MaterialTheme.colorScheme.primary else accent,
+                    )
+            },
         )
         Spacer(Modifier.width(10.dp))
         Column(
@@ -79,7 +92,7 @@ fun AcademicTimelineItem(
                 Text(
                     text = it,
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = if (highlighted) MaterialTheme.colorScheme.primary else accent,
                     maxLines = 1,
                 )
             }

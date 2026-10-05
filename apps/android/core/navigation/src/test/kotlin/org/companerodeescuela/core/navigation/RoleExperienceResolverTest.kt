@@ -12,7 +12,15 @@ class RoleExperienceResolverTest {
 
         assertEquals(AppExperience.STUDENT, config.experience)
         assertEquals(Destination.Home, config.startDestination)
-        assertEquals(TopLevelDestination.entries, config.topLevelDestinations)
+        assertEquals(
+            listOf(
+                TopLevelDestination.Home,
+                TopLevelDestination.Schedule,
+                TopLevelDestination.Channel,
+                TopLevelDestination.Attendance,
+            ),
+            config.topLevelDestinations,
+        )
     }
 
     @Test
@@ -20,9 +28,13 @@ class RoleExperienceResolverTest {
         val config = RoleExperienceResolver.resolve(setOf(UserRole.TEACHER))
 
         assertEquals(AppExperience.TEACHER, config.experience)
-        assertEquals(Destination.Channel, config.startDestination)
+        assertEquals(Destination.TeacherHome, config.startDestination)
         assertEquals(
-            listOf(TopLevelDestination.Channel, TopLevelDestination.Attendance),
+            listOf(
+                TopLevelDestination.TeacherHome,
+                TopLevelDestination.Channel,
+                TopLevelDestination.Attendance,
+            ),
             config.topLevelDestinations,
         )
     }

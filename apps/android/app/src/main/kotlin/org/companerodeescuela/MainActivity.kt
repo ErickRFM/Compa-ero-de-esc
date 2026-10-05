@@ -38,6 +38,7 @@ import org.companerodeescuela.core.navigation.Destination
 import org.companerodeescuela.core.navigation.RoleExperienceResolver
 import org.companerodeescuela.feature.attendance.AttendanceMode
 import org.companerodeescuela.feature.attendance.AttendanceScreen
+import org.companerodeescuela.feature.attendance.TeacherHomeScreen
 import org.companerodeescuela.feature.auth.LoginScreen
 import org.companerodeescuela.feature.auth.RegistrationScreen
 import org.companerodeescuela.feature.auth.SessionViewModel
@@ -166,6 +167,20 @@ class MainActivity : ComponentActivity() {
                                             HomeScreen(
                                                 onOpenSchedule = {
                                                     navController.navigate(Destination.Schedule.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                            )
+                                        }
+                                        composable(Destination.TeacherHome.route) {
+                                            TeacherHomeScreen(
+                                                onOpenAttendance = {
+                                                    navController.navigate(Destination.Attendance.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                                onOpenChannel = {
+                                                    navController.navigate(Destination.Channel.route) {
                                                         launchSingleTop = true
                                                     }
                                                 },

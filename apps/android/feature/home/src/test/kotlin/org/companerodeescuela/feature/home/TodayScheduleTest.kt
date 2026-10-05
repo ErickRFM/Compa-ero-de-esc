@@ -31,6 +31,36 @@ class TodayScheduleTest {
     }
 
     @Test
+    fun `free day exposes the next weekly class`() {
+        val result = TodaySchedule.calculate(
+            load = AcademicLoadResponse(
+                student = AcademicProfile("student-1", "Ana"),
+                schedule = AcademicScheduleResponse(
+                    ownerId = "student-1",
+                    entries = listOf(
+                        ScheduleEntry(
+                            courseId = "mobile",
+                            subjectCode = "PM",
+                            subjectName = "Programación móvil",
+                            groupName = "8-A",
+                            teacherName = "Docente",
+                            dayOfWeek = "MONDAY",
+                            startsAt = "08:00",
+                            endsAt = "09:00",
+                            classroomName = "Lab A",
+                        ),
+                    ),
+                ),
+            ),
+            now = LocalDateTime.of(2026, 10, 4, 12, 0),
+        )
+
+        assertEquals(0, result.classes.size)
+        assertEquals("Programación móvil", result.nextScheduled?.subjectName)
+        assertEquals(1, result.nextScheduledDaysAway)
+    }
+
+    @Test
     fun `empty institutional schedule is identified separately from a free day`() {
         val result = TodaySchedule.calculate(
             load = AcademicLoadResponse(

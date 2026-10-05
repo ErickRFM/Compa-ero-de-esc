@@ -37,4 +37,11 @@ dependencies {
     api(libs.androidx.compose.material.icons.extended)
     api(libs.androidx.compose.ui.tooling.preview)
     debugApi(libs.androidx.compose.ui.tooling)
+
+    testImplementation(libs.junit.jupiter)
+    testImplementation(libs.kotlin.test)
+}
+
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
 }

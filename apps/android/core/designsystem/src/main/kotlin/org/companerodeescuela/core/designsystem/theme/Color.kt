@@ -42,8 +42,11 @@ object CompanionColors {
     val lightOutline = Color(0xFF79716E)
 
     val darkBackground = Color(0xFF191A1C)
-    val darkSurface = Color(0xFF242528)
-    val darkSurfaceVariant = Color(0xFF45474A)
+    val darkSurface = Color(0xFF222326)
+    val darkInset = Color(0xFF26272A)
+    val darkRaised = Color(0xFF2B2D30)
+    val darkSurfaceVariant = Color(0xFF313338)
+    val darkFloating = Color(0xFF383A3F)
     val onDarkSurface = Color(0xFFE9E6E3)
     val onDarkSurfaceVariant = Color(0xFFC9C4C0)
     val darkOutline = Color(0xFF938C88)

@@ -1,5 +1,7 @@
 package org.companerodeescuela.core.navigation
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -12,7 +14,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -39,37 +43,19 @@ fun CompaneroScaffold(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    secondaryTitle?.let { Text(it) }
-                },
-                navigationIcon = {
-                    if (onSecondaryScreen) {
+            if (onSecondaryScreen) {
+                TopAppBar(
+                    title = { Text(secondaryTitle.orEmpty()) },
+                    navigationIcon = {
                         IconButton(onClick = { navController.popBackStack() }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Volver",
                             )
                         }
-                    }
-                },
-                actions = {
-                    if (!onSecondaryScreen) {
-                        IconButton(
-                            onClick = {
-                                navController.navigate(Destination.Profile.route) {
-                                    launchSingleTop = true
-                                }
-                            },
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Person,
-                                contentDescription = "Abrir perfil",
-                            )
-                        }
-                    }
-                },
-            )
+                    },
+                )
+            }
         },
         bottomBar = {
             if (!onSecondaryScreen && topLevelDestinations.isNotEmpty()) {
@@ -81,12 +67,36 @@ fun CompaneroScaffold(
             }
         },
     ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = startDestination.route,
-            modifier = Modifier.padding(innerPadding),
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
         ) {
-            destinations()
+            NavHost(
+                navController = navController,
+                startDestination = startDestination.route,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                destinations()
+            }
+
+            if (!onSecondaryScreen) {
+                IconButton(
+                    onClick = {
+                        navController.navigate(Destination.Profile.route) {
+                            launchSingleTop = true
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 2.dp, end = 6.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Person,
+                        contentDescription = "Abrir perfil",
+                    )
+                }
+            }
         }
     }
 }

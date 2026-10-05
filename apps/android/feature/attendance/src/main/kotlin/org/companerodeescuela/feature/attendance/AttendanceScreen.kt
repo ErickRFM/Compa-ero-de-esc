@@ -60,6 +60,9 @@ import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
+import org.companerodeescuela.core.ui.component.CompaneroHeroSurface
+import org.companerodeescuela.core.ui.component.CompaneroSurface
+import org.companerodeescuela.core.ui.component.CompaneroSurfaceRole
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse
@@ -161,6 +164,7 @@ private fun StudentAttendance(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .widthIn(max = CompaneroSize.homeContentMaxWidth)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
@@ -256,19 +260,16 @@ private fun StudentSessionCard(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
     ) {
-        Card(
+        CompaneroHeroSurface(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = CompanionColors.graphite,
-                contentColor = CompanionColors.onDarkSurface,
-            ),
+            containerColor = CompanionColors.graphite,
         ) {
             Column(
-                modifier = Modifier.padding(CompaneroSpacing.lg),
+                modifier = Modifier.padding(CompaneroSpacing.md),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
                 Text(
-                    text = "PASE ACTIVO",
+                    text = "EN VIVO  ●",
                     style = MaterialTheme.typography.labelLarge,
                     color = CompanionColors.crimsonContainer,
                 )
@@ -324,16 +325,15 @@ private fun QrCenterCard(
     onImage: () -> Unit,
     onPaste: () -> Unit,
 ) {
-    Surface(
+    CompaneroSurface(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        role = CompaneroSurfaceRole.CARD,
     ) {
         Column(
-            modifier = Modifier.padding(CompaneroSpacing.lg),
+            modifier = Modifier.padding(CompaneroSpacing.md),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
         ) {
-            Text("Comprobar un código QR", style = MaterialTheme.typography.titleLarge)
+            Text("Comprobar otro QR", style = MaterialTheme.typography.titleMedium)
             Text(
                 text = "Escanéalo, elige una captura o pega el código. La evidencia se guarda primero y se verifica después.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -663,16 +663,13 @@ private fun TeacherSessionCard(
     onRefreshRoster: () -> Unit,
     onRequestClose: () -> Unit,
 ) {
-    Card(
+    CompaneroHeroSurface(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = CompanionColors.graphite,
-            contentColor = CompanionColors.onDarkSurface,
-        ),
+        containerColor = CompanionColors.graphite,
     ) {
         Column(
-            modifier = Modifier.padding(CompaneroSpacing.xl),
-            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
+            modifier = Modifier.padding(CompaneroSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
@@ -760,7 +757,7 @@ private fun TeacherRosterPanel(
 ) {
     Text(
         text = "Registros recibidos (${roster.size})",
-        style = MaterialTheme.typography.titleLarge,
+        style = MaterialTheme.typography.titleMedium,
     )
 
     if (roster.isEmpty()) {
@@ -859,7 +856,7 @@ private fun TeacherOccurrenceList(
 
     Text(
         text = if (todayOccurrences.isNotEmpty()) "Clases de hoy" else "Clases de la semana",
-        style = MaterialTheme.typography.titleLarge,
+        style = MaterialTheme.typography.titleMedium,
     )
 
     if (visible.isEmpty()) {
@@ -911,29 +908,27 @@ private fun AttendanceHeader(
     loading: Boolean,
     onRefresh: () -> Unit,
 ) {
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top,
+        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
     ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        Text(
+            text = title,
+            modifier = Modifier.padding(
+                end = CompaneroSpacing.hero + CompaneroSpacing.sm,
+            ),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         TextButton(
             onClick = onRefresh,
             enabled = !loading,
+            modifier = Modifier.align(Alignment.End),
         ) {
             Text(if (loading) "…" else "Actualizar")
         }

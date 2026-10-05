@@ -5,16 +5,16 @@ import androidx.compose.material3.Shapes
 import androidx.compose.ui.unit.dp
 
 /**
- * Expressive V4 shape scale.
+ * V5.3 shape scale.
  *
- * Large surfaces deliberately carry stronger rounding so the product no
- * longer reads like default Material cards. Compact controls stay tighter to
- * preserve information density on small phones.
+ * Radius is hierarchical rather than uniformly pill-shaped: rows stay compact,
+ * cards are clearly rounded, and only hero/floating surfaces use the largest
+ * radius.
  */
 internal val CompanionShapes = Shapes(
-    extraSmall = RoundedCornerShape(10.dp),
+    extraSmall = RoundedCornerShape(8.dp),
     small = RoundedCornerShape(10.dp),
-    medium = RoundedCornerShape(18.dp),
-    large = RoundedCornerShape(24.dp),
-    extraLarge = RoundedCornerShape(32.dp),
+    medium = RoundedCornerShape(14.dp),
+    large = RoundedCornerShape(18.dp),
+    extraLarge = RoundedCornerShape(24.dp),
 )

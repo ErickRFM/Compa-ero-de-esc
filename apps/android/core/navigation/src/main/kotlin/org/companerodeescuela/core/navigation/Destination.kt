@@ -5,6 +5,7 @@ package org.companerodeescuela.core.navigation
  */
 sealed class Destination(val route: String) {
     data object Home : Destination("home")
+    data object TeacherHome : Destination("teacher-home")
     data object Schedule : Destination("schedule")
     data object Attendance : Destination("attendance")
     data object Channel : Destination("channel")
@@ -19,13 +20,14 @@ sealed class Destination(val route: String) {
 }
 
 /**
- * Only high-frequency student destinations belong in persistent navigation.
+ * High-frequency destinations are selected per role experience by RoleExperienceResolver.
  */
 enum class TopLevelDestination(
     val destination: Destination,
     val label: String,
 ) {
     Home(Destination.Home, "Hoy"),
+    TeacherHome(Destination.TeacherHome, "Hoy"),
     Schedule(Destination.Schedule, "Agenda"),
     Channel(Destination.Channel, "Canal"),
     Attendance(Destination.Attendance, "Asistencia"),

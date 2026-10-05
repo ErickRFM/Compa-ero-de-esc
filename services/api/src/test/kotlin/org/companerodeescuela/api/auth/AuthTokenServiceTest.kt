@@ -28,14 +28,15 @@ class AuthTokenServiceTest {
             roles = setOf(UserRole.STUDENT),
         )
 
-        val response = service.issue(user)
-        val decoded = JWT.decode(response.accessToken)
+        val response = service.issue(user, "session-1")
+        val decoded = JWT.decode(response.value)
         val restored = service.userFrom(decoded)
 
         assertEquals(user, restored)
         assertEquals(Instant.parse("2026-10-02T12:15:00Z").epochSecond, response.expiresAtEpochSeconds)
-        assertTrue(response.accessToken.isNotBlank())
-        assertTrue(response.accessToken.contains('.'))
+        assertTrue(response.value.isNotBlank())
+        assertTrue(response.value.contains('.'))
+        assertEquals("session-1", service.sessionIdFrom(decoded))
     }
 
     private fun settings(): ApiSettings = ApiSettings(

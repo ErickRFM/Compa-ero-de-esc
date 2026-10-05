@@ -21,7 +21,6 @@ import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.database.AttendanceLocalStore
 import org.companerodeescuela.core.security.SessionTokenInspector
-import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.shared.contracts.ApiErrorCode
 import org.companerodeescuela.shared.contracts.AttendanceReasonCode
 
@@ -68,7 +67,6 @@ class AttendanceSyncWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val localStore: AttendanceLocalStore,
     private val remoteClient: AttendanceRemoteClient,
-    private val tokenStore: SessionTokenStore,
 ) : CoroutineWorker(appContext, params) {
 
     private val clock: Clock = Clock.systemUTC()
@@ -78,12 +76,26 @@ class AttendanceSyncWorker @AssistedInject constructor(
             val operation = localStore.nextReady(clock.instant().epochSecond)
                 ?: return Result.success()
 
-            val token = runCatching { tokenStore.readAccessToken() }.getOrNull()
+            val token = when (val access = remoteClient.currentAccessToken()) {
+                is Outcome.Success -> access.value
+                is Outcome.Failure -> {
+                    val error = access.error
+                    if (error is AppError.Http && error.status == 401) {
+                        localStore.markAuthRequired(operation.operationId)
+                        return Result.success()
+                    }
+                    val delay = AttendanceRetryPolicy.nextDelaySeconds(operation.attemptCount)
+                    localStore.recordRetry(
+                        operationId = operation.operationId,
+                        nextAttemptAtEpochSeconds = clock.instant().epochSecond + delay,
+                        errorCode = AttendanceRemoteClient.errorCode(error),
+                    )
+                    return Result.retry()
+                }
+            }
             val claims = token?.let(SessionTokenInspector::inspect)
             if (
-                token.isNullOrBlank() ||
                 claims == null ||
-                !SessionTokenInspector.isUsable(token, clock) ||
                 claims.userId != operation.ownerId
             ) {
                 localStore.markAuthRequired(operation.operationId)
@@ -97,7 +109,6 @@ class AttendanceSyncWorker @AssistedInject constructor(
                 is Outcome.Failure -> {
                     val error = result.error
                     if (error is AppError.Http && error.status == 401) {
-                        runCatching { tokenStore.clear() }
                         localStore.markAuthRequired(operation.operationId)
                         return Result.success()
                     }

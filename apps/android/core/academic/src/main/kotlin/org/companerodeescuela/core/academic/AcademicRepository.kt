@@ -11,6 +11,7 @@ import org.companerodeescuela.core.database.PersonalScheduleItem
 import org.companerodeescuela.core.database.PersonalScheduleStore
 import org.companerodeescuela.core.network.apiCall
 import org.companerodeescuela.core.network.requireBody
+import org.companerodeescuela.core.network.SessionRefreshCoordinator
 import org.companerodeescuela.core.security.PlatformSessionClaims
 import org.companerodeescuela.core.security.SessionTokenInspector
 import org.companerodeescuela.core.security.SessionTokenStore
@@ -36,16 +37,20 @@ class AcademicRepository(
     private val cache: AcademicSnapshotCache,
     private val personalScheduleStore: PersonalScheduleStore? = null,
     private val clock: Clock = Clock.systemUTC(),
+    private val refreshCoordinator: SessionRefreshCoordinator =
+        SessionRefreshCoordinator(client, tokenStore, clock),
 ) {
     suspend fun load(): Outcome<AcademicContent> {
         val session = activeSession() ?: return Outcome.Failure(AppError.Http(status = 401))
         val (token, claims) = session
 
-        val remote = apiCall {
-            client.get("academic/load") {
-                bearerAuth(token)
-            }.requireBody<ApiResponse<AcademicLoadResponse>>()
-        }.map { it.data }
+        val remote = refreshCoordinator.execute(token) { accessToken ->
+            apiCall {
+                client.get("academic/load") {
+                    bearerAuth(accessToken)
+                }.requireBody<ApiResponse<AcademicLoadResponse>>()
+            }.map { it.data }
+        }
 
         return when (remote) {
             is Outcome.Success -> {
@@ -74,7 +79,6 @@ class AcademicRepository(
             is Outcome.Failure -> {
                 val error = remote.error
                 if (error is AppError.Http && error.status == 401) {
-                    tokenStore.clear()
                     remote
                 } else {
                     val cached = runCatching { cache.read(claims.userId) }.getOrNull()
@@ -146,12 +150,9 @@ class AcademicRepository(
     }
 
     private suspend fun activeSession(): Pair<String, PlatformSessionClaims>? {
-        val token = runCatching { tokenStore.readAccessToken() }.getOrNull()
-            ?.takeIf(String::isNotBlank)
-            ?: return null
-        if (!SessionTokenInspector.isUsable(token, clock)) {
-            runCatching { tokenStore.clear() }
-            return null
+        val token = when (val result = refreshCoordinator.currentAccessToken()) {
+            is Outcome.Success -> result.value
+            is Outcome.Failure -> return null
         }
         val claims = SessionTokenInspector.inspect(token) ?: run {
             runCatching { tokenStore.clear() }

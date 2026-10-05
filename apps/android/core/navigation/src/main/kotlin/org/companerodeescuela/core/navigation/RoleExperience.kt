@@ -58,15 +58,34 @@ object RoleExperienceResolver {
                 startDestination = Destination.TeacherHome,
                 topLevelDestinations = listOf(
                     TopLevelDestination.TeacherHome,
-                    TopLevelDestination.Channel,
+                    TopLevelDestination.Schedule,
                     TopLevelDestination.Attendance,
+                    TopLevelDestination.Channel,
                 ),
             )
-            AppExperience.COORDINATOR,
+            AppExperience.COORDINATOR -> RoleExperienceConfig(
+                experience = selected,
+                startDestination = Destination.CoordinatorHome,
+                topLevelDestinations = listOf(
+                    TopLevelDestination.CoordinatorHome,
+                    TopLevelDestination.Schedule,
+                    TopLevelDestination.Attendance,
+                    TopLevelDestination.Channel,
+                ),
+            )
             AppExperience.ADMIN,
             AppExperience.SUPER_ADMIN,
-            AppExperience.UNSUPPORTED,
             -> RoleExperienceConfig(
+                experience = selected,
+                startDestination = Destination.AdminHome,
+                topLevelDestinations = listOf(
+                    TopLevelDestination.AdminHome,
+                    TopLevelDestination.Schedule,
+                    TopLevelDestination.Attendance,
+                    TopLevelDestination.Channel,
+                ),
+            )
+            AppExperience.UNSUPPORTED -> RoleExperienceConfig(
                 experience = selected,
                 startDestination = Destination.RoleUnavailable,
                 topLevelDestinations = emptyList(),

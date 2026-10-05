@@ -15,6 +15,7 @@ data class PlatformSessionClaims(
     val displayName: String?,
     val roles: Set<UserRole>,
     val expiresAtEpochSeconds: Long,
+    val sessionId: String? = null,
 )
 
 /**
@@ -38,6 +39,8 @@ object SessionTokenInspector {
         val userId = json["sub"]?.jsonPrimitive?.contentOrNull
             ?.takeIf(String::isNotBlank)
             ?: return null
+        val sessionId = json["session_id"]?.jsonPrimitive?.contentOrNull
+            ?.takeIf(String::isNotBlank)
         val expiresAt = json["exp"]?.jsonPrimitive?.longOrNull ?: return null
         val displayName = json["display_name"]?.jsonPrimitive?.contentOrNull
             ?.takeIf(String::isNotBlank)
@@ -45,7 +48,7 @@ object SessionTokenInspector {
             ?.jsonArray
             ?.mapNotNull { entry ->
                 entry.jsonPrimitive.contentOrNull
-                    ?.let { encoded -> runCatching { UserRole.valueOf(encoded) }.getOrNull() }
+                    ?.let { encoded -> runCatching { UserRole.valueOf(encoded.uppercase()) }.getOrNull() }
             }
             ?.toSet()
             .orEmpty()
@@ -55,6 +58,7 @@ object SessionTokenInspector {
             displayName = displayName,
             roles = roles,
             expiresAtEpochSeconds = expiresAt,
+            sessionId = sessionId,
         )
     }.getOrNull()
 

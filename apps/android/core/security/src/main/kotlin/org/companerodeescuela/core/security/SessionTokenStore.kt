@@ -3,6 +3,11 @@ package org.companerodeescuela.core.security
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
+data class RefreshSessionCredentials(
+    val sessionId: String,
+    val refreshToken: String,
+)
+
 /**
  * Platform session storage.
  *
@@ -15,6 +20,14 @@ import kotlinx.coroutines.flow.flow
 interface SessionTokenStore {
     suspend fun readAccessToken(): String?
     suspend fun writeAccessToken(token: String)
+    suspend fun readRefreshSession(): RefreshSessionCredentials? = null
+
+    suspend fun writeSession(
+        accessToken: String,
+        sessionId: String,
+        refreshToken: String,
+    ) = writeAccessToken(accessToken)
+
     suspend fun clear()
 
     /**

@@ -23,6 +23,7 @@ import io.ktor.server.request.path
 import io.ktor.server.response.respond
 import kotlinx.serialization.json.Json
 import org.companerodeescuela.api.auth.AuthTokenService
+import org.companerodeescuela.api.auth.RefreshSessionRepository
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.errors.toApiError
@@ -67,7 +68,10 @@ fun ApplicationCall.requestId(): String? = callId
  * 2. `CallId` before `CallLogging`, so every log line carries the request id.
  * 3. `StatusPages` before routes, so route exceptions can be translated.
  */
-fun Application.configurePlugins(settings: ApiSettings) {
+fun Application.configurePlugins(
+    settings: ApiSettings,
+    refreshSessions: RefreshSessionRepository? = null,
+) {
     install(DefaultHeaders)
 
     install(CallId) {
@@ -113,9 +117,24 @@ fun Application.configurePlugins(settings: ApiSettings) {
                 realm = AuthTokenService.REALM
                 verifier(tokenService.verifier)
                 validate { credential ->
-                    credential.payload.subject
-                        ?.takeIf { subject -> subject.isNotBlank() }
-                        ?.let { JWTPrincipal(credential.payload) }
+                    val subject = credential.payload.subject?.takeIf(String::isNotBlank)
+                    val sessionId = tokenService.sessionIdFrom(credential.payload)
+                    val session = if (sessionId != null) {
+                        refreshSessions?.find(sessionId)
+                    } else {
+                        null
+                    }
+                    if (
+                        subject != null &&
+                        session != null &&
+                        session.user.id == subject &&
+                        session.revokedAt == null &&
+                        session.expiresAt.isAfter(java.time.Instant.now())
+                    ) {
+                        JWTPrincipal(credential.payload)
+                    } else {
+                        null
+                    }
                 }
             }
         }

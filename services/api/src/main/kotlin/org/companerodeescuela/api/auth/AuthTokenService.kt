@@ -8,7 +8,6 @@ import java.time.Clock
 import java.time.Duration
 import java.util.Date
 import org.companerodeescuela.api.config.ApiSettings
-import org.companerodeescuela.shared.contracts.LoginResponse
 import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
 
@@ -41,7 +40,11 @@ class AuthTokenService(
             .build()
     }
 
-    fun issue(user: UserSummary): LoginResponse {
+    fun issue(
+        user: UserSummary,
+        sessionId: String,
+        sessionGeneration: Long = 0,
+    ): IssuedAccessToken {
         val issuedAt = clock.instant()
         val expiresAt = issuedAt.plus(ACCESS_TOKEN_TTL)
 
@@ -49,6 +52,8 @@ class AuthTokenService(
             .withIssuer(issuer)
             .withAudience(audience)
             .withSubject(user.id)
+            .withClaim(CLAIM_SESSION_ID, sessionId)
+            .withClaim(CLAIM_SESSION_GENERATION, sessionGeneration)
             .withIssuedAt(Date.from(issuedAt))
             .withExpiresAt(Date.from(expiresAt))
             .withClaim(CLAIM_DISPLAY_NAME, user.displayName)
@@ -57,11 +62,7 @@ class AuthTokenService(
 
         user.email?.let { builder.withClaim(CLAIM_EMAIL, it) }
 
-        return LoginResponse(
-            accessToken = builder.sign(algorithm),
-            expiresAtEpochSeconds = expiresAt.epochSecond,
-            user = user,
-        )
+        return IssuedAccessToken(builder.sign(algorithm), expiresAt.epochSecond)
     }
 
     fun userFrom(jwt: Payload): UserSummary {
@@ -87,14 +88,25 @@ class AuthTokenService(
         )
     }
 
+    fun sessionIdFrom(jwt: Payload): String? = jwt.getClaim(CLAIM_SESSION_ID)
+        .asString()
+        ?.takeIf(String::isNotBlank)
+
     companion object {
         const val PROVIDER_NAME = "auth-jwt"
         const val REALM = "companero-api"
 
         private val ACCESS_TOKEN_TTL: Duration = Duration.ofMinutes(15)
+        private const val CLAIM_SESSION_ID = "session_id"
+        private const val CLAIM_SESSION_GENERATION = "session_generation"
         private const val CLAIM_DISPLAY_NAME = "display_name"
         private const val CLAIM_EMAIL = "email"
         private const val CLAIM_ROLES = "roles"
         private const val CLAIM_ACTIVE = "active"
     }
 }
+
+data class IssuedAccessToken(
+    val value: String,
+    val expiresAtEpochSeconds: Long,
+)

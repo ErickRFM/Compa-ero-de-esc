@@ -14,6 +14,7 @@ import org.companerodeescuela.core.attendance.AttendanceSyncScheduler
 import org.companerodeescuela.core.database.AcademicSnapshotCache
 import org.companerodeescuela.core.database.AttendanceLocalStore
 import org.companerodeescuela.core.database.PersonalScheduleStore
+import org.companerodeescuela.core.network.SessionRefreshCoordinator
 import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.feature.auth.AuthRepository
 import org.companerodeescuela.feature.channel.ChannelRepository
@@ -27,20 +28,20 @@ object FeatureBindingsModule {
     fun provideAuthRepository(
         client: HttpClient,
         tokenStore: SessionTokenStore,
+        refreshCoordinator: SessionRefreshCoordinator,
     ): AuthRepository = AuthRepository(
         client = client,
         tokenStore = tokenStore,
+        refreshCoordinator = refreshCoordinator,
     )
 
     @Provides
     @Singleton
     fun provideAttendanceRepository(
-        tokenStore: SessionTokenStore,
         localStore: AttendanceLocalStore,
         scheduler: AttendanceSyncScheduler,
         remoteClient: AttendanceRemoteClient,
     ): AttendanceRepository = AttendanceRepository(
-        tokenStore = tokenStore,
         localStore = localStore,
         scheduler = scheduler,
         remoteClient = remoteClient,
@@ -51,11 +52,13 @@ object FeatureBindingsModule {
     fun provideAcademicRepository(
         client: HttpClient,
         tokenStore: SessionTokenStore,
+        refreshCoordinator: SessionRefreshCoordinator,
         cache: AcademicSnapshotCache,
         personalScheduleStore: PersonalScheduleStore,
     ): AcademicRepository = AcademicRepository(
         client = client,
         tokenStore = tokenStore,
+        refreshCoordinator = refreshCoordinator,
         cache = cache,
         personalScheduleStore = personalScheduleStore,
     )
@@ -65,9 +68,11 @@ object FeatureBindingsModule {
     fun provideChannelRepository(
         client: HttpClient,
         tokenStore: SessionTokenStore,
+        refreshCoordinator: SessionRefreshCoordinator,
     ): ChannelRepository = ChannelRepository(
         client = client,
         tokenStore = tokenStore,
+        refreshCoordinator = refreshCoordinator,
     )
 
     @Provides

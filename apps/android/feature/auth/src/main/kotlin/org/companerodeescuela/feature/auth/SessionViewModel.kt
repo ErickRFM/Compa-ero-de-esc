@@ -3,6 +3,7 @@ package org.companerodeescuela.feature.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.Clock
 import java.time.Instant
 import javax.inject.Inject
 import kotlinx.coroutines.delay
@@ -32,6 +33,7 @@ data class SessionUiState(
 class SessionViewModel @Inject constructor(
     private val repository: AuthRepository,
     private val tokenStore: SessionTokenStore,
+    private val clock: Clock = Clock.systemUTC(),
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SessionUiState())
@@ -44,47 +46,79 @@ class SessionViewModel @Inject constructor(
     private fun observeSession() {
         viewModelScope.launch {
             tokenStore.observeAccessToken().collectLatest { token ->
-                val claims = token?.let(SessionTokenInspector::inspect)
-                val now = Instant.now().epochSecond
-
-                if (claims == null || claims.expiresAtEpochSeconds <= now) {
-                    if (token != null) {
-                        runCatching { tokenStore.clear() }
-                    }
-                    _state.update {
-                        it.copy(
-                            checking = false,
-                            authenticated = false,
-                            submitting = false,
-                            userId = null,
-                            displayName = null,
-                            roles = emptySet(),
-                        )
-                    }
+                if (token == null) {
+                    publishSignedOut()
                     return@collectLatest
                 }
 
-                _state.update {
-                    it.copy(
-                        checking = false,
-                        authenticated = true,
-                        submitting = false,
-                        userId = claims.userId,
-                        displayName = claims.displayName ?: it.displayName,
-                        roles = claims.roles,
-                        errorMessage = null,
-                    )
+                val claims = SessionTokenInspector.inspect(token)
+                if (claims == null) {
+                    runCatching { tokenStore.clear() }
+                    publishSignedOut()
+                    return@collectLatest
                 }
 
                 val millisUntilExpiry =
-                    ((claims.expiresAtEpochSeconds - now) * 1_000L).coerceAtLeast(1L)
-                delay(millisUntilExpiry)
+                    ((claims.expiresAtEpochSeconds - clock.instant().epochSecond) * 1_000L)
+                        .coerceAtLeast(0L)
+                if (millisUntilExpiry > 0L) {
+                    publishAuthenticated(claims.userId, claims.displayName, claims.roles)
+                    delay(millisUntilExpiry)
+                }
 
                 val current = tokenStore.readAccessToken()
                 if (current == token) {
-                    tokenStore.clear()
+                    when (val refreshed = repository.refreshSession()) {
+                        is Outcome.Success -> {
+                            val renewed = SessionTokenInspector.inspect(refreshed.value)
+                            if (renewed != null) {
+                                publishAuthenticated(renewed.userId, renewed.displayName, renewed.roles)
+                            }
+                        }
+                        is Outcome.Failure -> {
+                            val refreshError = refreshed.error
+                            val message = if (refreshError is AppError.Http && refreshError.status == 401) {
+                                "Tu sesión terminó. Inicia sesión de nuevo."
+                            } else {
+                                "No pudimos renovar tu sesión. Revisa tu conexión e inténtalo de nuevo."
+                            }
+                            publishSignedOut(message)
+                        }
+                    }
                 }
             }
+        }
+    }
+
+    private fun publishAuthenticated(
+        userId: String,
+        displayName: String?,
+        roles: Set<UserRole>,
+    ) {
+        _state.update {
+            it.copy(
+                checking = false,
+                authenticated = true,
+                submitting = false,
+                userId = userId,
+                displayName = displayName ?: it.displayName,
+                roles = roles,
+                errorMessage = null,
+            )
+        }
+    }
+
+    private fun publishSignedOut(message: String? = null) {
+        _state.update {
+            it.copy(
+                checking = false,
+                authenticated = false,
+                submitting = false,
+                userId = null,
+                displayName = null,
+                roles = emptySet(),
+                errorMessage = message,
+            )
         }
     }
 

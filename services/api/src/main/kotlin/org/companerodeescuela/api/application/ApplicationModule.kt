@@ -10,6 +10,8 @@ import org.companerodeescuela.api.attendance.InMemoryAttendanceRepository
 import org.companerodeescuela.api.attendance.MongoAttendanceRepository
 import org.companerodeescuela.api.attendance.attendanceRoutes
 import org.companerodeescuela.api.auth.authRoutes
+import org.companerodeescuela.api.auth.InMemoryRefreshSessionRepository
+import org.companerodeescuela.api.auth.MongoRefreshSessionRepository
 import org.companerodeescuela.api.channel.ChannelAccessPolicy
 import org.companerodeescuela.api.channel.ChannelService
 import org.companerodeescuela.api.channel.InMemoryChannelRepository
@@ -18,6 +20,12 @@ import org.companerodeescuela.api.channel.channelRoutes
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.database.MongoConnection
+import org.companerodeescuela.api.events.AcademicEventService
+import org.companerodeescuela.api.events.InMemoryAcademicEventRepository
+import org.companerodeescuela.api.events.MongoAcademicEventRepository
+import org.companerodeescuela.api.events.academicEventRoutes
+import org.companerodeescuela.api.devices.InMemoryDeviceTokenRepository
+import org.companerodeescuela.api.devices.deviceRoutes
 import org.companerodeescuela.api.health.HealthService
 import org.companerodeescuela.api.health.healthRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
@@ -41,9 +49,14 @@ fun Application.module(
 ) {
     ProviderRegistry.requireEnvironmentSatisfied(providerRegistry, settings.environment)
 
-    configurePlugins(settings)
-
     val healthService = HealthService(settings = settings, mongoConnection = mongoConnection)
+    val refreshSessionRepository = when {
+        !settings.hasAuthentication -> InMemoryRefreshSessionRepository()
+        settings.mongo.isConfigured -> MongoRefreshSessionRepository(mongoConnection.database())
+        settings.environment == Environment.LOCAL -> InMemoryRefreshSessionRepository()
+        else -> error("Refresh sessions require MONGODB_URI outside local development")
+    }
+    configurePlugins(settings, refreshSessions = refreshSessionRepository)
     val attendanceRepository = when {
         !settings.hasAuthentication -> InMemoryAttendanceRepository()
         settings.mongo.isConfigured -> MongoAttendanceRepository(mongoConnection.database())
@@ -72,6 +85,15 @@ fun Application.module(
         accessPolicy = ChannelAccessPolicy(providerRegistry.academic),
     )
 
+    val eventRepository = when {
+        !settings.hasAuthentication -> InMemoryAcademicEventRepository()
+        settings.mongo.isConfigured -> MongoAcademicEventRepository(mongoConnection.database())
+        settings.environment == Environment.LOCAL -> InMemoryAcademicEventRepository()
+        else -> error("Academic events require MONGODB_URI outside local development")
+    }
+    val eventService = AcademicEventService(repository = eventRepository)
+    val deviceTokenRepository = InMemoryDeviceTokenRepository()
+
     monitor.subscribe(ApplicationStopped) {
         providerRegistry.close()
         mongoConnection.close()
@@ -79,7 +101,11 @@ fun Application.module(
 
     routing {
         healthRoutes(settings = settings, healthService = healthService)
-        authRoutes(settings = settings, identityProvider = providerRegistry.identity)
+        authRoutes(
+            settings = settings,
+            identityProvider = providerRegistry.identity,
+            sessions = refreshSessionRepository,
+        )
         academicRoutes(settings = settings, academicProvider = providerRegistry.academic)
         attendanceRoutes(
             settings = settings,
@@ -87,5 +113,7 @@ fun Application.module(
             qrService = attendanceQrService,
         )
         channelRoutes(settings = settings, service = channelService)
+        academicEventRoutes(settings = settings, service = eventService)
+        deviceRoutes(settings = settings, repository = deviceTokenRepository)
     }
 }

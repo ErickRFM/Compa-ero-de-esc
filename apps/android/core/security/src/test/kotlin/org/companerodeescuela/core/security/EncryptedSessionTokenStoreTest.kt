@@ -3,9 +3,11 @@ package org.companerodeescuela.core.security
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import java.nio.file.Path
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.flow.first
 import org.junit.jupiter.api.io.TempDir
 
 class EncryptedSessionTokenStoreTest {
@@ -34,6 +36,30 @@ class EncryptedSessionTokenStoreTest {
 
         store.clear()
         assertNull(store.readAccessToken())
+    }
+
+    @Test
+    fun `refresh session credentials round trip encrypted and clear atomically`() = runTest {
+        val dataStore = PreferenceDataStoreFactory.create(
+            scope = backgroundScope,
+            produceFile = { tempDir.resolve("refresh-session.preferences_pb").toFile() },
+        )
+        val store = EncryptedSessionTokenStore(dataStore, FakeCipher)
+        val credentials = RefreshSessionCredentials("session-42", "refresh-secret-value")
+
+        store.writeSession("access-secret-value", credentials.sessionId, credentials.refreshToken)
+
+        assertEquals("access-secret-value", store.readAccessToken())
+        assertEquals(credentials, store.readRefreshSession())
+        val storedValues = dataStore.data.first().asMap().values.map(Any::toString)
+        assertFalse(storedValues.contains("access-secret-value"))
+        assertFalse(storedValues.contains("session-42"))
+        assertFalse(storedValues.contains("refresh-secret-value"))
+
+        store.clear()
+
+        assertNull(store.readAccessToken())
+        assertNull(store.readRefreshSession())
     }
 
     @Test

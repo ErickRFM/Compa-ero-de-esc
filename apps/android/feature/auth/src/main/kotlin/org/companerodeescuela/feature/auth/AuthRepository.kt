@@ -10,6 +10,8 @@ import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.network.apiCall
 import org.companerodeescuela.core.network.requireBody
+import org.companerodeescuela.core.network.requireUnit
+import org.companerodeescuela.core.network.SessionRefreshCoordinator
 import org.companerodeescuela.core.security.SessionTokenInspector
 import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.shared.contracts.ApiResponse
@@ -17,18 +19,20 @@ import org.companerodeescuela.shared.contracts.LoginRequest
 import org.companerodeescuela.shared.contracts.LoginResponse
 import org.companerodeescuela.shared.contracts.UserSummary
 
+import java.time.Clock
+
 class AuthRepository(
     private val client: HttpClient,
     private val tokenStore: SessionTokenStore,
+    private val clock: Clock = Clock.systemUTC(),
+    private val refreshCoordinator: SessionRefreshCoordinator =
+        SessionRefreshCoordinator(client, tokenStore, clock),
 ) {
     suspend fun hasSession(): Boolean {
-        val token = runCatching { tokenStore.readAccessToken() }.getOrNull()
-        val usable = SessionTokenInspector.isUsable(token)
-        if (!usable && token != null) {
-            runCatching { tokenStore.clear() }
-        }
-        return usable
+        return refreshCoordinator.currentAccessToken() is Outcome.Success
     }
+
+    suspend fun refreshSession(): Outcome<String> = refreshCoordinator.refreshSession()
 
     suspend fun login(
         username: String,
@@ -51,7 +55,11 @@ class AuthRepository(
                     )
                 } else {
                     try {
-                        tokenStore.writeAccessToken(result.value.accessToken)
+                        tokenStore.writeSession(
+                            accessToken = result.value.accessToken,
+                            sessionId = result.value.sessionId,
+                            refreshToken = result.value.refreshToken,
+                        )
                         Outcome.Success(result.value.user)
                     } catch (error: Exception) {
                         Outcome.Failure(
@@ -67,6 +75,23 @@ class AuthRepository(
     }
 
     suspend fun logout() {
-        tokenStore.clear()
+        try {
+            val refreshSession = runCatching { tokenStore.readRefreshSession() }.getOrNull()
+            if (refreshSession != null) {
+                apiCall<Unit> {
+                    client.post("auth/logout") {
+                        header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                        setBody(
+                            org.companerodeescuela.shared.contracts.RefreshSessionRequest(
+                                sessionId = refreshSession.sessionId,
+                                refreshToken = refreshSession.refreshToken,
+                            ),
+                        )
+                    }.requireUnit()
+                }
+            }
+        } finally {
+            tokenStore.clear()
+        }
     }
 }

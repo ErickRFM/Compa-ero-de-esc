@@ -9,7 +9,6 @@ import org.companerodeescuela.core.database.AttendanceLocalStore
 import org.companerodeescuela.core.database.LocalAttendanceRecord
 import org.companerodeescuela.core.security.PlatformSessionClaims
 import org.companerodeescuela.core.security.SessionTokenInspector
-import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.shared.contracts.AcademicWeekResponse
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse
@@ -26,7 +25,6 @@ data class QrEvidenceCapture(
 )
 
 class AttendanceRepository(
-    private val tokenStore: SessionTokenStore,
     private val localStore: AttendanceLocalStore,
     private val scheduler: AttendanceSyncEnqueuer,
     private val remoteClient: AttendanceRemoteClient,
@@ -159,15 +157,7 @@ class AttendanceRepository(
         localStore.observe(ownerId)
 
     private suspend fun currentToken(): Outcome<String> {
-        val token = runCatching { tokenStore.readAccessToken() }.getOrNull()
-            ?.takeIf(String::isNotBlank)
-            ?: return Outcome.Failure(AppError.Http(status = 401))
-
-        if (!SessionTokenInspector.isUsable(token, clock)) {
-            runCatching { tokenStore.clear() }
-            return Outcome.Failure(AppError.Http(status = 401))
-        }
-        return Outcome.Success(token)
+        return remoteClient.currentAccessToken()
     }
 
     private suspend fun <T> withToken(

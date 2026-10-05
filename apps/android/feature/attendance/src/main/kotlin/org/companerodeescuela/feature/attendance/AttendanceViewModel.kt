@@ -35,6 +35,14 @@ enum class AttendanceMode {
     UNSUPPORTED,
 }
 
+enum class QrVisualState {
+    IDLE,
+    LOADING,
+    ACTIVE,
+    RENEWING,
+    UNAVAILABLE,
+}
+
 data class AttendanceUiState(
     val mode: AttendanceMode = AttendanceMode.LOADING,
     val loading: Boolean = true,
@@ -44,11 +52,11 @@ data class AttendanceUiState(
     val occurrences: List<ClassOccurrenceContract> = emptyList(),
     val teacherSession: AttendanceSessionResponse? = null,
     val qr: AttendanceQrResponse? = null,
+    val qrVisualState: QrVisualState = QrVisualState.IDLE,
     val roster: AttendanceRosterResponse? = null,
     val localRecords: List<LocalAttendanceRecord> = emptyList(),
     val scannerOpen: Boolean = false,
     val scannerSessionHint: String? = null,
-    val pendingQrToken: String? = null,
     val qrInspection: AttendanceQrInspectionResponse? = null,
     val successMessage: String? = null,
     val errorMessage: String? = null,
@@ -63,9 +71,61 @@ class AttendanceViewModel @Inject constructor(
 
     private var localRecordsJob: Job? = null
     private var qrRotationJob: Job? = null
+    private var rosterPollingJob: Job? = null
 
     init {
         bootstrap()
+    }
+
+    fun selectMode(requestedMode: AttendanceMode) {
+        if (requestedMode !in setOf(AttendanceMode.STUDENT, AttendanceMode.TEACHER)) return
+
+        viewModelScope.launch {
+            when (val claimsResult = repository.localSessionClaims()) {
+                is Outcome.Success -> {
+                    val claims = claimsResult.value
+                    val allowed = when (requestedMode) {
+                        AttendanceMode.STUDENT -> UserRole.STUDENT in claims.roles
+                        AttendanceMode.TEACHER -> UserRole.TEACHER in claims.roles
+                        else -> false
+                    }
+                    if (!allowed) {
+                        _state.update {
+                            it.copy(
+                                mode = AttendanceMode.UNSUPPORTED,
+                                loading = false,
+                                errorMessage = "Tu cuenta no tiene acceso a este modo de asistencia.",
+                            )
+                        }
+                        return@launch
+                    }
+
+                    _state.update {
+                        it.copy(
+                            mode = requestedMode,
+                            userId = claims.userId,
+                            loading = false,
+                            errorMessage = null,
+                        )
+                    }
+                    observeLocalRecords(claims.userId)
+                    when (requestedMode) {
+                        AttendanceMode.STUDENT -> refreshStudent()
+                        AttendanceMode.TEACHER -> refreshTeacher()
+                        else -> Unit
+                    }
+                }
+                is Outcome.Failure -> {
+                    _state.update {
+                        it.copy(
+                            mode = AttendanceMode.UNSUPPORTED,
+                            loading = false,
+                            errorMessage = claimsResult.error.userMessage,
+                        )
+                    }
+                }
+            }
+        }
     }
 
     fun refresh() {
@@ -84,7 +144,6 @@ class AttendanceViewModel @Inject constructor(
                 scannerOpen = true,
                 scannerSessionHint = sessionId,
                 qrInspection = null,
-                pendingQrToken = null,
                 successMessage = null,
                 errorMessage = null,
             )
@@ -109,7 +168,6 @@ class AttendanceViewModel @Inject constructor(
                     scannerOpen = false,
                     scannerSessionHint = null,
                     qrInspection = null,
-                    pendingQrToken = null,
                     errorMessage = "No reconocimos un código QR de asistencia válido.",
                 )
             }
@@ -117,60 +175,29 @@ class AttendanceViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            _state.update { it.copy(actionInProgress = true, errorMessage = null) }
-            when (
-                val result = repository.inspectQr(
-                    AttendanceQrInspectionRequest(
-                        sessionId = sessionId,
-                        token = token,
-                    ),
+            _state.update {
+                it.copy(
+                    actionInProgress = true,
+                    errorMessage = null,
+                    successMessage = null,
                 )
-            ) {
-                is Outcome.Success -> {
-                    _state.update {
-                        it.copy(
-                            actionInProgress = false,
-                            scannerOpen = false,
-                            scannerSessionHint = null,
-                            pendingQrToken = token,
-                            qrInspection = result.value,
-                            errorMessage = null,
-                        )
-                    }
-                }
-                is Outcome.Failure -> {
-                    _state.update {
-                        it.copy(
-                            actionInProgress = false,
-                            scannerOpen = false,
-                            scannerSessionHint = null,
-                            qrInspection = null,
-                            pendingQrToken = null,
-                            errorMessage = result.error.userMessage,
-                        )
-                    }
-                }
             }
-        }
-    }
 
-    fun submitInspectedQr() {
-        val inspection = _state.value.qrInspection ?: return
-        val token = _state.value.pendingQrToken ?: return
-        val session = inspection.session ?: return
-        if (inspection.status != AttendanceQrInspectionStatus.VALID) return
-
-        viewModelScope.launch {
-            _state.update { it.copy(actionInProgress = true, errorMessage = null) }
-            when (val result = repository.enqueueAttempt(session.id, token)) {
+            when (val captured = repository.captureQrEvidence(sessionId, token)) {
                 is Outcome.Success -> {
+                    val inspection = captured.value.inspection
                     _state.update {
                         it.copy(
                             actionInProgress = false,
-                            qrInspection = null,
-                            pendingQrToken = null,
-                            successMessage =
-                                "Pase guardado en este dispositivo. El servidor confirmará el resultado.",
+                            scannerOpen = false,
+                            scannerSessionHint = null,
+                            qrInspection = inspection,
+                            errorMessage = null,
+                            successMessage = if (inspection == null) {
+                                "QR guardado. No pudimos comprobarlo ahora; se verificará automáticamente cuando haya conexión."
+                            } else {
+                                "QR guardado en este dispositivo. El servidor confirmará el resultado final."
+                            },
                         )
                     }
                 }
@@ -178,7 +205,10 @@ class AttendanceViewModel @Inject constructor(
                     _state.update {
                         it.copy(
                             actionInProgress = false,
-                            errorMessage = result.error.userMessage,
+                            scannerOpen = false,
+                            scannerSessionHint = null,
+                            qrInspection = null,
+                            errorMessage = captured.error.userMessage,
                         )
                     }
                 }
@@ -190,7 +220,6 @@ class AttendanceViewModel @Inject constructor(
         _state.update {
             it.copy(
                 qrInspection = null,
-                pendingQrToken = null,
             )
         }
     }
@@ -218,7 +247,7 @@ class AttendanceViewModel @Inject constructor(
                         )
                     }
                     startQrRotation(result.value.id)
-                    refreshRoster()
+                    startRosterPolling(result.value.id)
                 }
                 is Outcome.Failure -> {
                     _state.update {
@@ -239,11 +268,13 @@ class AttendanceViewModel @Inject constructor(
             when (val result = repository.closeSession(sessionId)) {
                 is Outcome.Success -> {
                     qrRotationJob?.cancel()
+                    rosterPollingJob?.cancel()
                     _state.update {
                         it.copy(
                             actionInProgress = false,
                             teacherSession = null,
                             qr = null,
+                            qrVisualState = QrVisualState.IDLE,
                             roster = null,
                             successMessage = "Pase cerrado.",
                         )
@@ -315,8 +346,8 @@ class AttendanceViewModel @Inject constructor(
                 is Outcome.Success -> {
                     val claims = claimsResult.value
                     val mode = when {
-                        UserRole.TEACHER in claims.roles -> AttendanceMode.TEACHER
                         UserRole.STUDENT in claims.roles -> AttendanceMode.STUDENT
+                        UserRole.TEACHER in claims.roles -> AttendanceMode.TEACHER
                         else -> AttendanceMode.UNSUPPORTED
                     }
                     _state.update {
@@ -406,7 +437,7 @@ class AttendanceViewModel @Inject constructor(
 
             if (activeSession != null) {
                 startQrRotation(activeSession.id)
-                refreshRoster()
+                startRosterPolling(activeSession.id)
             }
         }
     }
@@ -415,13 +446,34 @@ class AttendanceViewModel @Inject constructor(
         qrRotationJob?.cancel()
         qrRotationJob = viewModelScope.launch {
             while (_state.value.teacherSession?.id == sessionId) {
+                _state.update {
+                    it.copy(
+                        qrVisualState = if (it.qr == null) {
+                            QrVisualState.LOADING
+                        } else {
+                            QrVisualState.RENEWING
+                        },
+                    )
+                }
                 when (val result = repository.issueQr(sessionId)) {
                     is Outcome.Success -> {
-                        _state.update { it.copy(qr = result.value, errorMessage = null) }
+                        _state.update {
+                            it.copy(
+                                qr = result.value,
+                                qrVisualState = QrVisualState.ACTIVE,
+                                errorMessage = null,
+                            )
+                        }
                         delay(result.value.rotateAfterSeconds.coerceAtLeast(5) * 1_000L)
                     }
                     is Outcome.Failure -> {
-                        _state.update { it.copy(errorMessage = result.error.userMessage) }
+                        _state.update {
+                            it.copy(
+                                qr = null,
+                                qrVisualState = QrVisualState.UNAVAILABLE,
+                                errorMessage = result.error.userMessage,
+                            )
+                        }
                         delay(QR_RETRY_DELAY_MS)
                     }
                 }
@@ -429,13 +481,28 @@ class AttendanceViewModel @Inject constructor(
         }
     }
 
+    private fun startRosterPolling(sessionId: String) {
+        rosterPollingJob?.cancel()
+        rosterPollingJob = viewModelScope.launch {
+            while (_state.value.teacherSession?.id == sessionId) {
+                when (val result = repository.roster(sessionId)) {
+                    is Outcome.Success -> _state.update { it.copy(roster = result.value) }
+                    is Outcome.Failure -> Unit
+                }
+                delay(ROSTER_POLL_INTERVAL_MS)
+            }
+        }
+    }
+
     override fun onCleared() {
         qrRotationJob?.cancel()
+        rosterPollingJob?.cancel()
         localRecordsJob?.cancel()
         super.onCleared()
     }
 
     private companion object {
         const val QR_RETRY_DELAY_MS = 5_000L
+        const val ROSTER_POLL_INTERVAL_MS = 4_000L
     }
 }

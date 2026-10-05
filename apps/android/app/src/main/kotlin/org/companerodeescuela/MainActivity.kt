@@ -37,7 +37,8 @@ import org.companerodeescuela.core.navigation.CompaneroScaffold
 import org.companerodeescuela.core.navigation.Destination
 import org.companerodeescuela.core.navigation.RoleExperienceResolver
 import org.companerodeescuela.feature.attendance.AttendanceMode
-import org.companerodeescuela.feature.attendance.AttendanceScreen\nimport org.companerodeescuela.feature.attendance.TeacherHomeScreen
+import org.companerodeescuela.feature.attendance.AttendanceScreen
+import org.companerodeescuela.feature.attendance.TeacherHomeScreen
 import org.companerodeescuela.feature.auth.LoginScreen
 import org.companerodeescuela.feature.auth.RegistrationScreen
 import org.companerodeescuela.feature.auth.SessionViewModel

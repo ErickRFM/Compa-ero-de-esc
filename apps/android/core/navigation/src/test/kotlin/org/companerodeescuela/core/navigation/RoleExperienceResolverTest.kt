@@ -16,12 +16,15 @@ class RoleExperienceResolverTest {
     }
 
     @Test
-    fun `teacher gets attendance without one-item bottom navigation`() {
+    fun `teacher gets channel and attendance workspace`() {
         val config = RoleExperienceResolver.resolve(setOf(UserRole.TEACHER))
 
         assertEquals(AppExperience.TEACHER, config.experience)
-        assertEquals(Destination.Attendance, config.startDestination)
-        assertTrue(config.topLevelDestinations.isEmpty())
+        assertEquals(Destination.Channel, config.startDestination)
+        assertEquals(
+            listOf(TopLevelDestination.Channel, TopLevelDestination.Attendance),
+            config.topLevelDestinations,
+        )
     }
 
     @Test

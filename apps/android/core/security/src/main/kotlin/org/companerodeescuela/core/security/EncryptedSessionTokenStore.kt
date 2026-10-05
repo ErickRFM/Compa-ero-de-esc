@@ -48,6 +48,21 @@ internal class EncryptedSessionTokenStore(
             null
         }
 
+    override suspend fun readRefreshSession(): RefreshSessionCredentials? =
+        try {
+            val preferences = dataStore.data.first()
+            val sessionId = decodeValue(preferences, SESSION_ID_CIPHERTEXT_KEY, SESSION_ID_IV_KEY)
+                ?.takeIf(String::isNotBlank)
+                ?: return null
+            val refreshToken = decodeValue(preferences, REFRESH_CIPHERTEXT_KEY, REFRESH_IV_KEY)
+                ?.takeIf(String::isNotBlank)
+                ?: return null
+            RefreshSessionCredentials(sessionId, refreshToken)
+        } catch (_: Exception) {
+            runCatching { clear() }
+            null
+        }
+
     override fun observeAccessToken(): Flow<String?> =
         dataStore.data
             .map { preferences ->
@@ -61,20 +76,7 @@ internal class EncryptedSessionTokenStore(
 
     override suspend fun writeAccessToken(token: String) {
         require(token.isNotBlank()) { "access token must not be blank" }
-
-        val encrypted = try {
-            cipher.encrypt(token)
-        } catch (first: Exception) {
-            // Android Keystore keys can become invalid after lock-screen,
-            // restore or device-security changes. Recover once with a fresh key.
-            cipher.reset()
-            try {
-                cipher.encrypt(token)
-            } catch (second: Exception) {
-                second.addSuppressed(first)
-                throw second
-            }
-        }
+        val encrypted = encryptRecovering(listOf(token)).single()
 
         dataStore.edit { preferences ->
             preferences[CIPHERTEXT_KEY] = encrypted.ciphertext
@@ -82,26 +84,69 @@ internal class EncryptedSessionTokenStore(
         }
     }
 
+    override suspend fun writeSession(
+        accessToken: String,
+        sessionId: String,
+        refreshToken: String,
+    ) {
+        require(accessToken.isNotBlank()) { "access token must not be blank" }
+        require(sessionId.isNotBlank()) { "session id must not be blank" }
+        require(refreshToken.isNotBlank()) { "refresh token must not be blank" }
+        val encrypted = encryptRecovering(listOf(accessToken, sessionId, refreshToken))
+
+        dataStore.edit { preferences ->
+            preferences[CIPHERTEXT_KEY] = encrypted[0].ciphertext
+            preferences[IV_KEY] = encrypted[0].initializationVector
+            preferences[SESSION_ID_CIPHERTEXT_KEY] = encrypted[1].ciphertext
+            preferences[SESSION_ID_IV_KEY] = encrypted[1].initializationVector
+            preferences[REFRESH_CIPHERTEXT_KEY] = encrypted[2].ciphertext
+            preferences[REFRESH_IV_KEY] = encrypted[2].initializationVector
+        }
+    }
+
     override suspend fun clear() {
         dataStore.edit { preferences ->
             preferences.remove(CIPHERTEXT_KEY)
             preferences.remove(IV_KEY)
+            preferences.remove(SESSION_ID_CIPHERTEXT_KEY)
+            preferences.remove(SESSION_ID_IV_KEY)
+            preferences.remove(REFRESH_CIPHERTEXT_KEY)
+            preferences.remove(REFRESH_IV_KEY)
+        }
+    }
+
+    private fun encryptRecovering(values: List<String>): List<EncryptedValue> = try {
+        values.map(cipher::encrypt)
+    } catch (first: Exception) {
+        cipher.reset()
+        try {
+            values.map(cipher::encrypt)
+        } catch (second: Exception) {
+            second.addSuppressed(first)
+            throw second
         }
     }
 
     private fun decodeToken(preferences: Preferences): String? {
-        val ciphertext = preferences[CIPHERTEXT_KEY] ?: return null
-        val iv = preferences[IV_KEY] ?: return null
-        return cipher.decrypt(
-            EncryptedValue(
-                ciphertext = ciphertext,
-                initializationVector = iv,
-            ),
-        )
+        return decodeValue(preferences, CIPHERTEXT_KEY, IV_KEY)
+    }
+
+    private fun decodeValue(
+        preferences: Preferences,
+        ciphertextKey: androidx.datastore.preferences.core.Preferences.Key<String>,
+        ivKey: androidx.datastore.preferences.core.Preferences.Key<String>,
+    ): String? {
+        val ciphertext = preferences[ciphertextKey] ?: return null
+        val iv = preferences[ivKey] ?: return null
+        return cipher.decrypt(EncryptedValue(ciphertext, iv))
     }
 
     private companion object {
         val CIPHERTEXT_KEY = stringPreferencesKey("access_token_ciphertext")
         val IV_KEY = stringPreferencesKey("access_token_iv")
+        val SESSION_ID_CIPHERTEXT_KEY = stringPreferencesKey("session_id_ciphertext")
+        val SESSION_ID_IV_KEY = stringPreferencesKey("session_id_iv")
+        val REFRESH_CIPHERTEXT_KEY = stringPreferencesKey("refresh_token_ciphertext")
+        val REFRESH_IV_KEY = stringPreferencesKey("refresh_token_iv")
     }
 }

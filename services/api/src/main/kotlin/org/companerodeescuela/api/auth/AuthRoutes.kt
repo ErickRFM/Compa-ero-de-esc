@@ -18,6 +18,7 @@ import org.companerodeescuela.api.integrations.identity.IdentityProvider
 import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.LoginRequest
+import org.companerodeescuela.shared.contracts.RefreshSessionRequest
 
 /**
  * Platform authentication endpoints.
@@ -29,12 +30,13 @@ fun Route.authRoutes(
     settings: ApiSettings,
     identityProvider: IdentityProvider,
     loginAttemptLimiter: LoginAttemptLimiter = LoginAttemptLimiter(),
+    sessions: RefreshSessionRepository = InMemoryRefreshSessionRepository(),
 ) {
     val tokenService = settings.jwtSecret?.let { AuthTokenService(settings) }
 
     route("/auth") {
         post("/login") {
-            val service = tokenService?.let { AuthService(identityProvider, it) }
+            val service = tokenService?.let { AuthService(identityProvider, it, sessions) }
                 ?: throw ApiException.DependencyUnavailable(
                     "Authentication is not configured",
                 )
@@ -60,6 +62,28 @@ fun Route.authRoutes(
                     requestId = call.requestId(),
                 ),
             )
+        }
+
+        post("/refresh") {
+            val service = tokenService?.let { AuthService(identityProvider, it, sessions) }
+                ?: throw ApiException.DependencyUnavailable("Authentication is not configured")
+            val request = runCatching { call.receive<RefreshSessionRequest>() }
+                .getOrElse { throw ApiException.Unauthorized() }
+            call.respond(
+                ApiResponse(
+                    data = service.refresh(request),
+                    requestId = call.requestId(),
+                ),
+            )
+        }
+
+        post("/logout") {
+            val service = tokenService?.let { AuthService(identityProvider, it, sessions) }
+                ?: throw ApiException.DependencyUnavailable("Authentication is not configured")
+            val request = runCatching { call.receive<RefreshSessionRequest>() }
+                .getOrElse { throw ApiException.Unauthorized() }
+            service.logout(request)
+            call.respond(HttpStatusCode.NoContent)
         }
 
         if (tokenService == null) {

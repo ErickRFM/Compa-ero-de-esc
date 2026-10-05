@@ -18,13 +18,20 @@ data class LoginRequest(
 /**
  * Successful platform login.
  *
- * Access tokens are deliberately short lived. Refresh-token persistence and
- * revocation are added with the database-backed session lifecycle; this first
- * slice does not pretend logout/revocation exists before there is a store for it.
+ * Access tokens are deliberately short lived. The opaque refresh token is
+ * stored only in encrypted Android storage; the API stores only its hash.
  */
 @Serializable
 data class LoginResponse(
     val accessToken: String,
     val expiresAtEpochSeconds: Long,
+    val sessionId: String,
+    val refreshToken: String,
     val user: UserSummary,
+)
+
+@Serializable
+data class RefreshSessionRequest(
+    val sessionId: String,
+    val refreshToken: String,
 )

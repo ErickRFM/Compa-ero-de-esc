@@ -10,6 +10,8 @@ import org.companerodeescuela.api.attendance.InMemoryAttendanceRepository
 import org.companerodeescuela.api.attendance.MongoAttendanceRepository
 import org.companerodeescuela.api.attendance.attendanceRoutes
 import org.companerodeescuela.api.auth.authRoutes
+import org.companerodeescuela.api.auth.InMemoryRefreshSessionRepository
+import org.companerodeescuela.api.auth.MongoRefreshSessionRepository
 import org.companerodeescuela.api.channel.ChannelAccessPolicy
 import org.companerodeescuela.api.channel.ChannelService
 import org.companerodeescuela.api.channel.InMemoryChannelRepository
@@ -41,9 +43,14 @@ fun Application.module(
 ) {
     ProviderRegistry.requireEnvironmentSatisfied(providerRegistry, settings.environment)
 
-    configurePlugins(settings)
-
     val healthService = HealthService(settings = settings, mongoConnection = mongoConnection)
+    val refreshSessionRepository = when {
+        !settings.hasAuthentication -> InMemoryRefreshSessionRepository()
+        settings.mongo.isConfigured -> MongoRefreshSessionRepository(mongoConnection.database())
+        settings.environment == Environment.LOCAL -> InMemoryRefreshSessionRepository()
+        else -> error("Refresh sessions require MONGODB_URI outside local development")
+    }
+    configurePlugins(settings, refreshSessions = refreshSessionRepository)
     val attendanceRepository = when {
         !settings.hasAuthentication -> InMemoryAttendanceRepository()
         settings.mongo.isConfigured -> MongoAttendanceRepository(mongoConnection.database())
@@ -79,7 +86,11 @@ fun Application.module(
 
     routing {
         healthRoutes(settings = settings, healthService = healthService)
-        authRoutes(settings = settings, identityProvider = providerRegistry.identity)
+        authRoutes(
+            settings = settings,
+            identityProvider = providerRegistry.identity,
+            sessions = refreshSessionRepository,
+        )
         academicRoutes(settings = settings, academicProvider = providerRegistry.academic)
         attendanceRoutes(
             settings = settings,

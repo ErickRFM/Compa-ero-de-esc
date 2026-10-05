@@ -14,6 +14,7 @@ import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.database.PendingAttendanceOperation
 import org.companerodeescuela.core.network.apiCall
 import org.companerodeescuela.core.network.requireBody
+import org.companerodeescuela.core.network.SessionRefreshCoordinator
 import org.companerodeescuela.shared.contracts.AcademicWeekResponse
 import org.companerodeescuela.shared.contracts.ApiError
 import org.companerodeescuela.shared.contracts.ApiErrorCode
@@ -30,106 +31,118 @@ import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
 
 class AttendanceRemoteClient @Inject constructor(
     private val client: HttpClient,
+    private val refreshCoordinator: SessionRefreshCoordinator,
 ) {
+    suspend fun currentAccessToken(): Outcome<String> = refreshCoordinator.currentAccessToken()
+
     suspend fun activeStudentSessions(
         token: String,
-    ): Outcome<List<AttendanceSessionResponse>> =
+    ): Outcome<List<AttendanceSessionResponse>> = authorized(token) { accessToken ->
         apiCall {
             client.get("attendance/sessions/active") {
-                bearerAuth(token)
+                bearerAuth(accessToken)
             }.requireBody<ApiResponse<List<AttendanceSessionResponse>>>()
         }.map { it.data }
+    }
 
     suspend fun activeTeacherSessions(
         token: String,
-    ): Outcome<List<AttendanceSessionResponse>> =
+    ): Outcome<List<AttendanceSessionResponse>> = authorized(token) { accessToken ->
         apiCall {
             client.get("attendance/sessions/mine") {
-                bearerAuth(token)
+                bearerAuth(accessToken)
             }.requireBody<ApiResponse<List<AttendanceSessionResponse>>>()
         }.map { it.data }
+    }
 
     suspend fun academicWeek(
         token: String,
         weekOf: String,
-    ): Outcome<AcademicWeekResponse> =
+    ): Outcome<AcademicWeekResponse> = authorized(token) { accessToken ->
         apiCall {
             client.get("academic/schedule/v2?weekOf=$weekOf") {
-                bearerAuth(token)
+                bearerAuth(accessToken)
             }.requireBody<ApiResponse<AcademicWeekResponse>>()
         }.map { it.data }
+    }
 
     suspend fun openSession(
         token: String,
         request: CreateAttendanceSessionRequest,
-    ): Outcome<AttendanceSessionResponse> =
+    ): Outcome<AttendanceSessionResponse> = authorized(token) { accessToken ->
         apiCall {
             client.post("attendance/sessions") {
-                bearerAuth(token)
+                bearerAuth(accessToken)
                 setBody(request)
             }.requireBody<ApiResponse<AttendanceSessionResponse>>()
         }.map { it.data }
+    }
 
     suspend fun issueQr(
         token: String,
         sessionId: String,
-    ): Outcome<AttendanceQrResponse> =
+    ): Outcome<AttendanceQrResponse> = authorized(token) { accessToken ->
         apiCall {
             client.post("attendance/sessions/$sessionId/qr") {
-                bearerAuth(token)
+                bearerAuth(accessToken)
             }.requireBody<ApiResponse<AttendanceQrResponse>>()
         }.map { it.data }
+    }
 
     suspend fun inspectQr(
         token: String,
         request: AttendanceQrInspectionRequest,
-    ): Outcome<AttendanceQrInspectionResponse> =
+    ): Outcome<AttendanceQrInspectionResponse> = authorized(token) { accessToken ->
         apiCall {
             client.post("attendance/qr/inspect") {
-                bearerAuth(token)
+                bearerAuth(accessToken)
                 setBody(request)
             }.requireBody<ApiResponse<AttendanceQrInspectionResponse>>()
         }.map { it.data }
+    }
 
     suspend fun closeSession(
         token: String,
         sessionId: String,
-    ): Outcome<AttendanceSessionResponse> =
+    ): Outcome<AttendanceSessionResponse> = authorized(token) { accessToken ->
         apiCall {
             client.post("attendance/sessions/$sessionId/close") {
-                bearerAuth(token)
+                bearerAuth(accessToken)
             }.requireBody<ApiResponse<AttendanceSessionResponse>>()
         }.map { it.data }
+    }
 
     suspend fun roster(
         token: String,
         sessionId: String,
-    ): Outcome<AttendanceRosterResponse> =
+    ): Outcome<AttendanceRosterResponse> = authorized(token) { accessToken ->
         apiCall {
             client.get("attendance/sessions/$sessionId/roster") {
-                bearerAuth(token)
+                bearerAuth(accessToken)
             }.requireBody<ApiResponse<AttendanceRosterResponse>>()
         }.map { it.data }
+    }
 
     suspend fun review(
         token: String,
         recordId: String,
         request: ReviewAttendanceRequest,
-    ): Outcome<AttendanceRecordResponse> =
+    ): Outcome<AttendanceRecordResponse> = authorized(token) { accessToken ->
         apiCall {
             client.patch("attendance/records/$recordId/review") {
-                bearerAuth(token)
+                bearerAuth(accessToken)
                 setBody(request)
             }.requireBody<ApiResponse<AttendanceRecordResponse>>()
         }.map { it.data }
+    }
 
     suspend fun submit(
         token: String,
         operation: PendingAttendanceOperation,
-    ): Outcome<AttendanceRecordResponse> =
+    ): Outcome<AttendanceRecordResponse> = authorized(token) { accessToken ->
         apiCall {
             client.post("attendance/sessions/" + operation.sessionId + "/attempts") {
-                bearerAuth(token)
+                bearerAuth(accessToken)
                 setBody(
                     AttendanceAttemptRequest(
                         operationId = operation.operationId,
@@ -139,6 +152,12 @@ class AttendanceRemoteClient @Inject constructor(
                 )
             }.requireBody<ApiResponse<AttendanceRecordResponse>>()
         }.map { it.data }
+    }
+
+    private suspend fun <T> authorized(
+        failedAccessToken: String,
+        request: suspend (String) -> Outcome<T>,
+    ): Outcome<T> = refreshCoordinator.execute(failedAccessToken, request)
 
     companion object {
         private val errorJson = Json { ignoreUnknownKeys = true }

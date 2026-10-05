@@ -10,6 +10,7 @@ import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.network.apiCall
 import org.companerodeescuela.core.network.requireBody
+import org.companerodeescuela.core.network.SessionRefreshCoordinator
 import org.companerodeescuela.core.security.SessionTokenInspector
 import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.shared.contracts.ApiResponse
@@ -22,6 +23,8 @@ import org.companerodeescuela.shared.contracts.CreateChannelPostRequest
 class ChannelRepository(
     private val client: HttpClient,
     private val tokenStore: SessionTokenStore,
+    private val refreshCoordinator: SessionRefreshCoordinator =
+        SessionRefreshCoordinator(client, tokenStore),
 ) {
     suspend fun channels(): Outcome<List<ClassChannelSummary>> =
         authorized { token ->
@@ -69,19 +72,10 @@ class ChannelRepository(
     private suspend fun <T> authorized(
         block: suspend (String) -> Outcome<T>,
     ): Outcome<T> {
-        val token = runCatching { tokenStore.readAccessToken() }.getOrNull()
-            ?.takeIf(String::isNotBlank)
-            ?: return Outcome.Failure(AppError.Http(status = 401))
-
-        if (!SessionTokenInspector.isUsable(token)) {
-            runCatching { tokenStore.clear() }
-            return Outcome.Failure(AppError.Http(status = 401))
+        val token = when (val result = refreshCoordinator.currentAccessToken()) {
+            is Outcome.Success -> result.value
+            is Outcome.Failure -> return result
         }
-
-        val result = block(token)
-        if (result is Outcome.Failure && (result.error as? AppError.Http)?.status == 401) {
-            runCatching { tokenStore.clear() }
-        }
-        return result
+        return refreshCoordinator.execute(token, block)
     }
 }

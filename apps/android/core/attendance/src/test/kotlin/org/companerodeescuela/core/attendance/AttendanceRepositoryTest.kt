@@ -21,6 +21,7 @@ import org.companerodeescuela.core.database.AttendanceLocalStore
 import org.companerodeescuela.core.database.LocalAttendanceRecord
 import org.companerodeescuela.core.database.LocalAttendanceSyncState
 import org.companerodeescuela.core.database.PendingAttendanceOperation
+import org.companerodeescuela.core.network.SessionRefreshCoordinator
 import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.shared.contracts.AttendanceReasonCode
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
@@ -35,11 +36,11 @@ class AttendanceRepositoryTest {
     fun `enqueue persists before scheduling network delivery`() = runTest {
         val store = FakeStore()
         val scheduler = FakeScheduler()
+        val tokenStore = FakeTokenStore(token("student-1", 2_000_000_000L))
         val repository = AttendanceRepository(
-            tokenStore = FakeTokenStore(token("student-1", 2_000_000_000L)),
             localStore = store,
             scheduler = scheduler,
-            remoteClient = unusedRemoteClient(),
+            remoteClient = unusedRemoteClient(tokenStore),
             clock = clock,
             newOperationId = { "op-1" },
         )
@@ -59,11 +60,11 @@ class AttendanceRepositoryTest {
     fun `QR capture remains successful when immediate inspection network fails`() = runTest {
         val store = FakeStore()
         val scheduler = FakeScheduler()
+        val tokenStore = FakeTokenStore(token("student-1", 2_000_000_000L))
         val repository = AttendanceRepository(
-            tokenStore = FakeTokenStore(token("student-1", 2_000_000_000L)),
             localStore = store,
             scheduler = scheduler,
-            remoteClient = unusedRemoteClient(),
+            remoteClient = unusedRemoteClient(tokenStore),
             clock = clock,
             newOperationId = { "op-offline" },
         )
@@ -85,11 +86,11 @@ class AttendanceRepositoryTest {
     fun `expired session does not create an outbox row`() = runTest {
         val store = FakeStore()
         val scheduler = FakeScheduler()
+        val tokenStore = FakeTokenStore(token("student-1", 1L))
         val repository = AttendanceRepository(
-            tokenStore = FakeTokenStore(token("student-1", 1L)),
             localStore = store,
             scheduler = scheduler,
-            remoteClient = unusedRemoteClient(),
+            remoteClient = unusedRemoteClient(tokenStore),
             clock = clock,
         )
 
@@ -119,14 +120,17 @@ class AttendanceRepositoryTest {
         assertEquals(false, AttendanceRetryPolicy.isRetryableHttp(409))
     }
 
-    private fun unusedRemoteClient(): AttendanceRemoteClient =
-        AttendanceRemoteClient(
-            HttpClient(
-                MockEngine {
-                    respondError(HttpStatusCode.InternalServerError)
-                },
-            ),
+    private fun unusedRemoteClient(tokenStore: FakeTokenStore): AttendanceRemoteClient {
+        val client = HttpClient(
+            MockEngine {
+                respondError(HttpStatusCode.InternalServerError)
+            },
         )
+        return AttendanceRemoteClient(
+            client = client,
+            refreshCoordinator = SessionRefreshCoordinator(client, tokenStore),
+        )
+    }
 
     private fun token(subject: String, expiresAt: Long): String {
         val payload = """{"sub":"$subject","exp":$expiresAt}"""

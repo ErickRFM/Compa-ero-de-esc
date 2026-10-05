@@ -39,6 +39,7 @@ dependencies {
 
     api(project(":shared:contracts"))
     implementation(project(":apps:android:core:common"))
+    implementation(project(":apps:android:core:security"))
 
     // The aggregate already includes junit-jupiter-params, which the
     // @ParameterizedTest status matrix relies on.

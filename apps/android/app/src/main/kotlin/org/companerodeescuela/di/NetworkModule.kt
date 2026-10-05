@@ -7,7 +7,9 @@ import dagger.hilt.components.SingletonComponent
 import io.ktor.client.HttpClient
 import org.companerodeescuela.BuildConfig
 import org.companerodeescuela.core.network.ApiEnvironment
+import org.companerodeescuela.core.network.SessionRefreshCoordinator
 import org.companerodeescuela.core.network.createApiClient
+import org.companerodeescuela.core.security.SessionTokenStore
 import javax.inject.Singleton
 
 @Module
@@ -32,4 +34,11 @@ object NetworkModule {
     @Singleton
     fun provideApiClient(environment: ApiEnvironment): HttpClient =
         createApiClient(environment)
+
+    @Provides
+    @Singleton
+    fun provideSessionRefreshCoordinator(
+        client: HttpClient,
+        tokenStore: SessionTokenStore,
+    ): SessionRefreshCoordinator = SessionRefreshCoordinator(client, tokenStore)
 }

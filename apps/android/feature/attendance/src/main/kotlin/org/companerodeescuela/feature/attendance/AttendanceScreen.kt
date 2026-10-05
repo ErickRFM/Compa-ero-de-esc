@@ -536,6 +536,7 @@ private fun TeacherAttendance(
                 occurrence = state.occurrences.firstOrNull { it.id == active.occurrenceId },
                 qrToken = state.qr?.token,
                 qrExpiresAt = state.qr?.expiresAtEpochSeconds,
+                qrState = state.qrVisualState,
                 roster = state.roster?.records.orEmpty(),
                 busy = state.actionInProgress,
                 onClose = onClose,
@@ -558,6 +559,7 @@ private fun TeacherActiveSession(
     occurrence: ClassOccurrenceContract?,
     qrToken: String?,
     qrExpiresAt: Long?,
+    qrState: QrVisualState,
     roster: List<AttendanceRecordResponse>,
     busy: Boolean,
     onClose: () -> Unit,
@@ -582,6 +584,7 @@ private fun TeacherActiveSession(
                         occurrence = occurrence,
                         qrToken = qrToken,
                         qrExpiresAt = qrExpiresAt,
+                        qrState = qrState,
                         busy = busy,
                         onRefreshRoster = onRefreshRoster,
                         onRequestClose = { showCloseConfirmation = true },
@@ -605,6 +608,7 @@ private fun TeacherActiveSession(
                     occurrence = occurrence,
                     qrToken = qrToken,
                     qrExpiresAt = qrExpiresAt,
+                    qrState = qrState,
                     busy = busy,
                     onRefreshRoster = onRefreshRoster,
                     onRequestClose = { showCloseConfirmation = true },
@@ -654,6 +658,7 @@ private fun TeacherSessionCard(
     occurrence: ClassOccurrenceContract?,
     qrToken: String?,
     qrExpiresAt: Long?,
+    qrState: QrVisualState,
     busy: Boolean,
     onRefreshRoster: () -> Unit,
     onRequestClose: () -> Unit,
@@ -685,22 +690,42 @@ private fun TeacherSessionCard(
                 style = MaterialTheme.typography.bodyLarge,
             )
 
-            if (qrToken == null) {
-                CircularProgressIndicator()
-                Text("Generando QR firmado…")
-            } else {
-                AttendanceQrCode(
-                    token = qrToken,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = CompaneroSize.qrMaxWidth),
-                )
-                QrCountdown(qrExpiresAt)
-                Text(
-                    text = "El QR cambia automáticamente. No contiene datos del alumno.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = CompanionColors.onDarkSurfaceVariant,
-                )
+            when {
+                qrState == QrVisualState.ACTIVE && qrToken != null -> {
+                    AttendanceQrCode(
+                        token = qrToken,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = CompaneroSize.qrMaxWidth),
+                    )
+                    QrCountdown(qrExpiresAt)
+                    Text(
+                        text = "El QR cambia automáticamente. No contiene datos del alumno.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = CompanionColors.onDarkSurfaceVariant,
+                    )
+                }
+                qrState == QrVisualState.UNAVAILABLE -> {
+                    Text(
+                        text = "QR temporalmente no disponible",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = "Reconectando automáticamente. No uses un código anterior.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = CompanionColors.onDarkSurfaceVariant,
+                    )
+                }
+                else -> {
+                    CircularProgressIndicator()
+                    Text(
+                        if (qrState == QrVisualState.RENEWING) {
+                            "Renovando QR firmado…"
+                        } else {
+                            "Generando QR firmado…"
+                        },
+                    )
+                }
             }
 
             Row(

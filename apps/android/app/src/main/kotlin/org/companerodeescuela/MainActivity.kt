@@ -44,6 +44,7 @@ import org.companerodeescuela.feature.auth.LoginScreen
 import org.companerodeescuela.feature.auth.RegistrationScreen
 import org.companerodeescuela.feature.auth.SessionViewModel
 import org.companerodeescuela.feature.channel.ChannelScreen
+import org.companerodeescuela.feature.classroom.ClassroomScreen
 import org.companerodeescuela.feature.coordinator.CoordinatorHomeScreen
 import org.companerodeescuela.feature.designsystem.DesignSystemCatalogScreen
 import org.companerodeescuela.feature.home.HomeScreen
@@ -172,6 +173,11 @@ class MainActivity : ComponentActivity() {
                                                         launchSingleTop = true
                                                     }
                                                 },
+                                                onOpenClassrooms = {
+                                                    navController.navigate(Destination.Classrooms.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
                                             )
                                         }
                                         composable(Destination.TeacherHome.route) {
@@ -183,6 +189,11 @@ class MainActivity : ComponentActivity() {
                                                 },
                                                 onOpenChannel = {
                                                     navController.navigate(Destination.Channel.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                                onOpenClassrooms = {
+                                                    navController.navigate(Destination.Classrooms.route) {
                                                         launchSingleTop = true
                                                     }
                                                 },
@@ -227,6 +238,9 @@ class MainActivity : ComponentActivity() {
                                             )
                                         }
                                         composable(Destination.Schedule.route) { ScheduleScreen() }
+                                        composable(Destination.Classrooms.route) {
+                                            ClassroomScreen(roles = session.roles)
+                                        }
                                         composable(Destination.Channel.route) { ChannelScreen() }
                                         composable(Destination.Attendance.route) {
                                             AttendanceScreen(

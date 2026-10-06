@@ -49,20 +49,10 @@ import org.companerodeescuela.shared.contracts.ScheduleEntry
 fun HomeScreen(
     modifier: Modifier = Modifier,
     onOpenSchedule: () -> Unit = {},
+    onOpenClassrooms: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-
-    if (state.loading && state.overview == null) {
-        Column(
-            modifier = modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            CircularProgressIndicator()
-        }
-        return
-    }
 
     val overview = state.overview
     val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
@@ -91,6 +81,17 @@ fun HomeScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
+            Button(
+                onClick = onOpenClassrooms,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Mis clases")
+            }
+
+            if (state.loading && overview == null) {
+                CircularProgressIndicator()
+            }
+
             if (state.fromCache) {
                 StatusNotice(
                     title = "Información guardada",
@@ -101,7 +102,7 @@ fun HomeScreen(
 
             state.errorMessage?.let { message ->
                 StatusNotice(
-                    title = "No pudimos actualizar UPTlax",
+                    title = "No pudimos sincronizar el sistema escolar",
                     message = message,
                     tone = NoticeTone.ERROR,
                 )
@@ -115,7 +116,7 @@ fun HomeScreen(
                     !day.hasSchedule -> {
                         StatusNotice(
                             title = "Aún no tienes un horario",
-                            message = "Tu cuenta UPTlax está activa, pero todavía no hay clases en tu agenda.",
+                            message = "Todavía no hay clases en tu agenda. Puedes unirte con una clave o preparar tu horario manualmente.",
                         )
                         Button(
                             onClick = onOpenSchedule,
@@ -124,7 +125,7 @@ fun HomeScreen(
                             Text("Preparar mi agenda")
                         }
                         Text(
-                            text = "En Agenda puedes sincronizar UPTlax, importar un PDF o imagen, o crear un horario personal.",
+                            text = "En Agenda puedes importar un PDF o imagen, crear un horario personal o sincronizar un sistema escolar cuando esté disponible.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

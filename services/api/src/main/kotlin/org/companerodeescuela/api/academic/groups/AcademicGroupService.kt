@@ -15,9 +15,9 @@ class AcademicGroupService(
 ) {
     suspend fun listFor(actor: UserSummary): List<AcademicGroupSummary> =
         if (isAdmin(actor)) {
-            repository.list().map(AcademicGroupRecord::toSummary)
+            repository.list().map { it.toSummary() }
         } else {
-            repository.listGroupsForUser(actor.id).map(AcademicGroupRecord::toSummary)
+            repository.listGroupsForUser(actor.id).map { it.toSummary() }
         }
 
     suspend fun create(

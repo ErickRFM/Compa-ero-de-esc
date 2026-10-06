@@ -28,12 +28,46 @@ import org.companerodeescuela.shared.contracts.AttendanceRosterResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
 import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
+import org.companerodeescuela.shared.contracts.SchoolPresenceResponse
+import org.companerodeescuela.shared.contracts.StartSchoolPresenceRequest
 
 class AttendanceRemoteClient @Inject constructor(
     private val client: HttpClient,
     private val refreshCoordinator: SessionRefreshCoordinator,
 ) {
     suspend fun currentAccessToken(): Outcome<String> = refreshCoordinator.currentAccessToken()
+
+    suspend fun schoolPresence(
+        token: String,
+    ): Outcome<SchoolPresenceResponse?> = authorized(token) { accessToken ->
+        apiCall {
+            client.get("presence/school-day") {
+                bearerAuth(accessToken)
+            }.requireBody<ApiResponse<SchoolPresenceResponse?>>()
+        }.map { it.data }
+    }
+
+    suspend fun startSchoolPresence(
+        token: String,
+        request: StartSchoolPresenceRequest,
+    ): Outcome<SchoolPresenceResponse> = authorized(token) { accessToken ->
+        apiCall {
+            client.post("presence/school-day/start") {
+                bearerAuth(accessToken)
+                setBody(request)
+            }.requireBody<ApiResponse<SchoolPresenceResponse>>()
+        }.map { it.data }
+    }
+
+    suspend fun closeSchoolPresence(
+        token: String,
+    ): Outcome<SchoolPresenceResponse> = authorized(token) { accessToken ->
+        apiCall {
+            client.post("presence/school-day/close") {
+                bearerAuth(accessToken)
+            }.requireBody<ApiResponse<SchoolPresenceResponse>>()
+        }.map { it.data }
+    }
 
     suspend fun activeStudentSessions(
         token: String,

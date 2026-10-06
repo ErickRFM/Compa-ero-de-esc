@@ -360,8 +360,9 @@ private fun DayAgenda(
     onSelectedDay: (String) -> Unit,
     onEdit: (ScheduleEntry) -> Unit,
     onDelete: (ScheduleEntry) -> Unit,
+    onMoveRequest: (AgendaMoveProposal) -> Unit,
 ) {
-    val days = academicDays
+    val days = academicDaysV8
     val dayEntries = entries.filter { it.dayOfWeek == selectedDay }
 
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -389,6 +390,8 @@ private fun DayAgenda(
                     entries = dayEntries,
                     onEdit = onEdit,
                     onDelete = onDelete,
+                    onMoveRequest = onMoveRequest,
+                    allEntries = entries,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -413,6 +416,8 @@ private fun DayAgenda(
                     entries = dayEntries,
                     onEdit = onEdit,
                     onDelete = onDelete,
+                    onMoveRequest = onMoveRequest,
+                    allEntries = entries,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -426,6 +431,8 @@ private fun DayAgendaDetails(
     entries: List<ScheduleEntry>,
     onEdit: (ScheduleEntry) -> Unit,
     onDelete: (ScheduleEntry) -> Unit,
+    onMoveRequest: (AgendaMoveProposal) -> Unit,
+    allEntries: List<ScheduleEntry>,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -441,8 +448,10 @@ private fun DayAgendaDetails(
             Text(dayLabel(day), style = MaterialTheme.typography.titleMedium)
             AgendaTimeline(
                 entries = entries,
+                allEntries = allEntries,
                 onEdit = onEdit,
                 onDelete = onDelete,
+                onMoveRequest = onMoveRequest,
             )
         }
     }
@@ -453,12 +462,13 @@ private fun WeekAgenda(
     entries: List<ScheduleEntry>,
     onEdit: (ScheduleEntry) -> Unit,
     onDelete: (ScheduleEntry) -> Unit,
+    onMoveRequest: (AgendaMoveProposal) -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
-        academicDays.forEach { day ->
+        academicDaysV8.forEach { day ->
             val dayEntries = entries.filter { it.dayOfWeek == day }
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -474,8 +484,10 @@ private fun WeekAgenda(
                 } else {
                     AgendaTimeline(
                         entries = dayEntries,
+                        allEntries = entries,
                         onEdit = onEdit,
                         onDelete = onDelete,
+                        onMoveRequest = onMoveRequest,
                     )
                 }
             }
@@ -486,8 +498,10 @@ private fun WeekAgenda(
 @Composable
 private fun AgendaTimeline(
     entries: List<ScheduleEntry>,
+    allEntries: List<ScheduleEntry>,
     onEdit: (ScheduleEntry) -> Unit,
     onDelete: (ScheduleEntry) -> Unit,
+    onMoveRequest: (AgendaMoveProposal) -> Unit,
 ) {
     val railColor = MaterialTheme.colorScheme.outlineVariant
     CompaneroSurface(
@@ -512,8 +526,10 @@ private fun AgendaTimeline(
             entries.sortedBy { it.startsAt }.forEach { entry ->
                 AgendaTimelineEntry(
                     entry = entry,
+                    allEntries = allEntries,
                     onEdit = onEdit,
                     onDelete = onDelete,
+                    onMoveRequest = onMoveRequest,
                 )
             }
         }

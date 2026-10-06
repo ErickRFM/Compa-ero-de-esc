@@ -11,6 +11,7 @@ import org.companerodeescuela.core.academic.PersonalScheduleRepository
 import org.companerodeescuela.core.attendance.AttendanceRemoteClient
 import org.companerodeescuela.core.attendance.AttendanceRepository
 import org.companerodeescuela.core.attendance.AttendanceSyncScheduler
+import org.companerodeescuela.core.attendance.SchoolNetworkEvidenceProvider
 import org.companerodeescuela.core.database.AcademicSnapshotCache
 import org.companerodeescuela.core.database.AttendanceLocalStore
 import org.companerodeescuela.core.database.PersonalScheduleStore
@@ -43,10 +44,12 @@ object FeatureBindingsModule {
         localStore: AttendanceLocalStore,
         scheduler: AttendanceSyncScheduler,
         remoteClient: AttendanceRemoteClient,
+        networkEvidenceProvider: SchoolNetworkEvidenceProvider,
     ): AttendanceRepository = AttendanceRepository(
         localStore = localStore,
         scheduler = scheduler,
         remoteClient = remoteClient,
+        networkEvidenceProvider = networkEvidenceProvider,
     )
 
     @Provides

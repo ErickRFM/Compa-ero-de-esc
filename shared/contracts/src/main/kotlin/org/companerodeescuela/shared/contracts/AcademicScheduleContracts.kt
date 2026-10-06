@@ -11,6 +11,19 @@ enum class ScheduleShift {
 }
 
 @Serializable
+enum class ScheduleRecurrence {
+    @SerialName("one_time") ONE_TIME,
+    @SerialName("weekly") WEEKLY,
+    @SerialName("custom") CUSTOM,
+}
+
+@Serializable
+enum class ScheduleMutationScope {
+    @SerialName("single_occurrence") SINGLE_OCCURRENCE,
+    @SerialName("entire_series") ENTIRE_SERIES,
+}
+
+@Serializable
 enum class BlockStatus {
     @SerialName("scheduled") SCHEDULED,
     @SerialName("confirmed") CONFIRMED,
@@ -38,6 +51,9 @@ data class ScheduleBlock(
     val status: BlockStatus = BlockStatus.SCHEDULED,
     val shift: ScheduleShift = ScheduleShiftRules.forBlock(startTime, endTime),
     val isContraturno: Boolean = false,
+    val recurrence: ScheduleRecurrence = ScheduleRecurrence.WEEKLY,
+    val seriesId: String? = null,
+    val effectiveDate: String? = null,
 )
 
 @Serializable

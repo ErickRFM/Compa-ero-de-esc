@@ -10,6 +10,7 @@ import org.companerodeescuela.core.database.PersonalScheduleStore
 import org.companerodeescuela.core.security.SessionTokenInspector
 import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.shared.contracts.ScheduleEntry
+import org.companerodeescuela.shared.contracts.ScheduleRecurrence
 import org.companerodeescuela.shared.contracts.ScheduleSource
 
 data class PersonalScheduleDraft(
@@ -24,6 +25,9 @@ data class PersonalScheduleDraft(
     val classroomName: String? = null,
     val buildingName: String? = null,
     val source: ScheduleSource = ScheduleSource.MANUAL,
+    val recurrence: ScheduleRecurrence = ScheduleRecurrence.WEEKLY,
+    val seriesId: String? = null,
+    val effectiveDate: String? = null,
 )
 
 class PersonalScheduleRepository(
@@ -127,8 +131,17 @@ class PersonalScheduleRepository(
         val subject = draft.subjectName.trim()
         if (subject.isBlank()) return null
 
+        val id = draft.id?.takeIf(String::isNotBlank) ?: newId()
+        val effectiveDate = when (draft.recurrence) {
+            ScheduleRecurrence.ONE_TIME -> draft.effectiveDate
+                ?.trim()
+                ?.takeIf(String::isNotBlank)
+                ?: return null
+            else -> null
+        }
+
         return PersonalScheduleItem(
-            id = draft.id?.takeIf(String::isNotBlank) ?: newId(),
+            id = id,
             ownerId = ownerId,
             subjectCode = draft.subjectCode.trim(),
             subjectName = subject,
@@ -140,6 +153,10 @@ class PersonalScheduleRepository(
             classroomName = draft.classroomName?.trim()?.takeIf(String::isNotBlank),
             buildingName = draft.buildingName?.trim()?.takeIf(String::isNotBlank),
             source = draft.source,
+            recurrence = draft.recurrence,
+            seriesId = draft.seriesId?.trim()?.takeIf(String::isNotBlank)
+                ?: if (draft.recurrence == ScheduleRecurrence.WEEKLY) id else null,
+            effectiveDate = effectiveDate,
             updatedAtEpochSeconds = clock.instant().epochSecond,
         )
     }
@@ -177,4 +194,7 @@ private fun PersonalScheduleItem.toScheduleEntry(): ScheduleEntry =
         buildingName = buildingName,
         campusName = null,
         source = source,
+        recurrence = recurrence,
+        seriesId = seriesId,
+        effectiveDate = effectiveDate,
     )

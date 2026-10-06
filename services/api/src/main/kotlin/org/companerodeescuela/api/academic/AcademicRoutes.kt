@@ -13,6 +13,7 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import java.time.LocalDate
+import org.companerodeescuela.api.academic.groups.AcademicGroupRepository
 import org.companerodeescuela.api.auth.AuthTokenService
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
@@ -28,6 +29,7 @@ fun Route.academicRoutes(
     academicProvider: AcademicProvider,
     scheduleManagement: AcademicScheduleManagementService? = null,
     scheduleOverrides: AcademicScheduleOverrideRepository? = null,
+    groupRepository: AcademicGroupRepository? = null,
 ) {
     route("/academic") {
         if (!settings.hasAuthentication) {
@@ -49,6 +51,7 @@ fun Route.academicRoutes(
                             data = AcademicService(
                                 provider = academicProvider,
                                 scheduleOverrides = scheduleOverrides,
+                                groupRepository = groupRepository,
                             ).loadFor(externalId),
                             requestId = call.requestId(),
                         ),
@@ -61,6 +64,7 @@ fun Route.academicRoutes(
                             data = AcademicService(
                                 provider = academicProvider,
                                 scheduleOverrides = scheduleOverrides,
+                                groupRepository = groupRepository,
                             ).scheduleFor(externalId),
                             requestId = call.requestId(),
                         ),
@@ -80,6 +84,7 @@ fun Route.academicRoutes(
                             data = AcademicService(
                                 provider = academicProvider,
                                 scheduleOverrides = scheduleOverrides,
+                                groupRepository = groupRepository,
                             ).scheduleWeekFor(
                                 externalId = externalId,
                                 weekOf = weekOf,

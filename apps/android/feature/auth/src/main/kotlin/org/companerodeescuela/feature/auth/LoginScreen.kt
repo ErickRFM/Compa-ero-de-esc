@@ -228,11 +228,9 @@ fun LoginScreen(
                         shape = RoundedCornerShape(12.dp),
                         label = { Text("Correo / usuario") },
                         isError = username.isNotEmpty() && usernameError != null,
-                        supportingText = if (username.isNotEmpty() && usernameError != null) {
-                            { Text(usernameError) }
-                        } else {
-                            null
-                        },
+                        supportingText = usernameError
+                            ?.takeIf { username.isNotEmpty() }
+                            ?.let { error -> { Text(error) } },
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Email,
                             imeAction = ImeAction.Next,
@@ -253,11 +251,9 @@ fun LoginScreen(
                         shape = RoundedCornerShape(12.dp),
                         label = { Text("Contraseña") },
                         isError = password.isNotEmpty() && passwordError != null,
-                        supportingText = if (password.isNotEmpty() && passwordError != null) {
-                            { Text(passwordError) }
-                        } else {
-                            null
-                        },
+                        supportingText = passwordError
+                            ?.takeIf { password.isNotEmpty() }
+                            ?.let { error -> { Text(error) } },
                         visualTransformation = if (passwordVisible) {
                             VisualTransformation.None
                         } else {

@@ -32,7 +32,7 @@ object InstitutionalCredentialValidator {
 
     fun passwordError(value: String): String? {
         if (value.isEmpty()) return "Ingresa tu contraseña."
-        if (value.any { it.isISOControl() && !it.isWhitespace() }) {
+        if (value.any { it.code in 0..31 || it.code == 127 }) {
             return "La contraseña contiene caracteres no válidos."
         }
         return null

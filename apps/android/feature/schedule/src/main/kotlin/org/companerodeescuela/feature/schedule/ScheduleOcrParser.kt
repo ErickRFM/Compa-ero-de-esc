@@ -88,7 +88,7 @@ object ScheduleOcrParser {
                 it.teacherName.trim().lowercase(),
             ).joinToString("|")
         }
-        return canonicalizeRepeatedLabels(mergeContiguous(unique))
+        return mergeContiguous(canonicalizeRepeatedLabels(unique))
     }
 
     private fun canonicalizeRepeatedLabels(
@@ -116,8 +116,10 @@ object ScheduleOcrParser {
             }
             .maxWithOrNull(
                 compareBy<Map.Entry<String, Int>> { it.value }
-                    .thenBy { candidate -> candidate.key.count(Char::isLetter) }
-                    .thenBy { candidate -> candidate.key.length },
+                    .thenBy { candidate ->
+                        candidate.key.count { ch -> ch in "áéíóúÁÉÍÓÚñÑ" }
+                    }
+                    .thenBy { candidate -> -candidate.key.length },
             )
             ?.key
             ?: value

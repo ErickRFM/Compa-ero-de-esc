@@ -35,6 +35,11 @@ import org.companerodeescuela.api.health.HealthService
 import org.companerodeescuela.api.health.healthRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
 import org.companerodeescuela.api.plugins.configurePlugins
+import org.companerodeescuela.api.presence.InMemorySchoolPresenceRepository
+import org.companerodeescuela.api.presence.MongoSchoolPresenceRepository
+import org.companerodeescuela.api.presence.SchoolPresencePolicy
+import org.companerodeescuela.api.presence.SchoolPresenceService
+import org.companerodeescuela.api.presence.schoolPresenceRoutes
 
 /**
  * Composes the application graph.
@@ -86,10 +91,28 @@ fun Application.module(
             repository = attendanceRepository,
         )
     }
+    val schoolPresenceService = if (settings.hasSchoolPresenceVerification) {
+        val schoolPresenceRepository = when {
+            settings.mongo.isConfigured -> MongoSchoolPresenceRepository(mongoConnection.database())
+            settings.environment == Environment.LOCAL -> InMemorySchoolPresenceRepository()
+            else -> error("School presence requires MONGODB_URI outside local development")
+        }
+        SchoolPresenceService(
+            repository = schoolPresenceRepository,
+            policy = SchoolPresencePolicy(
+                entryQrSha256 = settings.schoolPresenceQrSha256,
+                allowedSsids = settings.schoolWifiSsids,
+                allowedBssids = settings.schoolWifiBssids,
+            ),
+        )
+    } else {
+        null
+    }
     val attendanceService = AttendanceService(
         repository = attendanceRepository,
         academicProvider = providerRegistry.academic,
         qrService = attendanceQrService,
+        schoolPresenceService = schoolPresenceService,
     )
     val channelService = ChannelService(
         repository = channelRepository,
@@ -140,6 +163,9 @@ fun Application.module(
             service = attendanceService,
             qrService = attendanceQrService,
         )
+        schoolPresenceService?.let { service ->
+            schoolPresenceRoutes(settings = settings, service = service)
+        }
         channelRoutes(settings = settings, service = channelService)
         academicEventRoutes(settings = settings, service = eventService)
         deviceRoutes(settings = settings, repository = deviceTokenRepository)

@@ -49,12 +49,16 @@ fun ClassroomScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val isStudent = UserRole.STUDENT in roles
-    val canCreate = UserRole.TEACHER in roles || roles.any(UserRole::isAdministrative)
+    val canCreate = UserRole.ADMIN in roles || UserRole.SUPER_ADMIN in roles
     val pendingTeacher = UserRole.TEACHER_PENDING in roles
 
     var joinCode by remember { mutableStateOf("") }
     var className by remember { mutableStateOf("") }
     var room by remember { mutableStateOf("") }
+    var groupId by remember { mutableStateOf("") }
+    var groupName by remember { mutableStateOf("") }
+    var teacherId by remember { mutableStateOf("") }
+    var teacherDisplayName by remember { mutableStateOf("") }
 
     Column(
         modifier = modifier
@@ -72,7 +76,7 @@ fun ClassroomScreen(
             style = MaterialTheme.typography.headlineSmall,
         )
         Text(
-            text = "Clases de Compañero funcionan sin depender del sistema escolar.",
+            text = "Tus materias, grupo, docente, aula y acceso académico en un solo lugar.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -107,7 +111,7 @@ fun ClassroomScreen(
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
-                        text = "Ingresa la clave que compartió tu docente. Las claves temporales vencen automáticamente.",
+                        text = "Usa un código de incorporación emitido por control escolar cuando tu grupo todavía no se haya sincronizado automáticamente.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -121,7 +125,7 @@ fun ClassroomScreen(
                         },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        label = { Text("Clave de clase") },
+                        label = { Text("Código de incorporación") },
                         placeholder = { Text("ABCD-2345") },
                     )
                     Button(
@@ -129,7 +133,7 @@ fun ClassroomScreen(
                         enabled = !state.submitting && joinCode.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("Unirme")
+                        Text("Vincular clase")
                     }
                 }
             }
@@ -146,7 +150,7 @@ fun ClassroomScreen(
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
-                        text = "Podrás crear clases y generar invitaciones después de verificar tu perfil docente.",
+                        text = "Cuando control escolar verifique tu perfil y te asigne grupos, tus clases y horarios aparecerán aquí automáticamente.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -160,7 +164,7 @@ fun ClassroomScreen(
                     verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
                 ) {
                     Text(
-                        text = "Crear clase",
+                        text = "Asignar clase",
                         style = MaterialTheme.typography.titleMedium,
                     )
                     OutlinedTextField(
@@ -168,7 +172,7 @@ fun ClassroomScreen(
                         onValueChange = { className = it.take(120) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        label = { Text("Nombre de la clase") },
+                        label = { Text("Materia") },
                     )
                     OutlinedTextField(
                         value = room,
@@ -177,20 +181,62 @@ fun ClassroomScreen(
                         singleLine = true,
                         label = { Text("Aula (opcional)") },
                     )
+                    OutlinedTextField(
+                        value = groupName,
+                        onValueChange = { groupName = it.take(80) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Grupo") },
+                        placeholder = { Text("9A") },
+                    )
+                    OutlinedTextField(
+                        value = groupId,
+                        onValueChange = { groupId = it.trim().take(120) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("ID de grupo") },
+                    )
+                    OutlinedTextField(
+                        value = teacherDisplayName,
+                        onValueChange = { teacherDisplayName = it.take(120) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Docente asignado") },
+                    )
+                    OutlinedTextField(
+                        value = teacherId,
+                        onValueChange = { teacherId = it.trim().take(120) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("ID de docente") },
+                    )
                     Button(
                         onClick = {
                             viewModel.createClassroom(
                                 name = className,
                                 description = null,
                                 room = room.ifBlank { null },
+                                groupId = groupId,
+                                groupName = groupName,
+                                teacherId = teacherId,
+                                teacherDisplayName = teacherDisplayName,
                             )
                             className = ""
                             room = ""
+                            groupId = ""
+                            groupName = ""
+                            teacherId = ""
+                            teacherDisplayName = ""
                         },
-                        enabled = !state.submitting && className.trim().length >= 2,
+                        enabled = !state.submitting &&
+                            className.trim().length >= 2 &&
+                            groupId.isNotBlank() &&
+                            groupName.isNotBlank() &&
+                            teacherId.isNotBlank() &&
+                            teacherDisplayName.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("Crear clase")
+                        Text("Asignar clase")
                     }
                 }
             }
@@ -216,7 +262,7 @@ fun ClassroomScreen(
                 text = when {
                     pendingTeacher -> "Todavía no tienes clases. Tu perfil docente sigue pendiente de verificación."
                     isStudent -> "Todavía no te has unido a ninguna clase."
-                    else -> "Todavía no tienes clases creadas."
+                    else -> "Todavía no hay clases académicas asignadas."
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -253,6 +299,10 @@ private fun ClassroomCard(
             )
             Text(
                 text = buildString {
+                    classroom.groupName?.let {
+                        append(it)
+                        append(" · ")
+                    }
                     append(classroom.teacherDisplayName)
                     classroom.room?.let {
                         append(" · ")
@@ -269,13 +319,13 @@ private fun ClassroomCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            if (classroom.canManage) {
+            if (classroom.canManageEnrollment) {
                 Button(
                     onClick = onGenerateInvite,
                     enabled = enabled,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Generar clave · 30 min")
+                    Text("Generar código de incorporación · 30 min")
                 }
             }
         }
@@ -296,7 +346,7 @@ private fun InviteCard(
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
         ) {
             Text(
-                text = "Invitación activa",
+                text = "Código de incorporación activo",
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
@@ -342,16 +392,16 @@ private fun copyInvite(context: Context, invite: ClassInvite) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(
         ClipData.newPlainText(
-            "Clave de clase",
+            "Código de incorporación",
             invite.code,
         ),
     )
 }
 
 private fun shareInvite(context: Context, invite: ClassInvite) {
-    val text = "Únete a mi clase en Compañero de Clase con la clave " +
+    val text = "Control escolar te invita a vincular una clase en Compañero con el código " +
         invite.code +
-        ". La invitación es temporal."
+        ". El código es temporal."
     val intent = Intent(Intent.ACTION_SEND)
         .setType("text/plain")
         .putExtra(Intent.EXTRA_TEXT, text)

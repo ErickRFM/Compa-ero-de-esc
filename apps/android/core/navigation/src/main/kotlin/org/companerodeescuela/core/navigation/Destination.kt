@@ -34,6 +34,7 @@ enum class TopLevelDestination(
     CoordinatorHome(Destination.CoordinatorHome, "Gestión"),
     AdminHome(Destination.AdminHome, "Administración"),
     Schedule(Destination.Schedule, "Agenda"),
+    Classrooms(Destination.Classrooms, "Clases"),
     Channel(Destination.Channel, "Canal"),
     Attendance(Destination.Attendance, "Asistencia"),
 }

@@ -10,7 +10,9 @@ import org.companerodeescuela.api.attendance.InMemoryAttendanceRepository
 import org.companerodeescuela.api.attendance.MongoAttendanceRepository
 import org.companerodeescuela.api.attendance.attendanceRoutes
 import org.companerodeescuela.api.auth.authRoutes
+import org.companerodeescuela.api.auth.InMemoryPlatformAccountRepository
 import org.companerodeescuela.api.auth.InMemoryRefreshSessionRepository
+import org.companerodeescuela.api.auth.MongoPlatformAccountRepository
 import org.companerodeescuela.api.auth.MongoRefreshSessionRepository
 import org.companerodeescuela.api.channel.ChannelAccessPolicy
 import org.companerodeescuela.api.channel.ChannelService
@@ -55,6 +57,12 @@ fun Application.module(
         settings.mongo.isConfigured -> MongoRefreshSessionRepository(mongoConnection.database())
         settings.environment == Environment.LOCAL -> InMemoryRefreshSessionRepository()
         else -> error("Refresh sessions require MONGODB_URI outside local development")
+    }
+    val platformAccountRepository = when {
+        !settings.hasAuthentication -> InMemoryPlatformAccountRepository()
+        settings.mongo.isConfigured -> MongoPlatformAccountRepository(mongoConnection.database())
+        settings.environment == Environment.LOCAL -> InMemoryPlatformAccountRepository()
+        else -> error("Platform accounts require MONGODB_URI outside local development")
     }
     configurePlugins(settings, refreshSessions = refreshSessionRepository)
     val attendanceRepository = when {
@@ -105,6 +113,7 @@ fun Application.module(
             settings = settings,
             identityProvider = providerRegistry.identity,
             sessions = refreshSessionRepository,
+            accounts = platformAccountRepository,
         )
         academicRoutes(settings = settings, academicProvider = providerRegistry.academic)
         attendanceRoutes(

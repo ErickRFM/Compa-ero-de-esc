@@ -3,6 +3,9 @@ package org.companerodeescuela.api.application
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.routing.routing
+import org.companerodeescuela.api.academic.AcademicScheduleManagementService
+import org.companerodeescuela.api.academic.InMemoryAcademicScheduleOverrideRepository
+import org.companerodeescuela.api.academic.MongoAcademicScheduleOverrideRepository
 import org.companerodeescuela.api.academic.academicRoutes
 import org.companerodeescuela.api.attendance.AttendanceQrService
 import org.companerodeescuela.api.attendance.AttendanceService
@@ -85,6 +88,17 @@ fun Application.module(
         accessPolicy = ChannelAccessPolicy(providerRegistry.academic),
     )
 
+    val scheduleOverrideRepository = when {
+        !settings.hasAuthentication -> InMemoryAcademicScheduleOverrideRepository()
+        settings.mongo.isConfigured ->
+            MongoAcademicScheduleOverrideRepository(mongoConnection.database())
+        settings.environment == Environment.LOCAL -> InMemoryAcademicScheduleOverrideRepository()
+        else -> error("Manual academic schedules require MONGODB_URI outside local development")
+    }
+    val scheduleManagementService = AcademicScheduleManagementService(
+        repository = scheduleOverrideRepository,
+    )
+
     val eventRepository = when {
         !settings.hasAuthentication -> InMemoryAcademicEventRepository()
         settings.mongo.isConfigured -> MongoAcademicEventRepository(mongoConnection.database())
@@ -106,7 +120,12 @@ fun Application.module(
             identityProvider = providerRegistry.identity,
             sessions = refreshSessionRepository,
         )
-        academicRoutes(settings = settings, academicProvider = providerRegistry.academic)
+        academicRoutes(
+            settings = settings,
+            academicProvider = providerRegistry.academic,
+            scheduleManagement = scheduleManagementService,
+            scheduleOverrides = scheduleOverrideRepository,
+        )
         attendanceRoutes(
             settings = settings,
             service = attendanceService,

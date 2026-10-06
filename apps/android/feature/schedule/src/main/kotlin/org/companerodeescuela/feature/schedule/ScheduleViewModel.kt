@@ -23,6 +23,7 @@ data class ScheduleUiState(
     val entries: List<ScheduleEntry> = emptyList(),
     val fromCache: Boolean = false,
     val importCandidates: List<PersonalScheduleDraft> = emptyList(),
+    val undoDrafts: List<PersonalScheduleDraft> = emptyList(),
     val successMessage: String? = null,
     val errorMessage: String? = null,
 )
@@ -83,6 +84,7 @@ class ScheduleViewModel @Inject constructor(
     fun savePersonalDays(
         draft: PersonalScheduleDraft,
         days: Set<String>,
+        applyToSeries: Boolean = false,
     ) {
         val normalizedDays = days.filter { it in academicDaysV8 }.toSet()
         if (normalizedDays.isEmpty()) {
@@ -93,12 +95,30 @@ class ScheduleViewModel @Inject constructor(
         viewModelScope.launch {
             _state.value = _state.value.copy(actionInProgress = true, errorMessage = null)
             val seriesId = draft.seriesId ?: UUID.randomUUID().toString()
-            var failure: Outcome.Failure? = null
+            val existingSeries = if (applyToSeries) {
+                _state.value.entries.filter {
+                    it.seriesId == seriesId && it.source != ScheduleSource.INSTITUTIONAL
+                }
+            } else {
+                emptyList()
+            }
 
+            if (applyToSeries) {
+                existingSeries
+                    .filter { it.dayOfWeek !in normalizedDays }
+                    .forEach { personalRepository.delete(it.courseId) }
+            }
+
+            var failure: Outcome.Failure? = null
             normalizedDays.forEachIndexed { index, day ->
                 if (failure != null) return@forEachIndexed
+                val existingForDay = existingSeries.firstOrNull { it.dayOfWeek == day }
                 val candidate = draft.copy(
-                    id = if (index == 0) draft.id else null,
+                    id = when {
+                        applyToSeries -> existingForDay?.courseId
+                        index == 0 -> draft.id
+                        else -> null
+                    },
                     dayOfWeek = day,
                     source = ScheduleSource.MANUAL,
                     recurrence = ScheduleRecurrence.WEEKLY,
@@ -114,7 +134,9 @@ class ScheduleViewModel @Inject constructor(
             if (failure == null) {
                 _state.value = _state.value.copy(
                     actionInProgress = false,
-                    successMessage = if (normalizedDays.size == 1) {
+                    successMessage = if (applyToSeries) {
+                        "Serie de horario actualizada."
+                    } else if (normalizedDays.size == 1) {
                         "Horario personal actualizado."
                     } else {
                         "Clase guardada en ${normalizedDays.size} días."
@@ -171,24 +193,74 @@ class ScheduleViewModel @Inject constructor(
         }
     }
 
-    fun deletePersonal(entry: ScheduleEntry) {
+    fun deletePersonal(
+        entry: ScheduleEntry,
+        deleteSeries: Boolean = false,
+    ) {
         if (entry.source == ScheduleSource.INSTITUTIONAL) return
         viewModelScope.launch {
             _state.value = _state.value.copy(actionInProgress = true, errorMessage = null)
-            when (val result = personalRepository.delete(entry.courseId)) {
-                is Outcome.Success -> {
-                    _state.value = _state.value.copy(
-                        actionInProgress = false,
-                        successMessage = "Clase eliminada del horario personal.",
-                    )
-                    load()
+            val targets = if (deleteSeries && entry.seriesId != null) {
+                _state.value.entries.filter {
+                    it.seriesId == entry.seriesId && it.source != ScheduleSource.INSTITUTIONAL
                 }
-                is Outcome.Failure -> {
-                    _state.value = _state.value.copy(
-                        actionInProgress = false,
-                        errorMessage = result.error.userMessage,
-                    )
+            } else {
+                listOf(entry)
+            }
+            val undoDrafts = targets.map(::entryToDraft)
+            var failure: Outcome.Failure? = null
+            targets.forEach { target ->
+                if (failure != null) return@forEach
+                when (val result = personalRepository.delete(target.courseId)) {
+                    is Outcome.Success -> Unit
+                    is Outcome.Failure -> failure = result
                 }
+            }
+            if (failure == null) {
+                _state.value = _state.value.copy(
+                    actionInProgress = false,
+                    undoDrafts = undoDrafts,
+                    successMessage = if (targets.size > 1) {
+                        "Serie eliminada del horario personal."
+                    } else {
+                        "Clase eliminada del horario personal."
+                    },
+                )
+                load()
+            } else {
+                _state.value = _state.value.copy(
+                    actionInProgress = false,
+                    errorMessage = failure?.error?.userMessage,
+                )
+            }
+        }
+    }
+
+    fun undoLastDelete() {
+        val drafts = _state.value.undoDrafts
+        if (drafts.isEmpty()) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(actionInProgress = true, errorMessage = null)
+            var failure: Outcome.Failure? = null
+            drafts.forEach { draft ->
+                if (failure != null) return@forEach
+                when (val result = personalRepository.save(draft)) {
+                    is Outcome.Success -> Unit
+                    is Outcome.Failure -> failure = result
+                }
+            }
+            if (failure == null) {
+                _state.value = _state.value.copy(
+                    actionInProgress = false,
+                    undoDrafts = emptyList(),
+                    successMessage = "Eliminación deshecha.",
+                )
+                load()
+            } else {
+                _state.value = _state.value.copy(
+                    actionInProgress = false,
+                    errorMessage = failure?.error?.userMessage,
+                )
             }
         }
     }
@@ -245,6 +317,24 @@ class ScheduleViewModel @Inject constructor(
             errorMessage = "No pudimos leer ese archivo. Prueba con una imagen más clara o crea el horario manualmente.",
         )
     }
+
+    private fun entryToDraft(entry: ScheduleEntry): PersonalScheduleDraft =
+        PersonalScheduleDraft(
+            id = entry.courseId,
+            subjectCode = entry.subjectCode,
+            subjectName = entry.subjectName,
+            groupName = entry.groupName,
+            teacherName = entry.teacherName,
+            dayOfWeek = entry.dayOfWeek,
+            startsAt = entry.startsAt,
+            endsAt = entry.endsAt,
+            classroomName = entry.classroomName,
+            buildingName = entry.buildingName,
+            source = entry.source,
+            recurrence = entry.recurrence,
+            seriesId = entry.seriesId,
+            effectiveDate = entry.effectiveDate,
+        )
 
     fun clearMessage() {
         _state.value = _state.value.copy(successMessage = null)

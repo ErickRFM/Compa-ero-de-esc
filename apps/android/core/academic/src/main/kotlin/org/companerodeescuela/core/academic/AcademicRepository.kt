@@ -175,6 +175,9 @@ private fun PersonalScheduleItem.toScheduleEntry(): ScheduleEntry =
         classroomName = classroomName,
         buildingName = buildingName,
         source = source,
+        recurrence = recurrence,
+        seriesId = seriesId,
+        effectiveDate = effectiveDate,
     )
 
 private fun scheduleKey(entry: ScheduleEntry): String =

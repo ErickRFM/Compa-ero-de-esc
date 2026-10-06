@@ -229,6 +229,12 @@ fun ScheduleScreen(
                 }
             }
 
+            Text(
+                text = "Tip: mantén presionada una clase personal y arrástrala para moverla. Se ajusta en intervalos de 15 minutos.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
@@ -397,18 +403,24 @@ private fun DayAgenda(
             }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md)) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
                 ) {
-                    days.forEach { day ->
-                        FilterChip(
-                            selected = selectedDay == day,
-                            onClick = { onSelectedDay(day) },
-                            label = { Text(dayShortLabel(day)) },
-                        )
+                    days.chunked(3).forEach { rowDays ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                        ) {
+                            rowDays.forEach { day ->
+                                FilterChip(
+                                    selected = selectedDay == day,
+                                    onClick = { onSelectedDay(day) },
+                                    label = { Text(dayShortLabel(day)) },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
                     }
                 }
                 DayAgendaDetails(
@@ -636,7 +648,7 @@ private fun AgendaTimelineEntry(
 private fun ScheduleEditorDialog(
     initial: PersonalScheduleDraft?,
     onDismiss: () -> Unit,
-    onSave: (PersonalScheduleDraft) -> Unit,
+    onSave: (PersonalScheduleDraft, Set<String>) -> Unit,
 ) {
     var subject by remember(initial) { mutableStateOf(initial?.subjectName.orEmpty()) }
     var teacher by remember(initial) { mutableStateOf(initial?.teacherName.orEmpty()) }
@@ -644,7 +656,9 @@ private fun ScheduleEditorDialog(
     var group by remember(initial) { mutableStateOf(initial?.groupName.orEmpty()) }
     var start by remember(initial) { mutableStateOf(initial?.startsAt ?: "08:00") }
     var end by remember(initial) { mutableStateOf(initial?.endsAt ?: "10:00") }
-    var day by remember(initial) { mutableStateOf(initial?.dayOfWeek ?: "MONDAY") }
+    var selectedDays by remember(initial) {
+        mutableStateOf(setOf(initial?.dayOfWeek ?: "MONDAY"))
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -661,25 +675,30 @@ private fun ScheduleEditorDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
                 ) {
-                    listOf(
-                        "MONDAY" to "Lun",
-                        "TUESDAY" to "Mar",
-                        "WEDNESDAY" to "Mié",
-                        "THURSDAY" to "Jue",
-                        "FRIDAY" to "Vie",
-                        "SATURDAY" to "Sáb",
-                    ).forEach { (value, label) ->
-                        FilterChip(
-                            selected = day == value,
-                            onClick = { day = value },
-                            label = { Text(label) },
-                        )
+                    academicDaysV8.chunked(3).forEach { rowDays ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                        ) {
+                            rowDays.forEach { value ->
+                                FilterChip(
+                                    selected = value in selectedDays,
+                                    onClick = {
+                                        selectedDays = if (value in selectedDays) {
+                                            selectedDays - value
+                                        } else {
+                                            selectedDays + value
+                                        }
+                                    },
+                                    label = { Text(dayShortLabel(value)) },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        }
                     }
                 }
                 Row(
@@ -738,16 +757,24 @@ private fun ScheduleEditorDialog(
                             subjectName = subject,
                             groupName = group,
                             teacherName = teacher,
-                            dayOfWeek = day,
+                            dayOfWeek = selectedDays.firstOrNull() ?: "MONDAY",
                             startsAt = start,
                             endsAt = end,
                             classroomName = room,
                             buildingName = initial?.buildingName,
                             source = initial?.source ?: ScheduleSource.MANUAL,
+                            recurrence = initial?.recurrence
+                                ?: org.companerodeescuela.shared.contracts.ScheduleRecurrence.WEEKLY,
+                            seriesId = initial?.seriesId,
+                            effectiveDate = initial?.effectiveDate,
                         ),
+                        selectedDays,
                     )
                 },
-                enabled = subject.isNotBlank() && start.isNotBlank() && end.isNotBlank(),
+                enabled = subject.isNotBlank() &&
+                    start.isNotBlank() &&
+                    end.isNotBlank() &&
+                    selectedDays.isNotEmpty(),
             ) {
                 Text("Guardar")
             }

@@ -18,8 +18,19 @@ class MockAcademicProviderTest {
     }
 
     @Test
-    fun qaTeacherDoesNotInheritDemoSchedule() = runTest {
-        assertTrue(provider.getSchedule(MockFixtures.QA_TEACHER_ID).isEmpty())
+    fun allQaRolesReceiveCleanAcademicState() = runTest {
+        listOf(
+            MockFixtures.QA_STUDENT_ID,
+            MockFixtures.QA_TEACHER_ID,
+            MockFixtures.QA_SUPERVISOR_ID,
+            MockFixtures.QA_ADMIN_ID,
+        ).forEach { externalId ->
+            val load = provider.getAcademicLoad(externalId)
+            assertEquals(externalId, load.student.externalId)
+            assertTrue(load.enrollments.isEmpty())
+            assertTrue(load.schedule.isEmpty())
+            assertTrue(provider.getSchedule(externalId).isEmpty())
+        }
     }
 
     @Test

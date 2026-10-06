@@ -22,6 +22,10 @@ import org.companerodeescuela.api.channel.ChannelService
 import org.companerodeescuela.api.channel.InMemoryChannelRepository
 import org.companerodeescuela.api.channel.MongoChannelRepository
 import org.companerodeescuela.api.channel.channelRoutes
+import org.companerodeescuela.api.classroom.ClassroomService
+import org.companerodeescuela.api.classroom.InMemoryClassroomRepository
+import org.companerodeescuela.api.classroom.MongoClassroomRepository
+import org.companerodeescuela.api.classroom.classroomRoutes
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.database.MongoConnection
@@ -79,6 +83,14 @@ fun Application.module(
         settings.environment == Environment.LOCAL -> InMemoryAttendanceRepository()
         else -> error("Attendance requires MONGODB_URI outside local development")
     }
+    val classroomRepository = when {
+        !settings.hasAuthentication -> InMemoryClassroomRepository()
+        settings.mongo.isConfigured -> MongoClassroomRepository(mongoConnection.database())
+        settings.environment == Environment.LOCAL -> InMemoryClassroomRepository()
+        else -> error("Native classrooms require MONGODB_URI outside local development")
+    }
+    val classroomService = ClassroomService(classroomRepository)
+
     val channelRepository = when {
         !settings.hasAuthentication -> InMemoryChannelRepository()
         settings.mongo.isConfigured -> MongoChannelRepository(mongoConnection.database())
@@ -116,7 +128,10 @@ fun Application.module(
     )
     val channelService = ChannelService(
         repository = channelRepository,
-        accessPolicy = ChannelAccessPolicy(providerRegistry.academic),
+        accessPolicy = ChannelAccessPolicy(
+            academicProvider = providerRegistry.academic,
+            classroomService = classroomService,
+        ),
     )
 
     val scheduleOverrideRepository = when {
@@ -166,6 +181,7 @@ fun Application.module(
         schoolPresenceService?.let { service ->
             schoolPresenceRoutes(settings = settings, service = service)
         }
+        classroomRoutes(settings = settings, service = classroomService)
         channelRoutes(settings = settings, service = channelService)
         academicEventRoutes(settings = settings, service = eventService)
         deviceRoutes(settings = settings, repository = deviceTokenRepository)

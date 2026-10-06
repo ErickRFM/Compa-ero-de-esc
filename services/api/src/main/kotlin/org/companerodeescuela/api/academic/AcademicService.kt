@@ -12,6 +12,7 @@ import org.companerodeescuela.shared.contracts.AcademicWeekResponse
 import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
 import org.companerodeescuela.shared.contracts.ClassOccurrenceStatusContract
 import org.companerodeescuela.shared.contracts.ScheduleEntry
+import org.companerodeescuela.shared.contracts.ScheduleSource
 import org.companerodeescuela.shared.model.ClassOccurrence
 import org.companerodeescuela.shared.model.ClassOccurrenceStatus
 import org.companerodeescuela.shared.model.PersonId
@@ -25,6 +26,7 @@ import org.companerodeescuela.shared.model.PersonId
  */
 class AcademicService(
     private val provider: AcademicProvider,
+    private val scheduleOverrides: AcademicScheduleOverrideRepository? = null,
 ) {
     suspend fun loadFor(externalId: String): AcademicLoadResponse =
         translateIntegrationFailure {
@@ -39,6 +41,44 @@ class AcademicService(
                 coursesById = coursesById,
             )
 
+            val institutionalEntries = schedule.slots
+                .sortedWith(compareBy({ it.dayOfWeek.value }, { it.startsAt }))
+                .map { slot ->
+                    ScheduleEntry(
+                        courseId = slot.group.course.id.value,
+                        subjectCode = slot.group.course.subject.code,
+                        subjectName = slot.group.course.subject.name,
+                        groupName = slot.group.name,
+                        teacherName = slot.group.course.teacher.person.displayName,
+                        dayOfWeek = slot.dayOfWeek.name,
+                        startsAt = slot.startsAt.toString(),
+                        endsAt = slot.endsAt.toString(),
+                        classroomName = slot.classroom?.name,
+                        buildingName = slot.classroom?.building?.name,
+                        campusName = slot.classroom?.building?.campus?.name,
+                    )
+                }
+            val manualEntries = scheduleOverrides
+                ?.listForOwner(externalId)
+                .orEmpty()
+                .map { managed ->
+                    val block = managed.block
+                    ScheduleEntry(
+                        courseId = block.id,
+                        subjectCode = block.subjectId ?: "MANUAL",
+                        subjectName = block.subjectName,
+                        groupName = block.groupName.orEmpty(),
+                        teacherName = block.teacherName.orEmpty(),
+                        dayOfWeek = block.dayOfWeek,
+                        startsAt = block.startTime,
+                        endsAt = block.endTime,
+                        classroomName = block.room,
+                        buildingName = null,
+                        campusName = null,
+                        source = ScheduleSource.MANUAL,
+                    )
+                }
+
             AcademicLoadResponse(
                 student = AcademicProfile(
                     id = student.person.id.value,
@@ -47,26 +87,38 @@ class AcademicService(
                 ),
                 schedule = AcademicScheduleResponse(
                     ownerId = schedule.ownerId.value,
-                    entries = schedule.slots
-                        .sortedWith(compareBy({ it.dayOfWeek.value }, { it.startsAt }))
-                        .map { slot ->
-                            ScheduleEntry(
-                                courseId = slot.group.course.id.value,
-                                subjectCode = slot.group.course.subject.code,
-                                subjectName = slot.group.course.subject.name,
-                                groupName = slot.group.name,
-                                teacherName = slot.group.course.teacher.person.displayName,
-                                dayOfWeek = slot.dayOfWeek.name,
-                                startsAt = slot.startsAt.toString(),
-                                endsAt = slot.endsAt.toString(),
-                                classroomName = slot.classroom?.name,
-                                buildingName = slot.classroom?.building?.name,
-                                campusName = slot.classroom?.building?.campus?.name,
-                            )
-                        },
+                    entries = mergeForPresentation(institutionalEntries, manualEntries),
                 ),
             )
         }
+
+    private fun mergeForPresentation(
+        institutional: List<ScheduleEntry>,
+        manual: List<ScheduleEntry>,
+    ): List<ScheduleEntry> {
+        val institutionalKeys = institutional.map(::entryKey).toSet()
+        return (institutional + manual.filter { entryKey(it) !in institutionalKeys })
+            .sortedWith(compareBy({ dayOrder(it.dayOfWeek) }, { it.startsAt }, { it.subjectName }))
+    }
+
+    private fun entryKey(entry: ScheduleEntry): String =
+        listOf(
+            entry.dayOfWeek.trim().uppercase(),
+            entry.startsAt.trim(),
+            entry.endsAt.trim(),
+            entry.subjectName.trim().lowercase(),
+        ).joinToString("|")
+
+    private fun dayOrder(day: String): Int = when (day) {
+        "MONDAY" -> 1
+        "TUESDAY" -> 2
+        "WEDNESDAY" -> 3
+        "THURSDAY" -> 4
+        "FRIDAY" -> 5
+        "SATURDAY" -> 6
+        "SUNDAY" -> 7
+        else -> 8
+    }
 
     suspend fun scheduleFor(externalId: String): AcademicScheduleResponse =
         loadFor(externalId).schedule

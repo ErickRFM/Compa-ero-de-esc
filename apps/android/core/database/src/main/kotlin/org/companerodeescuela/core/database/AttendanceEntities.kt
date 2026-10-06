@@ -18,6 +18,8 @@ internal data class AttendanceOutboxEntity(
     val sessionId: String,
     val deviceTimestampEpochSeconds: Long,
     val qrToken: String?,
+    val schoolSsid: String?,
+    val schoolBssid: String?,
     val createdAtEpochSeconds: Long,
     val attemptCount: Int,
     val nextAttemptAtEpochSeconds: Long,

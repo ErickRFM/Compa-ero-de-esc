@@ -10,14 +10,18 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -56,7 +60,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalTime
 import kotlinx.coroutines.launch
 import org.companerodeescuela.core.academic.PersonalScheduleDraft
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
@@ -487,13 +493,162 @@ private fun DayAgendaDetails(
             )
         } else {
             Text(dayLabel(day), style = MaterialTheme.typography.titleMedium)
-            AgendaTimeline(
+            DayTimeGrid(
                 entries = entries,
                 allEntries = allEntries,
                 onEdit = onEdit,
-                onDelete = onDelete,
                 onMoveRequest = onMoveRequest,
             )
+        }
+    }
+}
+
+@Composable
+private fun DayTimeGrid(
+    entries: List<ScheduleEntry>,
+    allEntries: List<ScheduleEntry>,
+    onEdit: (ScheduleEntry) -> Unit,
+    onMoveRequest: (AgendaMoveProposal) -> Unit,
+) {
+    val startHour = 6
+    val endHour = 22
+    val hourHeight = 96.dp
+    val totalHours = endHour - startHour
+    val railWidth = 58.dp
+    val lineColor = MaterialTheme.colorScheme.outlineVariant
+    val density = LocalDensity.current
+    val haptics = LocalHapticFeedback.current
+    val quarterHourPx = with(density) { (hourHeight / 4).toPx() }
+    val horizontalThresholdPx = with(density) { 72.dp.toPx() }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(hourHeight * totalHours)
+            .drawBehind {
+                for (index in 0..totalHours) {
+                    val y = index * hourHeight.toPx()
+                    drawLine(
+                        color = lineColor,
+                        start = Offset(railWidth.toPx(), y),
+                        end = Offset(size.width, y),
+                        strokeWidth = 1.dp.toPx(),
+                    )
+                }
+            },
+    ) {
+        for (hour in startHour..endHour) {
+            Text(
+                text = "%02d:00".format(hour),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .width(railWidth)
+                    .offset(y = hourHeight * (hour - startHour))
+                    .padding(top = 2.dp),
+            )
+        }
+
+        entries.sortedBy { it.startsAt }.forEach { entry ->
+            val start = runCatching { LocalTime.parse(entry.startsAt) }.getOrNull()
+                ?: return@forEach
+            val end = runCatching { LocalTime.parse(entry.endsAt) }.getOrNull()
+                ?: return@forEach
+            if (!start.isBefore(end)) return@forEach
+
+            val minutesFromStart = (start.hour * 60 + start.minute - startHour * 60)
+                .coerceAtLeast(0)
+            val durationMinutes = Duration.between(start, end).toMinutes().coerceAtLeast(15)
+            val top = hourHeight * (minutesFromStart / 60f)
+            val blockHeight = maxOf(
+                hourHeight * (durationMinutes / 60f),
+                72.dp,
+            )
+
+            var dragOffset by remember(entry.courseId) { mutableStateOf(Offset.Zero) }
+            val draggable = entry.source != ScheduleSource.INSTITUTIONAL
+            val dragModifier = if (!draggable) {
+                Modifier
+            } else {
+                Modifier
+                    .graphicsLayer {
+                        translationX = dragOffset.x
+                        translationY = dragOffset.y
+                    }
+                    .pointerInput(entry.courseId, allEntries) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            },
+                            onDragCancel = { dragOffset = Offset.Zero },
+                            onDragEnd = {
+                                val targetStart = AgendaEditingRules.shiftFromDrag(
+                                    entry = entry,
+                                    verticalPixels = dragOffset.y,
+                                    pixelsPerQuarterHour = quarterHourPx,
+                                )
+                                val targetDay = AgendaEditingRules.adjacentDay(
+                                    currentDay = entry.dayOfWeek,
+                                    horizontalPixels = dragOffset.x,
+                                    thresholdPixels = horizontalThresholdPx,
+                                )
+                                if (targetStart != null) {
+                                    AgendaEditingRules.proposeMove(
+                                        entry = entry,
+                                        targetDay = targetDay,
+                                        targetStart = targetStart,
+                                        existing = allEntries,
+                                    )?.let(onMoveRequest)
+                                }
+                                dragOffset = Offset.Zero
+                            },
+                            onDrag = { change, amount ->
+                                change.consume()
+                                dragOffset += amount
+                            },
+                        )
+                    }
+            }
+
+            Surface(
+                modifier = Modifier
+                    .padding(start = railWidth + CompaneroSpacing.xs)
+                    .offset(y = top)
+                    .fillMaxWidth()
+                    .height(blockHeight)
+                    .then(dragModifier)
+                    .then(
+                        if (draggable) {
+                            Modifier.clickable { onEdit(entry) }
+                        } else {
+                            Modifier
+                        },
+                    ),
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                tonalElevation = 1.dp,
+            ) {
+                Column(
+                    modifier = Modifier.padding(CompaneroSpacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
+                ) {
+                    Text(
+                        entry.startsAt + "–" + entry.endsAt,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        entry.subjectName,
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        locationAndTeacher(entry),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+            }
         }
     }
 }

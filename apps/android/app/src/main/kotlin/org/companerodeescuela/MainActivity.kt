@@ -314,11 +314,7 @@ private fun RoleUnavailableScreen(experience: AppExperience) {
         )
         Text(
             text = if (experience == AppExperience.UNSUPPORTED) {
-                if (org.companerodeescuela.shared.contracts.UserRole.TEACHER_PENDING in sessionRolesForMessage) {
-                    "Tu cuenta docente está creada y pendiente de verificación."
-                } else {
-                    "Tu cuenta no tiene un rol compatible con esta versión."
-                }
+                "Tu cuenta está creada, pero todavía no tiene un rol operativo habilitado."
             } else {
                 "Tu perfil está activo. Las herramientas para este rol se integrarán en el workspace V6 sin enviarte a pantallas de alumno."
             },

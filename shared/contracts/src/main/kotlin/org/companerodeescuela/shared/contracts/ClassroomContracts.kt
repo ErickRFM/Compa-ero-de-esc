@@ -21,10 +21,13 @@ data class ClassroomSummary(
     val name: String,
     val description: String? = null,
     val room: String? = null,
+    val groupId: String? = null,
+    val groupName: String? = null,
     val teacherId: String,
     val teacherDisplayName: String,
     val status: ClassroomStatus = ClassroomStatus.ACTIVE,
     val canManage: Boolean = false,
+    val canManageEnrollment: Boolean = false,
     val joinedAtEpochSeconds: Long? = null,
 )
 
@@ -33,6 +36,10 @@ data class CreateClassroomRequest(
     val name: String,
     val description: String? = null,
     val room: String? = null,
+    val groupId: String,
+    val groupName: String,
+    val teacherId: String,
+    val teacherDisplayName: String,
 )
 
 @Serializable

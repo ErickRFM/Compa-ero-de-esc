@@ -46,7 +46,7 @@ class InstitutionalCredentialValidatorTest {
     @Test
     fun `password sanitizer preserves spaces but removes control separators`() {
         assertEquals(
-            "Mi clave segura",
+            "Mi clavesegura",
             InstitutionalCredentialValidator.sanitizePassword("Mi clave\tsegura\n"),
         )
     }

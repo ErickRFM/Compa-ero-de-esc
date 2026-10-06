@@ -40,6 +40,7 @@ fun ProfileScreen(
     canSwitchExperience: Boolean = false,
     onSwitchExperience: () -> Unit = {},
     onAppearance: () -> Unit,
+    onIntegrations: () -> Unit = {},
     onLogout: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -106,7 +107,8 @@ fun ProfileScreen(
             GroupDivider()
             ProfileRow(
                 title = "Sistema escolar",
-                detail = "Opcional · podrás vincularlo para sincronizar datos.",
+                detail = "Opcional · estado, sincronización y fuentes académicas.",
+                onClick = onIntegrations,
             )
             GroupDivider()
             ProfileRow(

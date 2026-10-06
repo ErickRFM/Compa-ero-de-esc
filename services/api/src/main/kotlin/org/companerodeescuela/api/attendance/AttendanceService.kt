@@ -8,6 +8,7 @@ import io.ktor.http.HttpStatusCode
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.integrations.IntegrationException
 import org.companerodeescuela.api.integrations.academic.AcademicProvider
+import org.companerodeescuela.api.presence.SchoolPresenceService
 import org.companerodeescuela.shared.contracts.ApiErrorCode
 import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
@@ -29,6 +30,7 @@ class AttendanceService(
     private val occurrenceResolver: AttendanceOccurrenceResolver =
         ProviderAttendanceOccurrenceResolver(academicProvider),
     private val qrService: AttendanceQrService? = null,
+    private val schoolPresenceService: SchoolPresenceService? = null,
     private val clock: Clock = Clock.systemUTC(),
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) {
@@ -220,6 +222,15 @@ class AttendanceService(
                 code = ApiErrorCode.ATTENDANCE_NOT_ENROLLED,
                 message = "You are not enrolled in this class",
             )
+        }
+
+        schoolPresenceService?.let { presence ->
+            presence.requireActive(studentId)
+            val network = request.schoolNetwork
+                ?: throw ApiException.Forbidden(
+                    "Reconnect to the school Wi-Fi before confirming attendance",
+                )
+            presence.verifyNetworkForAttendance(network)
         }
 
         val evidence = classifyEvidence(

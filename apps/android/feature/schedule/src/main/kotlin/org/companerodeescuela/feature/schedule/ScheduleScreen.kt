@@ -676,8 +676,9 @@ private fun AgendaTimelineEntry(
 @Composable
 private fun ScheduleEditorDialog(
     initial: PersonalScheduleDraft?,
+    initialDays: Set<String>,
     onDismiss: () -> Unit,
-    onSave: (PersonalScheduleDraft, Set<String>) -> Unit,
+    onSave: (PersonalScheduleDraft, Set<String>, Boolean) -> Unit,
 ) {
     var subject by remember(initial) { mutableStateOf(initial?.subjectName.orEmpty()) }
     var teacher by remember(initial) { mutableStateOf(initial?.teacherName.orEmpty()) }
@@ -685,8 +686,12 @@ private fun ScheduleEditorDialog(
     var group by remember(initial) { mutableStateOf(initial?.groupName.orEmpty()) }
     var start by remember(initial) { mutableStateOf(initial?.startsAt ?: "08:00") }
     var end by remember(initial) { mutableStateOf(initial?.endsAt ?: "10:00") }
-    var selectedDays by remember(initial) {
-        mutableStateOf(setOf(initial?.dayOfWeek ?: "MONDAY"))
+    var applyToSeries by remember(initial) { mutableStateOf(initial?.seriesId != null) }
+    var selectedDays by remember(initial, initialDays) {
+        mutableStateOf(
+            initialDays.takeIf { it.isNotEmpty() }
+                ?: setOf(initial?.dayOfWeek ?: "MONDAY"),
+        )
     }
 
     AlertDialog(
@@ -704,6 +709,37 @@ private fun ScheduleEditorDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                if (initial?.seriesId != null) {
+                    Text(
+                        "Aplicar cambios a",
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                    ) {
+                        FilterChip(
+                            selected = !applyToSeries,
+                            onClick = {
+                                applyToSeries = false
+                                selectedDays = setOf(initial.dayOfWeek)
+                            },
+                            label = { Text("Solo este día") },
+                            modifier = Modifier.weight(1f),
+                        )
+                        FilterChip(
+                            selected = applyToSeries,
+                            onClick = {
+                                applyToSeries = true
+                                selectedDays = initialDays.takeIf { it.isNotEmpty() }
+                                    ?: setOf(initial.dayOfWeek)
+                            },
+                            label = { Text("Toda la serie") },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
@@ -798,6 +834,7 @@ private fun ScheduleEditorDialog(
                             effectiveDate = initial?.effectiveDate,
                         ),
                         selectedDays,
+                        applyToSeries,
                     )
                 },
                 enabled = subject.isNotBlank() &&
@@ -810,6 +847,59 @@ private fun ScheduleEditorDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancelar") }
+        },
+    )
+}
+
+@Composable
+private fun DeleteScheduleDialog(
+    entry: ScheduleEntry,
+    busy: Boolean,
+    onDismiss: () -> Unit,
+    onDelete: (Boolean) -> Unit,
+) {
+    val hasSeries = entry.seriesId != null
+    AlertDialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        title = { Text("Eliminar clase") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
+                Text(entry.subjectName, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    dayShortLabel(entry.dayOfWeek) + " · " +
+                        entry.startsAt + "–" + entry.endsAt,
+                )
+                if (hasSeries) {
+                    Text(
+                        "Esta clase pertenece a una serie. Elige si quieres quitar solo este día o toda la serie.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onDelete(false) },
+                enabled = !busy,
+            ) {
+                Text(if (hasSeries) "Solo este día" else "Eliminar")
+            }
+        },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
+                TextButton(onClick = onDismiss, enabled = !busy) {
+                    Text("Cancelar")
+                }
+                if (hasSeries) {
+                    TextButton(
+                        onClick = { onDelete(true) },
+                        enabled = !busy,
+                    ) {
+                        Text("Toda la serie")
+                    }
+                }
+            }
         },
     )
 }

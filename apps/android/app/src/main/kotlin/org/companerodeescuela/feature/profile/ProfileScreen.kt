@@ -221,6 +221,7 @@ private fun roleSummary(roles: Set<UserRole>): String = roles
             UserRole.STUDENT -> "Estudiante"
             UserRole.TEACHER_PENDING -> "Docente pendiente"
             UserRole.TEACHER -> "Docente"
+            UserRole.TUTOR -> "Tutoría"
             UserRole.COORDINATOR -> "Coordinación"
             UserRole.ADMIN -> "Administración"
             UserRole.SUPER_ADMIN -> "Administración general"

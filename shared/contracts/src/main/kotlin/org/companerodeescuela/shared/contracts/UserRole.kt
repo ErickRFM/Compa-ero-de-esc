@@ -21,6 +21,9 @@ enum class UserRole {
     @SerialName("teacher")
     TEACHER,
 
+    @SerialName("tutor")
+    TUTOR,
+
     @SerialName("coordinator")
     COORDINATOR,
 
@@ -37,7 +40,7 @@ enum class UserRole {
      * Students are never "staff".
      */
     val isStaff: Boolean
-        get() = this == TEACHER || this == COORDINATOR || this == ADMIN || this == SUPER_ADMIN
+        get() = this == TEACHER || this == TUTOR || this == COORDINATOR || this == ADMIN || this == SUPER_ADMIN
 
     /**
      * True for roles with administrative reach. Used as a coarse gate before

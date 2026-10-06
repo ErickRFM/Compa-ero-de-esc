@@ -48,6 +48,10 @@ import org.companerodeescuela.api.presence.MongoSchoolPresenceRepository
 import org.companerodeescuela.api.presence.SchoolPresencePolicy
 import org.companerodeescuela.api.presence.SchoolPresenceService
 import org.companerodeescuela.api.presence.schoolPresenceRoutes
+import org.companerodeescuela.api.tutoring.InMemoryTutorAssignmentRepository
+import org.companerodeescuela.api.tutoring.MongoTutorAssignmentRepository
+import org.companerodeescuela.api.tutoring.TutorAssignmentService
+import org.companerodeescuela.api.tutoring.tutoringRoutes
 
 /**
  * Composes the application graph.
@@ -88,6 +92,16 @@ fun Application.module(
         else -> error("Academic groups require MONGODB_URI outside local development")
     }
     val academicGroupService = AcademicGroupService(academicGroupRepository)
+    val tutorAssignmentRepository = when {
+        !settings.hasAuthentication -> InMemoryTutorAssignmentRepository()
+        settings.mongo.isConfigured -> MongoTutorAssignmentRepository(mongoConnection.database())
+        settings.environment == Environment.LOCAL -> InMemoryTutorAssignmentRepository()
+        else -> error("Tutor assignments require MONGODB_URI outside local development")
+    }
+    val tutorAssignmentService = TutorAssignmentService(
+        repository = tutorAssignmentRepository,
+        groupRepository = academicGroupRepository,
+    )
     val attendanceRepository = when {
         !settings.hasAuthentication -> InMemoryAttendanceRepository()
         settings.mongo.isConfigured -> MongoAttendanceRepository(mongoConnection.database())
@@ -197,6 +211,7 @@ fun Application.module(
             schoolPresenceRoutes(settings = settings, service = service)
         }
         academicGroupRoutes(settings = settings, service = academicGroupService)
+        tutoringRoutes(settings = settings, service = tutorAssignmentService)
         classroomRoutes(settings = settings, service = classroomService)
         channelRoutes(settings = settings, service = channelService)
         academicEventRoutes(settings = settings, service = eventService)

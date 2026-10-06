@@ -33,6 +33,7 @@ import org.companerodeescuela.shared.contracts.AttendanceStatus
 fun TeacherHomeScreen(
     onOpenAttendance: () -> Unit,
     onOpenChannel: () -> Unit,
+    onOpenClassrooms: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: AttendanceViewModel = hiltViewModel(),
 ) {
@@ -56,6 +57,13 @@ fun TeacherHomeScreen(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+
+        Button(
+            onClick = onOpenClassrooms,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Mis clases e invitaciones")
+        }
 
         if (state.loading && state.mode == AttendanceMode.LOADING) {
             CircularProgressIndicator()
@@ -160,7 +168,7 @@ fun TeacherHomeScreen(
         if (visible.isEmpty()) {
             StatusNotice(
                 title = "Todavía no tienes clases asignadas",
-                message = "Cuando la escuela o administración te asigne una clase, aparecerá aquí.",
+                message = "Puedes crear una clase propia desde Mis clases o sincronizar una institución cuando esté disponible.",
             )
         } else {
             visible.forEach { occurrence ->

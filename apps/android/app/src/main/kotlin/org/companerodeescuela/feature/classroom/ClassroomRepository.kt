@@ -38,6 +38,10 @@ class ClassroomRepository(
         name: String,
         description: String?,
         room: String?,
+        groupId: String,
+        groupName: String,
+        teacherId: String,
+        teacherDisplayName: String,
     ): Outcome<ClassroomSummary> =
         authorized { token ->
             apiCall {
@@ -48,6 +52,10 @@ class ClassroomRepository(
                             name = name,
                             description = description,
                             room = room,
+                            groupId = groupId,
+                            groupName = groupName,
+                            teacherId = teacherId,
+                            teacherDisplayName = teacherDisplayName,
                         ),
                     )
                 }.requireBody<ApiResponse<ClassroomSummary>>()

@@ -23,6 +23,10 @@ data class UpsertScheduleBlockRequest(
     val groupName: String? = null,
     val status: BlockStatus = BlockStatus.SCHEDULED,
     val isContraturno: Boolean = false,
+    val recurrence: ScheduleRecurrence = ScheduleRecurrence.WEEKLY,
+    val seriesId: String? = null,
+    val effectiveDate: String? = null,
+    val mutationScope: ScheduleMutationScope = ScheduleMutationScope.ENTIRE_SERIES,
     val reason: String? = null,
 )
 

@@ -13,6 +13,7 @@ import org.companerodeescuela.shared.contracts.AcademicProvenance
 import org.companerodeescuela.shared.contracts.BlockStatus
 import org.companerodeescuela.shared.contracts.ManagedScheduleBlock
 import org.companerodeescuela.shared.contracts.ScheduleBlock
+import org.companerodeescuela.shared.contracts.ScheduleRecurrence
 import org.companerodeescuela.shared.contracts.ScheduleShift
 
 interface AcademicScheduleOverrideRepository {
@@ -56,6 +57,9 @@ internal data class AcademicScheduleOverrideDocument(
     @param:BsonProperty("status") val status: String,
     @param:BsonProperty("shift") val shift: String,
     @param:BsonProperty("isContraturno") val isContraturno: Boolean,
+    @param:BsonProperty("recurrence") val recurrence: String = ScheduleRecurrence.WEEKLY.name,
+    @param:BsonProperty("seriesId") val seriesId: String? = null,
+    @param:BsonProperty("effectiveDate") val effectiveDate: String? = null,
     @param:BsonProperty("source") val source: String,
     @param:BsonProperty("sourceId") val sourceId: String?,
     @param:BsonProperty("verified") val verified: Boolean,
@@ -91,6 +95,10 @@ internal data class AcademicScheduleOverrideDocument(
             status = BlockStatus.valueOf(status),
             shift = ScheduleShift.valueOf(shift),
             isContraturno = isContraturno,
+            recurrence = runCatching { ScheduleRecurrence.valueOf(recurrence) }
+                .getOrDefault(ScheduleRecurrence.WEEKLY),
+            seriesId = seriesId,
+            effectiveDate = effectiveDate,
         ),
         reason = reason,
     )
@@ -115,6 +123,9 @@ internal data class AcademicScheduleOverrideDocument(
                 status = block.status.name,
                 shift = block.shift.name,
                 isContraturno = block.isContraturno,
+                recurrence = block.recurrence.name,
+                seriesId = block.seriesId,
+                effectiveDate = block.effectiveDate,
                 source = provenance.source.name,
                 sourceId = provenance.sourceId,
                 verified = provenance.verified,

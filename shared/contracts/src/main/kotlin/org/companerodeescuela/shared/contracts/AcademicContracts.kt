@@ -36,6 +36,9 @@ data class ScheduleEntry(
     val buildingName: String? = null,
     val campusName: String? = null,
     val source: ScheduleSource = ScheduleSource.INSTITUTIONAL,
+    val recurrence: ScheduleRecurrence = ScheduleRecurrence.WEEKLY,
+    val seriesId: String? = null,
+    val effectiveDate: String? = null,
 )
 
 @Serializable

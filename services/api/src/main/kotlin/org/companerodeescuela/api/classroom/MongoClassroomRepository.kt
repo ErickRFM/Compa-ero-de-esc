@@ -44,7 +44,7 @@ class MongoClassroomRepository(database: MongoDatabase) : ClassroomRepository {
     ): List<Pair<NativeClassroom, NativeClassroomMembership>> {
         ensureIndexes()
         val userMemberships = memberships.find(eq("userId", userId)).toList()
-            .map(Document::toMembership)
+            .map { it.toMembership() }
         return userMemberships.mapNotNull { membership ->
             findClassroom(membership.classroomId)?.let { it to membership }
         }

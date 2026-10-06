@@ -9,6 +9,9 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
+import org.companerodeescuela.api.academic.groups.AcademicGroupMembershipRecord
+import org.companerodeescuela.api.academic.groups.AcademicGroupRecord
+import org.companerodeescuela.api.academic.groups.InMemoryAcademicGroupRepository
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.shared.contracts.CreateClassInviteRequest
 import org.companerodeescuela.shared.contracts.CreateClassroomRequest
@@ -128,6 +131,39 @@ class ClassroomServiceTest {
         val second = service.join(STUDENT, invite.code)
 
         assertEquals(first.membership, second.membership)
+    }
+
+
+    @Test
+    fun studentInGroupAutomaticallySeesAssignedClasses() = runTest {
+        val classrooms = InMemoryClassroomRepository()
+        val groups = InMemoryAcademicGroupRepository()
+        groups.create(
+            AcademicGroupRecord(
+                id = "group-9a",
+                name = "9A",
+                active = true,
+                createdAt = BASE_TIME,
+            ),
+        )
+        groups.assign(
+            AcademicGroupMembershipRecord(
+                groupId = "group-9a",
+                userId = STUDENT.id,
+                joinedAt = BASE_TIME,
+            ),
+        )
+        val service = ClassroomService(
+            repository = classrooms,
+            groupRepository = groups,
+            clock = Clock.fixed(BASE_TIME, ZoneOffset.UTC),
+        )
+        val classroom = service.create(ADMIN, request())
+
+        val visible = service.listFor(STUDENT)
+
+        assertEquals(listOf(classroom.id), visible.map { it.id })
+        assertEquals(classroom.id, service.requireCanRead(STUDENT, classroom.id).id)
     }
 
     private fun request(name: String = "Programación móvil") = CreateClassroomRequest(

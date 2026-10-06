@@ -6,6 +6,8 @@ import java.time.Clock
 import java.time.Duration
 import java.util.Base64
 import java.util.UUID
+import org.companerodeescuela.api.academic.groups.AcademicGroupRecord
+import org.companerodeescuela.api.academic.groups.AcademicGroupRepository
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.shared.contracts.ClassInvite
 import org.companerodeescuela.shared.contracts.ClassroomMemberRole
@@ -20,6 +22,7 @@ import org.companerodeescuela.shared.contracts.UserSummary
 
 class ClassroomService(
     private val repository: ClassroomRepository,
+    private val groupRepository: AcademicGroupRepository? = null,
     private val clock: Clock = Clock.systemUTC(),
     private val random: SecureRandom = SecureRandom(),
 ) {
@@ -33,7 +36,7 @@ class ClassroomService(
                 )
             }
         } else {
-            repository.listClassroomsForUser(actor.id)
+            val direct = repository.listClassroomsForUser(actor.id)
                 .map { (classroom, membership) ->
                     classroom.toSummary(
                         canManage = canOperate(actor, classroom),
@@ -41,6 +44,19 @@ class ClassroomService(
                         joinedAtEpochSeconds = membership.joinedAt.epochSecond,
                     )
                 }
+            val groupIds = groupRepository
+                ?.listGroupsForUser(actor.id)
+                .orEmpty()
+                .map(AcademicGroupRecord::id)
+                .toSet()
+            val inherited = repository.listClassroomsForGroups(groupIds)
+                .map { classroom ->
+                    classroom.toSummary(
+                        canManage = canOperate(actor, classroom),
+                        canManageEnrollment = false,
+                    )
+                }
+            (direct + inherited).distinctBy(ClassroomSummary::id)
         }.sortedWith(
             compareBy<ClassroomSummary> { it.groupName.orEmpty() }
                 .thenBy(ClassroomSummary::name),
@@ -193,8 +209,11 @@ class ClassroomService(
         val classroom = repository.findClassroom(classroomId)
             ?: throw ApiException.NotFound("Classroom was not found")
         val membership = repository.findMembership(classroomId, actor.id)
-        if (membership == null && !isAcademicAdmin(actor)) {
-            throw ApiException.Forbidden("This classroom is not assigned to your account")
+        val inheritedAccess = classroom.groupId?.let { groupId ->
+            groupRepository?.isUserInGroup(actor.id, groupId)
+        } == true
+        if (membership == null && !inheritedAccess && !isAcademicAdmin(actor)) {
+            throw ApiException.Forbidden("This classroom is not assigned to your account or academic group")
         }
         return classroom.toSummary(
             canManage = canOperate(actor, classroom),

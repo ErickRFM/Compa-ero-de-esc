@@ -41,6 +41,7 @@ interface ClassroomRepository {
     suspend fun createClassroom(classroom: NativeClassroom)
     suspend fun findClassroom(classroomId: String): NativeClassroom?
     suspend fun listClassrooms(): List<NativeClassroom>
+    suspend fun listClassroomsForGroups(groupIds: Set<String>): List<NativeClassroom>
     suspend fun listClassroomsForUser(userId: String): List<Pair<NativeClassroom, NativeClassroomMembership>>
     suspend fun findMembership(classroomId: String, userId: String): NativeClassroomMembership?
     suspend fun addMembershipIfAbsent(membership: NativeClassroomMembership): NativeClassroomMembership
@@ -62,6 +63,10 @@ class InMemoryClassroomRepository : ClassroomRepository {
     override suspend fun findClassroom(classroomId: String): NativeClassroom? = classrooms[classroomId]
 
     override suspend fun listClassrooms(): List<NativeClassroom> = classrooms.values.toList()
+
+    override suspend fun listClassroomsForGroups(groupIds: Set<String>): List<NativeClassroom> =
+        if (groupIds.isEmpty()) emptyList()
+        else classrooms.values.filter { it.groupId != null && it.groupId in groupIds }
 
     override suspend fun listClassroomsForUser(
         userId: String,

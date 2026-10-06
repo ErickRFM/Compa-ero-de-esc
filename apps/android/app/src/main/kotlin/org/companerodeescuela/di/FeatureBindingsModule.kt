@@ -18,6 +18,7 @@ import org.companerodeescuela.core.network.SessionRefreshCoordinator
 import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.feature.auth.AuthRepository
 import org.companerodeescuela.feature.channel.ChannelRepository
+import org.companerodeescuela.feature.classroom.AcademicGroupRepository
 import org.companerodeescuela.feature.classroom.ClassroomRepository
 
 @Module
@@ -71,6 +72,18 @@ object FeatureBindingsModule {
         tokenStore: SessionTokenStore,
         refreshCoordinator: SessionRefreshCoordinator,
     ): ChannelRepository = ChannelRepository(
+        client = client,
+        tokenStore = tokenStore,
+        refreshCoordinator = refreshCoordinator,
+    )
+
+    @Provides
+    @Singleton
+    fun provideAcademicGroupRepository(
+        client: HttpClient,
+        tokenStore: SessionTokenStore,
+        refreshCoordinator: SessionRefreshCoordinator,
+    ): AcademicGroupRepository = AcademicGroupRepository(
         client = client,
         tokenStore = tokenStore,
         refreshCoordinator = refreshCoordinator,

@@ -4,6 +4,10 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.routing.routing
 import org.companerodeescuela.api.academic.AcademicScheduleManagementService
+import org.companerodeescuela.api.academic.groups.AcademicGroupService
+import org.companerodeescuela.api.academic.groups.InMemoryAcademicGroupRepository
+import org.companerodeescuela.api.academic.groups.MongoAcademicGroupRepository
+import org.companerodeescuela.api.academic.groups.academicGroupRoutes
 import org.companerodeescuela.api.academic.InMemoryAcademicScheduleOverrideRepository
 import org.companerodeescuela.api.academic.MongoAcademicScheduleOverrideRepository
 import org.companerodeescuela.api.academic.academicRoutes
@@ -77,6 +81,13 @@ fun Application.module(
         else -> error("Platform accounts require MONGODB_URI outside local development")
     }
     configurePlugins(settings, refreshSessions = refreshSessionRepository)
+    val academicGroupRepository = when {
+        !settings.hasAuthentication -> InMemoryAcademicGroupRepository()
+        settings.mongo.isConfigured -> MongoAcademicGroupRepository(mongoConnection.database())
+        settings.environment == Environment.LOCAL -> InMemoryAcademicGroupRepository()
+        else -> error("Academic groups require MONGODB_URI outside local development")
+    }
+    val academicGroupService = AcademicGroupService(academicGroupRepository)
     val attendanceRepository = when {
         !settings.hasAuthentication -> InMemoryAttendanceRepository()
         settings.mongo.isConfigured -> MongoAttendanceRepository(mongoConnection.database())
@@ -89,7 +100,10 @@ fun Application.module(
         settings.environment == Environment.LOCAL -> InMemoryClassroomRepository()
         else -> error("Native classrooms require MONGODB_URI outside local development")
     }
-    val classroomService = ClassroomService(classroomRepository)
+    val classroomService = ClassroomService(
+        repository = classroomRepository,
+        groupRepository = academicGroupRepository,
+    )
 
     val channelRepository = when {
         !settings.hasAuthentication -> InMemoryChannelRepository()
@@ -172,6 +186,7 @@ fun Application.module(
             academicProvider = providerRegistry.academic,
             scheduleManagement = scheduleManagementService,
             scheduleOverrides = scheduleOverrideRepository,
+            groupRepository = academicGroupRepository,
         )
         attendanceRoutes(
             settings = settings,
@@ -181,6 +196,7 @@ fun Application.module(
         schoolPresenceService?.let { service ->
             schoolPresenceRoutes(settings = settings, service = service)
         }
+        academicGroupRoutes(settings = settings, service = academicGroupService)
         classroomRoutes(settings = settings, service = classroomService)
         channelRoutes(settings = settings, service = channelService)
         academicEventRoutes(settings = settings, service = eventService)

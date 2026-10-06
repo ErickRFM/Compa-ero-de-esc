@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.companerodeescuela.core.common.result.Outcome
+import org.companerodeescuela.shared.contracts.AcademicGroupSummary
 import org.companerodeescuela.shared.contracts.ClassInvite
 import org.companerodeescuela.shared.contracts.ClassroomSummary
 
@@ -17,6 +18,7 @@ data class ClassroomUiState(
     val loading: Boolean = true,
     val submitting: Boolean = false,
     val classrooms: List<ClassroomSummary> = emptyList(),
+    val groups: List<AcademicGroupSummary> = emptyList(),
     val activeInvite: ClassInvite? = null,
     val errorMessage: String? = null,
     val successMessage: String? = null,
@@ -25,6 +27,7 @@ data class ClassroomUiState(
 @HiltViewModel
 class ClassroomViewModel @Inject constructor(
     private val repository: ClassroomRepository,
+    private val groupRepository: AcademicGroupRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ClassroomUiState())
     val state: StateFlow<ClassroomUiState> = _state.asStateFlow()
@@ -50,6 +53,12 @@ class ClassroomViewModel @Inject constructor(
                         errorMessage = outcome.error.userMessage,
                     )
                 }
+            }
+            when (val outcome = groupRepository.groups()) {
+                is Outcome.Success -> _state.update {
+                    it.copy(groups = outcome.value)
+                }
+                is Outcome.Failure -> Unit
             }
         }
     }
@@ -79,6 +88,49 @@ class ClassroomViewModel @Inject constructor(
                         submitting = false,
                         errorMessage = outcome.error.userMessage,
                     )
+                }
+            }
+        }
+    }
+
+
+    fun createGroup(id: String, name: String) {
+        if (_state.value.submitting) return
+        viewModelScope.launch {
+            _state.update { it.copy(submitting = true, errorMessage = null, successMessage = null) }
+            when (val outcome = groupRepository.create(id, name)) {
+                is Outcome.Success -> {
+                    _state.update {
+                        it.copy(
+                            submitting = false,
+                            successMessage = "Grupo " + outcome.value.name + " creado.",
+                        )
+                    }
+                    refresh()
+                }
+                is Outcome.Failure -> _state.update {
+                    it.copy(submitting = false, errorMessage = outcome.error.userMessage)
+                }
+            }
+        }
+    }
+
+    fun assignGroupMember(groupId: String, userId: String) {
+        if (_state.value.submitting) return
+        viewModelScope.launch {
+            _state.update { it.copy(submitting = true, errorMessage = null, successMessage = null) }
+            when (val outcome = groupRepository.assignMember(groupId, userId)) {
+                is Outcome.Success -> {
+                    _state.update {
+                        it.copy(
+                            submitting = false,
+                            successMessage = "Cuenta vinculada al grupo " + outcome.value.groupName + ".",
+                        )
+                    }
+                    refresh()
+                }
+                is Outcome.Failure -> _state.update {
+                    it.copy(submitting = false, errorMessage = outcome.error.userMessage)
                 }
             }
         }

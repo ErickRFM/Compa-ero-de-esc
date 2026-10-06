@@ -1,14 +1,23 @@
 package org.companerodeescuela.api.academic
 
+import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
+import org.companerodeescuela.api.academic.groups.AcademicGroupMembershipRecord
+import org.companerodeescuela.api.academic.groups.AcademicGroupRecord
+import org.companerodeescuela.api.academic.groups.InMemoryAcademicGroupRepository
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.integrations.mock.MockAcademicProvider
+import org.companerodeescuela.shared.contracts.AcademicDataSource
 import org.companerodeescuela.shared.contracts.ClassOccurrenceStatusContract
+import org.companerodeescuela.shared.contracts.UpsertScheduleBlockRequest
 
 class AcademicServiceTest {
 
@@ -92,4 +101,56 @@ class AcademicServiceTest {
             AcademicService(MockAcademicProvider()).loadFor("missing")
         }
     }
+
+    @Test
+    fun groupScheduleIsInheritedByLinkedStudentsWithoutSchoolApiDependency() = runTest {
+        val groups = InMemoryAcademicGroupRepository()
+        val schedules = InMemoryAcademicScheduleOverrideRepository()
+        val instant = Instant.parse("2026-10-06T17:00:00Z")
+        groups.create(
+            AcademicGroupRecord(
+                id = "9A",
+                name = "9A",
+                active = true,
+                createdAt = instant,
+            ),
+        )
+        groups.assign(AcademicGroupMembershipRecord("9A", "2020-10455", instant))
+        groups.assign(AcademicGroupMembershipRecord("9A", "local-student", instant))
+
+        AcademicScheduleManagementService(
+            repository = schedules,
+            clock = Clock.fixed(instant, ZoneOffset.UTC),
+            newId = { "SCH-GROUP" },
+        ).upsert(
+            actorId = "admin-1",
+            source = AcademicDataSource.ADMIN_MANUAL,
+            request = UpsertScheduleBlockRequest(
+                ownerId = "9A",
+                dayOfWeek = "FRIDAY",
+                startTime = "12:00",
+                endTime = "14:00",
+                subjectId = "PM-9",
+                subjectName = "Programación Móvil",
+                teacherId = "teacher-1",
+                teacherName = "Mtra. Elena",
+                room = "LAB-3",
+                groupId = "9A",
+                groupName = "9A",
+            ),
+        )
+
+        val service = AcademicService(
+            provider = MockAcademicProvider(),
+            scheduleOverrides = schedules,
+            groupRepository = groups,
+        )
+        val institutionalUser = service.loadFor("2020-10455")
+        assertTrue(institutionalUser.schedule.entries.any { it.subjectName == "Programación Móvil" })
+
+        val independentUser = service.loadFor("local-student")
+        assertEquals("local-student", independentUser.schedule.ownerId)
+        assertEquals(listOf("Programación Móvil"), independentUser.schedule.entries.map { it.subjectName })
+    }
+
 }

@@ -24,10 +24,21 @@ Channel and attendance remain available as contextual capabilities rather than c
 
 The existing classroom/channel storage is retained. Group metadata is additive and nullable at persistence level so older Mongo documents remain readable.
 
+## Group synchronization
+
+Implemented in the V9 group-sync wave:
+
+- persistent academic groups and group memberships;
+- admin-only group creation and member assignment;
+- students inherit classes from their group without per-class invitation;
+- group-owned schedule blocks are projected into the student's agenda;
+- independent platform accounts can receive a group schedule even when the school API has no identity for them;
+- enrollment codes remain only as a fallback when group synchronization is unavailable.
+
 ## Next waves
 
-1. Group directory and searchable teacher/group pickers for admin.
+1. Searchable teacher/student/group pickers instead of raw account IDs.
 2. Bulk schedule import scoped to group (PDF/image/API).
-3. Automatic group membership projection into class memberships.
-4. Class detail tabs: Resumen · Horario · Canal · Asistencia · Avisos.
-5. Conflict-aware drag/drop schedule publishing for administrators.
+3. Class detail tabs: Resumen · Horario · Canal · Asistencia · Avisos.
+4. Conflict-aware drag/drop schedule publishing for administrators.
+5. Roster management, transfers between groups and audit trail.

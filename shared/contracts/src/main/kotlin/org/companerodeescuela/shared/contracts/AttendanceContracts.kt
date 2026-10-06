@@ -91,6 +91,7 @@ data class AttendanceAttemptRequest(
     val operationId: String,
     val deviceTimestampEpochSeconds: Long,
     val qrToken: String? = null,
+    val schoolNetwork: SchoolNetworkEvidence? = null,
 )
 
 @Serializable

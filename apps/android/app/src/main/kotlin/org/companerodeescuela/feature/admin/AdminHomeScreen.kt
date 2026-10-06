@@ -27,6 +27,7 @@ fun AdminHomeScreen(
     onOpenSchedule: () -> Unit,
     onOpenAttendance: () -> Unit,
     onOpenChannel: () -> Unit,
+    onOpenClassrooms: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -42,7 +43,7 @@ fun AdminHomeScreen(
             style = MaterialTheme.typography.headlineSmall,
         )
         Text(
-            text = "Gestión institucional de usuarios, configuración del sistema y auditoría.",
+            text = "Organiza grupos, clases, docentes y horarios desde una sola estructura académica.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -86,9 +87,29 @@ fun AdminHomeScreen(
                 modifier = Modifier.padding(CompaneroSpacing.sm),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
             ) {
+                Text("Clases y grupos", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "Asigna materias a un grupo y docente. Estas asignaciones alimentan clases, canal y experiencia del profesor.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(onClick = onOpenClassrooms, modifier = Modifier.fillMaxWidth()) {
+                    Text("Gestionar asignaciones")
+                }
+            }
+        }
+
+        CompaneroSurface(
+            modifier = Modifier.fillMaxWidth(),
+            role = CompaneroSurfaceRole.CARD,
+        ) {
+            Column(
+                modifier = Modifier.padding(CompaneroSpacing.sm),
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+            ) {
                 Text("Gestión Académica", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "Supervisa horarios, grupos y configuraciones del ciclo activo.",
+                    "Publica horarios por grupo; los alumnos y docentes reciben automáticamente la agenda que les corresponde.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

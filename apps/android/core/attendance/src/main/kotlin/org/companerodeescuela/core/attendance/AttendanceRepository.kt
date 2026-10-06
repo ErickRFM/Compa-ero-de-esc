@@ -28,6 +28,8 @@ class AttendanceRepository(
     private val localStore: AttendanceLocalStore,
     private val scheduler: AttendanceSyncEnqueuer,
     private val remoteClient: AttendanceRemoteClient,
+    private val networkEvidenceProvider: SchoolNetworkEvidenceProvider =
+        SchoolNetworkEvidenceProvider { null },
     private val clock: Clock = Clock.systemUTC(),
     private val newOperationId: () -> String = { UUID.randomUUID().toString() },
 ) {
@@ -135,6 +137,7 @@ class AttendanceRepository(
                 sessionId = sessionId,
                 deviceTimestampEpochSeconds = clock.instant().epochSecond,
                 qrToken = normalizedQrToken,
+                schoolNetwork = networkEvidenceProvider.current(),
             )
             scheduler.schedule()
             Outcome.Success(local)

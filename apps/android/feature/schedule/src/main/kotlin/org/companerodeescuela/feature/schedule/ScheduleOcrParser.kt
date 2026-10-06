@@ -9,6 +9,10 @@ object ScheduleOcrParser {
         RegexOption.IGNORE_CASE,
     )
 
+    private val teacherTitle = Regex(
+        """(?i)(ma\.|mtr\.?|mtra\.?|mtro\.?|prof\.?|profa\.?|ing\.?|docente|dr\.?|dra\.?)""",
+    )
+
     private val dayAliases = linkedMapOf(
         "MONDAY" to listOf("lunes", "monday"),
         "TUESDAY" to listOf("martes", "tuesday"),
@@ -50,9 +54,18 @@ object ScheduleOcrParser {
             }
             if (subject.isBlank()) return@forEachIndexed
 
-            val context = lines.drop(contextStart).take(3)
+            val embedded = splitEmbeddedTeacher(subject)
+            subject = embedded.first
+
+            val context = lines
+                .drop(contextStart)
+                .takeWhile { next -> timeRange.find(next) == null && dayFrom(next) == null }
+                .take(4)
+
             val room = context.firstOrNull(::looksLikeRoom)
-            val teacher = context.firstOrNull(::looksLikeTeacher)
+            val teacher = embedded.second
+                ?: context.firstOrNull(::looksLikeTeacher)
+                ?: context.firstOrNull(::looksLikePersonName)
 
             result += PersonalScheduleDraft(
                 subjectName = subject,
@@ -65,14 +78,52 @@ object ScheduleOcrParser {
             )
         }
 
-        return result.distinctBy {
+        val unique = result.distinctBy {
             listOf(
                 it.dayOfWeek,
                 it.startsAt,
                 it.endsAt,
                 it.subjectName.trim().lowercase(),
+                it.teacherName.trim().lowercase(),
             ).joinToString("|")
         }
+        return mergeContiguous(unique)
+    }
+
+    private fun mergeContiguous(entries: List<PersonalScheduleDraft>): List<PersonalScheduleDraft> {
+        val sorted = entries.sortedWith(
+            compareBy<PersonalScheduleDraft>(
+                { dayOrder(it.dayOfWeek) },
+                { it.startsAt },
+                { it.subjectName.lowercase() },
+            ),
+        )
+        val merged = mutableListOf<PersonalScheduleDraft>()
+        sorted.forEach { next ->
+            val previous = merged.lastOrNull()
+            if (previous != null && canMerge(previous, next)) {
+                merged[merged.lastIndex] = previous.copy(endsAt = next.endsAt)
+            } else {
+                merged += next
+            }
+        }
+        return merged
+    }
+
+    private fun canMerge(a: PersonalScheduleDraft, b: PersonalScheduleDraft): Boolean =
+        a.dayOfWeek == b.dayOfWeek &&
+            a.endsAt == b.startsAt &&
+            a.subjectName.normalized() == b.subjectName.normalized() &&
+            a.teacherName.normalized() == b.teacherName.normalized() &&
+            a.classroomName.orEmpty().normalized() == b.classroomName.orEmpty().normalized() &&
+            a.groupName.normalized() == b.groupName.normalized()
+
+    private fun splitEmbeddedTeacher(value: String): Pair<String, String?> {
+        val match = teacherTitle.find(value) ?: return value.trim() to null
+        if (match.range.first == 0) return value.trim() to null
+        val subject = value.substring(0, match.range.first).trim()
+        val teacher = value.substring(match.range.first).trim()
+        return if (subject.isBlank() || teacher.isBlank()) value.trim() to null else subject to teacher
     }
 
     private fun dayFrom(line: String): String? {
@@ -97,9 +148,34 @@ object ScheduleOcrParser {
             .containsMatchIn(value)
 
     private fun looksLikeTeacher(value: String): Boolean =
-        Regex("""\b(mtr\.?|mtra\.?|mtro\.?|prof\.?|profa\.?|ing\.?|docente|dr\.?|dra\.?)\b""", RegexOption.IGNORE_CASE)
-            .containsMatchIn(value)
+        teacherTitle.containsMatchIn(value)
+
+    private fun looksLikePersonName(value: String): Boolean {
+        if (looksLikeRoom(value) || timeRange.containsMatchIn(value) || dayFrom(value) != null) return false
+        val words = value
+            .replace(Regex("""[.,]"""), "")
+            .split(Regex("""\s+"""))
+            .filter(String::isNotBlank)
+        if (words.size !in 2..5) return false
+        return words.all { word ->
+            val first = word.firstOrNull() ?: return@all false
+            first.isUpperCase() || word.equals("de", true) || word.equals("del", true)
+        }
+    }
+
+    private fun String.normalized(): String = trim().lowercase().replace(Regex("""\s+"""), " ")
 
     private fun formatTime(hour: String, minute: String): String =
         hour.toInt().toString().padStart(2, '0') + ":" + minute
+
+    private fun dayOrder(day: String): Int = when (day) {
+        "MONDAY" -> 1
+        "TUESDAY" -> 2
+        "WEDNESDAY" -> 3
+        "THURSDAY" -> 4
+        "FRIDAY" -> 5
+        "SATURDAY" -> 6
+        "SUNDAY" -> 7
+        else -> 8
+    }
 }

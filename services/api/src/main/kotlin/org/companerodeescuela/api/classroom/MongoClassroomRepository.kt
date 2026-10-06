@@ -44,6 +44,14 @@ class MongoClassroomRepository(database: MongoDatabase) : ClassroomRepository {
         return classrooms.find().toList().map { it.toClassroom() }
     }
 
+    override suspend fun listClassroomsForGroups(groupIds: Set<String>): List<NativeClassroom> {
+        ensureIndexes()
+        if (groupIds.isEmpty()) return emptyList()
+        return classrooms.find(com.mongodb.client.model.Filters.`in`("groupId", groupIds))
+            .toList()
+            .map { it.toClassroom() }
+    }
+
     override suspend fun listClassroomsForUser(
         userId: String,
     ): List<Pair<NativeClassroom, NativeClassroomMembership>> {

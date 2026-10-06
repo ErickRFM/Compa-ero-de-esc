@@ -93,6 +93,7 @@ fun ScheduleScreen(
     var editingImportIndex by remember { mutableStateOf<Int?>(null) }
     var importBusy by remember { mutableStateOf(false) }
     var moveProposal by remember { mutableStateOf<AgendaMoveProposal?>(null) }
+    var deleteTarget by remember { mutableStateOf<ScheduleEntry?>(null) }
 
     val documentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
@@ -162,6 +163,15 @@ fun ScheduleScreen(
             )
         }
 
+        if (state.undoDrafts.isNotEmpty()) {
+            OutlinedButton(
+                onClick = viewModel::undoLastDelete,
+                enabled = !state.actionInProgress,
+            ) {
+                Text("Deshacer eliminación")
+            }
+        }
+
         state.errorMessage?.let {
             StatusNotice(
                 title = "No pudimos completar la acción",
@@ -213,7 +223,7 @@ fun ScheduleScreen(
                             editingImportIndex = null
                             showEditor = true
                         },
-                        onDelete = viewModel::deletePersonal,
+                        onDelete = { deleteTarget = it },
                         onMoveRequest = { moveProposal = it },
                     )
                     AgendaMode.WEEK -> WeekAgenda(
@@ -223,7 +233,7 @@ fun ScheduleScreen(
                             editingImportIndex = null
                             showEditor = true
                         },
-                        onDelete = viewModel::deletePersonal,
+                        onDelete = { deleteTarget = it },
                         onMoveRequest = { moveProposal = it },
                     )
                 }
@@ -276,24 +286,43 @@ fun ScheduleScreen(
     if (showEditor) {
         val initial = editingEntry?.toDraft()
             ?: editingImportIndex?.let { state.importCandidates.getOrNull(it) }
+        val initialDays = editingEntry?.seriesId?.let { seriesId ->
+            state.entries
+                .filter { it.seriesId == seriesId && it.source != ScheduleSource.INSTITUTIONAL }
+                .map { it.dayOfWeek }
+                .toSet()
+        }.orEmpty()
         ScheduleEditorDialog(
             initial = initial,
+            initialDays = initialDays,
             onDismiss = {
                 showEditor = false
                 editingEntry = null
                 editingImportIndex = null
             },
-            onSave = { draft, days ->
+            onSave = { draft, days, applyToSeries ->
                 val importIndex = editingImportIndex
                 if (importIndex != null) {
                     val selected = days.firstOrNull() ?: draft.dayOfWeek
                     viewModel.updateImportCandidate(importIndex, draft.copy(dayOfWeek = selected))
                 } else {
-                    viewModel.savePersonalDays(draft, days)
+                    viewModel.savePersonalDays(draft, days, applyToSeries)
                 }
                 showEditor = false
                 editingEntry = null
                 editingImportIndex = null
+            },
+        )
+    }
+
+    deleteTarget?.let { target ->
+        DeleteScheduleDialog(
+            entry = target,
+            busy = state.actionInProgress,
+            onDismiss = { deleteTarget = null },
+            onDelete = { entireSeries ->
+                viewModel.deletePersonal(target, deleteSeries = entireSeries)
+                deleteTarget = null
             },
         )
     }

@@ -8,6 +8,7 @@ import io.ktor.client.HttpClient
 import javax.inject.Singleton
 import org.companerodeescuela.core.academic.AcademicRepository
 import org.companerodeescuela.core.academic.PersonalScheduleRepository
+import org.companerodeescuela.core.attendance.AndroidSchoolNetworkEvidenceProvider
 import org.companerodeescuela.core.attendance.AttendanceRemoteClient
 import org.companerodeescuela.core.attendance.AttendanceRepository
 import org.companerodeescuela.core.attendance.AttendanceSyncScheduler
@@ -25,6 +26,12 @@ import org.companerodeescuela.feature.classroom.ClassroomRepository
 @Module
 @InstallIn(SingletonComponent::class)
 object FeatureBindingsModule {
+
+    @Provides
+    @Singleton
+    fun provideSchoolNetworkEvidenceProvider(
+        provider: AndroidSchoolNetworkEvidenceProvider,
+    ): SchoolNetworkEvidenceProvider = provider
 
     @Provides
     @Singleton

@@ -71,13 +71,13 @@ class MongoTutorAssignmentRepository(database: MongoDatabase) : TutorAssignmentR
     override suspend fun listForTutor(tutorUserId: String): List<TutorAssignmentRecord> {
         ensureIndexes()
         return collection.find(and(eq("tutorUserId", tutorUserId), eq("active", true)))
-            .toList().map(Document::toRecord)
+            .toList().map { it.toRecord() }
             .sortedByDescending(TutorAssignmentRecord::assignedAt)
     }
 
     override suspend fun listAll(): List<TutorAssignmentRecord> {
         ensureIndexes()
-        return collection.find().toList().map(Document::toRecord)
+        return collection.find().toList().map { it.toRecord() }
             .sortedByDescending(TutorAssignmentRecord::assignedAt)
     }
 

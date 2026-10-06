@@ -786,6 +786,64 @@ private fun ScheduleEditorDialog(
 }
 
 @Composable
+private fun MoveScheduleDialog(
+    proposal: AgendaMoveProposal,
+    busy: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        title = { Text("Mover clase") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+            ) {
+                Text(
+                    proposal.entry.subjectName,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    "De: " + dayShortLabel(proposal.entry.dayOfWeek) + " " +
+                        proposal.entry.startsAt + "–" + proposal.entry.endsAt,
+                )
+                Text(
+                    "A: " + dayShortLabel(proposal.targetDay) + " " +
+                        proposal.targetStart + "–" + proposal.targetEnd,
+                )
+                if (proposal.conflicts.isNotEmpty()) {
+                    StatusNotice(
+                        title = "Conflicto de horario",
+                        message = proposal.conflicts.joinToString("\n") {
+                            it.subjectName + " · " + it.startsAt + "–" + it.endsAt
+                        },
+                        tone = NoticeTone.WARNING,
+                    )
+                    Text(
+                        "Es un horario personal: puedes moverlo de todos modos, pero revisa el cruce.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = !busy) {
+                Text(
+                    if (proposal.conflicts.isEmpty()) "Mover"
+                    else "Mover de todos modos",
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !busy) {
+                Text("Cancelar")
+            }
+        },
+    )
+}
+
+@Composable
 private fun ImportReviewDialog(
     candidates: List<PersonalScheduleDraft>,
     busy: Boolean,
@@ -855,6 +913,9 @@ private fun ScheduleEntry.toDraft(): PersonalScheduleDraft =
         classroomName = classroomName,
         buildingName = buildingName,
         source = source,
+        recurrence = recurrence,
+        seriesId = seriesId,
+        effectiveDate = effectiveDate,
     )
 
 private fun locationAndTeacher(entry: ScheduleEntry): String {

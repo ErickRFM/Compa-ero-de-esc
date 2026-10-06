@@ -25,5 +25,8 @@ internal data class PersonalScheduleEntity(
     val classroomName: String?,
     val buildingName: String?,
     val source: String,
+    val recurrence: String,
+    val seriesId: String?,
+    val effectiveDate: String?,
     val updatedAtEpochSeconds: Long,
 )

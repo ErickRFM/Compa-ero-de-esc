@@ -14,7 +14,7 @@ import androidx.room.RoomDatabase
         AttendanceLocalRecordEntity::class,
         PersonalScheduleEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class CompaneroDatabase : RoomDatabase() {

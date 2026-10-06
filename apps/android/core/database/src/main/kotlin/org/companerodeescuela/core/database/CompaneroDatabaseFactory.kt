@@ -12,8 +12,22 @@ object CompaneroDatabaseFactory {
             CompaneroDatabase::class.java,
             "companero-cache.db",
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .build()
+
+    internal val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE personal_schedule_entries ADD COLUMN recurrence TEXT NOT NULL DEFAULT 'WEEKLY'",
+            )
+            db.execSQL(
+                "ALTER TABLE personal_schedule_entries ADD COLUMN seriesId TEXT",
+            )
+            db.execSQL(
+                "ALTER TABLE personal_schedule_entries ADD COLUMN effectiveDate TEXT",
+            )
+        }
+    }
 
     internal val MIGRATION_3_4 = object : Migration(3, 4) {
         override fun migrate(db: SupportSQLiteDatabase) {

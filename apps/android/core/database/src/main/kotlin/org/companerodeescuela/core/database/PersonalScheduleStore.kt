@@ -1,5 +1,6 @@
 package org.companerodeescuela.core.database
 
+import org.companerodeescuela.shared.contracts.ScheduleRecurrence
 import org.companerodeescuela.shared.contracts.ScheduleSource
 
 data class PersonalScheduleItem(
@@ -15,6 +16,9 @@ data class PersonalScheduleItem(
     val classroomName: String?,
     val buildingName: String?,
     val source: ScheduleSource,
+    val recurrence: ScheduleRecurrence = ScheduleRecurrence.WEEKLY,
+    val seriesId: String? = null,
+    val effectiveDate: String? = null,
     val updatedAtEpochSeconds: Long,
 )
 
@@ -77,6 +81,10 @@ private fun PersonalScheduleEntity.toItem(): PersonalScheduleItem =
         buildingName = buildingName,
         source = runCatching { ScheduleSource.valueOf(source) }
             .getOrDefault(ScheduleSource.MANUAL),
+        recurrence = runCatching { ScheduleRecurrence.valueOf(recurrence) }
+            .getOrDefault(ScheduleRecurrence.WEEKLY),
+        seriesId = seriesId,
+        effectiveDate = effectiveDate,
         updatedAtEpochSeconds = updatedAtEpochSeconds,
     )
 
@@ -94,5 +102,8 @@ private fun PersonalScheduleItem.toEntity(): PersonalScheduleEntity =
         classroomName = classroomName,
         buildingName = buildingName,
         source = source.name,
+        recurrence = recurrence.name,
+        seriesId = seriesId,
+        effectiveDate = effectiveDate,
         updatedAtEpochSeconds = updatedAtEpochSeconds,
     )

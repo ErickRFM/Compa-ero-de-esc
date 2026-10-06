@@ -26,7 +26,9 @@ data class RoleExperienceConfig(
 object RoleExperienceResolver {
     fun available(roles: Set<UserRole>): List<AppExperience> = buildList {
         if (UserRole.STUDENT in roles) add(AppExperience.STUDENT)
-        if (UserRole.TEACHER in roles) add(AppExperience.TEACHER)
+        if (UserRole.TEACHER in roles || UserRole.TEACHER_PENDING in roles) {
+            add(AppExperience.TEACHER)
+        }
         if (UserRole.COORDINATOR in roles) add(AppExperience.COORDINATOR)
         if (UserRole.ADMIN in roles) add(AppExperience.ADMIN)
         if (UserRole.SUPER_ADMIN in roles) add(AppExperience.SUPER_ADMIN)

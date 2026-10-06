@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.map
 import org.companerodeescuela.shared.contracts.AttendanceReasonCode
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
 import org.companerodeescuela.shared.contracts.AttendanceStatus
+import org.companerodeescuela.shared.contracts.SchoolNetworkEvidence
 
 enum class LocalAttendanceSyncState {
     PENDING,
@@ -21,6 +22,7 @@ data class PendingAttendanceOperation(
     val sessionId: String,
     val deviceTimestampEpochSeconds: Long,
     val qrToken: String?,
+    val schoolNetwork: SchoolNetworkEvidence?,
     val attemptCount: Int,
     val nextAttemptAtEpochSeconds: Long,
     val lastErrorCode: String?,
@@ -43,6 +45,7 @@ interface AttendanceLocalStore {
         sessionId: String,
         deviceTimestampEpochSeconds: Long,
         qrToken: String? = null,
+        schoolNetwork: SchoolNetworkEvidence? = null,
     ): LocalAttendanceRecord
 
     suspend fun nextReady(nowEpochSeconds: Long): PendingAttendanceOperation?
@@ -83,6 +86,7 @@ internal class RoomAttendanceLocalStore(
         sessionId: String,
         deviceTimestampEpochSeconds: Long,
         qrToken: String?,
+        schoolNetwork: SchoolNetworkEvidence?,
     ): LocalAttendanceRecord {
         require(operationId.isNotBlank()) { "operationId must not be blank" }
         require(ownerId.isNotBlank()) { "ownerId must not be blank" }
@@ -96,6 +100,8 @@ internal class RoomAttendanceLocalStore(
                 sessionId = sessionId,
                 deviceTimestampEpochSeconds = deviceTimestampEpochSeconds,
                 qrToken = qrToken,
+                schoolSsid = schoolNetwork?.ssid,
+                schoolBssid = schoolNetwork?.bssid,
                 createdAtEpochSeconds = now,
                 attemptCount = 0,
                 nextAttemptAtEpochSeconds = now,
@@ -124,6 +130,10 @@ internal class RoomAttendanceLocalStore(
                 sessionId = entity.sessionId,
                 deviceTimestampEpochSeconds = entity.deviceTimestampEpochSeconds,
                 qrToken = entity.qrToken,
+                schoolNetwork = SchoolNetworkEvidence(
+                    ssid = entity.schoolSsid,
+                    bssid = entity.schoolBssid,
+                ).takeIf { it.ssid != null || it.bssid != null },
                 attemptCount = entity.attemptCount,
                 nextAttemptAtEpochSeconds = entity.nextAttemptAtEpochSeconds,
                 lastErrorCode = entity.lastErrorCode,

@@ -80,14 +80,12 @@ fun Application.module(
             repository = attendanceRepository,
         )
     }
-    val schoolPresenceRepository = when {
-        settings.mongo.isConfigured -> MongoSchoolPresenceRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemorySchoolPresenceRepository()
-        else -> null
-    }
-    val schoolPresenceService = if (
-        settings.hasSchoolPresenceVerification && schoolPresenceRepository != null
-    ) {
+    val schoolPresenceService = if (settings.hasSchoolPresenceVerification) {
+        val schoolPresenceRepository = when {
+            settings.mongo.isConfigured -> MongoSchoolPresenceRepository(mongoConnection.database())
+            settings.environment == Environment.LOCAL -> InMemorySchoolPresenceRepository()
+            else -> error("School presence requires MONGODB_URI outside local development")
+        }
         SchoolPresenceService(
             repository = schoolPresenceRepository,
             policy = SchoolPresencePolicy(

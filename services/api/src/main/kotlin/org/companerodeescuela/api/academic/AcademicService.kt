@@ -1,6 +1,7 @@
 package org.companerodeescuela.api.academic
 
 import java.time.LocalDate
+import org.companerodeescuela.api.academic.groups.AcademicGroupRepository
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.integrations.IntegrationException
 import org.companerodeescuela.api.integrations.academic.AcademicProvider
@@ -27,9 +28,11 @@ import org.companerodeescuela.shared.model.PersonId
 class AcademicService(
     private val provider: AcademicProvider,
     private val scheduleOverrides: AcademicScheduleOverrideRepository? = null,
+    private val groupRepository: AcademicGroupRepository? = null,
 ) {
-    suspend fun loadFor(externalId: String): AcademicLoadResponse =
-        translateIntegrationFailure {
+    suspend fun loadFor(externalId: String): AcademicLoadResponse {
+        val inheritedEntries = inheritedGroupEntries(externalId)
+        return try {
             val load = provider.getAcademicLoad(externalId)
             val student = AcademicMappers.toStudent(load.student)
             val coursesById = load.enrollments.associate { enrollment ->
@@ -58,26 +61,10 @@ class AcademicService(
                         campusName = slot.classroom?.building?.campus?.name,
                     )
                 }
-            val manualEntries = scheduleOverrides
+            val personalEntries = scheduleOverrides
                 ?.listForOwner(externalId)
                 .orEmpty()
-                .map { managed ->
-                    val block = managed.block
-                    ScheduleEntry(
-                        courseId = block.id,
-                        subjectCode = block.subjectId ?: "MANUAL",
-                        subjectName = block.subjectName,
-                        groupName = block.groupName.orEmpty(),
-                        teacherName = block.teacherName.orEmpty(),
-                        dayOfWeek = block.dayOfWeek,
-                        startsAt = block.startTime,
-                        endsAt = block.endTime,
-                        classroomName = block.room,
-                        buildingName = null,
-                        campusName = null,
-                        source = ScheduleSource.MANUAL,
-                    )
-                }
+                .map(::managedToEntry)
 
             AcademicLoadResponse(
                 student = AcademicProfile(
@@ -87,10 +74,64 @@ class AcademicService(
                 ),
                 schedule = AcademicScheduleResponse(
                     ownerId = schedule.ownerId.value,
-                    entries = mergeForPresentation(institutionalEntries, manualEntries),
+                    entries = mergeForPresentation(
+                        institutionalEntries,
+                        personalEntries + inheritedEntries,
+                    ),
                 ),
             )
+        } catch (error: IntegrationException) {
+            if (
+                error.category == IntegrationException.Category.NOT_FOUND &&
+                inheritedEntries.isNotEmpty()
+            ) {
+                AcademicLoadResponse(
+                    student = AcademicProfile(
+                        id = externalId,
+                        displayName = externalId,
+                    ),
+                    schedule = AcademicScheduleResponse(
+                        ownerId = externalId,
+                        entries = mergeForPresentation(emptyList(), inheritedEntries),
+                    ),
+                )
+            } else {
+                throw integrationApiException(error)
+            }
         }
+    }
+
+    private suspend fun inheritedGroupEntries(userId: String): List<ScheduleEntry> {
+        val groups = groupRepository?.listGroupsForUser(userId).orEmpty()
+        if (groups.isEmpty()) return emptyList()
+        return groups.flatMap { group ->
+            scheduleOverrides
+                ?.listForOwner(group.id)
+                .orEmpty()
+                .map(::managedToEntry)
+        }
+    }
+
+    private fun managedToEntry(managed: org.companerodeescuela.shared.contracts.ManagedScheduleBlock): ScheduleEntry {
+        val block = managed.block
+        return ScheduleEntry(
+            courseId = block.id,
+            subjectCode = block.subjectId ?: "MANUAL",
+            subjectName = block.subjectName,
+            groupName = block.groupName.orEmpty(),
+            teacherName = block.teacherName.orEmpty(),
+            dayOfWeek = block.dayOfWeek,
+            startsAt = block.startTime,
+            endsAt = block.endTime,
+            classroomName = block.room,
+            buildingName = null,
+            campusName = null,
+            source = ScheduleSource.MANUAL,
+            recurrence = block.recurrence,
+            seriesId = block.seriesId,
+            effectiveDate = block.effectiveDate,
+        )
+    }
 
     private fun mergeForPresentation(
         institutional: List<ScheduleEntry>,
@@ -172,23 +213,26 @@ class AcademicService(
         try {
             block()
         } catch (error: IntegrationException) {
-            when (error.category) {
-                IntegrationException.Category.NOT_FOUND ->
-                    throw ApiException.NotFound("Academic record was not found")
-                IntegrationException.Category.UNAUTHORIZED ->
-                    throw ApiException.Unauthorized("Institutional session is no longer valid")
-                IntegrationException.Category.UNAVAILABLE,
-                IntegrationException.Category.TIMEOUT,
-                -> throw ApiException.DependencyUnavailable(
-                    "The academic system is temporarily unavailable",
-                    error,
-                )
-                IntegrationException.Category.BAD_REQUEST,
-                IntegrationException.Category.MALFORMED_RESPONSE,
-                -> throw ApiException.Internal(
-                    "The academic system returned data we could not use",
-                    error,
-                )
-            }
+            throw integrationApiException(error)
+        }
+
+    private fun integrationApiException(error: IntegrationException): ApiException =
+        when (error.category) {
+            IntegrationException.Category.NOT_FOUND ->
+                ApiException.NotFound("Academic record was not found")
+            IntegrationException.Category.UNAUTHORIZED ->
+                ApiException.Unauthorized("Institutional session is no longer valid")
+            IntegrationException.Category.UNAVAILABLE,
+            IntegrationException.Category.TIMEOUT,
+            -> ApiException.DependencyUnavailable(
+                "The academic system is temporarily unavailable",
+                error,
+            )
+            IntegrationException.Category.BAD_REQUEST,
+            IntegrationException.Category.MALFORMED_RESPONSE,
+            -> ApiException.Internal(
+                "The academic system returned data we could not use",
+                error,
+            )
         }
 }

@@ -51,10 +51,10 @@ class ExcuseService(
     suspend fun listFor(actor: UserSummary): List<ExcuseRequestSummary> =
         when {
             UserRole.STUDENT in actor.roles ->
-                repository.listForStudent(actor.id).map(ExcuseRecord::toSummary)
+                repository.listForStudent(actor.id).map { it.toSummary() }
 
             isAdmin(actor) ->
-                repository.listAll().map(ExcuseRecord::toSummary)
+                repository.listAll().map { it.toSummary() }
 
             UserRole.TUTOR in actor.roles ->
                 repository.listAll().filter { record ->
@@ -62,7 +62,7 @@ class ExcuseService(
                         tutoring.requireCanAccessGroup(actor, record.academicGroupId)
                         true
                     }.getOrDefault(false)
-                }.map(ExcuseRecord::toSummary)
+                }.map { it.toSummary() }
 
             else -> throw ApiException.Forbidden("Excuse access is not allowed for this account")
         }

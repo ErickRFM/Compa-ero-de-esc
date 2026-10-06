@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import org.companerodeescuela.core.designsystem.brand.UptlaxBrand
@@ -62,12 +63,14 @@ fun RegistrationScreen(
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
-    val canSubmit = !state.submitting && institutionalId.isNotBlank() && password.isNotBlank()
+    val institutionalIdError = InstitutionalCredentialValidator.identifierError(institutionalId)
+    val passwordError = InstitutionalCredentialValidator.passwordError(password)
+    val canSubmit = !state.submitting && institutionalIdError == null && passwordError == null
 
     fun submit() {
         if (!canSubmit) return
         focusManager.clearFocus()
-        onActivate(institutionalId.trim(), password)
+        onActivate(institutionalId, password)
     }
 
     Box(
@@ -126,22 +129,37 @@ fun RegistrationScreen(
 
                     OutlinedTextField(
                         value = institutionalId,
-                        onValueChange = { institutionalId = it },
+                        onValueChange = {
+                            institutionalId = InstitutionalCredentialValidator.sanitizeIdentifier(it)
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !state.submitting,
                         singleLine = true,
                         shape = MaterialTheme.shapes.large,
-                        label = { Text("Matrícula o ID institucional") },
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        label = { Text("Matrícula, correo o ID institucional") },
+                        isError = institutionalId.isNotEmpty() && institutionalIdError != null,
+                        supportingText = institutionalIdError
+                            ?.takeIf { institutionalId.isNotEmpty() }
+                            ?.let { error -> { Text(error) } },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Email,
+                            imeAction = ImeAction.Next,
+                        ),
                     )
                     OutlinedTextField(
                         value = password,
-                        onValueChange = { password = it },
+                        onValueChange = {
+                            password = InstitutionalCredentialValidator.sanitizePassword(it)
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !state.submitting,
                         singleLine = true,
                         shape = MaterialTheme.shapes.large,
                         label = { Text("Contraseña institucional") },
+                        isError = password.isNotEmpty() && passwordError != null,
+                        supportingText = passwordError
+                            ?.takeIf { password.isNotEmpty() }
+                            ?.let { error -> { Text(error) } },
                         visualTransformation = if (passwordVisible) {
                             VisualTransformation.None
                         } else {
@@ -163,7 +181,10 @@ fun RegistrationScreen(
                                 )
                             }
                         },
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Password,
+                            imeAction = ImeAction.Done,
+                        ),
                         keyboardActions = KeyboardActions(onDone = { submit() }),
                     )
 

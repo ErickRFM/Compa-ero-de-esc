@@ -9,6 +9,7 @@ import io.ktor.http.headersOf
 import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -99,6 +100,55 @@ class SessionViewModelTest {
         assertEquals(setOf(UserRole.TEACHER), state.roles)
         assertEquals(refreshedToken, tokenStore.accessToken.value)
         assertEquals("refresh-after", tokenStore.refreshSession?.refreshToken)
+    }
+
+    @Test
+    fun `refresh failure is shown as session notice not credential error`() = runTest {
+        val currentEpoch = System.currentTimeMillis() / 1000
+        val tokenStore = FakeSessionStore(
+            accessToken = token(
+                subject = "student-1",
+                sessionId = "session-1",
+                expiresAt = currentEpoch - 100,
+                roles = listOf("STUDENT"),
+            ),
+            refreshSession = RefreshSessionCredentials("session-1", "refresh-before"),
+        )
+        val clock = java.time.Clock.fixed(
+            java.time.Instant.ofEpochSecond(currentEpoch),
+            java.time.ZoneId.of("UTC"),
+        )
+        val repository = AuthRepository(
+            client = createApiClient(
+                ApiEnvironment("https://example.test/", "test"),
+                MockEngine {
+                    respond(
+                        content = """{"error":"temporarily unavailable"}""",
+                        status = HttpStatusCode.ServiceUnavailable,
+                        headers = headersOf(
+                            HttpHeaders.ContentType,
+                            ContentType.Application.Json.toString(),
+                        ),
+                    )
+                },
+            ),
+            tokenStore = tokenStore,
+            clock = clock,
+        )
+
+        val viewModel = SessionViewModel(
+            repository = repository,
+            tokenStore = tokenStore,
+            clock = clock,
+        )
+        val state = viewModel.state.first { !it.checking }
+
+        assertTrue(!state.authenticated)
+        assertNull(state.errorMessage)
+        assertEquals(
+            "No pudimos renovar tu sesión. Revisa tu conexión e inténtalo de nuevo.",
+            state.noticeMessage,
+        )
     }
 
     private class FakeSessionStore(

@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -47,7 +48,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.LocalDate
@@ -72,15 +78,6 @@ private enum class AgendaMode {
     WEEK,
 }
 
-private val academicDays = listOf(
-    "MONDAY",
-    "TUESDAY",
-    "WEDNESDAY",
-    "THURSDAY",
-    "FRIDAY",
-    "SATURDAY",
-)
-
 @Composable
 fun ScheduleScreen(
     modifier: Modifier = Modifier,
@@ -95,6 +92,7 @@ fun ScheduleScreen(
     var editingEntry by remember { mutableStateOf<ScheduleEntry?>(null) }
     var editingImportIndex by remember { mutableStateOf<Int?>(null) }
     var importBusy by remember { mutableStateOf(false) }
+    var moveProposal by remember { mutableStateOf<AgendaMoveProposal?>(null) }
 
     val documentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
@@ -123,9 +121,7 @@ fun ScheduleScreen(
     var selectedDay by remember(state.entries) {
         val today = LocalDate.now().dayOfWeek.name
         mutableStateOf(
-            today.takeIf { candidate -> state.entries.any { it.dayOfWeek == candidate } }
-                ?: state.entries.firstOrNull()?.dayOfWeek
-                ?: today,
+            today.takeIf { it in academicDaysV8 } ?: "MONDAY",
         )
     }
 
@@ -218,6 +214,7 @@ fun ScheduleScreen(
                             showEditor = true
                         },
                         onDelete = viewModel::deletePersonal,
+                        onMoveRequest = { moveProposal = it },
                     )
                     AgendaMode.WEEK -> WeekAgenda(
                         entries = state.entries,
@@ -227,6 +224,7 @@ fun ScheduleScreen(
                             showEditor = true
                         },
                         onDelete = viewModel::deletePersonal,
+                        onMoveRequest = { moveProposal = it },
                     )
                 }
             }
@@ -279,16 +277,29 @@ fun ScheduleScreen(
                 editingEntry = null
                 editingImportIndex = null
             },
-            onSave = { draft ->
+            onSave = { draft, days ->
                 val importIndex = editingImportIndex
                 if (importIndex != null) {
-                    viewModel.updateImportCandidate(importIndex, draft)
+                    val selected = days.firstOrNull() ?: draft.dayOfWeek
+                    viewModel.updateImportCandidate(importIndex, draft.copy(dayOfWeek = selected))
                 } else {
-                    viewModel.savePersonal(draft)
+                    viewModel.savePersonalDays(draft, days)
                 }
                 showEditor = false
                 editingEntry = null
                 editingImportIndex = null
+            },
+        )
+    }
+
+    moveProposal?.let { proposal ->
+        MoveScheduleDialog(
+            proposal = proposal,
+            busy = state.actionInProgress,
+            onDismiss = { moveProposal = null },
+            onConfirm = {
+                viewModel.movePersonal(proposal)
+                moveProposal = null
             },
         )
     }

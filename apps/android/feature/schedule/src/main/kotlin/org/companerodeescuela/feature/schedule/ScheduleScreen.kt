@@ -539,11 +539,72 @@ private fun AgendaTimeline(
 @Composable
 private fun AgendaTimelineEntry(
     entry: ScheduleEntry,
+    allEntries: List<ScheduleEntry>,
     onEdit: (ScheduleEntry) -> Unit,
     onDelete: (ScheduleEntry) -> Unit,
+    onMoveRequest: (AgendaMoveProposal) -> Unit,
 ) {
+    var dragOffset by remember(entry.courseId) { mutableStateOf(Offset.Zero) }
+    val density = LocalDensity.current
+    val haptics = LocalHapticFeedback.current
+    val quarterHourPx = with(density) { 24.dp.toPx() }
+    val horizontalThresholdPx = with(density) { 72.dp.toPx() }
+    val draggable = entry.source != ScheduleSource.INSTITUTIONAL
+
+    val dragModifier = if (!draggable) {
+        Modifier
+    } else {
+        Modifier
+            .graphicsLayer {
+                translationX = dragOffset.x
+                translationY = dragOffset.y
+            }
+            .pointerInput(entry.courseId, allEntries) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    },
+                    onDragCancel = { dragOffset = Offset.Zero },
+                    onDragEnd = {
+                        val targetStart = AgendaEditingRules.shiftFromDrag(
+                            entry = entry,
+                            verticalPixels = dragOffset.y,
+                            pixelsPerQuarterHour = quarterHourPx,
+                        )
+                        val targetDay = AgendaEditingRules.adjacentDay(
+                            currentDay = entry.dayOfWeek,
+                            horizontalPixels = dragOffset.x,
+                            thresholdPixels = horizontalThresholdPx,
+                        )
+                        if (targetStart != null) {
+                            AgendaEditingRules.proposeMove(
+                                entry = entry,
+                                targetDay = targetDay,
+                                targetStart = targetStart,
+                                existing = allEntries,
+                            )?.let { proposal ->
+                                if (
+                                    proposal.targetDay != entry.dayOfWeek ||
+                                    proposal.targetStart != entry.startsAt
+                                ) {
+                                    onMoveRequest(proposal)
+                                }
+                            }
+                        }
+                        dragOffset = Offset.Zero
+                    },
+                    onDrag = { change, amount ->
+                        change.consume()
+                        dragOffset += amount
+                    },
+                )
+            }
+    }
+
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(dragModifier),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
     ) {
         AcademicTimelineItem(

@@ -518,13 +518,13 @@ private fun DayTimeGrid(
     val lineColor = MaterialTheme.colorScheme.outlineVariant
     val density = LocalDensity.current
     val haptics = LocalHapticFeedback.current
-    val quarterHourPx = with(density) { (hourHeight / 4).toPx() }
+    val quarterHourPx = with(density) { hourHeight.toPx() / 4f }
     val horizontalThresholdPx = with(density) { 72.dp.toPx() }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(hourHeight * totalHours)
+            .height(hourHeight * totalHours.toFloat())
             .drawBehind {
                 for (index in 0..totalHours) {
                     val y = index * hourHeight.toPx()
@@ -544,7 +544,7 @@ private fun DayTimeGrid(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
                     .width(railWidth)
-                    .offset(y = hourHeight * (hour - startHour))
+                    .offset(y = hourHeight * (hour - startHour).toFloat())
                     .padding(top = 2.dp),
             )
         }

@@ -114,6 +114,27 @@ internal object MockFixtures {
             programCode = "QA",
             enrollmentYear = null,
         ),
+        QA_TEACHER_ID to ExternalStudent(
+            externalId = QA_TEACHER_ID,
+            fullName = "QA Docente",
+            institutionalEmail = "qa.docente@example.invalid",
+            programCode = "QA",
+            enrollmentYear = null,
+        ),
+        QA_SUPERVISOR_ID to ExternalStudent(
+            externalId = QA_SUPERVISOR_ID,
+            fullName = "QA Supervisor",
+            institutionalEmail = "qa.supervisor@example.invalid",
+            programCode = "QA",
+            enrollmentYear = null,
+        ),
+        QA_ADMIN_ID to ExternalStudent(
+            externalId = QA_ADMIN_ID,
+            fullName = "QA Admin",
+            institutionalEmail = "qa.admin@example.invalid",
+            programCode = "QA",
+            enrollmentYear = null,
+        ),
     )
 
     private val ALGEBRA = ExternalSubject("MAT-101", "Álgebra Lineal", credits = 8)

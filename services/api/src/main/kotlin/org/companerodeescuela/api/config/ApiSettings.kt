@@ -52,12 +52,19 @@ data class ApiSettings(
     val jwtIssuer: String,
     val jwtAudience: String,
     val attendanceQrSecret: CharArray? = null,
+    val schoolPresenceQrSha256: String = "",
+    val schoolWifiSsids: Set<String> = emptySet(),
+    val schoolWifiBssids: Set<String> = emptySet(),
 ) {
     val hasAuthentication: Boolean
         get() = jwtSecret != null
 
     val hasAttendanceQrSigning: Boolean
         get() = attendanceQrSecret != null
+
+    val hasSchoolPresenceVerification: Boolean
+        get() = schoolPresenceQrSha256.isNotBlank() &&
+            (schoolWifiSsids.isNotEmpty() || schoolWifiBssids.isNotEmpty())
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -72,7 +79,10 @@ data class ApiSettings(
             jwtIssuer == other.jwtIssuer &&
             jwtAudience == other.jwtAudience &&
             hasAuthentication == other.hasAuthentication &&
-            hasAttendanceQrSigning == other.hasAttendanceQrSigning
+            hasAttendanceQrSigning == other.hasAttendanceQrSigning &&
+            schoolPresenceQrSha256 == other.schoolPresenceQrSha256 &&
+            schoolWifiSsids == other.schoolWifiSsids &&
+            schoolWifiBssids == other.schoolWifiBssids
     }
 
     override fun hashCode(): Int {
@@ -87,6 +97,9 @@ data class ApiSettings(
         result = 31 * result + jwtAudience.hashCode()
         result = 31 * result + hasAuthentication.hashCode()
         result = 31 * result + hasAttendanceQrSigning.hashCode()
+        result = 31 * result + schoolPresenceQrSha256.hashCode()
+        result = 31 * result + schoolWifiSsids.hashCode()
+        result = 31 * result + schoolWifiBssids.hashCode()
         return result
     }
 
@@ -104,7 +117,8 @@ data class ApiSettings(
             "mongoConfigured=${mongo.isConfigured}, " +
             "mongoDatabase=${mongo.databaseName}, " +
             "authenticationConfigured=$hasAuthentication, " +
-            "attendanceQrSigningConfigured=$hasAttendanceQrSigning" +
+            "attendanceQrSigningConfigured=$hasAttendanceQrSigning, " +
+            "schoolPresenceConfigured=$hasSchoolPresenceVerification" +
             ")"
 }
 
@@ -128,6 +142,9 @@ class SettingsLoader(
         val jwtIssuer = env("JWT_ISSUER")?.trim().orEmpty().ifEmpty { DEFAULT_JWT_ISSUER }
         val jwtAudience = env("JWT_AUDIENCE")?.trim().orEmpty().ifEmpty { DEFAULT_JWT_AUDIENCE }
         val attendanceQrSecret = env("ATTENDANCE_QR_SECRET")?.takeIf { it.isNotBlank() }
+        val schoolPresenceQrSha256 = env("SCHOOL_PRESENCE_QR_SHA256")?.trim().orEmpty().lowercase()
+        val schoolWifiSsids = parseCsv(env("SCHOOL_WIFI_SSIDS"))
+        val schoolWifiBssids = parseCsv(env("SCHOOL_WIFI_BSSIDS")).map(String::lowercase).toSet()
 
         val results = listOf(
             Validators.port(ENV_API_PORT, portText),
@@ -143,6 +160,7 @@ class SettingsLoader(
 
         validateSecret(environment, jwtSecret)
         validateOptionalSecret("ATTENDANCE_QR_SECRET", attendanceQrSecret)
+        validateSchoolPresence(schoolPresenceQrSha256, schoolWifiSsids, schoolWifiBssids)
 
         return ApiSettings(
             serviceName = DEFAULT_SERVICE_NAME,
@@ -167,7 +185,32 @@ class SettingsLoader(
             jwtIssuer = jwtIssuer,
             jwtAudience = jwtAudience,
             attendanceQrSecret = attendanceQrSecret?.toCharArray(),
+            schoolPresenceQrSha256 = schoolPresenceQrSha256,
+            schoolWifiSsids = schoolWifiSsids,
+            schoolWifiBssids = schoolWifiBssids,
         )
+    }
+
+    private fun parseCsv(raw: String?): Set<String> =
+        raw.orEmpty()
+            .split(',')
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .toSet()
+
+    private fun validateSchoolPresence(
+        qrSha256: String,
+        ssids: Set<String>,
+        bssids: Set<String>,
+    ) {
+        val partiallyConfigured = qrSha256.isNotBlank() || ssids.isNotEmpty() || bssids.isNotEmpty()
+        if (!partiallyConfigured) return
+        if (qrSha256.length != 64 || qrSha256.any { it !in "0123456789abcdef" }) {
+            throw ConfigurationException("SCHOOL_PRESENCE_QR_SHA256 must be a lowercase SHA-256 hex digest")
+        }
+        if (ssids.isEmpty() && bssids.isEmpty()) {
+            throw ConfigurationException("Configure SCHOOL_WIFI_SSIDS or SCHOOL_WIFI_BSSIDS")
+        }
     }
 
     private fun validateOptionalSecret(name: String, secret: String?) {

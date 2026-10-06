@@ -3,7 +3,6 @@ package org.companerodeescuela.api.classroom
 import com.mongodb.client.model.Filters.and
 import com.mongodb.client.model.Filters.eq
 import com.mongodb.client.model.Filters.gt
-import com.mongodb.client.model.Filters.lt
 import com.mongodb.client.model.FindOneAndUpdateOptions
 import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
@@ -74,8 +73,8 @@ class MongoClassroomRepository(database: MongoDatabase) : ClassroomRepository {
         return try {
             memberships.insertOne(membership.toDocument())
             membership
-        } catch (_: com.mongodb.MongoWriteException) {
-            memberships.find(filter).firstOrNull()?.toMembership() ?: throw
+        } catch (error: com.mongodb.MongoWriteException) {
+            memberships.find(filter).firstOrNull()?.toMembership() ?: throw error
         }
     }
 
@@ -94,18 +93,23 @@ class MongoClassroomRepository(database: MongoDatabase) : ClassroomRepository {
         now: Instant,
     ): NativeClassInviteRecord? {
         ensureIndexes()
+        val current = invites.find(eq("_id", inviteId)).firstOrNull()?.toInvite() ?: return null
+        if (
+            current.revokedAt != null ||
+            current.expiresAt <= now ||
+            current.uses >= current.maxUses
+        ) return null
         val document = invites.findOneAndUpdate(
             and(
                 eq("_id", inviteId),
                 eq("revokedAt", null),
                 gt("expiresAt", Date.from(now)),
-                lt("uses", Int.MAX_VALUE),
+                eq("uses", current.uses),
             ),
             Updates.inc("uses", 1),
             FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
         ) ?: return null
-        val invite = document.toInvite()
-        return invite.takeIf { it.uses <= it.maxUses }
+        return document.toInvite()
     }
 
     override suspend fun revokeInvite(

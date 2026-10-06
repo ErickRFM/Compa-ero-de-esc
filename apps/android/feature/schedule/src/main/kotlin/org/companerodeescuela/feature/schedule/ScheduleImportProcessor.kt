@@ -167,7 +167,7 @@ private object TimetableOcrReconstructor {
                     val cellLines = lines
                         .asSequence()
                         .filterNot(excluded::contains)
-                        .filter { it.centerY in top..<bottom }
+                        .filter { it.centerY >= top && it.centerY < bottom }
                         .filter { nearestDay(it.centerX, dayHeaders) == header }
                         .sortedWith(compareBy<PositionedLine>({ it.centerY }, { it.left }))
                         .map { it.text.replace(Regex("""\s+"""), " ").trim() }

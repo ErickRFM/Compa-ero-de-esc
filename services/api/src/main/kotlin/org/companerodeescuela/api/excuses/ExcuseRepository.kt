@@ -72,12 +72,12 @@ class MongoExcuseRepository(database: MongoDatabase) : ExcuseRepository {
 
     override suspend fun listForStudent(studentId: String): List<ExcuseRecord> =
         collection.find(eq("studentId", studentId)).toList()
-            .map(Document::toRecord)
+            .map { it.toRecord() }
             .sortedByDescending(ExcuseRecord::submittedAt)
 
     override suspend fun listAll(): List<ExcuseRecord> =
         collection.find().toList()
-            .map(Document::toRecord)
+            .map { it.toRecord() }
             .sortedByDescending(ExcuseRecord::submittedAt)
 
     private fun ExcuseRecord.toDocument(): Document =

@@ -26,6 +26,7 @@ data class ScheduleUiState(
     val importCandidates: List<PersonalScheduleDraft> = emptyList(),
     val undoDrafts: List<PersonalScheduleDraft> = emptyList(),
     val successMessage: String? = null,
+    val syncMessage: String? = null,
     val errorMessage: String? = null,
 )
 

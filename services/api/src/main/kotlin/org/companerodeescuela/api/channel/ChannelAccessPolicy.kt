@@ -1,18 +1,59 @@
 package org.companerodeescuela.api.channel
 
+import org.companerodeescuela.api.classroom.ClassroomService
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.integrations.IntegrationException
 import org.companerodeescuela.api.integrations.academic.AcademicProvider
 import org.companerodeescuela.api.integrations.academic.dto.ExternalCourse
 import org.companerodeescuela.shared.contracts.ClassChannelSummary
 import org.companerodeescuela.shared.contracts.UserRole
+import org.companerodeescuela.shared.contracts.UserSummary
 
 class ChannelAccessPolicy(
     private val academicProvider: AcademicProvider,
+    private val classroomService: ClassroomService? = null,
 ) {
     suspend fun channelsFor(userId: String, roles: Set<UserRole>): List<ClassChannelSummary> {
-        val courses = accessibleCourses(userId, roles)
-        return courses
+        val native = classroomService
+            ?.nativeChannelsFor(
+                UserSummary(
+                    id = userId,
+                    displayName = userId,
+                    roles = roles,
+                ),
+            )
+            .orEmpty()
+            .map { classroom ->
+                ClassChannelSummary(
+                    id = classroom.id,
+                    courseId = classroom.id,
+                    subjectCode = "LOCAL",
+                    subjectName = classroom.name,
+                    groupName = classroom.room ?: "Clase",
+                    term = "Compañero",
+                    teacherId = classroom.teacherId,
+                    teacherDisplayName = classroom.teacherDisplayName,
+                    canPublish = classroom.canManage,
+                )
+            }
+
+        val courses = try {
+            accessibleCourses(userId, roles)
+        } catch (error: ApiException) {
+            if (
+                native.isNotEmpty() &&
+                (
+                    error is ApiException.NotFound ||
+                        error is ApiException.DependencyUnavailable ||
+                        error is ApiException.Unauthorized
+                )
+            ) {
+                emptyList()
+            } else {
+                throw error
+            }
+        }
+        val institutional = courses
             .distinctBy(ExternalCourse::externalId)
             .sortedWith(compareBy({ it.subject.name }, { it.groupName }))
             .map { course ->
@@ -28,6 +69,7 @@ class ChannelAccessPolicy(
                     canPublish = canPublishCourse(userId, roles, course),
                 )
             }
+        return (native + institutional).distinctBy(ClassChannelSummary::id)
     }
 
     suspend fun requireCanRead(

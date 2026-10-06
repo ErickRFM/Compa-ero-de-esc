@@ -3,6 +3,7 @@ package org.companerodeescuela.feature.schedule
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,6 +14,7 @@ import org.companerodeescuela.core.academic.PersonalScheduleDraft
 import org.companerodeescuela.core.academic.PersonalScheduleRepository
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.shared.contracts.ScheduleEntry
+import org.companerodeescuela.shared.contracts.ScheduleRecurrence
 import org.companerodeescuela.shared.contracts.ScheduleSource
 
 data class ScheduleUiState(
@@ -65,6 +67,97 @@ class ScheduleViewModel @Inject constructor(
                     _state.value = _state.value.copy(
                         actionInProgress = false,
                         successMessage = "Horario personal actualizado.",
+                    )
+                    load()
+                }
+                is Outcome.Failure -> {
+                    _state.value = _state.value.copy(
+                        actionInProgress = false,
+                        errorMessage = result.error.userMessage,
+                    )
+                }
+            }
+        }
+    }
+
+    fun savePersonalDays(
+        draft: PersonalScheduleDraft,
+        days: Set<String>,
+    ) {
+        val normalizedDays = days.filter { it in academicDaysV8 }.toSet()
+        if (normalizedDays.isEmpty()) {
+            _state.value = _state.value.copy(errorMessage = "Selecciona al menos un día.")
+            return
+        }
+
+        viewModelScope.launch {
+            _state.value = _state.value.copy(actionInProgress = true, errorMessage = null)
+            val seriesId = draft.seriesId ?: UUID.randomUUID().toString()
+            var failure: Outcome.Failure? = null
+
+            normalizedDays.forEachIndexed { index, day ->
+                if (failure != null) return@forEachIndexed
+                val candidate = draft.copy(
+                    id = if (index == 0) draft.id else null,
+                    dayOfWeek = day,
+                    source = ScheduleSource.MANUAL,
+                    recurrence = ScheduleRecurrence.WEEKLY,
+                    seriesId = seriesId,
+                    effectiveDate = null,
+                )
+                when (val result = personalRepository.save(candidate)) {
+                    is Outcome.Success -> Unit
+                    is Outcome.Failure -> failure = result
+                }
+            }
+
+            if (failure == null) {
+                _state.value = _state.value.copy(
+                    actionInProgress = false,
+                    successMessage = if (normalizedDays.size == 1) {
+                        "Horario personal actualizado."
+                    } else {
+                        "Clase guardada en ${normalizedDays.size} días."
+                    },
+                )
+                load()
+            } else {
+                _state.value = _state.value.copy(
+                    actionInProgress = false,
+                    errorMessage = failure?.error?.userMessage,
+                )
+            }
+        }
+    }
+
+    fun movePersonal(proposal: AgendaMoveProposal) {
+        val entry = proposal.entry
+        if (entry.source == ScheduleSource.INSTITUTIONAL) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(actionInProgress = true, errorMessage = null)
+            val draft = PersonalScheduleDraft(
+                id = entry.courseId,
+                subjectCode = entry.subjectCode,
+                subjectName = entry.subjectName,
+                groupName = entry.groupName,
+                teacherName = entry.teacherName,
+                dayOfWeek = proposal.targetDay,
+                startsAt = proposal.targetStart,
+                endsAt = proposal.targetEnd,
+                classroomName = entry.classroomName,
+                buildingName = entry.buildingName,
+                source = entry.source,
+                recurrence = entry.recurrence,
+                seriesId = entry.seriesId,
+                effectiveDate = entry.effectiveDate,
+            )
+            when (val result = personalRepository.save(draft)) {
+                is Outcome.Success -> {
+                    _state.value = _state.value.copy(
+                        actionInProgress = false,
+                        successMessage = "Clase movida a " +
+                            dayShortLabelV8(proposal.targetDay) + " " +
+                            proposal.targetStart + "–" + proposal.targetEnd + ".",
                     )
                     load()
                 }

@@ -104,7 +104,10 @@ fun Application.module(
     )
     val channelService = ChannelService(
         repository = channelRepository,
-        accessPolicy = ChannelAccessPolicy(providerRegistry.academic),
+        accessPolicy = ChannelAccessPolicy(
+            academicProvider = providerRegistry.academic,
+            classroomService = classroomService,
+        ),
     )
 
     val scheduleOverrideRepository = when {

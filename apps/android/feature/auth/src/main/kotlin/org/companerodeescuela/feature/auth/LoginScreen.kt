@@ -186,7 +186,7 @@ fun LoginScreen(
 
                     Text(
                         text = state.noticeMessage
-                            ?: "Ingresa con tu cuenta institucional para consultar horario, clases y asistencia.",
+                            ?: "Ingresa con tu cuenta de Compañero para consultar clases, horario y asistencia.",
                         modifier = Modifier.padding(top = 4.dp),
                         color = Color(0xFFADB4BF),
                         fontSize = 13.sp,
@@ -205,13 +205,13 @@ fun LoginScreen(
             ) {
                 Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp)) {
                     Text(
-                        text = "Acceso institucional",
+                        text = "Acceso a Compañero",
                         color = UptlaxInk,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        text = "Usa la misma cuenta de tu universidad.",
+                        text = "Tu cuenta funciona aunque la escuela no tenga una API conectada.",
                         modifier = Modifier.padding(top = 3.dp, bottom = 14.dp),
                         color = UptlaxMuted,
                         fontSize = 13.sp,
@@ -335,7 +335,7 @@ fun LoginScreen(
                     }
 
                     Text(
-                        text = "¿Primera vez aquí?",
+                        text = "¿Aún no tienes cuenta?",
                         modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
                         color = UptlaxMuted,
                         fontSize = 12.sp,
@@ -350,7 +350,7 @@ fun LoginScreen(
                         shape = RoundedCornerShape(12.dp),
                     ) {
                         Text(
-                            text = "Activar mi acceso",
+                            text = "Crear cuenta",
                             color = UptlaxAccent,
                             fontWeight = FontWeight.SemiBold,
                         )

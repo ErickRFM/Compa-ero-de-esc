@@ -61,8 +61,11 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
 import org.companerodeescuela.core.academic.PersonalScheduleDraft
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
@@ -279,13 +282,12 @@ fun ScheduleScreen(
                 }
             }
 
-            TextButton(
-                onClick = viewModel::load,
-                enabled = !state.loading,
-                modifier = Modifier.align(Alignment.End),
-            ) {
-                Text(if (state.loading) "Actualizando…" else "Sincronizar UPTlax")
-            }
+            InstitutionSyncCard(
+                fromCache = state.fromCache,
+                lastUpdatedAtEpochSeconds = state.lastUpdatedAtEpochSeconds,
+                loading = state.loading,
+                onSync = viewModel::load,
+            )
         }
     }
 
@@ -357,6 +359,57 @@ fun ScheduleScreen(
             onDismiss = viewModel::discardImport,
             onConfirm = viewModel::confirmImport,
         )
+    }
+}
+
+@Composable
+private fun InstitutionSyncCard(
+    fromCache: Boolean,
+    lastUpdatedAtEpochSeconds: Long?,
+    loading: Boolean,
+    onSync: () -> Unit,
+) {
+    CompaneroSurface(
+        modifier = Modifier.fillMaxWidth(),
+        role = CompaneroSurfaceRole.CARD,
+    ) {
+        Row(
+            modifier = Modifier.padding(CompaneroSpacing.sm),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
+            ) {
+                Text(
+                    "Fuente institucional · UPTlax",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    if (fromCache) {
+                        "Sin conexión institucional · usando copia guardada"
+                    } else {
+                        "Sincronización disponible"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                lastUpdatedAtEpochSeconds?.let { epoch ->
+                    Text(
+                        "Última actualización: " + formatSyncTime(epoch),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            TextButton(
+                onClick = onSync,
+                enabled = !loading,
+            ) {
+                Text(if (loading) "…" else "Sincronizar")
+            }
+        }
     }
 }
 
@@ -1233,3 +1286,11 @@ private fun dayLabel(day: String): String = when (day) {
     "SUNDAY" -> "Domingo"
     else -> day
 }
+
+
+private fun formatSyncTime(epochSeconds: Long): String =
+    runCatching {
+        DateTimeFormatter.ofPattern("dd/MM HH:mm")
+            .withZone(ZoneId.systemDefault())
+            .format(Instant.ofEpochSecond(epochSeconds))
+    }.getOrDefault("reciente")

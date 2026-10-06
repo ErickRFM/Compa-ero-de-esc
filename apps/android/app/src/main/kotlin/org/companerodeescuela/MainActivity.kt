@@ -115,7 +115,7 @@ class MainActivity : ComponentActivity() {
                                 if (activatingAccess) {
                                     RegistrationScreen(
                                         state = session,
-                                        onActivate = sessionViewModel::login,
+                                        onRegister = sessionViewModel::register,
                                         onBackToLogin = { activatingAccess = false },
                                     )
                                 } else {
@@ -314,7 +314,7 @@ private fun RoleUnavailableScreen(experience: AppExperience) {
         )
         Text(
             text = if (experience == AppExperience.UNSUPPORTED) {
-                "Tu cuenta no tiene un rol compatible con esta versión. Revisa el acceso institucional."
+                "Tu cuenta está creada, pero todavía no tiene un rol operativo habilitado."
             } else {
                 "Tu perfil está activo. Las herramientas para este rol se integrarán en el workspace V6 sin enviarte a pantallas de alumno."
             },

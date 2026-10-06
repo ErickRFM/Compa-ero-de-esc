@@ -79,7 +79,7 @@ fun ProfileScreen(
                 ) {
                     Text(
                         text = displayName?.takeIf(String::isNotBlank)
-                            ?: "Cuenta institucional",
+                            ?: "Cuenta de Compañero",
                         style = MaterialTheme.typography.titleLarge,
                         color = CompanionColors.onDarkSurface,
                     )
@@ -89,7 +89,7 @@ fun ProfileScreen(
                         color = CompanionColors.onDarkSurfaceVariant,
                     )
                     Text(
-                        text = "UPTlax · Sesión institucional activa",
+                        text = "Cuenta de Compañero activa",
                         style = MaterialTheme.typography.labelLarge,
                         color = CompanionColors.crimsonContainer,
                     )
@@ -99,14 +99,14 @@ fun ProfileScreen(
 
         ProfileGroup(title = "Cuenta") {
             ProfileRow(
-                title = "Institución",
-                detail = "Universidad Politécnica de Tlaxcala",
-                trailingLabel = "UPTlax",
+                title = "Cuenta",
+                detail = "Compañero de Clase",
+                trailingLabel = "Activa",
             )
             GroupDivider()
             ProfileRow(
-                title = "Sesión",
-                detail = "Institucional activa",
+                title = "Sistema escolar",
+                detail = "Opcional · podrás vincularlo para sincronizar datos.",
             )
             GroupDivider()
             ProfileRow(
@@ -219,6 +219,7 @@ private fun roleSummary(roles: Set<UserRole>): String = roles
     .joinToString(" · ") { role ->
         when (role) {
             UserRole.STUDENT -> "Estudiante"
+            UserRole.TEACHER_PENDING -> "Docente pendiente"
             UserRole.TEACHER -> "Docente"
             UserRole.COORDINATOR -> "Coordinación"
             UserRole.ADMIN -> "Administración"

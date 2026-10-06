@@ -17,6 +17,7 @@ import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.security.SessionTokenInspector
 import org.companerodeescuela.core.security.SessionTokenStore
+import org.companerodeescuela.shared.contracts.RegistrationAccountType
 import org.companerodeescuela.shared.contracts.UserRole
 
 data class SessionUiState(
@@ -163,6 +164,55 @@ class SessionViewModel @Inject constructor(
                         displayName = null,
                         roles = emptySet(),
                         errorMessage = message,
+                        noticeMessage = null,
+                    )
+                }
+            }
+        }
+    }
+
+    fun register(
+        displayName: String,
+        email: String,
+        password: String,
+        accountType: RegistrationAccountType,
+    ) {
+        if (_state.value.submitting) return
+        viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    submitting = true,
+                    errorMessage = null,
+                    noticeMessage = null,
+                )
+            }
+            when (
+                val result = repository.register(
+                    displayName = displayName,
+                    email = email,
+                    password = password,
+                    accountType = accountType,
+                )
+            ) {
+                is Outcome.Success -> _state.update {
+                    it.copy(
+                        checking = false,
+                        authenticated = true,
+                        submitting = false,
+                        displayName = result.value.displayName,
+                        roles = result.value.roles,
+                        errorMessage = null,
+                        noticeMessage = null,
+                    )
+                }
+                is Outcome.Failure -> _state.update {
+                    it.copy(
+                        checking = false,
+                        authenticated = false,
+                        submitting = false,
+                        displayName = null,
+                        roles = emptySet(),
+                        errorMessage = result.error.userMessage,
                         noticeMessage = null,
                     )
                 }

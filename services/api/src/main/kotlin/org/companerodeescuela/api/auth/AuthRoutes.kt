@@ -19,6 +19,7 @@ import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.LoginRequest
 import org.companerodeescuela.shared.contracts.RefreshSessionRequest
+import org.companerodeescuela.shared.contracts.RegisterRequest
 
 /**
  * Platform authentication endpoints.
@@ -31,12 +32,15 @@ fun Route.authRoutes(
     identityProvider: IdentityProvider,
     loginAttemptLimiter: LoginAttemptLimiter = LoginAttemptLimiter(),
     sessions: RefreshSessionRepository = InMemoryRefreshSessionRepository(),
+    accounts: PlatformAccountRepository = InMemoryPlatformAccountRepository(),
 ) {
     val tokenService = settings.jwtSecret?.let { AuthTokenService(settings) }
 
     route("/auth") {
         post("/login") {
-            val service = tokenService?.let { AuthService(identityProvider, it, sessions) }
+            val service = tokenService?.let {
+                AuthService(identityProvider, it, sessions, accounts = accounts)
+            }
                 ?: throw ApiException.DependencyUnavailable(
                     "Authentication is not configured",
                 )
@@ -64,8 +68,27 @@ fun Route.authRoutes(
             )
         }
 
+        post("/register") {
+            val service = tokenService?.let {
+                AuthService(identityProvider, it, sessions, accounts = accounts)
+            } ?: throw ApiException.DependencyUnavailable(
+                "Authentication is not configured",
+            )
+            val request = runCatching { call.receive<RegisterRequest>() }
+                .getOrElse { throw ApiException.Validation("Invalid registration request") }
+            call.respond(
+                status = HttpStatusCode.Created,
+                message = ApiResponse(
+                    data = service.register(request),
+                    requestId = call.requestId(),
+                ),
+            )
+        }
+
         post("/refresh") {
-            val service = tokenService?.let { AuthService(identityProvider, it, sessions) }
+            val service = tokenService?.let {
+                AuthService(identityProvider, it, sessions, accounts = accounts)
+            }
                 ?: throw ApiException.DependencyUnavailable("Authentication is not configured")
             val request = runCatching { call.receive<RefreshSessionRequest>() }
                 .getOrElse { throw ApiException.Unauthorized() }
@@ -78,7 +101,9 @@ fun Route.authRoutes(
         }
 
         post("/logout") {
-            val service = tokenService?.let { AuthService(identityProvider, it, sessions) }
+            val service = tokenService?.let {
+                AuthService(identityProvider, it, sessions, accounts = accounts)
+            }
                 ?: throw ApiException.DependencyUnavailable("Authentication is not configured")
             val request = runCatching { call.receive<RefreshSessionRequest>() }
                 .getOrElse { throw ApiException.Unauthorized() }

@@ -35,3 +35,18 @@ data class RefreshSessionRequest(
     val sessionId: String,
     val refreshToken: String,
 )
+
+
+@Serializable
+enum class RegistrationAccountType {
+    STUDENT,
+    TEACHER,
+}
+
+@Serializable
+data class RegisterRequest(
+    val displayName: String,
+    val email: String,
+    val password: String,
+    val accountType: RegistrationAccountType,
+)

@@ -1,56 +1,103 @@
 package org.companerodeescuela.api.auth
 
-import org.companerodeescuela.api.errors.ApiException
-import org.companerodeescuela.api.integrations.identity.IdentityProvider
-import org.companerodeescuela.api.integrations.identity.InstitutionalCredentials
-import org.companerodeescuela.shared.contracts.LoginRequest
-import org.companerodeescuela.shared.contracts.LoginResponse
-import org.companerodeescuela.shared.contracts.RefreshSessionRequest
-import org.companerodeescuela.shared.contracts.UserSummary
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.Clock
 import java.time.Duration
 import java.util.Base64
 import java.util.UUID
+import org.companerodeescuela.api.errors.ApiException
+import org.companerodeescuela.api.integrations.identity.IdentityProvider
+import org.companerodeescuela.api.integrations.identity.InstitutionalCredentials
+import org.companerodeescuela.shared.contracts.LoginRequest
+import org.companerodeescuela.shared.contracts.LoginResponse
+import org.companerodeescuela.shared.contracts.RefreshSessionRequest
+import org.companerodeescuela.shared.contracts.RegisterRequest
+import org.companerodeescuela.shared.contracts.RegistrationAccountType
+import org.companerodeescuela.shared.contracts.UserRole
+import org.companerodeescuela.shared.contracts.UserSummary
 
 /**
  * Authentication use case.
  *
- * Passwords exist only for the duration of this call and are delegated to the
- * institutional adapter. They are never persisted by the platform.
+ * Compañero accounts are first-class and work without any institutional API.
+ * Institutional identity remains an optional fallback for users who have not
+ * created a native account yet.
  */
 class AuthService(
     private val identityProvider: IdentityProvider,
     private val tokenService: AuthTokenService,
     private val sessions: RefreshSessionRepository,
+    private val accounts: PlatformAccountRepository = InMemoryPlatformAccountRepository(),
+    private val passwordHasher: PasswordHasher = PasswordHasher(),
     private val clock: Clock = Clock.systemUTC(),
     private val random: SecureRandom = SecureRandom(),
 ) {
+    suspend fun register(request: RegisterRequest): LoginResponse {
+        val displayName = request.displayName.trim()
+        val email = request.email.trim().lowercase()
+
+        if (displayName.length !in 2..80) {
+            throw ApiException.Validation("Display name must contain between 2 and 80 characters")
+        }
+        if (!EMAIL_REGEX.matches(email)) {
+            throw ApiException.Validation("A valid email is required")
+        }
+        if (request.password.length !in 8..256) {
+            throw ApiException.Validation("Password must contain between 8 and 256 characters")
+        }
+
+        val roles = when (request.accountType) {
+            RegistrationAccountType.STUDENT -> setOf(UserRole.STUDENT)
+            RegistrationAccountType.TEACHER -> setOf(UserRole.TEACHER_PENDING)
+        }
+        val account = PlatformAccount(
+            id = UUID.randomUUID().toString(),
+            displayName = displayName,
+            email = email,
+            passwordHash = passwordHasher.hash(request.password),
+            roles = roles,
+            createdAt = clock.instant(),
+        )
+        if (!accounts.create(account)) {
+            throw ApiException.Conflict("An account with that email already exists")
+        }
+        return createSession(account.toUserSummary())
+    }
+
     suspend fun login(request: LoginRequest): LoginResponse {
         val username = request.username.trim()
         if (username.isBlank()) {
             throw ApiException.Validation("Username is required")
         }
-        if (request.password.isBlank()) {
+        if (request.password.isEmpty()) {
             throw ApiException.Validation("Password is required")
         }
 
-        val account = identityProvider.authenticate(
+        val localAccount = accounts.findByIdentifier(username)
+        if (localAccount != null) {
+            if (!localAccount.active || !passwordHasher.verify(request.password, localAccount.passwordHash)) {
+                throw ApiException.Unauthorized("Invalid username or password")
+            }
+            return createSession(localAccount.toUserSummary())
+        }
+
+        val institutional = identityProvider.authenticate(
             InstitutionalCredentials(
                 username = username,
                 password = request.password,
             ),
         ) ?: throw ApiException.Unauthorized("Invalid username or password")
 
-        val user = UserSummary(
-            id = account.externalId,
-            displayName = account.displayName,
-            email = account.email,
-            roles = account.roles,
-            active = true,
+        return createSession(
+            UserSummary(
+                id = institutional.externalId,
+                displayName = institutional.displayName,
+                email = institutional.email,
+                roles = institutional.roles,
+                active = true,
+            ),
         )
-        return createSession(user)
     }
 
     suspend fun refresh(request: RefreshSessionRequest): LoginResponse {
@@ -61,9 +108,16 @@ class AuthService(
         val session = sessions.find(request.sessionId)
             ?.takeIf { it.revokedAt == null && it.expiresAt > now }
             ?: throw ApiException.Unauthorized()
-        val updatedUser = session.user.copy(
-            roles = identityProvider.refreshRoles(session.user.id),
-        )
+
+        val local = accounts.findById(session.user.id)
+        val updatedUser = if (local != null) {
+            local.toUserSummary()
+        } else {
+            session.user.copy(
+                roles = identityProvider.refreshRoles(session.user.id),
+            )
+        }
+
         val nextRefreshToken = newRefreshToken()
         val rotated = sessions.rotate(
             sessionId = session.id,
@@ -112,6 +166,14 @@ class AuthService(
         )
     }
 
+    private fun PlatformAccount.toUserSummary(): UserSummary = UserSummary(
+        id = id,
+        displayName = displayName,
+        email = email,
+        roles = roles,
+        active = active,
+    )
+
     private fun newRefreshToken(): String {
         val bytes = ByteArray(REFRESH_TOKEN_BYTES)
         random.nextBytes(bytes)
@@ -125,5 +187,6 @@ class AuthService(
     private companion object {
         val REFRESH_TOKEN_TTL: Duration = Duration.ofDays(30)
         const val REFRESH_TOKEN_BYTES = 32
+        val EMAIL_REGEX = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
     }
 }

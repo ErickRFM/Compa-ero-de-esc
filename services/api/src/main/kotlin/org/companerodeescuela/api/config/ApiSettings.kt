@@ -144,7 +144,7 @@ class SettingsLoader(
         val attendanceQrSecret = env("ATTENDANCE_QR_SECRET")?.takeIf { it.isNotBlank() }
         val schoolPresenceQrSha256 = env("SCHOOL_PRESENCE_QR_SHA256")?.trim().orEmpty().lowercase()
         val schoolWifiSsids = parseCsv(env("SCHOOL_WIFI_SSIDS"))
-        val schoolWifiBssids = parseCsv(env("SCHOOL_WIFI_BSSIDS")).map(String::lowercase).toSet()
+        val schoolWifiBssids = parseCsv(env("SCHOOL_WIFI_BSSIDS")).map { it.lowercase() }.toSet()
 
         val results = listOf(
             Validators.port(ENV_API_PORT, portText),

@@ -22,6 +22,7 @@ data class ScheduleUiState(
     val actionInProgress: Boolean = false,
     val entries: List<ScheduleEntry> = emptyList(),
     val fromCache: Boolean = false,
+    val lastUpdatedAtEpochSeconds: Long? = null,
     val importCandidates: List<PersonalScheduleDraft> = emptyList(),
     val undoDrafts: List<PersonalScheduleDraft> = emptyList(),
     val successMessage: String? = null,
@@ -47,14 +48,31 @@ class ScheduleViewModel @Inject constructor(
                         loading = false,
                         entries = WeeklySchedule.order(result.value.academic.schedule.entries),
                         fromCache = result.value.fromCache,
+                        lastUpdatedAtEpochSeconds = result.value.updatedAtEpochSeconds,
                         errorMessage = null,
                     )
                 }
                 is Outcome.Failure -> {
-                    _state.value = _state.value.copy(
-                        loading = false,
-                        errorMessage = result.error.userMessage,
-                    )
+                    when (val local = repository.readWeeklySchedule()) {
+                        is Outcome.Success -> {
+                            _state.value = _state.value.copy(
+                                loading = false,
+                                entries = WeeklySchedule.order(local.value),
+                                fromCache = true,
+                                errorMessage = if (local.value.isEmpty()) {
+                                    result.error.userMessage
+                                } else {
+                                    "No pudimos sincronizar UPTlax. Tu horario guardado sigue disponible."
+                                },
+                            )
+                        }
+                        is Outcome.Failure -> {
+                            _state.value = _state.value.copy(
+                                loading = false,
+                                errorMessage = result.error.userMessage,
+                            )
+                        }
+                    }
                 }
             }
         }

@@ -27,6 +27,7 @@ data class SessionUiState(
     val displayName: String? = null,
     val roles: Set<UserRole> = emptySet(),
     val errorMessage: String? = null,
+    val noticeMessage: String? = null,
 )
 
 @HiltViewModel
@@ -82,7 +83,7 @@ class SessionViewModel @Inject constructor(
                             } else {
                                 "No pudimos renovar tu sesión. Revisa tu conexión e inténtalo de nuevo."
                             }
-                            publishSignedOut(message)
+                            publishSignedOut(noticeMessage = message)
                         }
                     }
                 }
@@ -104,11 +105,12 @@ class SessionViewModel @Inject constructor(
                 displayName = displayName ?: it.displayName,
                 roles = roles,
                 errorMessage = null,
+                noticeMessage = null,
             )
         }
     }
 
-    private fun publishSignedOut(message: String? = null) {
+    private fun publishSignedOut(noticeMessage: String? = null) {
         _state.update {
             it.copy(
                 checking = false,
@@ -117,7 +119,8 @@ class SessionViewModel @Inject constructor(
                 userId = null,
                 displayName = null,
                 roles = emptySet(),
-                errorMessage = message,
+                errorMessage = null,
+                noticeMessage = noticeMessage,
             )
         }
     }
@@ -125,7 +128,13 @@ class SessionViewModel @Inject constructor(
     fun login(username: String, password: String) {
         if (_state.value.submitting) return
         viewModelScope.launch {
-            _state.update { it.copy(submitting = true, errorMessage = null) }
+            _state.update {
+                it.copy(
+                    submitting = true,
+                    errorMessage = null,
+                    noticeMessage = null,
+                )
+            }
             when (val result = repository.login(username, password)) {
                 is Outcome.Success -> _state.update {
                     it.copy(
@@ -135,6 +144,7 @@ class SessionViewModel @Inject constructor(
                         displayName = result.value.displayName,
                         roles = result.value.roles,
                         errorMessage = null,
+                        noticeMessage = null,
                     )
                 }
                 is Outcome.Failure -> _state.update {
@@ -153,6 +163,7 @@ class SessionViewModel @Inject constructor(
                         displayName = null,
                         roles = emptySet(),
                         errorMessage = message,
+                        noticeMessage = null,
                     )
                 }
             }

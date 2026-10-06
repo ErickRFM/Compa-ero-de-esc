@@ -15,8 +15,7 @@ class RoleExperienceResolverTest {
             listOf(
                 TopLevelDestination.Home,
                 TopLevelDestination.Schedule,
-                TopLevelDestination.Channel,
-                TopLevelDestination.Attendance,
+                TopLevelDestination.Classrooms,
             ),
             config.topLevelDestinations,
         )
@@ -31,9 +30,8 @@ class RoleExperienceResolverTest {
         assertEquals(
             listOf(
                 TopLevelDestination.TeacherHome,
+                TopLevelDestination.Classrooms,
                 TopLevelDestination.Schedule,
-                TopLevelDestination.Attendance,
-                TopLevelDestination.Channel,
             ),
             config.topLevelDestinations,
         )

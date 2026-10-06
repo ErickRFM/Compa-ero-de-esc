@@ -62,7 +62,7 @@ fun TeacherHomeScreen(
             onClick = onOpenClassrooms,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text("Mis clases e invitaciones")
+            Text("Mis clases")
         }
 
         if (state.loading && state.mode == AttendanceMode.LOADING) {
@@ -168,7 +168,7 @@ fun TeacherHomeScreen(
         if (visible.isEmpty()) {
             StatusNotice(
                 title = "Todavía no tienes clases asignadas",
-                message = "Puedes crear una clase propia desde Mis clases o sincronizar una institución cuando esté disponible.",
+                message = "Control escolar todavía no te ha asignado clases. Cuando lo haga, aparecerán aquí junto con tu horario.",
             )
         } else {
             visible.forEach { occurrence ->

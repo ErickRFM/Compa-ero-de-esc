@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -134,6 +135,7 @@ fun CompaneroBottomBar(
                                     TopLevelDestination.AdminHome,
                                     -> Icons.Filled.Home
                                     TopLevelDestination.Schedule -> Icons.Filled.DateRange
+                                    TopLevelDestination.Classrooms -> Icons.Filled.School
                                     TopLevelDestination.Channel -> Icons.Filled.Forum
                                     TopLevelDestination.Attendance -> Icons.Filled.QrCodeScanner
                                 },

@@ -10,6 +10,8 @@ data class NativeClassroom(
     val name: String,
     val description: String?,
     val room: String?,
+    val groupId: String?,
+    val groupName: String?,
     val teacherId: String,
     val teacherDisplayName: String,
     val status: ClassroomStatus,
@@ -38,6 +40,7 @@ data class NativeClassInviteRecord(
 interface ClassroomRepository {
     suspend fun createClassroom(classroom: NativeClassroom)
     suspend fun findClassroom(classroomId: String): NativeClassroom?
+    suspend fun listClassrooms(): List<NativeClassroom>
     suspend fun listClassroomsForUser(userId: String): List<Pair<NativeClassroom, NativeClassroomMembership>>
     suspend fun findMembership(classroomId: String, userId: String): NativeClassroomMembership?
     suspend fun addMembershipIfAbsent(membership: NativeClassroomMembership): NativeClassroomMembership
@@ -57,6 +60,8 @@ class InMemoryClassroomRepository : ClassroomRepository {
     }
 
     override suspend fun findClassroom(classroomId: String): NativeClassroom? = classrooms[classroomId]
+
+    override suspend fun listClassrooms(): List<NativeClassroom> = classrooms.values.toList()
 
     override suspend fun listClassroomsForUser(
         userId: String,

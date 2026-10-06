@@ -235,6 +235,11 @@ class MainActivity : ComponentActivity() {
                                                         launchSingleTop = true
                                                     }
                                                 },
+                                                onOpenClassrooms = {
+                                                    navController.navigate(Destination.Classrooms.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
                                             )
                                         }
                                         composable(Destination.Schedule.route) { ScheduleScreen() }

@@ -39,6 +39,11 @@ class MongoClassroomRepository(database: MongoDatabase) : ClassroomRepository {
         return classrooms.find(eq("_id", classroomId)).firstOrNull()?.toClassroom()
     }
 
+    override suspend fun listClassrooms(): List<NativeClassroom> {
+        ensureIndexes()
+        return classrooms.find().toList().map { it.toClassroom() }
+    }
+
     override suspend fun listClassroomsForUser(
         userId: String,
     ): List<Pair<NativeClassroom, NativeClassroomMembership>> {
@@ -144,6 +149,14 @@ class MongoClassroomRepository(database: MongoDatabase) : ClassroomRepository {
                 Indexes.ascending("userId"),
                 IndexOptions().name("ix_classroom_membership_user"),
             )
+            classrooms.createIndex(
+                Indexes.ascending("groupId"),
+                IndexOptions().name("ix_classroom_group"),
+            )
+            classrooms.createIndex(
+                Indexes.ascending("teacherId"),
+                IndexOptions().name("ix_classroom_teacher"),
+            )
             invites.createIndex(
                 Indexes.ascending("tokenHash"),
                 IndexOptions().unique(true).name("uq_classroom_invite_token"),
@@ -157,6 +170,8 @@ class MongoClassroomRepository(database: MongoDatabase) : ClassroomRepository {
         .append("name", name)
         .append("description", description)
         .append("room", room)
+        .append("groupId", groupId)
+        .append("groupName", groupName)
         .append("teacherId", teacherId)
         .append("teacherDisplayName", teacherDisplayName)
         .append("status", status.name)
@@ -167,6 +182,8 @@ class MongoClassroomRepository(database: MongoDatabase) : ClassroomRepository {
         name = getString("name"),
         description = getString("description"),
         room = getString("room"),
+        groupId = getString("groupId"),
+        groupName = getString("groupName"),
         teacherId = getString("teacherId"),
         teacherDisplayName = getString("teacherDisplayName"),
         status = ClassroomStatus.valueOf(getString("status")),

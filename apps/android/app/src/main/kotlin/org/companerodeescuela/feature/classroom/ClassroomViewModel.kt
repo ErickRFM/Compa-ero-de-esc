@@ -88,6 +88,10 @@ class ClassroomViewModel @Inject constructor(
         name: String,
         description: String?,
         room: String?,
+        groupId: String,
+        groupName: String,
+        teacherId: String,
+        teacherDisplayName: String,
     ) {
         if (_state.value.submitting) return
         viewModelScope.launch {
@@ -98,12 +102,22 @@ class ClassroomViewModel @Inject constructor(
                     successMessage = null,
                 )
             }
-            when (val outcome = repository.create(name, description, room)) {
+            when (
+                val outcome = repository.create(
+                    name = name,
+                    description = description,
+                    room = room,
+                    groupId = groupId,
+                    groupName = groupName,
+                    teacherId = teacherId,
+                    teacherDisplayName = teacherDisplayName,
+                )
+            ) {
                 is Outcome.Success -> {
                     _state.update {
                         it.copy(
                             submitting = false,
-                            successMessage = "Clase " + outcome.value.name + " creada.",
+                            successMessage = "Clase " + outcome.value.name + " asignada a " + outcome.value.groupName + ".",
                         )
                     }
                     refresh()

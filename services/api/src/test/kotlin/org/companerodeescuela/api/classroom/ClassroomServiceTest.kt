@@ -6,6 +6,7 @@ import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import org.companerodeescuela.api.errors.ApiException
@@ -16,15 +17,62 @@ import org.companerodeescuela.shared.contracts.UserSummary
 
 class ClassroomServiceTest {
     @Test
-    fun `verified teacher creates class and student joins with temporary code`() = runTest {
+    fun adminCreatesClassAndAssignedTeacherReceivesMembership() = runTest {
         val repository = InMemoryClassroomRepository()
         val service = service(repository, BASE_TIME)
-        val classroom = service.create(
-            TEACHER,
-            CreateClassroomRequest(name = "Programación móvil", room = "Laboratorio A"),
-        )
+
+        val classroom = service.create(ADMIN, request())
+
+        assertEquals("9A", classroom.groupName)
+        assertEquals(TEACHER.id, classroom.teacherId)
+        assertTrue(classroom.canManageEnrollment)
+
+        val teacherClasses = service.listFor(TEACHER)
+        assertEquals(1, teacherClasses.size)
+        assertEquals(classroom.id, teacherClasses.single().id)
+        assertTrue(teacherClasses.single().canManage)
+        assertFalse(teacherClasses.single().canManageEnrollment)
+    }
+
+    @Test
+    fun teacherCannotCreateClassroom() = runTest {
+        val service = service(InMemoryClassroomRepository(), BASE_TIME)
+
+        assertFailsWith<ApiException.Forbidden> {
+            service.create(TEACHER, request())
+        }
+    }
+
+    @Test
+    fun pendingTeacherCannotCreateClassroom() = runTest {
+        val service = service(InMemoryClassroomRepository(), BASE_TIME)
+
+        assertFailsWith<ApiException.Forbidden> {
+            service.create(PENDING_TEACHER, request())
+        }
+    }
+
+    @Test
+    fun teacherCannotGenerateEnrollmentCode() = runTest {
+        val service = service(InMemoryClassroomRepository(), BASE_TIME)
+        val classroom = service.create(ADMIN, request())
+
+        assertFailsWith<ApiException.Forbidden> {
+            service.createInvite(
+                TEACHER,
+                classroom.id,
+                CreateClassInviteRequest(ttlMinutes = 30, maxUses = 10),
+            )
+        }
+    }
+
+    @Test
+    fun adminEnrollmentCodeLetsStudentJoinAssignedClass() = runTest {
+        val repository = InMemoryClassroomRepository()
+        val service = service(repository, BASE_TIME)
+        val classroom = service.create(ADMIN, request())
         val invite = service.createInvite(
-            TEACHER,
+            ADMIN,
             classroom.id,
             CreateClassInviteRequest(ttlMinutes = 30, maxUses = 10),
         )
@@ -38,26 +86,11 @@ class ClassroomServiceTest {
     }
 
     @Test
-    fun `pending teacher cannot create classroom`() = runTest {
-        val service = service(InMemoryClassroomRepository(), BASE_TIME)
-
-        assertFailsWith<ApiException.Forbidden> {
-            service.create(
-                PENDING_TEACHER,
-                CreateClassroomRequest(name = "Programación móvil"),
-            )
-        }
-    }
-
-    @Test
-    fun `expired invite is rejected`() = runTest {
+    fun expiredEnrollmentCodeIsRejected() = runTest {
         val repository = InMemoryClassroomRepository()
-        val classroom = service(repository, BASE_TIME).create(
-            TEACHER,
-            CreateClassroomRequest(name = "Bases de datos"),
-        )
+        val classroom = service(repository, BASE_TIME).create(ADMIN, request(name = "Bases de datos"))
         val invite = service(repository, BASE_TIME).createInvite(
-            TEACHER,
+            ADMIN,
             classroom.id,
             CreateClassInviteRequest(ttlMinutes = 30),
         )
@@ -68,15 +101,12 @@ class ClassroomServiceTest {
     }
 
     @Test
-    fun `revoked invite is rejected`() = runTest {
+    fun revokedEnrollmentCodeIsRejected() = runTest {
         val repository = InMemoryClassroomRepository()
         val service = service(repository, BASE_TIME)
-        val classroom = service.create(
-            TEACHER,
-            CreateClassroomRequest(name = "Redes"),
-        )
-        val invite = service.createInvite(TEACHER, classroom.id, CreateClassInviteRequest())
-        service.revokeInvite(TEACHER, classroom.id, invite.id)
+        val classroom = service.create(ADMIN, request(name = "Redes"))
+        val invite = service.createInvite(ADMIN, classroom.id, CreateClassInviteRequest())
+        service.revokeInvite(ADMIN, classroom.id, invite.id)
 
         assertFailsWith<ApiException.Conflict> {
             service.join(STUDENT, invite.code)
@@ -84,15 +114,12 @@ class ClassroomServiceTest {
     }
 
     @Test
-    fun `joining same classroom is idempotent and does not require a fresh membership`() = runTest {
+    fun joiningSameClassroomIsIdempotent() = runTest {
         val repository = InMemoryClassroomRepository()
         val service = service(repository, BASE_TIME)
-        val classroom = service.create(
-            TEACHER,
-            CreateClassroomRequest(name = "Ingeniería de software"),
-        )
+        val classroom = service.create(ADMIN, request(name = "Ingeniería de software"))
         val invite = service.createInvite(
-            TEACHER,
+            ADMIN,
             classroom.id,
             CreateClassInviteRequest(maxUses = 1),
         )
@@ -102,6 +129,15 @@ class ClassroomServiceTest {
 
         assertEquals(first.membership, second.membership)
     }
+
+    private fun request(name: String = "Programación móvil") = CreateClassroomRequest(
+        name = name,
+        room = "Laboratorio A",
+        groupId = "group-9a",
+        groupName = "9A",
+        teacherId = TEACHER.id,
+        teacherDisplayName = TEACHER.displayName,
+    )
 
     private fun service(
         repository: ClassroomRepository,
@@ -114,6 +150,11 @@ class ClassroomServiceTest {
     private companion object {
         val BASE_TIME: Instant = Instant.parse("2026-10-06T12:00:00Z")
 
+        val ADMIN = UserSummary(
+            id = "admin-1",
+            displayName = "Control escolar",
+            roles = setOf(UserRole.ADMIN),
+        )
         val TEACHER = UserSummary(
             id = "teacher-1",
             displayName = "Mtra. Elena",

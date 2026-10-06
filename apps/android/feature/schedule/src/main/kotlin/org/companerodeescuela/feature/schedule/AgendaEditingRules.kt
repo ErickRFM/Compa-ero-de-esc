@@ -100,3 +100,14 @@ internal val academicDaysV8 = listOf(
     "FRIDAY",
     "SATURDAY",
 )
+
+
+internal fun dayShortLabelV8(day: String): String = when (day) {
+    "MONDAY" -> "Lun"
+    "TUESDAY" -> "Mar"
+    "WEDNESDAY" -> "Mié"
+    "THURSDAY" -> "Jue"
+    "FRIDAY" -> "Vie"
+    "SATURDAY" -> "Sáb"
+    else -> day.take(3)
+}

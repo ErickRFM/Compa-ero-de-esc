@@ -15,9 +15,9 @@ import org.companerodeescuela.api.integrations.academic.dto.ExternalTeacher
 /**
  * Development-only [AcademicProvider] backed by in-memory fixtures.
  *
- * This class must never be reachable in a non-local environment. The rule is
- * enforced by [org.companerodeescuela.api.integrations.ProviderRegistry],
- * which refuses to build a production registry containing a mock provider.
+ * Demo fixtures are explicitly scoped to the demo Ana/Elena identities. Clean
+ * QA identities resolve successfully without inheriting demo enrollments or
+ * timetable entries.
  */
 class MockAcademicProvider : AcademicProvider, MockIntegrationProvider {
     override val id: String = "mock-academic"
@@ -27,21 +27,46 @@ class MockAcademicProvider : AcademicProvider, MockIntegrationProvider {
         MockFixtures.STUDENTS[externalId]
 
     override suspend fun getAcademicLoad(externalId: String): ExternalAcademicLoad {
-        if (MockFixtures.STUDENTS[externalId] == null) throw MockFixtures.notFound(externalId)
-        return ExternalAcademicLoad(
-            student = MockFixtures.STUDENTS.getValue(externalId),
-            enrollments = MockFixtures.ENROLLMENTS,
-            schedule = MockFixtures.SCHEDULE,
-        )
+        val student = MockFixtures.STUDENTS[externalId] ?: throw MockFixtures.notFound(externalId)
+        return when (externalId) {
+            MockFixtures.STUDENT_ID -> ExternalAcademicLoad(
+                student = student,
+                enrollments = MockFixtures.ENROLLMENTS,
+                schedule = MockFixtures.SCHEDULE,
+            )
+            MockFixtures.QA_STUDENT_ID -> ExternalAcademicLoad(
+                student = student,
+                enrollments = emptyList(),
+                schedule = emptyList(),
+            )
+            else -> ExternalAcademicLoad(
+                student = student,
+                enrollments = emptyList(),
+                schedule = emptyList(),
+            )
+        }
     }
 
     override suspend fun listCourses(): List<ExternalCourse> =
         MockFixtures.ENROLLMENTS.map { it.course }
 
     override suspend fun getSchedule(externalId: String, weekOf: LocalDate?): List<ExternalScheduleSlot> =
-        MockFixtures.SCHEDULE
+        when (externalId) {
+            MockFixtures.STUDENT_ID,
+            MockFixtures.TEACHER_ID,
+            -> MockFixtures.SCHEDULE
 
-    override suspend fun listTeachers(): List<ExternalTeacher> = listOf(MockFixtures.TEACHER)
+            MockFixtures.QA_STUDENT_ID,
+            MockFixtures.QA_TEACHER_ID,
+            MockFixtures.QA_SUPERVISOR_ID,
+            MockFixtures.QA_ADMIN_ID,
+            -> emptyList()
+
+            else -> emptyList()
+        }
+
+    override suspend fun listTeachers(): List<ExternalTeacher> =
+        listOf(MockFixtures.TEACHER, MockFixtures.QA_TEACHER)
 }
 
 /**
@@ -53,12 +78,25 @@ class MockAcademicProvider : AcademicProvider, MockIntegrationProvider {
  */
 internal object MockFixtures {
     const val STUDENT_ID = "2020-10455"
+    const val TEACHER_ID = "T-0001"
+
+    const val QA_STUDENT_ID = "QA-STUDENT"
+    const val QA_TEACHER_ID = "QA-TEACHER"
+    const val QA_SUPERVISOR_ID = "QA-SUPERVISOR"
+    const val QA_ADMIN_ID = "QA-ADMIN"
 
     val TEACHER = ExternalTeacher(
-        externalId = "T-0001",
+        externalId = TEACHER_ID,
         fullName = "Mtra. Elena Ríos Salgado",
         institutionalEmail = "elena.rios@escuela.edu",
         departmentCode = "MAT",
+    )
+
+    val QA_TEACHER = ExternalTeacher(
+        externalId = QA_TEACHER_ID,
+        fullName = "QA Docente",
+        institutionalEmail = "qa.docente@example.invalid",
+        departmentCode = "QA",
     )
 
     val STUDENTS: Map<String, ExternalStudent> = mapOf(
@@ -68,6 +106,34 @@ internal object MockFixtures {
             institutionalEmail = "ana.lopez@escuela.edu",
             programCode = "ING-SIS",
             enrollmentYear = 3,
+        ),
+        QA_STUDENT_ID to ExternalStudent(
+            externalId = QA_STUDENT_ID,
+            fullName = "QA Alumno",
+            institutionalEmail = "qa.alumno@example.invalid",
+            programCode = "QA",
+            enrollmentYear = null,
+        ),
+        QA_TEACHER_ID to ExternalStudent(
+            externalId = QA_TEACHER_ID,
+            fullName = "QA Docente",
+            institutionalEmail = "qa.docente@example.invalid",
+            programCode = "QA",
+            enrollmentYear = null,
+        ),
+        QA_SUPERVISOR_ID to ExternalStudent(
+            externalId = QA_SUPERVISOR_ID,
+            fullName = "QA Supervisor",
+            institutionalEmail = "qa.supervisor@example.invalid",
+            programCode = "QA",
+            enrollmentYear = null,
+        ),
+        QA_ADMIN_ID to ExternalStudent(
+            externalId = QA_ADMIN_ID,
+            fullName = "QA Admin",
+            institutionalEmail = "qa.admin@example.invalid",
+            programCode = "QA",
+            enrollmentYear = null,
         ),
     )
 

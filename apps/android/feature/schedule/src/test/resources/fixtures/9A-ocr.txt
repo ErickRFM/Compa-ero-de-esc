@@ -1,0 +1,79 @@
+Lunes
+13:00-14:00 Sistemas Embebidos
+Ivette Hernández
+14:00-15:00 Inglés IX
+Laura Saldaña
+15:00-16:00 Inglés IX
+Laura Saldaña
+16:00-17:00 Sistemas Embebidos
+Ivette Hernández
+17:00-18:00 Inteligencia de NegociosMa. Guadalupe Tecuapacho
+18:00-19:00 Inteligencia de NegociosMa. Guadalupe Tecuapacho
+19:00-20:00 Seguridad Informática
+Osvaldo Moreno
+
+Martes
+13:00-14:00 Sistemas Embebidos
+Ivette Hernández
+14:00-15:00 Expresión Oral y Escrita II
+Diana Laura Montes
+15:00-16:00 Expresión Oral y Escrita II
+Diana Laura Montes
+16:00-17:00 Inteligencia de NegociosMa. Guadalupe Tecuapacho
+17:00-18:00 Inglés IX
+Laura Saldaña
+18:00-19:00 Inglés IX
+Laura Saldaña
+19:00-20:00 Seguridad Informática
+Osvaldo Moreno
+
+Miércoles
+13:00-14:00 Desarrollo de Negocios para TI
+Máxima Sánchez
+14:00-15:00 Desarrollo de Negocios para TI
+Máxima Sánchez
+15:00-16:00 Expresión Oral y Escrita II
+Diana Laura Montes
+16:00-17:00 Tutorías
+Patricia Hernández
+17:00-18:00 Seguridad Informática
+Osvaldo Moreno
+18:00-19:00 Seguridad Informática
+Osvaldo Moreno
+19:00-20:00 Seguridad Informática
+Osvaldo Moreno
+
+Jueves
+13:00-14:00 Expresión Oral y Escrita II
+Diana Laura Montes
+14:00-15:00 Sistemas Embebidos
+Ivette Hernández
+15:00-16:00 Sistemas Embebidos
+Ivette Hernández
+16:00-17:00 Inteligencia de NegociosMa. Guadalupe Tecuapacho
+17:00-18:00 Inteligencia de NegociosMa. Guadalupe Tecuapacho
+18:00-19:00 Programación Móvil
+Saúl Olaf Loaiza Meléndez
+19:00-20:00 Programación Móvil
+Saúl Olaf Loaiza Meléndez
+
+Viernes
+11:00-12:00 Tutorías
+Patricia Hernández
+12:00-13:00 Inteligencia de NegociosMa. Guadalupe Tecuapacho
+13:00-14:00 Sistemas Embebidos
+Ivette Hernández
+14:00-15:00 Desarrollo de Negocios para TI
+Máxima Sánchez
+15:00-16:00 Inglés IX
+Laura Saldaña
+16:00-17:00 Programación Móvil
+Saúl Olaf Loaiza Meléndez
+17:00-18:00 Programación Móvil
+Saúl Olaf Loaiza Meléndez
+
+Sábado
+07:00-08:00 Programación Móvil
+Saúl Olaf Loaiza Meléndez
+08:00-09:00 Programación Móvil
+Saúl Olaf Loaiza Meléndez

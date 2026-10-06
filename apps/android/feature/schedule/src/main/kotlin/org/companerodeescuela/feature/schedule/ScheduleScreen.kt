@@ -72,6 +72,15 @@ private enum class AgendaMode {
     WEEK,
 }
 
+private val academicDays = listOf(
+    "MONDAY",
+    "TUESDAY",
+    "WEDNESDAY",
+    "THURSDAY",
+    "FRIDAY",
+    "SATURDAY",
+)
+
 @Composable
 fun ScheduleScreen(
     modifier: Modifier = Modifier,
@@ -341,7 +350,7 @@ private fun DayAgenda(
     onEdit: (ScheduleEntry) -> Unit,
     onDelete: (ScheduleEntry) -> Unit,
 ) {
-    val days = entries.map { it.dayOfWeek }.distinct()
+    val days = academicDays
     val dayEntries = entries.filter { it.dayOfWeek == selectedDay }
 
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -434,25 +443,30 @@ private fun WeekAgenda(
     onEdit: (ScheduleEntry) -> Unit,
     onDelete: (ScheduleEntry) -> Unit,
 ) {
-    val orderedDays = entries.groupBy { it.dayOfWeek }
-        .toList()
-        .sortedBy { dayOrder(it.first) }
-
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
-        orderedDays.forEach { (day, dayEntries) ->
+        academicDays.forEach { day ->
+            val dayEntries = entries.filter { it.dayOfWeek == day }
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
             ) {
                 Text(dayLabel(day), style = MaterialTheme.typography.titleMedium)
-                AgendaTimeline(
-                    entries = dayEntries,
-                    onEdit = onEdit,
-                    onDelete = onDelete,
-                )
+                if (dayEntries.isEmpty()) {
+                    Text(
+                        text = "Sin clases",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    AgendaTimeline(
+                        entries = dayEntries,
+                        onEdit = onEdit,
+                        onDelete = onDelete,
+                    )
+                }
             }
         }
     }
@@ -506,7 +520,7 @@ private fun AgendaTimelineEntry(
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
     ) {
         AcademicTimelineItem(
-            time = entry.startsAt,
+            time = "${entry.startsAt}–${entry.endsAt}",
             title = entry.subjectName,
             subtitle = locationAndTeacher(entry),
             status = when (entry.source) {

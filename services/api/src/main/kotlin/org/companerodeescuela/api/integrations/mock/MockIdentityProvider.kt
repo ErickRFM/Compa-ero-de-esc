@@ -13,41 +13,46 @@ import org.companerodeescuela.shared.contracts.UserRole
 /**
  * Development-only identity provider.
  *
- * It accepts one hard-coded account. The password lives in the fixture because
- * the fixture is development data, but the class refuses to run outside
- * `APP_ENV=local`: [assertDevelopmentOnly] is called by
- * [org.companerodeescuela.api.integrations.ProviderRegistry] when a production
- * registry is built.
+ * Demo identities and clean QA identities are intentionally explicit. The
+ * provider itself is rejected outside local development by ProviderRegistry,
+ * so QA credentials can never become a production authentication path.
  */
 class MockIdentityProvider : IdentityProvider, MockIntegrationProvider {
     override val id: String = "mock-identity"
     override val displayName: String = "Mock identity source (development only)"
 
     override suspend fun authenticate(credentials: InstitutionalCredentials): AuthenticatedAccount? =
-        when {
-            credentials.username == MOCK_USERNAME &&
-                credentials.password == MOCK_PASSWORD -> MOCK_ACCOUNT
-            credentials.username == MOCK_TEACHER_USERNAME &&
-                credentials.password == MOCK_TEACHER_PASSWORD -> MOCK_TEACHER_ACCOUNT
-            else -> null
-        }
+        accountFor(credentials.username, credentials.password)
 
     override suspend fun refreshRoles(externalId: String): Set<UserRole> =
-        when (externalId) {
-            MOCK_ACCOUNT.externalId -> MOCK_ACCOUNT.roles
-            MOCK_TEACHER_ACCOUNT.externalId -> MOCK_TEACHER_ACCOUNT.roles
-            else -> throw IntegrationException(
+        ALL_ACCOUNTS.firstOrNull { it.externalId == externalId }?.roles
+            ?: throw IntegrationException(
                 providerId = id,
                 category = IntegrationException.Category.NOT_FOUND,
                 message = "No account for '$externalId'",
             )
-        }
+
+    private fun accountFor(username: String, password: String): AuthenticatedAccount? = when {
+        username == MOCK_USERNAME && password == MOCK_PASSWORD -> MOCK_ACCOUNT
+        username == MOCK_TEACHER_USERNAME && password == MOCK_TEACHER_PASSWORD -> MOCK_TEACHER_ACCOUNT
+        username == QA_STUDENT_USERNAME && password == QA_PASSWORD -> QA_STUDENT_ACCOUNT
+        username == QA_TEACHER_USERNAME && password == QA_PASSWORD -> QA_TEACHER_ACCOUNT
+        username == QA_SUPERVISOR_USERNAME && password == QA_PASSWORD -> QA_SUPERVISOR_ACCOUNT
+        username == QA_ADMIN_USERNAME && password == QA_PASSWORD -> QA_ADMIN_ACCOUNT
+        else -> null
+    }
 
     companion object {
         const val MOCK_USERNAME = "ana.lopez"
         const val MOCK_PASSWORD = "development-only"
         const val MOCK_TEACHER_USERNAME = "elena.rios"
         const val MOCK_TEACHER_PASSWORD = "development-only-teacher"
+
+        const val QA_STUDENT_USERNAME = "qa.alumno"
+        const val QA_TEACHER_USERNAME = "qa.docente"
+        const val QA_SUPERVISOR_USERNAME = "qa.supervisor"
+        const val QA_ADMIN_USERNAME = "qa.admin"
+        const val QA_PASSWORD = "qa-development-only"
 
         val MOCK_ACCOUNT = AuthenticatedAccount(
             externalId = MockFixtures.STUDENT_ID,
@@ -57,10 +62,47 @@ class MockIdentityProvider : IdentityProvider, MockIntegrationProvider {
         )
 
         val MOCK_TEACHER_ACCOUNT = AuthenticatedAccount(
-            externalId = "T-0001",
+            externalId = MockFixtures.TEACHER_ID,
             displayName = "Mtra. Elena Ríos Salgado",
             email = "elena.rios@escuela.edu",
             roles = setOf(UserRole.TEACHER),
+        )
+
+        val QA_STUDENT_ACCOUNT = AuthenticatedAccount(
+            externalId = MockFixtures.QA_STUDENT_ID,
+            displayName = "QA Alumno",
+            email = "qa.alumno@example.invalid",
+            roles = setOf(UserRole.STUDENT),
+        )
+
+        val QA_TEACHER_ACCOUNT = AuthenticatedAccount(
+            externalId = MockFixtures.QA_TEACHER_ID,
+            displayName = "QA Docente",
+            email = "qa.docente@example.invalid",
+            roles = setOf(UserRole.TEACHER),
+        )
+
+        val QA_SUPERVISOR_ACCOUNT = AuthenticatedAccount(
+            externalId = MockFixtures.QA_SUPERVISOR_ID,
+            displayName = "QA Supervisor",
+            email = "qa.supervisor@example.invalid",
+            roles = setOf(UserRole.COORDINATOR),
+        )
+
+        val QA_ADMIN_ACCOUNT = AuthenticatedAccount(
+            externalId = MockFixtures.QA_ADMIN_ID,
+            displayName = "QA Admin",
+            email = "qa.admin@example.invalid",
+            roles = setOf(UserRole.ADMIN),
+        )
+
+        val ALL_ACCOUNTS = listOf(
+            MOCK_ACCOUNT,
+            MOCK_TEACHER_ACCOUNT,
+            QA_STUDENT_ACCOUNT,
+            QA_TEACHER_ACCOUNT,
+            QA_SUPERVISOR_ACCOUNT,
+            QA_ADMIN_ACCOUNT,
         )
     }
 }

@@ -216,11 +216,6 @@ class MainActivity : ComponentActivity() {
                                                         launchSingleTop = true
                                                     }
                                                 },
-                                                onOpenClassrooms = {
-                                                    navController.navigate(Destination.Classrooms.route) {
-                                                        launchSingleTop = true
-                                                    }
-                                                },
                                             )
                                         }
                                         composable(Destination.AdminHome.route) {
@@ -237,6 +232,11 @@ class MainActivity : ComponentActivity() {
                                                 },
                                                 onOpenChannel = {
                                                     navController.navigate(Destination.Channel.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                                onOpenClassrooms = {
+                                                    navController.navigate(Destination.Classrooms.route) {
                                                         launchSingleTop = true
                                                     }
                                                 },

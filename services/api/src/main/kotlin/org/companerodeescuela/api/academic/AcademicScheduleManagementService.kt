@@ -1,12 +1,15 @@
 package org.companerodeescuela.api.academic
 
 import java.time.Clock
+import java.time.LocalDate
 import java.util.UUID
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.shared.contracts.AcademicDataSource
 import org.companerodeescuela.shared.contracts.AcademicProvenance
 import org.companerodeescuela.shared.contracts.ManagedScheduleBlock
 import org.companerodeescuela.shared.contracts.ScheduleBlock
+import org.companerodeescuela.shared.contracts.ScheduleConflictRules
+import org.companerodeescuela.shared.contracts.ScheduleRecurrence
 import org.companerodeescuela.shared.contracts.ScheduleShiftRules
 import org.companerodeescuela.shared.contracts.UpsertScheduleBlockRequest
 
@@ -39,6 +42,7 @@ class AcademicScheduleManagementService(
         }
         val subjectName = request.subjectName.trim().takeIf(String::isNotBlank)
             ?: throw ApiException.Validation("subjectName is required")
+        val effectiveDate = normalizeEffectiveDate(request.recurrence, request.effectiveDate)
         val now = clock.instant().epochSecond
         val id = request.id?.trim()?.takeIf(String::isNotBlank) ?: newId()
         val existing = repository.findById(id)
@@ -72,7 +76,22 @@ class AcademicScheduleManagementService(
             status = request.status,
             shift = ScheduleShiftRules.forBlock(start, end),
             isContraturno = request.isContraturno,
+            recurrence = request.recurrence,
+            seriesId = request.seriesId?.trim()?.takeIf(String::isNotBlank)
+                ?: existing?.block?.seriesId
+                ?: if (request.recurrence == ScheduleRecurrence.WEEKLY) id else null,
+            effectiveDate = effectiveDate,
         )
+        val conflicts = ScheduleConflictRules.conflictsFor(
+            candidate = block,
+            existing = repository.listForOwner(ownerId).map { it.block },
+        )
+        if (conflicts.isNotEmpty()) {
+            val first = conflicts.first()
+            throw ApiException.Conflict(
+                "Schedule conflicts with ${first.subjectName} ${first.startTime}-${first.endTime}",
+            )
+        }
         return repository.save(
             ManagedScheduleBlock(
                 ownerId = ownerId,
@@ -95,6 +114,18 @@ class AcademicScheduleManagementService(
         ) {
             throw ApiException.Validation("Staff schedule source is required")
         }
+    }
+
+    private fun normalizeEffectiveDate(
+        recurrence: ScheduleRecurrence,
+        raw: String?,
+    ): String? {
+        if (recurrence != ScheduleRecurrence.ONE_TIME) return null
+        val value = raw?.trim()?.takeIf(String::isNotBlank)
+            ?: throw ApiException.Validation("effectiveDate is required for one-time classes")
+        return runCatching { LocalDate.parse(value) }
+            .getOrElse { throw ApiException.Validation("effectiveDate must be YYYY-MM-DD") }
+            .toString()
     }
 
     private fun normalizeTime(raw: String): String {

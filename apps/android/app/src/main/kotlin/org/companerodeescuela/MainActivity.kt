@@ -54,6 +54,7 @@ import org.companerodeescuela.feature.schedule.ScheduleScreen
 import org.companerodeescuela.feature.settings.AppThemeMode
 import org.companerodeescuela.feature.settings.AppearancePreferences
 import org.companerodeescuela.feature.settings.AppearanceSettingsScreen
+import org.companerodeescuela.feature.settings.IntegrationSettingsScreen
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -273,7 +274,21 @@ class MainActivity : ComponentActivity() {
                                                         Destination.AppearanceSettings.route,
                                                     )
                                                 },
+                                                onIntegrations = {
+                                                    navController.navigate(
+                                                        Destination.IntegrationSettings.route,
+                                                    )
+                                                },
                                                 onLogout = sessionViewModel::logout,
+                                            )
+                                        }
+                                        composable(Destination.IntegrationSettings.route) {
+                                            IntegrationSettingsScreen(
+                                                onOpenSchedule = {
+                                                    navController.navigate(Destination.Schedule.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
                                             )
                                         }
                                         composable(Destination.AppearanceSettings.route) {

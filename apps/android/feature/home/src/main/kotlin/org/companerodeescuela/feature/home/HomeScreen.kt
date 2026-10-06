@@ -116,7 +116,7 @@ fun HomeScreen(
                     !day.hasSchedule -> {
                         StatusNotice(
                             title = "Aún no tienes un horario",
-                            message = "Todavía no hay clases en tu agenda. Puedes unirte con una clave o preparar tu horario manualmente.",
+                            message = "Todavía no hay clases institucionales vinculadas a tu cuenta. Control escolar puede sincronizar tu grupo; mientras tanto puedes mantener una agenda personal.",
                         )
                         Button(
                             onClick = onOpenSchedule,
@@ -125,7 +125,7 @@ fun HomeScreen(
                             Text("Preparar mi agenda")
                         }
                         Text(
-                            text = "En Agenda puedes importar un PDF o imagen, crear un horario personal o sincronizar un sistema escolar cuando esté disponible.",
+                            text = "Tu horario institucional se sincroniza desde tu grupo. Agenda conserva además bloques personales, importaciones y recordatorios sin alterar la fuente oficial.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

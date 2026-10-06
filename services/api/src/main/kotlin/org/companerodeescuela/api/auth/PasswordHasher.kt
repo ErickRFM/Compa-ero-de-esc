@@ -17,11 +17,11 @@ class PasswordHasher(
             ITERATIONS.toString(),
             Base64.getUrlEncoder().withoutPadding().encodeToString(salt),
             Base64.getUrlEncoder().withoutPadding().encodeToString(digest),
-        ).joinToString("\\$")
+        ).joinToString(":")
     }
 
     fun verify(password: String, encoded: String): Boolean {
-        val parts = encoded.split("\\$")
+        val parts = encoded.split(":")
         if (parts.size != 4 || parts[0] != PREFIX) return false
         val iterations = parts[1].toIntOrNull() ?: return false
         val salt = runCatching { Base64.getUrlDecoder().decode(parts[2]) }.getOrNull() ?: return false

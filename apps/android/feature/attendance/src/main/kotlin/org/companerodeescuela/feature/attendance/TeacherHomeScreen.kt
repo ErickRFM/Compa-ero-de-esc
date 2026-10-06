@@ -159,8 +159,8 @@ fun TeacherHomeScreen(
         val visible = state.occurrences.take(3)
         if (visible.isEmpty()) {
             StatusNotice(
-                title = "Sin clases disponibles",
-                message = "No encontramos clases próximas para mostrar.",
+                title = "Todavía no tienes clases asignadas",
+                message = "Cuando la escuela o administración te asigne una clase, aparecerá aquí.",
             )
         } else {
             visible.forEach { occurrence ->

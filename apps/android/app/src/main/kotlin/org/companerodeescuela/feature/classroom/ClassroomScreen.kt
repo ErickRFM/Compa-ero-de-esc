@@ -104,7 +104,7 @@ fun ClassroomScreen(
             )
         }
 
-        if (isStudent) {
+        if (isStudent && state.groups.isEmpty()) {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(CompaneroSpacing.md),
@@ -139,6 +139,29 @@ fun ClassroomScreen(
                     ) {
                         Text("Vincular clase")
                     }
+                }
+            }
+        }
+
+        if (isStudent && state.groups.isNotEmpty()) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(CompaneroSpacing.md),
+                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                ) {
+                    Text(
+                        text = "Grupo sincronizado",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = state.groups.joinToString(" · ") { it.name },
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        text = "Las materias y cambios de horario publicados por control escolar se reflejan automáticamente.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
@@ -343,7 +366,7 @@ fun ClassroomScreen(
             Text(
                 text = when {
                     pendingTeacher -> "Todavía no tienes clases. Tu perfil docente sigue pendiente de verificación."
-                    isStudent -> "Todavía no te has unido a ninguna clase."
+                    isStudent -> "Control escolar todavía no ha vinculado clases a tu grupo."
                     else -> "Todavía no hay clases académicas asignadas."
                 },
                 style = MaterialTheme.typography.bodyMedium,

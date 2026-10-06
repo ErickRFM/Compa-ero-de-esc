@@ -59,6 +59,10 @@ fun ClassroomScreen(
     var groupName by remember { mutableStateOf("") }
     var teacherId by remember { mutableStateOf("") }
     var teacherDisplayName by remember { mutableStateOf("") }
+    var newGroupId by remember { mutableStateOf("") }
+    var newGroupName by remember { mutableStateOf("") }
+    var memberGroupId by remember { mutableStateOf("") }
+    var memberUserId by remember { mutableStateOf("") }
 
     Column(
         modifier = modifier
@@ -164,7 +168,85 @@ fun ClassroomScreen(
                     verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
                 ) {
                     Text(
-                        text = "Asignar clase",
+                        text = "Grupos académicos",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = "Crea el grupo una sola vez y vincula cuentas. Sus clases y horario se heredan automáticamente.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (state.groups.isNotEmpty()) {
+                        Text(
+                            text = state.groups.joinToString(" · ") { it.name },
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                    OutlinedTextField(
+                        value = newGroupName,
+                        onValueChange = { newGroupName = it.take(120) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Nombre del grupo") },
+                        placeholder = { Text("9A") },
+                    )
+                    OutlinedTextField(
+                        value = newGroupId,
+                        onValueChange = { newGroupId = it.uppercase().filter { ch -> ch.isLetterOrDigit() || ch == '-' }.take(120) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("ID del grupo") },
+                        placeholder = { Text("9A") },
+                    )
+                    Button(
+                        onClick = {
+                            viewModel.createGroup(newGroupId, newGroupName)
+                            memberGroupId = newGroupId
+                            groupId = newGroupId
+                            groupName = newGroupName
+                            newGroupId = ""
+                            newGroupName = ""
+                        },
+                        enabled = !state.submitting && newGroupId.isNotBlank() && newGroupName.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Crear grupo")
+                    }
+                    HorizontalDivider()
+                    OutlinedTextField(
+                        value = memberGroupId,
+                        onValueChange = { memberGroupId = it.uppercase().filter { ch -> ch.isLetterOrDigit() || ch == '-' }.take(120) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Grupo a vincular") },
+                    )
+                    OutlinedTextField(
+                        value = memberUserId,
+                        onValueChange = { memberUserId = it.trim().take(160) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("ID de cuenta del alumno") },
+                    )
+                    Button(
+                        onClick = {
+                            viewModel.assignGroupMember(memberGroupId, memberUserId)
+                            memberUserId = ""
+                        },
+                        enabled = !state.submitting && memberGroupId.isNotBlank() && memberUserId.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Vincular cuenta al grupo")
+                    }
+                }
+            }
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(CompaneroSpacing.md),
+                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+                ) {
+                    Text(
+                        text = "Asignar materia al grupo",
                         style = MaterialTheme.typography.titleMedium,
                     )
                     OutlinedTextField(
@@ -236,7 +318,7 @@ fun ClassroomScreen(
                             teacherDisplayName.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("Asignar clase")
+                        Text("Guardar asignación")
                     }
                 }
             }

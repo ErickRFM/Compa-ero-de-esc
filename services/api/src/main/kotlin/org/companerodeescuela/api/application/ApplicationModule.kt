@@ -37,6 +37,10 @@ import org.companerodeescuela.api.events.AcademicEventService
 import org.companerodeescuela.api.events.InMemoryAcademicEventRepository
 import org.companerodeescuela.api.events.MongoAcademicEventRepository
 import org.companerodeescuela.api.events.academicEventRoutes
+import org.companerodeescuela.api.excuses.ExcuseService
+import org.companerodeescuela.api.excuses.InMemoryExcuseRepository
+import org.companerodeescuela.api.excuses.MongoExcuseRepository
+import org.companerodeescuela.api.excuses.excuseRoutes
 import org.companerodeescuela.api.devices.InMemoryDeviceTokenRepository
 import org.companerodeescuela.api.devices.deviceRoutes
 import org.companerodeescuela.api.health.HealthService
@@ -180,6 +184,16 @@ fun Application.module(
         else -> error("Academic events require MONGODB_URI outside local development")
     }
     val eventService = AcademicEventService(repository = eventRepository)
+    val excuseRepository = when {
+        !settings.hasAuthentication -> InMemoryExcuseRepository()
+        settings.mongo.isConfigured -> MongoExcuseRepository(mongoConnection.database())
+        settings.environment == Environment.LOCAL -> InMemoryExcuseRepository()
+        else -> error("Excuse requests require MONGODB_URI outside local development")
+    }
+    val excuseService = ExcuseService(
+        repository = excuseRepository,
+        tutoring = tutorAssignmentService,
+    )
     val deviceTokenRepository = InMemoryDeviceTokenRepository()
 
     monitor.subscribe(ApplicationStopped) {
@@ -215,6 +229,7 @@ fun Application.module(
         classroomRoutes(settings = settings, service = classroomService)
         channelRoutes(settings = settings, service = channelService)
         academicEventRoutes(settings = settings, service = eventService)
+        excuseRoutes(settings = settings, service = excuseService)
         deviceRoutes(settings = settings, repository = deviceTokenRepository)
     }
 }

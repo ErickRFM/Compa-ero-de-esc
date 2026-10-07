@@ -98,6 +98,8 @@ class AttendanceService(
     }
 
     suspend fun activeFor(studentId: String): List<AttendanceSessionResponse> {
+        schoolPresenceService?.requireActive(studentId)
+
         val load = academicLoad(studentId)
         val enrolled = load.enrollments
             .map { it.course.externalId to it.course.groupName.trim() }

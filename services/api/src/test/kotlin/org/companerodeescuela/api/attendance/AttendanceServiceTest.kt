@@ -15,6 +15,9 @@ import org.companerodeescuela.api.academic.AcademicOccurrenceProjection
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.integrations.academic.mapper.AcademicMappers
 import org.companerodeescuela.api.integrations.mock.MockAcademicProvider
+import org.companerodeescuela.api.presence.InMemorySchoolPresenceRepository
+import org.companerodeescuela.api.presence.SchoolPresencePolicy
+import org.companerodeescuela.api.presence.SchoolPresenceService
 import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionStatus
@@ -23,6 +26,8 @@ import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
 import org.companerodeescuela.shared.contracts.AttendanceStatus
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
+import org.companerodeescuela.shared.contracts.SchoolNetworkEvidence
+import org.companerodeescuela.shared.contracts.StartSchoolPresenceRequest
 import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
 import org.companerodeescuela.shared.model.ClassOccurrence
 import org.companerodeescuela.shared.model.PersonId
@@ -277,6 +282,38 @@ class AttendanceServiceTest {
     }
 
     @Test
+    fun `class attendance prompt requires active school presence when policy is enabled`() = runTest {
+        val presence = SchoolPresenceService(
+            repository = InMemorySchoolPresenceRepository(),
+            policy = SchoolPresencePolicy(
+                entryQrSha256 = sha256("school-entry"),
+                allowedSsids = setOf("UD4-Alumno"),
+                allowedBssids = emptySet(),
+            ),
+            clock = Clock.fixed(initialInstant, ZoneOffset.UTC),
+            newId = { "presence-1" },
+        )
+        val service = service(schoolPresenceService = presence)
+        val session = service.openSession("T-0001", requestFor(teacherOccurrence()))
+
+        assertFailsWith<ApiException.Forbidden> {
+            service.activeFor("2020-10455")
+        }
+
+        presence.start(
+            studentId = "2020-10455",
+            request = StartSchoolPresenceRequest(
+                operationId = "presence-op-1",
+                qrToken = "school-entry",
+                network = SchoolNetworkEvidence(ssid = "UD4-Alumno"),
+                deviceTimestampEpochSeconds = initialInstant.epochSecond,
+            ),
+        )
+
+        assertEquals(listOf(session.id), service.activeFor("2020-10455").map { it.id })
+    }
+
+    @Test
     fun `active sessions are filtered by student enrollment`() = runTest {
         val repository = InMemoryAttendanceRepository()
         val service = service(repository = repository)
@@ -321,13 +358,20 @@ class AttendanceServiceTest {
         repository: AttendanceRepository = InMemoryAttendanceRepository(),
         clock: Clock = Clock.fixed(initialInstant, ZoneOffset.UTC),
         newId: () -> String = { "session-1" },
+        schoolPresenceService: SchoolPresenceService? = null,
     ): AttendanceService =
         AttendanceService(
             repository = repository,
             academicProvider = provider,
+            schoolPresenceService = schoolPresenceService,
             clock = clock,
             newId = newId,
         )
+
+    private fun sha256(value: String): String =
+        java.security.MessageDigest.getInstance("SHA-256")
+            .digest(value.toByteArray(Charsets.UTF_8))
+            .joinToString("") { byte -> "%02x".format(byte) }
 
     private class MutableClock(
         private var now: Instant,

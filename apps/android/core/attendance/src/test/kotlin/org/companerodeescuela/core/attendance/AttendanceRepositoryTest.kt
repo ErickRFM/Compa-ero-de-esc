@@ -25,6 +25,7 @@ import org.companerodeescuela.core.network.SessionRefreshCoordinator
 import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.shared.contracts.AttendanceReasonCode
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
+import org.companerodeescuela.shared.contracts.SchoolNetworkEvidence
 
 class AttendanceRepositoryTest {
     private val clock = Clock.fixed(
@@ -42,6 +43,9 @@ class AttendanceRepositoryTest {
             scheduler = scheduler,
             remoteClient = unusedRemoteClient(tokenStore),
             clock = clock,
+            networkEvidenceProvider = SchoolNetworkEvidenceProvider {
+                SchoolNetworkEvidence(ssid = "UD4-Alumno", bssid = "aa:bb:cc:dd:ee:ff")
+            },
             newOperationId = { "op-1" },
         )
 
@@ -53,6 +57,8 @@ class AttendanceRepositoryTest {
         assertEquals("session-1", success.value.sessionId)
         assertEquals("op-1", store.lastOperationId)
         assertEquals("signed-qr", store.lastQrToken)
+        assertEquals("UD4-Alumno", store.lastSchoolNetwork?.ssid)
+        assertEquals("aa:bb:cc:dd:ee:ff", store.lastSchoolNetwork?.bssid)
         assertEquals(1, scheduler.calls)
     }
 
@@ -161,6 +167,7 @@ class AttendanceRepositoryTest {
     private class FakeStore : AttendanceLocalStore {
         var lastOperationId: String? = null
         var lastQrToken: String? = null
+        var lastSchoolNetwork: SchoolNetworkEvidence? = null
 
         override suspend fun enqueue(
             operationId: String,
@@ -168,9 +175,11 @@ class AttendanceRepositoryTest {
             sessionId: String,
             deviceTimestampEpochSeconds: Long,
             qrToken: String?,
+            schoolNetwork: SchoolNetworkEvidence?,
         ): LocalAttendanceRecord {
             lastOperationId = operationId
             lastQrToken = qrToken
+            lastSchoolNetwork = schoolNetwork
             return LocalAttendanceRecord(
                 operationId = operationId,
                 ownerId = ownerId,

@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import org.companerodeescuela.core.attendance.AttendanceRepository
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.database.LocalAttendanceRecord
+import org.companerodeescuela.shared.contracts.AttendanceDisposition
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionStatus
@@ -371,6 +372,49 @@ class AttendanceViewModel @Inject constructor(
             when (val result = repository.roster(sessionId)) {
                 is Outcome.Success -> _state.update { it.copy(roster = result.value) }
                 is Outcome.Failure -> _state.update { it.copy(errorMessage = result.error.userMessage) }
+            }
+        }
+    }
+
+    fun markRecord(
+        record: AttendanceRecordResponse,
+        disposition: AttendanceDisposition,
+    ) {
+        viewModelScope.launch {
+            _state.update { it.copy(actionInProgress = true, errorMessage = null) }
+            when (
+                val result = repository.review(
+                    recordId = record.id,
+                    request = ReviewAttendanceRequest(
+                        status = record.status,
+                        disposition = disposition,
+                    ),
+                )
+            ) {
+                is Outcome.Success -> {
+                    _state.update {
+                        val current = it.roster
+                        it.copy(
+                            actionInProgress = false,
+                            roster = current?.copy(
+                                records = current.records.map { item ->
+                                    if (item.id == result.value.id) result.value else item
+                                },
+                            ),
+                            successMessage = when (disposition) {
+                                AttendanceDisposition.PRESENT -> "Alumno marcado como presente."
+                                AttendanceDisposition.LATE -> "Alumno marcado con retardo."
+                                AttendanceDisposition.ABSENT -> "Alumno marcado como ausente."
+                            },
+                        )
+                    }
+                }
+                is Outcome.Failure -> _state.update {
+                    it.copy(
+                        actionInProgress = false,
+                        errorMessage = result.error.userMessage,
+                    )
+                }
             }
         }
     }

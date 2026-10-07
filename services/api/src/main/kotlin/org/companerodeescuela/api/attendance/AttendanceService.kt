@@ -320,8 +320,9 @@ class AttendanceService(
         requireOwnerOrAdministrative(reviewerId, session, allowCrossOwner)
 
         val reviewed = record.copy(
-            status = request.status,
-            reasonCode = request.reasonCode,
+            status = if (request.disposition == null) request.status else record.status,
+            reasonCode = if (request.disposition == null) request.reasonCode else record.reasonCode,
+            disposition = request.disposition ?: record.disposition,
             reviewedBy = reviewerId,
             reviewedAtEpochSeconds = clock.instant().epochSecond,
         )

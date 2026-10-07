@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.bson.Document
+import org.companerodeescuela.shared.contracts.AttendanceDisposition
 import org.companerodeescuela.shared.contracts.AttendanceReasonCode
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
@@ -210,6 +211,7 @@ class MongoAttendanceRepository(
         .append("receivedAtEpochSeconds", receivedAtEpochSeconds)
         .append("reviewedBy", reviewedBy)
         .append("reviewedAtEpochSeconds", reviewedAtEpochSeconds)
+        .append("disposition", disposition?.name)
 
     private fun Document.toRecord(): AttendanceRecordResponse =
         AttendanceRecordResponse(
@@ -224,6 +226,7 @@ class MongoAttendanceRepository(
             receivedAtEpochSeconds = requireLong("receivedAtEpochSeconds"),
             reviewedBy = getString("reviewedBy"),
             reviewedAtEpochSeconds = numberAsLong("reviewedAtEpochSeconds"),
+            disposition = getString("disposition")?.let(AttendanceDisposition::valueOf),
         )
 
     private fun Document.requireLong(name: String): Long =

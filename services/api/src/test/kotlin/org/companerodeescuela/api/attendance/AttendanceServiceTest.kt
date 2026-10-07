@@ -19,6 +19,7 @@ import org.companerodeescuela.api.presence.InMemorySchoolPresenceRepository
 import org.companerodeescuela.api.presence.SchoolPresencePolicy
 import org.companerodeescuela.api.presence.SchoolPresenceService
 import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
+import org.companerodeescuela.shared.contracts.AttendanceDisposition
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionStatus
 import org.companerodeescuela.shared.contracts.AttendanceReasonCode
@@ -212,6 +213,36 @@ class AttendanceServiceTest {
         assertEquals(AttendanceStatus.VERIFIED, reviewed.status)
         assertEquals("T-0001", reviewed.reviewedBy)
         assertEquals(AttendanceReasonCode.TEACHER_REVIEW, reviewed.reasonCode)
+    }
+
+    @Test
+    fun `teacher can mark rejected evidence as present without rewriting evidence`() = runTest {
+        val repository = InMemoryAttendanceRepository()
+        val service = service(repository = repository)
+        val session = service.openSession("T-0001", requestFor(teacherOccurrence()))
+        val original = service.register(
+            "2020-10455",
+            session.id,
+            AttendanceAttemptRequest("op-1", initialInstant.epochSecond),
+        ).copy(
+            status = AttendanceStatus.REJECTED,
+            reasonCode = AttendanceReasonCode.QR_INVALID,
+        )
+        repository.replaceRecord(original)
+
+        val reviewed = service.review(
+            reviewerId = "T-0001",
+            recordId = original.id,
+            request = ReviewAttendanceRequest(
+                status = AttendanceStatus.VERIFIED,
+                disposition = AttendanceDisposition.PRESENT,
+            ),
+        )
+
+        assertEquals(AttendanceStatus.REJECTED, reviewed.status)
+        assertEquals(AttendanceReasonCode.QR_INVALID, reviewed.reasonCode)
+        assertEquals(AttendanceDisposition.PRESENT, reviewed.disposition)
+        assertEquals("T-0001", reviewed.reviewedBy)
     }
 
     @Test

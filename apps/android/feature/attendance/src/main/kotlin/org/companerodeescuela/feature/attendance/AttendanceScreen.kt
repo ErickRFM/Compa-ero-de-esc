@@ -65,6 +65,7 @@ import org.companerodeescuela.core.ui.component.CompaneroSurface
 import org.companerodeescuela.core.ui.component.CompaneroSurfaceRole
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
+import org.companerodeescuela.shared.contracts.AttendanceDisposition
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionStatus
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
@@ -136,6 +137,7 @@ fun AttendanceScreen(
             onClose = viewModel::closeTeacherSession,
             onRefreshRoster = viewModel::refreshRoster,
             onReview = viewModel::reviewRecord,
+            onMark = viewModel::markRecord,
             modifier = modifier,
         )
         AttendanceMode.UNSUPPORTED -> UnsupportedAttendance(
@@ -572,6 +574,7 @@ private fun TeacherAttendance(
     onClose: () -> Unit,
     onRefreshRoster: () -> Unit,
     onReview: (AttendanceRecordResponse, AttendanceStatus) -> Unit,
+    onMark: (AttendanceRecordResponse, AttendanceDisposition) -> Unit,
     modifier: Modifier,
 ) {
     Column(
@@ -616,6 +619,7 @@ private fun TeacherAttendance(
                 onClose = onClose,
                 onRefreshRoster = onRefreshRoster,
                 onReview = onReview,
+                onMark = onMark,
             )
         } else {
             TeacherOccurrenceList(
@@ -639,6 +643,7 @@ private fun TeacherActiveSession(
     onClose: () -> Unit,
     onRefreshRoster: () -> Unit,
     onReview: (AttendanceRecordResponse, AttendanceStatus) -> Unit,
+    onMark: (AttendanceRecordResponse, AttendanceDisposition) -> Unit,
 ) {
     var showCloseConfirmation by remember { mutableStateOf(false) }
 
@@ -672,6 +677,7 @@ private fun TeacherActiveSession(
                         roster = roster,
                         busy = busy,
                         onReview = onReview,
+                        onMark = onMark,
                     )
                 }
             }
@@ -691,6 +697,7 @@ private fun TeacherActiveSession(
                     roster = roster,
                     busy = busy,
                     onReview = onReview,
+                    onMark = onMark,
                 )
             }
         }
@@ -828,11 +835,24 @@ private fun TeacherRosterPanel(
     roster: List<AttendanceRecordResponse>,
     busy: Boolean,
     onReview: (AttendanceRecordResponse, AttendanceStatus) -> Unit,
+    onMark: (AttendanceRecordResponse, AttendanceDisposition) -> Unit,
 ) {
+    val present = roster.count { it.disposition == AttendanceDisposition.PRESENT }
+    val late = roster.count { it.disposition == AttendanceDisposition.LATE }
+    val absent = roster.count { it.disposition == AttendanceDisposition.ABSENT }
+    val pending = roster.size - present - late - absent
+
     Text(
         text = "Registros recibidos (${roster.size})",
         style = MaterialTheme.typography.titleMedium,
     )
+    if (roster.isNotEmpty()) {
+        Text(
+            text = "Presentes $present · Retardos $late · Ausentes $absent · Sin decidir $pending",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 
     if (roster.isEmpty()) {
         StatusNotice(
@@ -845,6 +865,7 @@ private fun TeacherRosterPanel(
                 record = record,
                 busy = busy,
                 onReview = onReview,
+                onMark = onMark,
             )
         }
     }
@@ -855,6 +876,7 @@ private fun RosterRecord(
     record: AttendanceRecordResponse,
     busy: Boolean,
     onReview: (AttendanceRecordResponse, AttendanceStatus) -> Unit,
+    onMark: (AttendanceRecordResponse, AttendanceDisposition) -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -870,48 +892,58 @@ private fun RosterRecord(
                     style = MaterialTheme.typography.titleMedium,
                 )
                 Text(
-                    text = attendanceStatusLabel(record.status),
+                    text = attendanceDisplayLabel(record),
                     style = MaterialTheme.typography.labelLarge,
-                    color = when (record.status) {
-                        AttendanceStatus.VERIFIED -> if (
-                            MaterialTheme.colorScheme.surface.luminance() < 0.5f
-                        ) {
-                            CompanionColors.semanticGreenDark
-                        } else {
-                            CompanionColors.semanticGreen
-                        }
-                        AttendanceStatus.REJECTED -> MaterialTheme.colorScheme.error
-                        AttendanceStatus.REVIEW_REQUIRED -> MaterialTheme.colorScheme.tertiary
-                        AttendanceStatus.LIKELY -> if (
-                            MaterialTheme.colorScheme.surface.luminance() < 0.5f
-                        ) {
-                            CompanionColors.semanticBlueDark
-                        } else {
-                            CompanionColors.semanticBlue
-                        }
-                    },
+                    color = attendanceDisplayColor(record),
                 )
             }
             Text(
-                text = record.reasonCode.name.lowercase().replace('_', ' '),
+                text = "Evidencia: " + attendanceStatusLabel(record.status) +
+                    " · " + record.reasonCode.name.lowercase().replace('_', ' '),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            record.reviewedBy?.let {
+                Text(
+                    text = "Último ajuste docente: $it",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+            ) {
+                FilledTonalButton(
+                    onClick = { onMark(record, AttendanceDisposition.PRESENT) },
+                    enabled = !busy && record.disposition != AttendanceDisposition.PRESENT,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Presente")
+                }
+                OutlinedButton(
+                    onClick = { onMark(record, AttendanceDisposition.LATE) },
+                    enabled = !busy && record.disposition != AttendanceDisposition.LATE,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Retardo")
+                }
+                OutlinedButton(
+                    onClick = { onMark(record, AttendanceDisposition.ABSENT) },
+                    enabled = !busy && record.disposition != AttendanceDisposition.ABSENT,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Ausente")
+                }
+            }
 
             if (record.status == AttendanceStatus.REVIEW_REQUIRED) {
-                Row(horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
-                    FilledTonalButton(
-                        onClick = { onReview(record, AttendanceStatus.VERIFIED) },
-                        enabled = !busy,
-                    ) {
-                        Text("Verificar")
-                    }
-                    OutlinedButton(
-                        onClick = { onReview(record, AttendanceStatus.REJECTED) },
-                        enabled = !busy,
-                    ) {
-                        Text("Rechazar")
-                    }
+                TextButton(
+                    onClick = { onReview(record, AttendanceStatus.VERIFIED) },
+                    enabled = !busy,
+                ) {
+                    Text("Validar evidencia")
                 }
             }
         }
@@ -1087,6 +1119,46 @@ private fun localStatusLabel(
     AttendanceClientVerdict.SERVER_REJECTED ->
         "Rechazada por el servidor" to NoticeTone.ERROR
 }
+
+private fun attendanceDisplayLabel(record: AttendanceRecordResponse): String =
+    when (record.disposition) {
+        AttendanceDisposition.PRESENT -> "Presente"
+        AttendanceDisposition.LATE -> "Retardo"
+        AttendanceDisposition.ABSENT -> "Ausente"
+        null -> attendanceStatusLabel(record.status)
+    }
+
+@Composable
+private fun attendanceDisplayColor(record: AttendanceRecordResponse) =
+    when (record.disposition) {
+        AttendanceDisposition.PRESENT -> if (
+            MaterialTheme.colorScheme.surface.luminance() < 0.5f
+        ) {
+            CompanionColors.semanticGreenDark
+        } else {
+            CompanionColors.semanticGreen
+        }
+        AttendanceDisposition.LATE -> MaterialTheme.colorScheme.tertiary
+        AttendanceDisposition.ABSENT -> MaterialTheme.colorScheme.error
+        null -> when (record.status) {
+            AttendanceStatus.VERIFIED -> if (
+                MaterialTheme.colorScheme.surface.luminance() < 0.5f
+            ) {
+                CompanionColors.semanticGreenDark
+            } else {
+                CompanionColors.semanticGreen
+            }
+            AttendanceStatus.REJECTED -> MaterialTheme.colorScheme.error
+            AttendanceStatus.REVIEW_REQUIRED -> MaterialTheme.colorScheme.tertiary
+            AttendanceStatus.LIKELY -> if (
+                MaterialTheme.colorScheme.surface.luminance() < 0.5f
+            ) {
+                CompanionColors.semanticBlueDark
+            } else {
+                CompanionColors.semanticBlue
+            }
+        }
+    }
 
 private fun attendanceStatusLabel(status: AttendanceStatus): String = when (status) {
     AttendanceStatus.VERIFIED -> "Verificada"

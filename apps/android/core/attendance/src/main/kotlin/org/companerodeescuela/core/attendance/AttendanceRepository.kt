@@ -18,6 +18,9 @@ import org.companerodeescuela.shared.contracts.AttendanceRosterResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
 import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
+import org.companerodeescuela.shared.contracts.SchoolNetworkEvidence
+import org.companerodeescuela.shared.contracts.SchoolPresenceResponse
+import org.companerodeescuela.shared.contracts.StartSchoolPresenceRequest
 
 data class QrEvidenceCapture(
     val localRecord: LocalAttendanceRecord,
@@ -28,6 +31,8 @@ class AttendanceRepository(
     private val localStore: AttendanceLocalStore,
     private val scheduler: AttendanceSyncEnqueuer,
     private val remoteClient: AttendanceRemoteClient,
+    private val networkEvidenceProvider: SchoolNetworkEvidenceProvider =
+        SchoolNetworkEvidenceProvider { null },
     private val clock: Clock = Clock.systemUTC(),
     private val newOperationId: () -> String = { UUID.randomUUID().toString() },
 ) {
@@ -38,6 +43,28 @@ class AttendanceRepository(
             ?: return Outcome.Failure(AppError.Http(status = 401))
         return Outcome.Success(claims)
     }
+
+    suspend fun schoolPresence(): Outcome<SchoolPresenceResponse?> =
+        withToken(remoteClient::schoolPresence)
+
+    suspend fun startSchoolPresence(qrToken: String): Outcome<SchoolPresenceResponse> {
+        val network = networkEvidenceProvider.current()
+            ?: return Outcome.Failure(
+                AppError.Network("Connect to the school Wi-Fi before starting the school day"),
+            )
+        val request = StartSchoolPresenceRequest(
+            operationId = newOperationId(),
+            qrToken = qrToken.trim(),
+            network = network,
+            deviceTimestampEpochSeconds = clock.instant().epochSecond,
+        )
+        return withToken { token -> remoteClient.startSchoolPresence(token, request) }
+    }
+
+    suspend fun closeSchoolPresence(): Outcome<SchoolPresenceResponse> =
+        withToken(remoteClient::closeSchoolPresence)
+
+    fun currentSchoolNetwork(): SchoolNetworkEvidence? = networkEvidenceProvider.current()
 
     suspend fun activeStudentSessions(): Outcome<List<AttendanceSessionResponse>> =
         withToken(remoteClient::activeStudentSessions)
@@ -135,6 +162,7 @@ class AttendanceRepository(
                 sessionId = sessionId,
                 deviceTimestampEpochSeconds = clock.instant().epochSecond,
                 qrToken = normalizedQrToken,
+                schoolNetwork = networkEvidenceProvider.current(),
             )
             scheduler.schedule()
             Outcome.Success(local)

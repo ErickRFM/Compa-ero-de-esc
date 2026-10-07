@@ -18,12 +18,13 @@ data class SchoolPresencePolicy(
     val sessionHours: Long = 14,
 ) {
     val enabled: Boolean
-        get() = entryQrSha256.isNotBlank() && (allowedSsids.isNotEmpty() || allowedBssids.isNotEmpty())
+        get() = allowedSsids.isNotEmpty() || allowedBssids.isNotEmpty()
 }
 
 class SchoolPresenceService(
     private val repository: SchoolPresenceRepository,
     private val policy: SchoolPresencePolicy,
+    private val entryQrService: SchoolEntryQrService? = null,
     private val clock: Clock = Clock.systemUTC(),
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) {
@@ -87,14 +88,22 @@ class SchoolPresenceService(
     fun verifyNetworkForAttendance(network: SchoolNetworkEvidence): NetworkVerificationMethod =
         verifyNetwork(network)
 
-    private fun verifyQr(rawToken: String) {
+    private suspend fun verifyQr(rawToken: String) {
         val token = rawToken.trim()
         if (token.isBlank() || token.length > 2_048) {
             throw ApiException.Validation("Institutional QR is invalid")
         }
 
+        val managed = entryQrService?.verifyAndRecordUse(token)
+        if (managed != null) return
+
+        val fallbackHash = policy.entryQrSha256.lowercase()
+        if (fallbackHash.isBlank()) {
+            throw ApiException.Forbidden("Institutional QR could not be verified")
+        }
+
         val actual = sha256(token)
-        if (!MessageDigest.isEqual(actual.toByteArray(), policy.entryQrSha256.lowercase().toByteArray())) {
+        if (!MessageDigest.isEqual(actual.toByteArray(), fallbackHash.toByteArray())) {
             throw ApiException.Forbidden("Institutional QR could not be verified")
         }
     }

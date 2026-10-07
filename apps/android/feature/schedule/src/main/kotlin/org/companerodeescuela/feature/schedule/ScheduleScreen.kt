@@ -159,7 +159,8 @@ fun ScheduleScreen(
         if (state.fromCache) {
             StatusNotice(
                 title = "Agenda guardada",
-                message = "Estás viendo la última versión disponible en este dispositivo.",
+                message = state.syncMessage
+                    ?: "Estás viendo la última versión disponible en este dispositivo.",
                 tone = NoticeTone.WARNING,
             )
         }
@@ -183,7 +184,7 @@ fun ScheduleScreen(
 
         state.errorMessage?.let {
             StatusNotice(
-                title = "No pudimos completar la acción",
+                title = "Revisa esta acción",
                 message = it,
                 tone = NoticeTone.ERROR,
             )

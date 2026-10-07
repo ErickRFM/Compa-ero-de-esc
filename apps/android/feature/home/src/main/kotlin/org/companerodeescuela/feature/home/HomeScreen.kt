@@ -94,17 +94,17 @@ fun HomeScreen(
 
             if (state.fromCache) {
                 StatusNotice(
-                    title = "Información guardada",
-                    message = "No pudimos actualizar ahora. Tu jornada sigue disponible sin conexión.",
+                    title = "Usando información guardada",
+                    message = "Tu agenda sigue disponible. La integración escolar se puede actualizar después desde Configuración.",
                     tone = NoticeTone.WARNING,
                 )
             }
 
-            state.errorMessage?.let { message ->
+            if (state.errorMessage != null && overview == null) {
                 StatusNotice(
-                    title = "No pudimos sincronizar el sistema escolar",
-                    message = message,
-                    tone = NoticeTone.ERROR,
+                    title = "No pudimos actualizar",
+                    message = "Compañero puede seguir funcionando con tu agenda local. Reintenta cuando tengas conexión.",
+                    tone = NoticeTone.WARNING,
                 )
                 Button(onClick = viewModel::refresh) {
                     Text("Reintentar")
@@ -115,8 +115,8 @@ fun HomeScreen(
                 when {
                     !day.hasSchedule -> {
                         StatusNotice(
-                            title = "Aún no tienes un horario",
-                            message = "Todavía no hay clases institucionales vinculadas a tu cuenta. Control escolar puede sincronizar tu grupo; mientras tanto puedes mantener una agenda personal.",
+                            title = "Todavía no tienes horario",
+                            message = "Importa una imagen o PDF, crea tu agenda manualmente o conecta el sistema escolar desde Configuración.",
                         )
                         Button(
                             onClick = onOpenSchedule,
@@ -125,7 +125,7 @@ fun HomeScreen(
                             Text("Preparar mi agenda")
                         }
                         Text(
-                            text = "Tu horario institucional se sincroniza desde tu grupo. Agenda conserva además bloques personales, importaciones y recordatorios sin alterar la fuente oficial.",
+                            text = "La agenda local funciona sin integración escolar y conserva tus bloques personales, importaciones y recordatorios.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

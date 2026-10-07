@@ -12,7 +12,7 @@ import org.bson.Document
 import org.companerodeescuela.shared.contracts.SchoolEntryQrResponse
 import org.companerodeescuela.shared.contracts.SchoolEntryQrStatus
 
-internal data class StoredSchoolEntryQr(
+data class StoredSchoolEntryQr(
     val response: SchoolEntryQrResponse,
     val tokenHash: String,
 )

@@ -1,11 +1,9 @@
 package org.companerodeescuela.api.presence
 
-import java.security.MessageDigest
 import java.time.Clock
 import java.time.Duration
 import java.util.UUID
 import org.companerodeescuela.api.errors.ApiException
-import org.companerodeescuela.shared.contracts.NetworkVerificationMethod
 import org.companerodeescuela.shared.contracts.SchoolNetworkEvidence
 import org.companerodeescuela.shared.contracts.SchoolPresenceResponse
 import org.companerodeescuela.shared.contracts.SchoolPresenceStatus
@@ -24,7 +22,13 @@ data class SchoolPresencePolicy(
 class SchoolPresenceService(
     private val repository: SchoolPresenceRepository,
     private val policy: SchoolPresencePolicy,
-    private val entryQrService: SchoolEntryQrService? = null,
+    private val qrVerifier: SchoolEntryQrVerifier = SchoolEntryQrVerifier(
+        legacyQrSha256 = policy.entryQrSha256,
+    ),
+    private val networkVerifier: SchoolNetworkVerifier = SchoolNetworkVerifier(
+        allowedSsids = policy.allowedSsids,
+        allowedBssids = policy.allowedBssids,
+    ),
     private val clock: Clock = Clock.systemUTC(),
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) {
@@ -44,8 +48,8 @@ class SchoolPresenceService(
             throw ApiException.Validation("device timestamp is invalid")
         }
 
-        verifyQr(request.qrToken)
-        val method = verifyNetwork(request.network)
+        qrVerifier.verify(request.qrToken)
+        val method = networkVerifier.verify(request.network)
         val now = clock.instant()
 
         repository.findActiveForStudent(studentId, now.epochSecond)?.let { return it }
@@ -85,57 +89,6 @@ class SchoolPresenceService(
         return closed
     }
 
-    fun verifyNetworkForAttendance(network: SchoolNetworkEvidence): NetworkVerificationMethod =
-        verifyNetwork(network)
-
-    private suspend fun verifyQr(rawToken: String) {
-        val token = rawToken.trim()
-        if (token.isBlank() || token.length > 2_048) {
-            throw ApiException.Validation("Institutional QR is invalid")
-        }
-
-        val managed = entryQrService?.verifyAndRecordUse(token)
-        if (managed != null) return
-
-        val fallbackHash = policy.entryQrSha256.lowercase()
-        if (fallbackHash.isBlank()) {
-            throw ApiException.Forbidden("Institutional QR could not be verified")
-        }
-
-        val actual = sha256(token)
-        if (!MessageDigest.isEqual(actual.toByteArray(), fallbackHash.toByteArray())) {
-            throw ApiException.Forbidden("Institutional QR could not be verified")
-        }
-    }
-
-    private fun verifyNetwork(network: SchoolNetworkEvidence): NetworkVerificationMethod {
-        val ssid = normalizeSsid(network.ssid)
-        val bssid = normalizeBssid(network.bssid)
-        val ssidOk = ssid != null && policy.allowedSsids.any { normalizeSsid(it) == ssid }
-        val bssidOk = bssid != null && policy.allowedBssids.any { normalizeBssid(it) == bssid }
-
-        if (policy.allowedSsids.isNotEmpty() && policy.allowedBssids.isNotEmpty()) {
-            if (!ssidOk || !bssidOk) {
-                throw ApiException.Forbidden("Connect to an authorized school Wi-Fi access point")
-            }
-            return NetworkVerificationMethod.SSID_BSSID
-        }
-        if (policy.allowedBssids.isNotEmpty()) {
-            if (!bssidOk) throw ApiException.Forbidden("Connect to an authorized school Wi-Fi access point")
-            return NetworkVerificationMethod.BSSID
-        }
-        if (!ssidOk) throw ApiException.Forbidden("Connect to the authorized school Wi-Fi network")
-        return NetworkVerificationMethod.SSID
-    }
-
-    private fun sha256(value: String): String =
-        MessageDigest.getInstance("SHA-256")
-            .digest(value.toByteArray(Charsets.UTF_8))
-            .joinToString("") { byte -> "%02x".format(byte) }
-
-    private fun normalizeSsid(value: String?): String? =
-        value?.trim()?.removePrefix(""")?.removeSuffix(""")?.takeIf { it.isNotBlank() }
-
-    private fun normalizeBssid(value: String?): String? =
-        value?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
+    fun verifyNetworkForAttendance(network: SchoolNetworkEvidence) =
+        networkVerifier.verify(network)
 }

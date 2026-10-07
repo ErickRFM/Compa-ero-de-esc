@@ -104,9 +104,8 @@ class AttendanceServiceTest {
             repository = repository,
             clock = Clock.fixed(initialInstant, ZoneOffset.UTC),
         )
-        val service = AttendanceService(
+        val service = service(
             repository = repository,
-            academicProvider = provider,
             qrService = qrService,
             clock = Clock.fixed(initialInstant, ZoneOffset.UTC),
             newId = { "session-inspect" },
@@ -390,14 +389,81 @@ class AttendanceServiceTest {
         clock: Clock = Clock.fixed(initialInstant, ZoneOffset.UTC),
         newId: () -> String = { "session-1" },
         schoolPresenceService: SchoolPresenceService? = null,
-    ): AttendanceService =
-        AttendanceService(
-            repository = repository,
-            academicProvider = provider,
-            schoolPresenceService = schoolPresenceService,
-            clock = clock,
-            newId = newId,
+        qrService: AttendanceQrService? = null,
+    ): TestAttendanceServices {
+        val accessPolicy = AttendanceAccessPolicy(repository)
+        return TestAttendanceServices(
+            session = AttendanceSessionService(
+                repository = repository,
+                occurrenceResolver = ProviderAttendanceOccurrenceResolver(provider),
+                accessPolicy = accessPolicy,
+                clock = clock,
+                newId = newId,
+            ),
+            student = AttendanceStudentService(
+                repository = repository,
+                enrollmentResolver = AttendanceEnrollmentResolver(provider),
+                qrService = qrService,
+                schoolPresenceService = schoolPresenceService,
+                clock = clock,
+            ),
+            review = AttendanceReviewService(
+                repository = repository,
+                accessPolicy = accessPolicy,
+                clock = clock,
+            ),
         )
+    }
+
+    private data class TestAttendanceServices(
+        val session: AttendanceSessionService,
+        val student: AttendanceStudentService,
+        val review: AttendanceReviewService,
+    ) {
+        suspend fun openSession(
+            teacherId: String,
+            request: CreateAttendanceSessionRequest,
+        ) = session.openSession(teacherId, request)
+
+        suspend fun activeForTeacher(teacherId: String) =
+            session.activeForTeacher(teacherId)
+
+        suspend fun activeForAdministration() =
+            session.activeForAdministration()
+
+        suspend fun activeFor(studentId: String) =
+            student.activeFor(studentId)
+
+        suspend fun inspectQr(
+            studentId: String,
+            request: AttendanceQrInspectionRequest,
+        ) = student.inspectQr(studentId, request)
+
+        suspend fun register(
+            studentId: String,
+            sessionId: String,
+            request: AttendanceAttemptRequest,
+        ) = student.register(studentId, sessionId, request)
+
+        suspend fun closeSession(
+            actorId: String,
+            sessionId: String,
+            allowCrossOwner: Boolean = false,
+        ) = session.closeSession(actorId, sessionId, allowCrossOwner)
+
+        suspend fun roster(
+            actorId: String,
+            sessionId: String,
+            allowCrossOwner: Boolean = false,
+        ) = session.roster(actorId, sessionId, allowCrossOwner)
+
+        suspend fun review(
+            reviewerId: String,
+            recordId: String,
+            request: ReviewAttendanceRequest,
+            allowCrossOwner: Boolean = false,
+        ) = review.review(reviewerId, recordId, request, allowCrossOwner)
+    }
 
     private fun sha256(value: String): String =
         java.security.MessageDigest.getInstance("SHA-256")

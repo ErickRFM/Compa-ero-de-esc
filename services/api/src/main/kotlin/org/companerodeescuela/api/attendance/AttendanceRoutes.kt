@@ -1,8 +1,6 @@
 package org.companerodeescuela.api.attendance
 
 import io.ktor.server.auth.authenticate
-import io.ktor.server.auth.jwt.JWTPrincipal
-import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -11,6 +9,12 @@ import io.ktor.server.routing.patch
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import org.companerodeescuela.api.auth.AuthTokenService
+import org.companerodeescuela.api.auth.hasAdministrativeScope
+import org.companerodeescuela.api.auth.requireAdministrative
+import org.companerodeescuela.api.auth.requirePlatformPrincipal
+import org.companerodeescuela.api.auth.requireRole
+import org.companerodeescuela.api.auth.requireStaff
+import org.companerodeescuela.api.auth.subjectId
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
@@ -23,24 +27,13 @@ import org.companerodeescuela.shared.contracts.UserRole
 
 fun Route.attendanceRoutes(
     settings: ApiSettings,
-    service: AttendanceService,
+    sessionService: AttendanceSessionService,
+    studentService: AttendanceStudentService,
+    reviewService: AttendanceReviewService,
     qrService: AttendanceQrService? = null,
 ) {
     route("/attendance") {
         if (!settings.hasAuthentication) {
-            get("/sessions/open") {
-                val principal = call.requirePrincipal()
-                if (principal.roles().none { it.isAdministrative }) {
-                    throw ApiException.Forbidden("Administrative role is required")
-                }
-                call.respond(
-                    ApiResponse(
-                        data = service.activeForAdministration(),
-                        requestId = call.requestId(),
-                    ),
-                )
-            }
-
             get("/sessions/active") {
                 throw ApiException.DependencyUnavailable("Authentication is not configured")
             }
@@ -48,24 +41,35 @@ fun Route.attendanceRoutes(
         }
 
         authenticate(AuthTokenService.PROVIDER_NAME) {
-            get("/sessions/active") {
-                val principal = call.requirePrincipal()
-                principal.requireStudentRole()
+            get("/sessions/open") {
+                val principal = call.requirePlatformPrincipal()
+                principal.requireAdministrative()
                 call.respond(
                     ApiResponse(
-                        data = service.activeFor(principal.subject()),
+                        data = sessionService.activeForAdministration(),
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
+
+            get("/sessions/active") {
+                val principal = call.requirePlatformPrincipal()
+                principal.requireRole(UserRole.STUDENT)
+                call.respond(
+                    ApiResponse(
+                        data = studentService.activeFor(principal.subjectId()),
                         requestId = call.requestId(),
                     ),
                 )
             }
 
             post("/qr/inspect") {
-                val principal = call.requirePrincipal()
-                principal.requireStudentRole()
+                val principal = call.requirePlatformPrincipal()
+                principal.requireRole(UserRole.STUDENT)
                 call.respond(
                     ApiResponse(
-                        data = service.inspectQr(
-                            studentId = principal.subject(),
+                        data = studentService.inspectQr(
+                            studentId = principal.subjectId(),
                             request = call.receive<AttendanceQrInspectionRequest>(),
                         ),
                         requestId = call.requestId(),
@@ -74,23 +78,23 @@ fun Route.attendanceRoutes(
             }
 
             get("/sessions/mine") {
-                val principal = call.requirePrincipal()
-                principal.requireTeacherRole()
+                val principal = call.requirePlatformPrincipal()
+                principal.requireRole(UserRole.TEACHER)
                 call.respond(
                     ApiResponse(
-                        data = service.activeForTeacher(principal.subject()),
+                        data = sessionService.activeForTeacher(principal.subjectId()),
                         requestId = call.requestId(),
                     ),
                 )
             }
 
             post("/sessions") {
-                val principal = call.requirePrincipal()
-                principal.requireTeacherRole()
+                val principal = call.requirePlatformPrincipal()
+                principal.requireRole(UserRole.TEACHER)
                 call.respond(
                     ApiResponse(
-                        data = service.openSession(
-                            teacherId = principal.subject(),
+                        data = sessionService.openSession(
+                            teacherId = principal.subjectId(),
                             request = call.receive<CreateAttendanceSessionRequest>(),
                         ),
                         requestId = call.requestId(),
@@ -99,8 +103,8 @@ fun Route.attendanceRoutes(
             }
 
             post("/sessions/{sessionId}/qr") {
-                val principal = call.requirePrincipal()
-                principal.requireStaffRole()
+                val principal = call.requirePlatformPrincipal()
+                principal.requireStaff()
                 val sessionId = call.parameters["sessionId"]
                     ?: throw ApiException.Validation("sessionId is required")
                 val serviceQr = qrService
@@ -110,9 +114,9 @@ fun Route.attendanceRoutes(
                 call.respond(
                     ApiResponse(
                         data = serviceQr.issue(
-                            actorId = principal.subject(),
+                            actorId = principal.subjectId(),
                             sessionId = sessionId,
-                            allowCrossOwner = principal.roles().any(UserRole::isAdministrative),
+                            allowCrossOwner = principal.hasAdministrativeScope(),
                         ),
                         requestId = call.requestId(),
                     ),
@@ -120,14 +124,14 @@ fun Route.attendanceRoutes(
             }
 
             post("/sessions/{sessionId}/attempts") {
-                val principal = call.requirePrincipal()
-                principal.requireStudentRole()
+                val principal = call.requirePlatformPrincipal()
+                principal.requireRole(UserRole.STUDENT)
                 val sessionId = call.parameters["sessionId"]
                     ?: throw ApiException.Validation("sessionId is required")
                 call.respond(
                     ApiResponse(
-                        data = service.register(
-                            studentId = principal.subject(),
+                        data = studentService.register(
+                            studentId = principal.subjectId(),
                             sessionId = sessionId,
                             request = call.receive<AttendanceAttemptRequest>(),
                         ),
@@ -137,16 +141,16 @@ fun Route.attendanceRoutes(
             }
 
             post("/sessions/{sessionId}/close") {
-                val principal = call.requirePrincipal()
-                principal.requireStaffRole()
+                val principal = call.requirePlatformPrincipal()
+                principal.requireStaff()
                 val sessionId = call.parameters["sessionId"]
                     ?: throw ApiException.Validation("sessionId is required")
                 call.respond(
                     ApiResponse(
-                        data = service.closeSession(
-                            actorId = principal.subject(),
+                        data = sessionService.closeSession(
+                            actorId = principal.subjectId(),
                             sessionId = sessionId,
-                            allowCrossOwner = principal.roles().any(UserRole::isAdministrative),
+                            allowCrossOwner = principal.hasAdministrativeScope(),
                         ),
                         requestId = call.requestId(),
                     ),
@@ -154,16 +158,16 @@ fun Route.attendanceRoutes(
             }
 
             get("/sessions/{sessionId}/roster") {
-                val principal = call.requirePrincipal()
-                principal.requireStaffRole()
+                val principal = call.requirePlatformPrincipal()
+                principal.requireStaff()
                 val sessionId = call.parameters["sessionId"]
                     ?: throw ApiException.Validation("sessionId is required")
                 call.respond(
                     ApiResponse(
-                        data = service.roster(
-                            actorId = principal.subject(),
+                        data = sessionService.roster(
+                            actorId = principal.subjectId(),
                             sessionId = sessionId,
-                            allowCrossOwner = principal.roles().any(UserRole::isAdministrative),
+                            allowCrossOwner = principal.hasAdministrativeScope(),
                         ),
                         requestId = call.requestId(),
                     ),
@@ -171,53 +175,22 @@ fun Route.attendanceRoutes(
             }
 
             patch("/records/{recordId}/review") {
-                val principal = call.requirePrincipal()
-                principal.requireStaffRole()
+                val principal = call.requirePlatformPrincipal()
+                principal.requireStaff()
                 val recordId = call.parameters["recordId"]
                     ?: throw ApiException.Validation("recordId is required")
                 call.respond(
                     ApiResponse(
-                        data = service.review(
-                            reviewerId = principal.subject(),
+                        data = reviewService.review(
+                            reviewerId = principal.subjectId(),
                             recordId = recordId,
                             request = call.receive<ReviewAttendanceRequest>(),
-                            allowCrossOwner = principal.roles().any(UserRole::isAdministrative),
+                            allowCrossOwner = principal.hasAdministrativeScope(),
                         ),
                         requestId = call.requestId(),
                     ),
                 )
             }
         }
-    }
-}
-
-private fun io.ktor.server.application.ApplicationCall.requirePrincipal(): JWTPrincipal =
-    principal<JWTPrincipal>() ?: throw ApiException.Unauthorized()
-
-private fun JWTPrincipal.subject(): String =
-    payload.subject?.takeIf { it.isNotBlank() } ?: throw ApiException.Unauthorized()
-
-private fun JWTPrincipal.roles(): Set<UserRole> =
-    payload.getClaim("roles")
-        .asList(String::class.java)
-        .orEmpty()
-        .mapNotNull { encoded -> runCatching { UserRole.valueOf(encoded) }.getOrNull() }
-        .toSet()
-
-private fun JWTPrincipal.requireStudentRole() {
-    if (UserRole.STUDENT !in roles()) {
-        throw ApiException.Forbidden("Student role is required")
-    }
-}
-
-private fun JWTPrincipal.requireTeacherRole() {
-    if (UserRole.TEACHER !in roles()) {
-        throw ApiException.Forbidden("Teacher role is required")
-    }
-}
-
-private fun JWTPrincipal.requireStaffRole() {
-    if (roles().none { it.isStaff }) {
-        throw ApiException.Forbidden("Staff role is required")
     }
 }

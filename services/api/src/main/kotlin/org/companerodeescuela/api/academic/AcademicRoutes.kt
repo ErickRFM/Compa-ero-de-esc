@@ -3,8 +3,6 @@ package org.companerodeescuela.api.academic
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.auth.authenticate
-import io.ktor.server.auth.jwt.JWTPrincipal
-import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -15,6 +13,9 @@ import io.ktor.server.routing.route
 import java.time.LocalDate
 import org.companerodeescuela.api.academic.groups.AcademicGroupRepository
 import org.companerodeescuela.api.auth.AuthTokenService
+import org.companerodeescuela.api.auth.platformRoles
+import org.companerodeescuela.api.auth.requirePlatformPrincipal
+import org.companerodeescuela.api.auth.subjectId
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.integrations.academic.AcademicProvider
@@ -45,7 +46,7 @@ fun Route.academicRoutes(
         } else {
             authenticate(AuthTokenService.PROVIDER_NAME) {
                 get("/load") {
-                    val externalId = call.requireSubject()
+                    val externalId = call.requirePlatformPrincipal().subjectId()
                     call.respond(
                         ApiResponse(
                             data = AcademicService(
@@ -58,7 +59,7 @@ fun Route.academicRoutes(
                     )
                 }
                 get("/schedule") {
-                    val externalId = call.requireSubject()
+                    val externalId = call.requirePlatformPrincipal().subjectId()
                     call.respond(
                         ApiResponse(
                             data = AcademicService(
@@ -71,7 +72,7 @@ fun Route.academicRoutes(
                     )
                 }
                 get("/schedule/v2") {
-                    val externalId = call.requireSubject()
+                    val externalId = call.requirePlatformPrincipal().subjectId()
                     val weekOf = call.request.queryParameters["weekOf"]
                         ?.let { raw ->
                             runCatching { LocalDate.parse(raw) }
@@ -96,7 +97,7 @@ fun Route.academicRoutes(
 
                 route("/manual-schedule") {
                     get("/{ownerId}") {
-                        val principal = call.requirePrincipal()
+                        val principal = call.requirePlatformPrincipal()
                         principal.requireScheduleManager()
                         val ownerId = call.parameters["ownerId"]
                             ?.takeIf(String::isNotBlank)
@@ -114,7 +115,7 @@ fun Route.academicRoutes(
                     }
 
                     post {
-                        val principal = call.requirePrincipal()
+                        val principal = call.requirePlatformPrincipal()
                         val source = principal.requireScheduleManager()
                         val service = scheduleManagement
                             ?: throw ApiException.DependencyUnavailable(
@@ -123,7 +124,7 @@ fun Route.academicRoutes(
                         call.respond(
                             ApiResponse(
                                 data = service.upsert(
-                                    actorId = principal.subject(),
+                                    actorId = principal.subjectId(),
                                     source = source,
                                     request = call.receive<UpsertScheduleBlockRequest>(),
                                 ),
@@ -133,7 +134,7 @@ fun Route.academicRoutes(
                     }
 
                     delete("/{id}") {
-                        val principal = call.requirePrincipal()
+                        val principal = call.requirePlatformPrincipal()
                         principal.requireScheduleManager()
                         val id = call.parameters["id"]
                             ?.takeIf(String::isNotBlank)
@@ -142,7 +143,7 @@ fun Route.academicRoutes(
                             ?: throw ApiException.DependencyUnavailable(
                                 "Manual academic schedule management is not configured",
                             )
-                        val deleted = service.delete(principal.subject(), id)
+                        val deleted = service.delete(principal.subjectId(), id)
                         if (!deleted) throw ApiException.NotFound("Schedule block $id not found")
                         call.respond(
                             ApiResponse(
@@ -157,24 +158,8 @@ fun Route.academicRoutes(
     }
 }
 
-private fun ApplicationCall.requirePrincipal(): JWTPrincipal =
-    principal<JWTPrincipal>() ?: throw ApiException.Unauthorized()
-
-private fun ApplicationCall.requireSubject(): String =
-    requirePrincipal().subject()
-
-private fun JWTPrincipal.subject(): String =
-    payload.subject?.takeIf(String::isNotBlank) ?: throw ApiException.Unauthorized()
-
-private fun JWTPrincipal.roles(): Set<UserRole> =
-    payload.getClaim("roles")
-        .asList(String::class.java)
-        .orEmpty()
-        .mapNotNull { raw -> runCatching { UserRole.valueOf(raw.uppercase()) }.getOrNull() }
-        .toSet()
-
-private fun JWTPrincipal.requireScheduleManager(): AcademicDataSource {
-    val roles = roles()
+private fun io.ktor.server.auth.jwt.JWTPrincipal.requireScheduleManager(): AcademicDataSource {
+    val roles = platformRoles()
     return when {
         UserRole.SUPER_ADMIN in roles || UserRole.ADMIN in roles -> AcademicDataSource.ADMIN_MANUAL
         UserRole.COORDINATOR in roles -> AcademicDataSource.SUPERVISOR_MANUAL

@@ -106,6 +106,9 @@ dependencies {
     implementation(project(":apps:android:feature:schedule"))
     implementation(project(":apps:android:feature:attendance"))
     implementation(project(":apps:android:feature:channel"))
+    implementation(project(":apps:android:feature:classroom"))
+    implementation(project(":apps:android:feature:profile"))
+    implementation(project(":apps:android:feature:settings"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

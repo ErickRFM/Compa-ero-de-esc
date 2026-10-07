@@ -1,11 +1,8 @@
 package org.companerodeescuela.api.devices
 
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.auth.authenticate
-import io.ktor.server.auth.jwt.JWTPrincipal
-import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -15,8 +12,9 @@ import io.ktor.server.routing.route
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.Serializable
 import org.companerodeescuela.api.auth.AuthTokenService
+import org.companerodeescuela.api.auth.requirePlatformPrincipal
+import org.companerodeescuela.api.auth.subjectId
 import org.companerodeescuela.api.config.ApiSettings
-import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.shared.contracts.ApiResponse
 
@@ -58,10 +56,10 @@ fun Route.deviceRoutes(
 
         authenticate(AuthTokenService.PROVIDER_NAME) {
             post("/register") {
-                val principal = call.requirePrincipal()
+                val principal = call.requirePlatformPrincipal()
                 val request = call.receive<DeviceRegistrationRequest>()
                 repository.register(
-                    userId = principal.subject(),
+                    userId = principal.subjectId(),
                     token = request.token,
                     platform = request.platform,
                     model = request.model,
@@ -75,9 +73,9 @@ fun Route.deviceRoutes(
             }
 
             delete("/register") {
-                val principal = call.requirePrincipal()
+                val principal = call.requirePlatformPrincipal()
                 val request = call.receive<DeviceRegistrationRequest>()
-                val removed = repository.unregister(principal.subject(), request.token)
+                val removed = repository.unregister(principal.subjectId(), request.token)
                 call.respond(
                     ApiResponse(
                         data = removed,
@@ -88,9 +86,3 @@ fun Route.deviceRoutes(
         }
     }
 }
-
-private fun ApplicationCall.requirePrincipal(): JWTPrincipal =
-    principal<JWTPrincipal>() ?: throw ApiException.Unauthorized()
-
-private fun JWTPrincipal.subject(): String =
-    payload.subject?.takeIf(String::isNotBlank) ?: throw ApiException.Unauthorized()

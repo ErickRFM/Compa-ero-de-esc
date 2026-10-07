@@ -3,61 +3,22 @@ package org.companerodeescuela.api.application
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.routing.routing
-import org.companerodeescuela.api.academic.AcademicScheduleManagementService
-import org.companerodeescuela.api.academic.groups.AcademicGroupService
-import org.companerodeescuela.api.academic.groups.InMemoryAcademicGroupRepository
-import org.companerodeescuela.api.academic.groups.MongoAcademicGroupRepository
 import org.companerodeescuela.api.academic.groups.academicGroupRoutes
-import org.companerodeescuela.api.academic.InMemoryAcademicScheduleOverrideRepository
-import org.companerodeescuela.api.academic.MongoAcademicScheduleOverrideRepository
 import org.companerodeescuela.api.academic.academicRoutes
-import org.companerodeescuela.api.attendance.AttendanceQrService
-import org.companerodeescuela.api.attendance.AttendanceService
-import org.companerodeescuela.api.attendance.InMemoryAttendanceRepository
-import org.companerodeescuela.api.attendance.MongoAttendanceRepository
 import org.companerodeescuela.api.attendance.attendanceRoutes
 import org.companerodeescuela.api.auth.authRoutes
-import org.companerodeescuela.api.auth.InMemoryPlatformAccountRepository
-import org.companerodeescuela.api.auth.InMemoryRefreshSessionRepository
-import org.companerodeescuela.api.auth.MongoPlatformAccountRepository
-import org.companerodeescuela.api.auth.MongoRefreshSessionRepository
-import org.companerodeescuela.api.channel.ChannelAccessPolicy
-import org.companerodeescuela.api.channel.ChannelService
-import org.companerodeescuela.api.channel.InMemoryChannelRepository
-import org.companerodeescuela.api.channel.MongoChannelRepository
 import org.companerodeescuela.api.channel.channelRoutes
-import org.companerodeescuela.api.classroom.ClassroomService
-import org.companerodeescuela.api.classroom.InMemoryClassroomRepository
-import org.companerodeescuela.api.classroom.MongoClassroomRepository
 import org.companerodeescuela.api.classroom.classroomRoutes
 import org.companerodeescuela.api.config.ApiSettings
-import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.database.MongoConnection
-import org.companerodeescuela.api.events.AcademicEventService
-import org.companerodeescuela.api.events.InMemoryAcademicEventRepository
-import org.companerodeescuela.api.events.MongoAcademicEventRepository
 import org.companerodeescuela.api.events.academicEventRoutes
-import org.companerodeescuela.api.excuses.ExcuseService
-import org.companerodeescuela.api.excuses.InMemoryExcuseRepository
-import org.companerodeescuela.api.excuses.MongoExcuseRepository
 import org.companerodeescuela.api.excuses.excuseRoutes
-import org.companerodeescuela.api.devices.InMemoryDeviceTokenRepository
 import org.companerodeescuela.api.devices.deviceRoutes
 import org.companerodeescuela.api.health.HealthService
 import org.companerodeescuela.api.health.healthRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
 import org.companerodeescuela.api.plugins.configurePlugins
-import org.companerodeescuela.api.presence.InMemorySchoolEntryQrRepository
-import org.companerodeescuela.api.presence.InMemorySchoolPresenceRepository
-import org.companerodeescuela.api.presence.MongoSchoolEntryQrRepository
-import org.companerodeescuela.api.presence.MongoSchoolPresenceRepository
-import org.companerodeescuela.api.presence.SchoolEntryQrService
-import org.companerodeescuela.api.presence.SchoolPresencePolicy
-import org.companerodeescuela.api.presence.SchoolPresenceService
 import org.companerodeescuela.api.presence.schoolPresenceRoutes
-import org.companerodeescuela.api.tutoring.InMemoryTutorAssignmentRepository
-import org.companerodeescuela.api.tutoring.MongoTutorAssignmentRepository
-import org.companerodeescuela.api.tutoring.TutorAssignmentService
 import org.companerodeescuela.api.tutoring.tutoringRoutes
 
 /**
@@ -79,134 +40,38 @@ fun Application.module(
     ProviderRegistry.requireEnvironmentSatisfied(providerRegistry, settings.environment)
 
     val healthService = HealthService(settings = settings, mongoConnection = mongoConnection)
-    val refreshSessionRepository = when {
-        !settings.hasAuthentication -> InMemoryRefreshSessionRepository()
-        settings.mongo.isConfigured -> MongoRefreshSessionRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemoryRefreshSessionRepository()
-        else -> error("Refresh sessions require MONGODB_URI outside local development")
-    }
-    val platformAccountRepository = when {
-        !settings.hasAuthentication -> InMemoryPlatformAccountRepository()
-        settings.mongo.isConfigured -> MongoPlatformAccountRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemoryPlatformAccountRepository()
-        else -> error("Platform accounts require MONGODB_URI outside local development")
-    }
-    configurePlugins(settings, refreshSessions = refreshSessionRepository)
-    val academicGroupRepository = when {
-        !settings.hasAuthentication -> InMemoryAcademicGroupRepository()
-        settings.mongo.isConfigured -> MongoAcademicGroupRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemoryAcademicGroupRepository()
-        else -> error("Academic groups require MONGODB_URI outside local development")
-    }
-    val academicGroupService = AcademicGroupService(academicGroupRepository)
-    val tutorAssignmentRepository = when {
-        !settings.hasAuthentication -> InMemoryTutorAssignmentRepository()
-        settings.mongo.isConfigured -> MongoTutorAssignmentRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemoryTutorAssignmentRepository()
-        else -> error("Tutor assignments require MONGODB_URI outside local development")
-    }
-    val tutorAssignmentService = TutorAssignmentService(
-        repository = tutorAssignmentRepository,
-        groupRepository = academicGroupRepository,
+    val identityGraph = buildIdentityFeatureGraph(
+        settings = settings,
+        mongoConnection = mongoConnection,
     )
-    val attendanceRepository = when {
-        !settings.hasAuthentication -> InMemoryAttendanceRepository()
-        settings.mongo.isConfigured -> MongoAttendanceRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemoryAttendanceRepository()
-        else -> error("Attendance requires MONGODB_URI outside local development")
-    }
-    val classroomRepository = when {
-        !settings.hasAuthentication -> InMemoryClassroomRepository()
-        settings.mongo.isConfigured -> MongoClassroomRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemoryClassroomRepository()
-        else -> error("Native classrooms require MONGODB_URI outside local development")
-    }
-    val classroomService = ClassroomService(
-        repository = classroomRepository,
-        groupRepository = academicGroupRepository,
-    )
+    configurePlugins(settings, refreshSessions = identityGraph.refreshSessions)
 
-    val channelRepository = when {
-        !settings.hasAuthentication -> InMemoryChannelRepository()
-        settings.mongo.isConfigured -> MongoChannelRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemoryChannelRepository()
-        else -> error("Class channels require MONGODB_URI outside local development")
-    }
-    val attendanceQrService = settings.attendanceQrSecret?.let { secret ->
-        AttendanceQrService(
-            secret = secret,
-            repository = attendanceRepository,
-        )
-    }
-    val schoolPresenceGraph = if (settings.hasSchoolPresenceVerification) {
-        val schoolPresenceRepository = when {
-            settings.mongo.isConfigured -> MongoSchoolPresenceRepository(mongoConnection.database())
-            settings.environment == Environment.LOCAL -> InMemorySchoolPresenceRepository()
-            else -> error("School presence requires MONGODB_URI outside local development")
-        }
-        val schoolEntryQrRepository = when {
-            settings.mongo.isConfigured -> MongoSchoolEntryQrRepository(mongoConnection.database())
-            settings.environment == Environment.LOCAL -> InMemorySchoolEntryQrRepository()
-            else -> error("School entry QR management requires MONGODB_URI outside local development")
-        }
-        val schoolEntryQrService = SchoolEntryQrService(schoolEntryQrRepository)
-        val presenceService = SchoolPresenceService(
-            repository = schoolPresenceRepository,
-            policy = SchoolPresencePolicy(
-                entryQrSha256 = settings.schoolPresenceQrSha256,
-                allowedSsids = settings.schoolWifiSsids,
-                allowedBssids = settings.schoolWifiBssids,
-            ),
-            entryQrService = schoolEntryQrService,
-        )
-        presenceService to schoolEntryQrService
-    } else {
-        null
-    }
-    val schoolPresenceService = schoolPresenceGraph?.first
-    val attendanceService = AttendanceService(
-        repository = attendanceRepository,
+    val academicGraph = buildAcademicFeatureGraph(
+        settings = settings,
+        mongoConnection = mongoConnection,
+    )
+    val classroomGraph = buildClassroomFeatureGraph(
+        settings = settings,
+        mongoConnection = mongoConnection,
         academicProvider = providerRegistry.academic,
-        qrService = attendanceQrService,
-        schoolPresenceService = schoolPresenceService,
+        groupRepository = academicGraph.groupRepository,
     )
-    val channelService = ChannelService(
-        repository = channelRepository,
-        accessPolicy = ChannelAccessPolicy(
-            academicProvider = providerRegistry.academic,
-            classroomService = classroomService,
-        ),
+    val presenceGraph = buildPresenceFeatureGraph(
+        settings = settings,
+        mongoConnection = mongoConnection,
     )
-
-    val scheduleOverrideRepository = when {
-        !settings.hasAuthentication -> InMemoryAcademicScheduleOverrideRepository()
-        settings.mongo.isConfigured ->
-            MongoAcademicScheduleOverrideRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemoryAcademicScheduleOverrideRepository()
-        else -> error("Manual academic schedules require MONGODB_URI outside local development")
-    }
-    val scheduleManagementService = AcademicScheduleManagementService(
-        repository = scheduleOverrideRepository,
+    val attendanceGraph = buildAttendanceFeatureGraph(
+        settings = settings,
+        mongoConnection = mongoConnection,
+        academicProvider = providerRegistry.academic,
+        schoolPresenceService = presenceGraph?.service,
     )
 
-    val eventRepository = when {
-        !settings.hasAuthentication -> InMemoryAcademicEventRepository()
-        settings.mongo.isConfigured -> MongoAcademicEventRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemoryAcademicEventRepository()
-        else -> error("Academic events require MONGODB_URI outside local development")
-    }
-    val eventService = AcademicEventService(repository = eventRepository)
-    val excuseRepository = when {
-        !settings.hasAuthentication -> InMemoryExcuseRepository()
-        settings.mongo.isConfigured -> MongoExcuseRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemoryExcuseRepository()
-        else -> error("Excuse requests require MONGODB_URI outside local development")
-    }
-    val excuseService = ExcuseService(
-        repository = excuseRepository,
-        tutoring = tutorAssignmentService,
+    val operationsGraph = buildOperationsFeatureGraph(
+        settings = settings,
+        mongoConnection = mongoConnection,
+        tutoringService = academicGraph.tutoringService,
     )
-    val deviceTokenRepository = InMemoryDeviceTokenRepository()
 
     monitor.subscribe(ApplicationStopped) {
         providerRegistry.close()
@@ -218,34 +83,36 @@ fun Application.module(
         authRoutes(
             settings = settings,
             identityProvider = providerRegistry.identity,
-            sessions = refreshSessionRepository,
-            accounts = platformAccountRepository,
+            sessions = identityGraph.refreshSessions,
+            accounts = identityGraph.accounts,
         )
         academicRoutes(
             settings = settings,
             academicProvider = providerRegistry.academic,
-            scheduleManagement = scheduleManagementService,
-            scheduleOverrides = scheduleOverrideRepository,
-            groupRepository = academicGroupRepository,
+            scheduleManagement = academicGraph.scheduleManagement,
+            scheduleOverrides = academicGraph.scheduleOverrides,
+            groupRepository = academicGraph.groupRepository,
         )
         attendanceRoutes(
             settings = settings,
-            service = attendanceService,
-            qrService = attendanceQrService,
+            sessionService = attendanceGraph.sessionService,
+            studentService = attendanceGraph.studentService,
+            reviewService = attendanceGraph.reviewService,
+            qrService = attendanceGraph.qrService,
         )
-        schoolPresenceGraph?.let { (service, qrAdminService) ->
+        presenceGraph?.let { graph ->
             schoolPresenceRoutes(
                 settings = settings,
-                service = service,
-                qrAdminService = qrAdminService,
+                service = graph.service,
+                qrAdminService = graph.qrAdminService,
             )
         }
-        academicGroupRoutes(settings = settings, service = academicGroupService)
-        tutoringRoutes(settings = settings, service = tutorAssignmentService)
-        classroomRoutes(settings = settings, service = classroomService)
-        channelRoutes(settings = settings, service = channelService)
-        academicEventRoutes(settings = settings, service = eventService)
-        excuseRoutes(settings = settings, service = excuseService)
-        deviceRoutes(settings = settings, repository = deviceTokenRepository)
+        academicGroupRoutes(settings = settings, service = academicGraph.groupService)
+        tutoringRoutes(settings = settings, service = academicGraph.tutoringService)
+        classroomRoutes(settings = settings, service = classroomGraph.classroomService)
+        channelRoutes(settings = settings, service = classroomGraph.channelService)
+        academicEventRoutes(settings = settings, service = operationsGraph.eventService)
+        excuseRoutes(settings = settings, service = operationsGraph.excuseService)
+        deviceRoutes(settings = settings, repository = operationsGraph.deviceTokenRepository)
     }
 }

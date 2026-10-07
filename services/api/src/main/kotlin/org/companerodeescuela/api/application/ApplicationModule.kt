@@ -47,8 +47,11 @@ import org.companerodeescuela.api.health.HealthService
 import org.companerodeescuela.api.health.healthRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
 import org.companerodeescuela.api.plugins.configurePlugins
+import org.companerodeescuela.api.presence.InMemorySchoolEntryQrRepository
 import org.companerodeescuela.api.presence.InMemorySchoolPresenceRepository
+import org.companerodeescuela.api.presence.MongoSchoolEntryQrRepository
 import org.companerodeescuela.api.presence.MongoSchoolPresenceRepository
+import org.companerodeescuela.api.presence.SchoolEntryQrService
 import org.companerodeescuela.api.presence.SchoolPresencePolicy
 import org.companerodeescuela.api.presence.SchoolPresenceService
 import org.companerodeescuela.api.presence.schoolPresenceRoutes
@@ -135,23 +138,32 @@ fun Application.module(
             repository = attendanceRepository,
         )
     }
-    val schoolPresenceService = if (settings.hasSchoolPresenceVerification) {
+    val schoolPresenceGraph = if (settings.hasSchoolPresenceVerification) {
         val schoolPresenceRepository = when {
             settings.mongo.isConfigured -> MongoSchoolPresenceRepository(mongoConnection.database())
             settings.environment == Environment.LOCAL -> InMemorySchoolPresenceRepository()
             else -> error("School presence requires MONGODB_URI outside local development")
         }
-        SchoolPresenceService(
+        val schoolEntryQrRepository = when {
+            settings.mongo.isConfigured -> MongoSchoolEntryQrRepository(mongoConnection.database())
+            settings.environment == Environment.LOCAL -> InMemorySchoolEntryQrRepository()
+            else -> error("School entry QR management requires MONGODB_URI outside local development")
+        }
+        val schoolEntryQrService = SchoolEntryQrService(schoolEntryQrRepository)
+        val presenceService = SchoolPresenceService(
             repository = schoolPresenceRepository,
             policy = SchoolPresencePolicy(
                 entryQrSha256 = settings.schoolPresenceQrSha256,
                 allowedSsids = settings.schoolWifiSsids,
                 allowedBssids = settings.schoolWifiBssids,
             ),
+            entryQrService = schoolEntryQrService,
         )
+        presenceService to schoolEntryQrService
     } else {
         null
     }
+    val schoolPresenceService = schoolPresenceGraph?.first
     val attendanceService = AttendanceService(
         repository = attendanceRepository,
         academicProvider = providerRegistry.academic,
@@ -221,8 +233,12 @@ fun Application.module(
             service = attendanceService,
             qrService = attendanceQrService,
         )
-        schoolPresenceService?.let { service ->
-            schoolPresenceRoutes(settings = settings, service = service)
+        schoolPresenceGraph?.let { (service, qrAdminService) ->
+            schoolPresenceRoutes(
+                settings = settings,
+                service = service,
+                qrAdminService = qrAdminService,
+            )
         }
         academicGroupRoutes(settings = settings, service = academicGroupService)
         tutoringRoutes(settings = settings, service = tutorAssignmentService)

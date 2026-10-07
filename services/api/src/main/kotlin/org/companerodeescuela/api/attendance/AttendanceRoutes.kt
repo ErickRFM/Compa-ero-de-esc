@@ -28,6 +28,19 @@ fun Route.attendanceRoutes(
 ) {
     route("/attendance") {
         if (!settings.hasAuthentication) {
+            get("/sessions/open") {
+                val principal = call.requirePrincipal()
+                if (principal.roles().none { it.isAdministrative }) {
+                    throw ApiException.Forbidden("Administrative role is required")
+                }
+                call.respond(
+                    ApiResponse(
+                        data = service.activeForAdministration(),
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
+
             get("/sessions/active") {
                 throw ApiException.DependencyUnavailable("Authentication is not configured")
             }

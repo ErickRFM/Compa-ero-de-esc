@@ -63,8 +63,7 @@ data class ApiSettings(
         get() = attendanceQrSecret != null
 
     val hasSchoolPresenceVerification: Boolean
-        get() = schoolPresenceQrSha256.isNotBlank() &&
-            (schoolWifiSsids.isNotEmpty() || schoolWifiBssids.isNotEmpty())
+        get() = schoolWifiSsids.isNotEmpty() || schoolWifiBssids.isNotEmpty()
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -205,7 +204,10 @@ class SettingsLoader(
     ) {
         val partiallyConfigured = qrSha256.isNotBlank() || ssids.isNotEmpty() || bssids.isNotEmpty()
         if (!partiallyConfigured) return
-        if (qrSha256.length != 64 || qrSha256.any { it !in "0123456789abcdef" }) {
+        if (
+            qrSha256.isNotBlank() &&
+            (qrSha256.length != 64 || qrSha256.any { it !in "0123456789abcdef" })
+        ) {
             throw ConfigurationException("SCHOOL_PRESENCE_QR_SHA256 must be a lowercase SHA-256 hex digest")
         }
         if (ssids.isEmpty() && bssids.isEmpty()) {

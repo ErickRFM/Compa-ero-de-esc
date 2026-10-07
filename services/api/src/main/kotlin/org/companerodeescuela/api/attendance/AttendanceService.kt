@@ -97,6 +97,13 @@ class AttendanceService(
             .sortedBy { it.closesAtEpochSeconds }
     }
 
+    suspend fun activeForAdministration(): List<AttendanceSessionResponse> {
+        val now = clock.instant().epochSecond
+        return repository.findOpenSessions()
+            .filter { it.status == AttendanceSessionStatus.OPEN && it.closesAtEpochSeconds > now }
+            .sortedBy { it.closesAtEpochSeconds }
+    }
+
     suspend fun activeFor(studentId: String): List<AttendanceSessionResponse> {
         schoolPresenceService?.requireActive(studentId)
 

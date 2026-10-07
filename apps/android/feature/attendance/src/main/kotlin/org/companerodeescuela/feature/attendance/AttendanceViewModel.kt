@@ -26,6 +26,7 @@ import org.companerodeescuela.shared.contracts.AttendanceStatus
 import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
 import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
+import org.companerodeescuela.shared.contracts.SchoolPresenceResponse
 import org.companerodeescuela.shared.contracts.UserRole
 
 enum class AttendanceMode {
@@ -33,6 +34,11 @@ enum class AttendanceMode {
     STUDENT,
     TEACHER,
     UNSUPPORTED,
+}
+
+enum class ScannerPurpose {
+    ATTENDANCE,
+    SCHOOL_DAY,
 }
 
 enum class QrVisualState {
@@ -55,7 +61,10 @@ data class AttendanceUiState(
     val qrVisualState: QrVisualState = QrVisualState.IDLE,
     val roster: AttendanceRosterResponse? = null,
     val localRecords: List<LocalAttendanceRecord> = emptyList(),
+    val schoolPresence: SchoolPresenceResponse? = null,
+    val schoolNetworkSsid: String? = null,
     val scannerOpen: Boolean = false,
+    val scannerPurpose: ScannerPurpose = ScannerPurpose.ATTENDANCE,
     val scannerSessionHint: String? = null,
     val qrInspection: AttendanceQrInspectionResponse? = null,
     val successMessage: String? = null,
@@ -142,6 +151,7 @@ class AttendanceViewModel @Inject constructor(
         _state.update {
             it.copy(
                 scannerOpen = true,
+                scannerPurpose = ScannerPurpose.ATTENDANCE,
                 scannerSessionHint = sessionId,
                 qrInspection = null,
                 successMessage = null,
@@ -154,12 +164,40 @@ class AttendanceViewModel @Inject constructor(
         openScanner(null)
     }
 
+    fun openSchoolDayScanner() {
+        val network = repository.currentSchoolNetwork()
+        if (network == null) {
+            _state.update {
+                it.copy(
+                    schoolNetworkSsid = null,
+                    errorMessage = "Conéctate al Wi-Fi de la escuela antes de iniciar tu jornada.",
+                )
+            }
+            return
+        }
+        _state.update {
+            it.copy(
+                scannerOpen = true,
+                scannerPurpose = ScannerPurpose.SCHOOL_DAY,
+                scannerSessionHint = null,
+                schoolNetworkSsid = network.ssid,
+                qrInspection = null,
+                successMessage = null,
+                errorMessage = null,
+            )
+        }
+    }
+
     fun dismissScanner() {
         _state.update { it.copy(scannerOpen = false, scannerSessionHint = null) }
     }
 
     fun inspectQr(rawToken: String) {
         val token = rawToken.trim()
+        if (_state.value.scannerPurpose == ScannerPurpose.SCHOOL_DAY) {
+            startSchoolDay(token)
+            return
+        }
         val sessionId = _state.value.scannerSessionHint
             ?: AttendanceQrTokenParser.sessionId(token)
         if (sessionId.isNullOrBlank()) {
@@ -211,6 +249,40 @@ class AttendanceViewModel @Inject constructor(
                             errorMessage = captured.error.userMessage,
                         )
                     }
+                }
+            }
+        }
+    }
+
+    private fun startSchoolDay(rawToken: String) {
+        val token = rawToken.trim()
+        if (token.isBlank()) {
+            _state.update {
+                it.copy(
+                    scannerOpen = false,
+                    errorMessage = "No reconocimos el QR institucional.",
+                )
+            }
+            return
+        }
+        viewModelScope.launch {
+            _state.update { it.copy(actionInProgress = true, errorMessage = null) }
+            when (val result = repository.startSchoolPresence(token)) {
+                is Outcome.Success -> _state.update {
+                    it.copy(
+                        actionInProgress = false,
+                        scannerOpen = false,
+                        schoolPresence = result.value,
+                        schoolNetworkSsid = repository.currentSchoolNetwork()?.ssid,
+                        successMessage = "Jornada escolar iniciada. Tu red y el QR institucional fueron verificados.",
+                    )
+                }
+                is Outcome.Failure -> _state.update {
+                    it.copy(
+                        actionInProgress = false,
+                        scannerOpen = false,
+                        errorMessage = result.error.userMessage,
+                    )
                 }
             }
         }
@@ -390,6 +462,8 @@ class AttendanceViewModel @Inject constructor(
             _state.update { it.copy(loading = true, errorMessage = null) }
             val week = repository.academicWeek(LocalDate.now().toString())
             val sessions = repository.activeStudentSessions()
+            val presence = repository.schoolPresence()
+            val network = repository.currentSchoolNetwork()
 
             val occurrences = week.valueOrNull()?.occurrences.orEmpty()
             when (sessions) {
@@ -398,6 +472,8 @@ class AttendanceViewModel @Inject constructor(
                         loading = false,
                         activeSessions = sessions.value,
                         occurrences = occurrences,
+                        schoolPresence = presence.valueOrNull(),
+                        schoolNetworkSsid = network?.ssid,
                     )
                 }
                 is Outcome.Failure -> _state.update {

@@ -26,6 +26,7 @@ data class ScheduleUiState(
     val importCandidates: List<PersonalScheduleDraft> = emptyList(),
     val undoDrafts: List<PersonalScheduleDraft> = emptyList(),
     val successMessage: String? = null,
+    val syncMessage: String? = null,
     val errorMessage: String? = null,
 )
 
@@ -41,7 +42,11 @@ class ScheduleViewModel @Inject constructor(
 
     fun load() {
         viewModelScope.launch {
-            _state.value = _state.value.copy(loading = true, errorMessage = null)
+            _state.value = _state.value.copy(
+                loading = true,
+                syncMessage = null,
+                errorMessage = null,
+            )
             when (val result = repository.load()) {
                 is Outcome.Success -> {
                     _state.value = _state.value.copy(
@@ -49,6 +54,7 @@ class ScheduleViewModel @Inject constructor(
                         entries = WeeklySchedule.order(result.value.academic.schedule.entries),
                         fromCache = result.value.fromCache,
                         lastUpdatedAtEpochSeconds = result.value.updatedAtEpochSeconds,
+                        syncMessage = null,
                         errorMessage = null,
                     )
                 }
@@ -59,10 +65,15 @@ class ScheduleViewModel @Inject constructor(
                                 loading = false,
                                 entries = WeeklySchedule.order(local.value),
                                 fromCache = true,
-                                errorMessage = if (local.value.isEmpty()) {
-                                    result.error.userMessage
+                                syncMessage = if (local.value.isEmpty()) {
+                                    null
                                 } else {
-                                    "No pudimos sincronizar UPTlax. Tu horario guardado sigue disponible."
+                                    "La integración escolar no respondió. Estás usando tu horario guardado."
+                                },
+                                errorMessage = if (local.value.isEmpty()) {
+                                    "Todavía no hay un horario guardado. Puedes importarlo o crearlo manualmente."
+                                } else {
+                                    null
                                 },
                             )
                         }

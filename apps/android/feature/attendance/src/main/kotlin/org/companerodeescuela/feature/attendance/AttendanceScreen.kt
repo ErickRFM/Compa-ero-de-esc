@@ -123,6 +123,7 @@ fun AttendanceScreen(
             onRefresh = viewModel::refresh,
             onScan = viewModel::openScanner,
             onGenericScan = viewModel::openGenericScanner,
+            onStartSchoolDay = viewModel::openSchoolDayScanner,
             onPickImage = { imageLauncher.launch(arrayOf("image/*")) },
             onInspectToken = viewModel::inspectQr,
             onDismissInspection = viewModel::clearQrInspection,
@@ -151,6 +152,7 @@ private fun StudentAttendance(
     onRefresh: () -> Unit,
     onScan: (String?) -> Unit,
     onGenericScan: () -> Unit,
+    onStartSchoolDay: () -> Unit,
     onPickImage: () -> Unit,
     onInspectToken: (String) -> Unit,
     onDismissInspection: () -> Unit,
@@ -190,6 +192,14 @@ private fun StudentAttendance(
                 tone = NoticeTone.ERROR,
             )
         }
+
+        SchoolDayPresenceCard(
+            active = state.schoolPresence != null,
+            ssid = state.schoolNetworkSsid,
+            expiresAtEpochSeconds = state.schoolPresence?.expiresAtEpochSeconds,
+            busy = state.actionInProgress,
+            onStart = onStartSchoolDay,
+        )
 
         state.qrInspection?.let { inspection ->
             QrInspectionCard(
@@ -316,6 +326,70 @@ private fun StudentSessionCard(
         }
 
         local?.let { LocalAttendanceStatus(it) }
+    }
+}
+
+@Composable
+private fun SchoolDayPresenceCard(
+    active: Boolean,
+    ssid: String?,
+    expiresAtEpochSeconds: Long?,
+    busy: Boolean,
+    onStart: () -> Unit,
+) {
+    CompaneroSurface(
+        modifier = Modifier.fillMaxWidth(),
+        role = CompaneroSurfaceRole.CARD,
+    ) {
+        Column(
+            modifier = Modifier.padding(CompaneroSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+        ) {
+            Text(
+                text = "Presencia en la escuela",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (active) {
+                StatusNotice(
+                    title = "Jornada iniciada",
+                    message = buildString {
+                        append("QR institucional validado")
+                        ssid?.let { append(" · Wi-Fi: ").append(it) }
+                        expiresAtEpochSeconds?.let {
+                            append(" · válida hasta ")
+                            append(
+                                DateTimeFormatter.ofPattern("HH:mm")
+                                    .withZone(java.time.ZoneId.systemDefault())
+                                    .format(Instant.ofEpochSecond(it)),
+                            )
+                        }
+                    },
+                    tone = NoticeTone.SUCCESS,
+                )
+            } else {
+                Text(
+                    text = "Conéctate al Wi-Fi de la escuela y escanea el QR institucional una vez al iniciar tu jornada.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (ssid != null) {
+                    Text(
+                        text = "Red detectada: $ssid",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Button(
+                    onClick = onStart,
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Filled.QrCodeScanner, contentDescription = null)
+                    Text(" Iniciar jornada")
+                }
+            }
+        }
     }
 }
 

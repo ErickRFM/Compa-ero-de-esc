@@ -88,6 +88,28 @@ class ScheduleOcrParserTest {
         assertEquals("Saúl Olaf Loaiza Meléndez", result.single().teacherName)
     }
 
+
+    @Test
+    fun `normalizes repeated minor OCR variants using the dominant label`() {
+        val result = ScheduleOcrParser.parse(
+            """
+            Lunes
+            14:00-15:00 Programación Móvil
+            Saúl Olaf Loaiza Meléndez
+            15:00-16:00 Programacion Movil
+            Saul Olaf Loaiza Melendez
+            16:00-17:00 Programación Móvill
+            Saúl Olaf Loaiza Meléndez
+            """.trimIndent(),
+        )
+
+        assertEquals(1, result.size)
+        assertEquals("Programación Móvil", result.single().subjectName)
+        assertEquals("Saúl Olaf Loaiza Meléndez", result.single().teacherName)
+        assertEquals("14:00", result.single().startsAt)
+        assertEquals("17:00", result.single().endsAt)
+    }
+
     @Test
     fun `does not fabricate entries when a time or day is missing`() {
         val result = ScheduleOcrParser.parse(

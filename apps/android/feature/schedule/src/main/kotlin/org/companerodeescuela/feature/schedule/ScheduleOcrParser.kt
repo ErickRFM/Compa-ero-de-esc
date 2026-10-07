@@ -1,5 +1,6 @@
 package org.companerodeescuela.feature.schedule
 
+import java.text.Normalizer
 import org.companerodeescuela.core.academic.PersonalScheduleDraft
 import org.companerodeescuela.shared.contracts.ScheduleSource
 
@@ -87,8 +88,70 @@ object ScheduleOcrParser {
                 it.teacherName.trim().lowercase(),
             ).joinToString("|")
         }
-        return mergeContiguous(unique)
+        return mergeContiguous(canonicalizeRepeatedLabels(unique))
     }
+
+    private fun canonicalizeRepeatedLabels(
+        entries: List<PersonalScheduleDraft>,
+    ): List<PersonalScheduleDraft> {
+        val subjects = entries.map { it.subjectName }.filter(String::isNotBlank)
+        val teachers = entries.map { it.teacherName }.filter(String::isNotBlank)
+        return entries.map { entry ->
+            entry.copy(
+                subjectName = representative(entry.subjectName, subjects),
+                teacherName = representative(entry.teacherName, teachers),
+            )
+        }
+    }
+
+    private fun representative(value: String, candidates: List<String>): String {
+        if (value.isBlank()) return value
+        val folded = value.foldForComparison()
+        val threshold = if (folded.length >= 10) 2 else 1
+        return candidates
+            .groupingBy { it }
+            .eachCount()
+            .filterKeys { candidate ->
+                editDistance(folded, candidate.foldForComparison()) <= threshold
+            }
+            .maxWithOrNull(
+                compareBy<Map.Entry<String, Int>> { it.value }
+                    .thenBy { candidate ->
+                        candidate.key.count { ch -> ch in "áéíóúÁÉÍÓÚñÑ" }
+                    }
+                    .thenBy { candidate -> -candidate.key.length },
+            )
+            ?.key
+            ?: value
+    }
+
+    private fun editDistance(left: String, right: String): Int {
+        if (left == right) return 0
+        if (left.isEmpty()) return right.length
+        if (right.isEmpty()) return left.length
+        var previous = IntArray(right.length + 1) { it }
+        left.forEachIndexed { index, lc ->
+            val current = IntArray(right.length + 1)
+            current[0] = index + 1
+            right.forEachIndexed { j, rc ->
+                current[j + 1] = minOf(
+                    current[j] + 1,
+                    previous[j + 1] + 1,
+                    previous[j] + if (lc == rc) 0 else 1,
+                )
+            }
+            previous = current
+        }
+        return previous[right.length]
+    }
+
+    private fun String.foldForComparison(): String =
+        Normalizer.normalize(this, Normalizer.Form.NFD)
+            .replace(Regex("""\p{M}+"""), "")
+            .lowercase()
+            .replace(Regex("""[^a-z0-9]+"""), " ")
+            .trim()
+
 
     private fun mergeContiguous(entries: List<PersonalScheduleDraft>): List<PersonalScheduleDraft> {
         val sorted = entries.sortedWith(

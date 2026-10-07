@@ -17,12 +17,16 @@ import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.database.AcademicSnapshotCache
 import org.companerodeescuela.core.database.CachedAcademicLoad
+import org.companerodeescuela.core.database.PersonalScheduleItem
+import org.companerodeescuela.core.database.PersonalScheduleStore
 import org.companerodeescuela.core.network.ApiEnvironment
 import org.companerodeescuela.core.network.createApiClient
 import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.shared.contracts.AcademicLoadResponse
 import org.companerodeescuela.shared.contracts.AcademicProfile
 import org.companerodeescuela.shared.contracts.AcademicScheduleResponse
+import org.companerodeescuela.shared.contracts.ScheduleRecurrence
+import org.companerodeescuela.shared.contracts.ScheduleSource
 
 class AcademicRepositoryTest {
 
@@ -49,6 +53,74 @@ class AcademicRepositoryTest {
         assertTrue(success.value.fromCache)
         assertEquals("student-1", success.value.academic.student.id)
         assertEquals("student-1", cache.lastReadOwner)
+    }
+
+
+    @Test
+    fun `network failure without institutional cache still exposes imported local schedule`() = runTest {
+        val tokenStore = FakeTokenStore(platformToken("student-1"))
+        val cache = FakeCache(emptyMap())
+        val personalStore = FakePersonalScheduleStore(
+            listOf(
+                PersonalScheduleItem(
+                    id = "pdf-mobile-1",
+                    ownerId = "student-1",
+                    subjectCode = "PM",
+                    subjectName = "Programación Móvil",
+                    groupName = "9 A",
+                    teacherName = "Saúl Olaf Loaiza",
+                    dayOfWeek = "TUESDAY",
+                    startsAt = "07:00",
+                    endsAt = "08:00",
+                    classroomName = null,
+                    buildingName = null,
+                    source = ScheduleSource.OCR_IMPORT,
+                    recurrence = ScheduleRecurrence.WEEKLY,
+                    seriesId = "pdf-mobile",
+                    effectiveDate = null,
+                    updatedAtEpochSeconds = 100,
+                ),
+            ),
+        )
+        val repository = repository(
+            engine = MockEngine {
+                respond(content = "{}", status = HttpStatusCode.ServiceUnavailable)
+            },
+            tokenStore = tokenStore,
+            cache = cache,
+            personalScheduleStore = personalStore,
+        )
+
+        val result = repository.load()
+
+        val success = assertIs<Outcome.Success<AcademicContent>>(result)
+        assertTrue(success.value.fromCache)
+        assertEquals("student-1", success.value.academic.student.id)
+        assertEquals("Student", success.value.academic.student.displayName)
+        assertEquals(1, success.value.academic.schedule.entries.size)
+        assertEquals(
+            "Programación Móvil",
+            success.value.academic.schedule.entries.single().subjectName,
+        )
+        assertEquals("TUESDAY", success.value.academic.schedule.entries.single().dayOfWeek)
+    }
+
+    @Test
+    fun `network failure without any local schedule remains a failure`() = runTest {
+        val tokenStore = FakeTokenStore(platformToken("student-1"))
+        val cache = FakeCache(emptyMap())
+        val repository = repository(
+            engine = MockEngine {
+                respond(content = "{}", status = HttpStatusCode.ServiceUnavailable)
+            },
+            tokenStore = tokenStore,
+            cache = cache,
+            personalScheduleStore = FakePersonalScheduleStore(emptyList()),
+        )
+
+        val result = repository.load()
+
+        assertIs<Outcome.Failure>(result)
     }
 
     @Test
@@ -109,6 +181,7 @@ class AcademicRepositoryTest {
         engine: MockEngine,
         tokenStore: FakeTokenStore,
         cache: FakeCache,
+        personalScheduleStore: PersonalScheduleStore? = null,
     ): AcademicRepository = AcademicRepository(
         client = createApiClient(
             environment = ApiEnvironment("https://example.test/", "test"),
@@ -116,6 +189,7 @@ class AcademicRepositoryTest {
         ),
         tokenStore = tokenStore,
         cache = cache,
+        personalScheduleStore = personalScheduleStore,
     )
 
     private fun cached(userId: String, name: String): CachedAcademicLoad =
@@ -147,6 +221,23 @@ class AcademicRepositoryTest {
         override suspend fun clear() {
             token = null
         }
+    }
+
+    private class FakePersonalScheduleStore(
+        private val items: List<PersonalScheduleItem>,
+    ) : PersonalScheduleStore {
+        override suspend fun list(ownerId: String): List<PersonalScheduleItem> =
+            items.filter { it.ownerId == ownerId }
+
+        override suspend fun upsert(item: PersonalScheduleItem) = Unit
+
+        override suspend fun replaceBySource(
+            ownerId: String,
+            source: ScheduleSource,
+            items: List<PersonalScheduleItem>,
+        ) = Unit
+
+        override suspend fun delete(ownerId: String, id: String) = Unit
     }
 
     private class FakeCache(

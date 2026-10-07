@@ -16,6 +16,8 @@ import org.companerodeescuela.core.security.PlatformSessionClaims
 import org.companerodeescuela.core.security.SessionTokenInspector
 import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.shared.contracts.AcademicLoadResponse
+import org.companerodeescuela.shared.contracts.AcademicProfile
+import org.companerodeescuela.shared.contracts.AcademicScheduleResponse
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.ScheduleEntry
 
@@ -91,7 +93,7 @@ class AcademicRepository(
                             ),
                         )
                     } else {
-                        remote
+                        localOnlyContent(claims) ?: remote
                     }
                 }
             }
@@ -112,6 +114,37 @@ class AcademicRepository(
         val institutional = cached?.value?.schedule?.entries.orEmpty()
         val personal = personalEntries(session.second.userId)
         return Outcome.Success(mergeEntries(institutional, personal))
+    }
+
+    /**
+     * Keeps the product usable when the institutional endpoint is unavailable
+     * before we have ever written an institutional cache. PDF/image/manual
+     * imports live in the personal schedule store and are a valid source for
+     * Today/Agenda presentation, but never become institutional enrollment.
+     */
+    private suspend fun localOnlyContent(
+        claims: PlatformSessionClaims,
+    ): Outcome.Success<AcademicContent>? {
+        val personal = personalEntries(claims.userId)
+        if (personal.isEmpty()) return null
+
+        val local = AcademicLoadResponse(
+            student = AcademicProfile(
+                id = claims.userId,
+                displayName = claims.displayName ?: "Estudiante",
+            ),
+            schedule = AcademicScheduleResponse(
+                ownerId = claims.userId,
+                entries = mergeEntries(emptyList(), personal),
+            ),
+        )
+        return Outcome.Success(
+            AcademicContent(
+                academic = local,
+                fromCache = true,
+                updatedAtEpochSeconds = clock.instant().epochSecond,
+            ),
+        )
     }
 
     private suspend fun mergePersonal(

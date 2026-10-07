@@ -140,7 +140,7 @@ private fun io.ktor.server.application.ApplicationCall.requireAdminPrincipal(): 
         .orEmpty()
         .mapNotNull { encoded -> runCatching { UserRole.valueOf(encoded) }.getOrNull() }
         .toSet()
-    if (roles.none(UserRole::isAdministrative)) {
+    if (roles.none { it.isAdministrative }) {
         throw ApiException.Forbidden("Administrative role is required")
     }
     return principal

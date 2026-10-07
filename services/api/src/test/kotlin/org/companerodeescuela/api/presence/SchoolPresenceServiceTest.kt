@@ -9,6 +9,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlinx.coroutines.test.runTest
 import org.companerodeescuela.api.errors.ApiException
+import org.companerodeescuela.shared.contracts.CreateSchoolEntryQrRequest
 import org.companerodeescuela.shared.contracts.NetworkVerificationMethod
 import org.companerodeescuela.shared.contracts.SchoolNetworkEvidence
 import org.companerodeescuela.shared.contracts.SchoolPresenceStatus
@@ -62,6 +63,43 @@ class SchoolPresenceServiceTest {
                 ),
             )
         }
+    }
+
+    @Test
+    fun `admin managed QR starts school day without legacy fixed hash`() = runTest {
+        val qrService = SchoolEntryQrService(
+            repository = InMemorySchoolEntryQrRepository(),
+            clock = Clock.fixed(instant, ZoneOffset.UTC),
+            newId = { "managed-qr-1" },
+            tokenGenerator = { "managed-entry-token-" + "x".repeat(32) },
+        )
+        val managedQr = qrService.create(
+            actorId = "admin-1",
+            request = CreateSchoolEntryQrRequest(
+                name = "Entrada principal",
+                validFromEpochSeconds = instant.minusSeconds(60).epochSecond,
+                expiresAtEpochSeconds = instant.plusSeconds(3600).epochSecond,
+            ),
+        )
+        val service = SchoolPresenceService(
+            repository = InMemorySchoolPresenceRepository(),
+            policy = SchoolPresencePolicy(
+                entryQrSha256 = "",
+                allowedSsids = setOf("Escuela-Alumnos"),
+                allowedBssids = setOf("aa:bb:cc:dd:ee:ff"),
+            ),
+            entryQrService = qrService,
+            clock = Clock.fixed(instant, ZoneOffset.UTC),
+            newId = { "presence-managed" },
+        )
+
+        val result = service.start(
+            "2020-10455",
+            request().copy(qrToken = managedQr.token!!),
+        )
+
+        assertEquals(SchoolPresenceStatus.ACTIVE, result.status)
+        assertEquals(1, qrService.list().single().usageCount)
     }
 
     @Test

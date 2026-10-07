@@ -88,7 +88,13 @@ class SchoolPresenceServiceTest {
                 allowedSsids = setOf("Escuela-Alumnos"),
                 allowedBssids = setOf("aa:bb:cc:dd:ee:ff"),
             ),
-            entryQrService = qrService,
+            qrVerifier = SchoolEntryQrVerifier(
+                managedQrService = qrService,
+            ),
+            networkVerifier = SchoolNetworkVerifier(
+                allowedSsids = setOf("Escuela-Alumnos"),
+                allowedBssids = setOf("aa:bb:cc:dd:ee:ff"),
+            ),
             clock = Clock.fixed(instant, ZoneOffset.UTC),
             newId = { "presence-managed" },
         )

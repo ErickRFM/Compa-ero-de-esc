@@ -3,8 +3,6 @@ package org.companerodeescuela.api.events
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.auth.authenticate
-import io.ktor.server.auth.jwt.JWTPrincipal
-import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -14,12 +12,13 @@ import io.ktor.server.routing.patch
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import org.companerodeescuela.api.auth.AuthTokenService
+import org.companerodeescuela.api.auth.platformRoles
+import org.companerodeescuela.api.auth.requirePlatformPrincipal
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.shared.contracts.AcademicEvent
 import org.companerodeescuela.shared.contracts.ApiResponse
-import org.companerodeescuela.shared.contracts.UserRole
 
 fun Route.academicEventRoutes(
     settings: ApiSettings,
@@ -40,7 +39,7 @@ fun Route.academicEventRoutes(
 
         authenticate(AuthTokenService.PROVIDER_NAME) {
             get {
-                val principal = call.requirePrincipal()
+                val principal = call.requirePlatformPrincipal()
                 call.respond(
                     ApiResponse(
                         data = service.listEvents(),
@@ -50,7 +49,7 @@ fun Route.academicEventRoutes(
             }
 
             get("/{id}") {
-                val principal = call.requirePrincipal()
+                val principal = call.requirePlatformPrincipal()
                 val id = call.requireEventId()
                 val event = service.getEvent(id) ?: throw ApiException.NotFound("Event $id not found")
                 call.respond(
@@ -62,8 +61,8 @@ fun Route.academicEventRoutes(
             }
 
             post {
-                val principal = call.requirePrincipal()
-                val roles = principal.roles()
+                val principal = call.requirePlatformPrincipal()
+                val roles = principal.platformRoles()
                 if (roles.none { it.isStaff }) {
                     throw ApiException.Forbidden("Only staff can post events")
                 }
@@ -79,9 +78,9 @@ fun Route.academicEventRoutes(
             }
 
             patch("/{id}") {
-                val principal = call.requirePrincipal()
+                val principal = call.requirePlatformPrincipal()
                 val id = call.requireEventId()
-                val roles = principal.roles()
+                val roles = principal.platformRoles()
                 if (roles.none { it.isStaff }) {
                     throw ApiException.Forbidden("Only staff can edit events")
                 }
@@ -97,9 +96,9 @@ fun Route.academicEventRoutes(
             }
 
             delete("/{id}") {
-                val principal = call.requirePrincipal()
+                val principal = call.requirePlatformPrincipal()
                 val id = call.requireEventId()
-                val roles = principal.roles()
+                val roles = principal.platformRoles()
                 if (roles.none { it.isStaff }) {
                     throw ApiException.Forbidden("Only staff can delete events")
                 }
@@ -117,16 +116,6 @@ fun Route.academicEventRoutes(
     }
 }
 
-private fun ApplicationCall.requirePrincipal(): JWTPrincipal =
-    principal<JWTPrincipal>() ?: throw ApiException.Unauthorized()
-
 private fun ApplicationCall.requireEventId(): String =
     parameters["id"]?.takeIf(String::isNotBlank)
         ?: throw ApiException.Validation("id is required")
-
-private fun JWTPrincipal.roles(): Set<UserRole> =
-    payload.getClaim("roles")
-        .asList(String::class.java)
-        .orEmpty()
-        .mapNotNull { encoded -> runCatching { UserRole.valueOf(encoded.uppercase()) }.getOrNull() }
-        .toSet()

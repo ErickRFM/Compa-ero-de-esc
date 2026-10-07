@@ -94,15 +94,20 @@ class AttendanceQrClassificationTest {
             repository = repository,
             clock = clock,
         )
-        val attendance = AttendanceService(
+        val sessionService = AttendanceSessionService(
             repository = repository,
-            academicProvider = provider,
-            qrService = qr,
+            occurrenceResolver = ProviderAttendanceOccurrenceResolver(provider),
             clock = clock,
             newId = { "session-1" },
         )
+        val attendance = AttendanceStudentService(
+            repository = repository,
+            enrollmentResolver = AttendanceEnrollmentResolver(provider),
+            qrService = qr,
+            clock = clock,
+        )
         val occurrence = teacherOccurrence()
-        val session = attendance.openSession(
+        val session = sessionService.openSession(
             teacherId = "T-0001",
             request = CreateAttendanceSessionRequest(
                 occurrenceId = occurrence.id.value,
@@ -124,7 +129,7 @@ class AttendanceQrClassificationTest {
     }
 
     private data class Setup(
-        val attendance: AttendanceService,
+        val attendance: AttendanceStudentService,
         val qr: AttendanceQrService,
         val clock: MutableClock,
         val sessionId: String,

@@ -1,13 +1,8 @@
 package org.companerodeescuela.api.attendance
 
-import java.time.Clock
-import java.time.Duration
-import java.time.LocalDate
-import java.util.UUID
 import io.ktor.http.HttpStatusCode
+import java.time.Clock
 import org.companerodeescuela.api.errors.ApiException
-import org.companerodeescuela.api.integrations.IntegrationException
-import org.companerodeescuela.api.integrations.academic.AcademicProvider
 import org.companerodeescuela.api.presence.SchoolPresenceService
 import org.companerodeescuela.shared.contracts.ApiErrorCode
 import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
@@ -16,101 +11,20 @@ import org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionStatus
 import org.companerodeescuela.shared.contracts.AttendanceReasonCode
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
-import org.companerodeescuela.shared.contracts.AttendanceRosterResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
 import org.companerodeescuela.shared.contracts.AttendanceStatus
-import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
-import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
-import org.companerodeescuela.shared.model.ClassOccurrenceStatus
 
-class AttendanceService(
+class AttendanceStudentService(
     private val repository: AttendanceRepository,
-    private val academicProvider: AcademicProvider,
-    private val occurrenceResolver: AttendanceOccurrenceResolver =
-        ProviderAttendanceOccurrenceResolver(academicProvider),
+    private val enrollmentResolver: AttendanceEnrollmentResolver,
     private val qrService: AttendanceQrService? = null,
     private val schoolPresenceService: SchoolPresenceService? = null,
     private val clock: Clock = Clock.systemUTC(),
-    private val newId: () -> String = { UUID.randomUUID().toString() },
 ) {
-    suspend fun openSession(
-        teacherId: String,
-        request: CreateAttendanceSessionRequest,
-    ): AttendanceSessionResponse {
-        val occurrenceId = request.occurrenceId.trim()
-        if (occurrenceId.isBlank()) {
-            throw ApiException.Validation("occurrenceId is required")
-        }
-        if (request.durationMinutes !in MIN_DURATION_MINUTES..MAX_DURATION_MINUTES) {
-            throw ApiException.Validation(
-                "Attendance duration must be between 1 and 15 minutes",
-            )
-        }
-        val occurrenceDate = runCatching { LocalDate.parse(request.occurrenceDate) }
-            .getOrElse { throw ApiException.Validation("occurrenceDate must be YYYY-MM-DD") }
-
-        val occurrence = occurrenceResolver.resolveTeacherOccurrence(
-            teacherId = teacherId,
-            occurrenceId = occurrenceId,
-            occurrenceDate = occurrenceDate,
-        )
-        if (occurrence.status == ClassOccurrenceStatus.CANCELLED) {
-            throw ApiException.Conflict("Attendance cannot open for a cancelled class")
-        }
-
-        val now = clock.instant()
-        val candidate = AttendanceSessionResponse(
-            id = newId(),
-            occurrenceId = occurrence.id.value,
-            courseId = occurrence.group.course.id.value,
-            groupName = occurrence.group.name,
-            occurrenceDate = occurrence.date.toString(),
-            scheduledStartsAt = occurrence.startsAt.toString(),
-            scheduledEndsAt = occurrence.endsAt.toString(),
-            openedBy = teacherId,
-            openedAtEpochSeconds = now.epochSecond,
-            closesAtEpochSeconds = now.plus(
-                Duration.ofMinutes(request.durationMinutes.toLong()),
-            ).epochSecond,
-            status = AttendanceSessionStatus.OPEN,
-        )
-
-        return when (val result = repository.createSession(candidate)) {
-            is SessionWriteResult.Created -> result.session
-            is SessionWriteResult.Existing -> {
-                if (result.session.openedBy != teacherId) {
-                    throw ApiException.Conflict("Attendance session already belongs to another teacher")
-                }
-                result.session
-            }
-        }
-    }
-
-    suspend fun activeForTeacher(teacherId: String): List<AttendanceSessionResponse> {
-        val now = clock.instant().epochSecond
-        return repository.findOpenSessions()
-            .filter { session ->
-                session.openedBy == teacherId &&
-                    session.closesAtEpochSeconds > now
-            }
-            .sortedBy { it.closesAtEpochSeconds }
-    }
-
-    suspend fun activeForAdministration(): List<AttendanceSessionResponse> {
-        val now = clock.instant().epochSecond
-        return repository.findOpenSessions()
-            .filter { it.status == AttendanceSessionStatus.OPEN && it.closesAtEpochSeconds > now }
-            .sortedBy { it.closesAtEpochSeconds }
-    }
-
     suspend fun activeFor(studentId: String): List<AttendanceSessionResponse> {
         schoolPresenceService?.requireActive(studentId)
-
-        val load = academicLoad(studentId)
-        val enrolled = load.enrollments
-            .map { it.course.externalId to it.course.groupName.trim() }
-            .toSet()
+        val enrolled = enrollmentResolver.courseGroupsFor(studentId)
         val now = clock.instant().epochSecond
 
         return repository.findOpenSessions().filter { session ->
@@ -134,12 +48,7 @@ class AttendanceService(
                 status = AttendanceQrInspectionStatus.INVALID,
             )
 
-        val load = academicLoad(studentId)
-        val enrolled = load.enrollments.any {
-            it.course.externalId == session.courseId &&
-                it.course.groupName.trim() == session.groupName
-        }
-        if (!enrolled) {
+        if (!enrollmentResolver.isEnrolled(studentId, session.courseId, session.groupName)) {
             return AttendanceQrInspectionResponse(
                 status = AttendanceQrInspectionStatus.NOT_ENROLLED,
             )
@@ -157,7 +66,9 @@ class AttendanceService(
         }
 
         val verifier = qrService
-            ?: throw ApiException.DependencyUnavailable("Attendance QR verification is not configured")
+            ?: throw ApiException.DependencyUnavailable(
+                "Attendance QR verification is not configured",
+            )
         return when (
             val result = verifier.verify(
                 token = token,
@@ -220,12 +131,7 @@ class AttendanceService(
             )
         }
 
-        val load = academicLoad(studentId)
-        val enrolled = load.enrollments.any {
-            it.course.externalId == session.courseId &&
-                it.course.groupName.trim() == session.groupName
-        }
-        if (!enrolled) {
+        if (!enrollmentResolver.isEnrolled(studentId, session.courseId, session.groupName)) {
             throw ApiException.Domain(
                 status = HttpStatusCode.Forbidden,
                 code = ApiErrorCode.ATTENDANCE_NOT_ENROLLED,
@@ -273,63 +179,6 @@ class AttendanceService(
         }
     }
 
-    suspend fun closeSession(
-        actorId: String,
-        sessionId: String,
-        allowCrossOwner: Boolean = false,
-    ): AttendanceSessionResponse {
-        val session = repository.findSession(sessionId)
-            ?: throw ApiException.NotFound("Attendance session was not found")
-        requireOwnerOrAdministrative(actorId, session, allowCrossOwner)
-        if (session.status == AttendanceSessionStatus.CLOSED) return session
-
-        val closed = session.copy(
-            status = AttendanceSessionStatus.CLOSED,
-            closedAtEpochSeconds = clock.instant().epochSecond,
-        )
-        repository.replaceSession(closed)
-        return closed
-    }
-
-    suspend fun roster(
-        actorId: String,
-        sessionId: String,
-        allowCrossOwner: Boolean = false,
-    ): AttendanceRosterResponse {
-        val session = repository.findSession(sessionId)
-            ?: throw ApiException.NotFound("Attendance session was not found")
-        requireOwnerOrAdministrative(actorId, session, allowCrossOwner)
-
-        return AttendanceRosterResponse(
-            session = session,
-            records = repository.recordsForSession(sessionId)
-                .sortedBy { it.studentId },
-        )
-    }
-
-    suspend fun review(
-        reviewerId: String,
-        recordId: String,
-        request: ReviewAttendanceRequest,
-        allowCrossOwner: Boolean = false,
-    ): AttendanceRecordResponse {
-        val record = repository.findRecord(recordId)
-            ?: throw ApiException.NotFound("Attendance record was not found")
-        val session = repository.findSession(record.sessionId)
-            ?: throw ApiException.NotFound("Attendance session was not found")
-        requireOwnerOrAdministrative(reviewerId, session, allowCrossOwner)
-
-        val reviewed = record.copy(
-            status = if (request.disposition == null) request.status else record.status,
-            reasonCode = if (request.disposition == null) request.reasonCode else record.reasonCode,
-            disposition = request.disposition ?: record.disposition,
-            reviewedBy = reviewerId,
-            reviewedAtEpochSeconds = clock.instant().epochSecond,
-        )
-        repository.replaceRecord(reviewed)
-        return reviewed
-    }
-
     private fun classifyEvidence(
         request: AttendanceAttemptRequest,
         sessionId: String,
@@ -346,7 +195,9 @@ class AttendanceService(
         }
 
         val verifier = qrService
-            ?: throw ApiException.DependencyUnavailable("Attendance QR verification is not configured")
+            ?: throw ApiException.DependencyUnavailable(
+                "Attendance QR verification is not configured",
+            )
         return when (
             val qr = verifier.verify(
                 token = qrToken,
@@ -385,43 +236,7 @@ class AttendanceService(
         }
     }
 
-    private fun requireOwnerOrAdministrative(
-        actorId: String,
-        session: AttendanceSessionResponse,
-        allowCrossOwner: Boolean,
-    ) {
-        if (!allowCrossOwner && session.openedBy != actorId) {
-            throw ApiException.Forbidden("This attendance session belongs to another teacher")
-        }
-    }
-
-    private suspend fun academicLoad(studentId: String) =
-        try {
-            academicProvider.getAcademicLoad(studentId)
-        } catch (error: IntegrationException) {
-            when (error.category) {
-                IntegrationException.Category.NOT_FOUND ->
-                    throw ApiException.NotFound("Academic record was not found")
-                IntegrationException.Category.UNAUTHORIZED ->
-                    throw ApiException.Unauthorized("Institutional session is no longer valid")
-                IntegrationException.Category.UNAVAILABLE,
-                IntegrationException.Category.TIMEOUT,
-                -> throw ApiException.DependencyUnavailable(
-                    "The academic system is temporarily unavailable",
-                    error,
-                )
-                IntegrationException.Category.BAD_REQUEST,
-                IntegrationException.Category.MALFORMED_RESPONSE,
-                -> throw ApiException.Internal(
-                    "The academic system returned data we could not use",
-                    error,
-                )
-            }
-        }
-
     private companion object {
-        const val MIN_DURATION_MINUTES = 1
-        const val MAX_DURATION_MINUTES = 15
         const val MAX_OPERATION_ID_LENGTH = 128
         const val MAX_QR_TOKEN_LENGTH = 2_048
         const val LATE_SYNC_REVIEW_WINDOW_SECONDS = 24L * 60L * 60L

@@ -2,8 +2,6 @@ package org.companerodeescuela.api.tutoring
 
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
-import io.ktor.server.auth.jwt.JWTPrincipal
-import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -11,6 +9,7 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import org.companerodeescuela.api.auth.AuthTokenService
+import org.companerodeescuela.api.auth.requireActor
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
@@ -56,9 +55,3 @@ fun Route.tutoringRoutes(
         }
     }
 }
-
-private fun io.ktor.server.application.ApplicationCall.requireActor(
-    tokenService: AuthTokenService,
-) = tokenService.userFrom(
-    principal<JWTPrincipal>()?.payload ?: throw ApiException.Unauthorized(),
-)

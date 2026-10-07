@@ -19,6 +19,18 @@ enum class AttendanceStatus {
 }
 
 @Serializable
+enum class AttendanceDisposition {
+    @SerialName("present")
+    PRESENT,
+
+    @SerialName("late")
+    LATE,
+
+    @SerialName("absent")
+    ABSENT,
+}
+
+@Serializable
 enum class AttendanceSessionStatus {
     @SerialName("open")
     OPEN,
@@ -149,6 +161,7 @@ data class AttendanceRecordResponse(
     val receivedAtEpochSeconds: Long,
     val reviewedBy: String? = null,
     val reviewedAtEpochSeconds: Long? = null,
+    val disposition: AttendanceDisposition? = null,
 )
 
 @Serializable
@@ -161,4 +174,5 @@ data class AttendanceRosterResponse(
 data class ReviewAttendanceRequest(
     val status: AttendanceStatus,
     val reasonCode: AttendanceReasonCode = AttendanceReasonCode.TEACHER_REVIEW,
+    val disposition: AttendanceDisposition? = null,
 )

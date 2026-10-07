@@ -15,6 +15,7 @@ sealed class Destination(val route: String) {
     data object RoleUnavailable : Destination("role-unavailable")
     data object Profile : Destination("profile")
     data object AppearanceSettings : Destination("appearance-settings")
+    data object IntegrationSettings : Destination("integration-settings")
     data object DesignSystemCatalog : Destination("design-system-catalog")
 
     fun createRoute(vararg arguments: Any): String =

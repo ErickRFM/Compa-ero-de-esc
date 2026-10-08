@@ -55,9 +55,13 @@ fun TeacherHomeScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    // A dual-role account can default to student mode in AttendanceViewModel.
-    // Request teacher mode using the existing verified local session claims.
-    LaunchedEffect(viewModel) { viewModel.selectMode(AttendanceMode.TEACHER) }
+    // Bootstrap can select STUDENT for a dual-role account; switch only when needed.
+    // Existing session-claim verification still guards teacher mode.
+    LaunchedEffect(state.mode) {
+        if (state.mode == AttendanceMode.STUDENT) {
+            viewModel.selectMode(AttendanceMode.TEACHER)
+        }
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         V8CampusBackdrop(modifier = Modifier.matchParentSize())
@@ -160,7 +164,7 @@ fun TeacherHomeScreen(
                         Text(
                             text = if (active != null) {
                                 "${active.scheduledStartsAt} – ${active.scheduledEndsAt} · " +
-                                    if (state.roster == null) "Actualizando registros…" else "${records.size} registros recibidos"
+                                    (if (state.roster == null) "Actualizando registros…" else "${records.size} registros recibidos")
                             } else "El QR se genera desde el servidor y se renueva automáticamente.",
                             color = V8RedColors.TextSecondary,
                             style = MaterialTheme.typography.bodyMedium,

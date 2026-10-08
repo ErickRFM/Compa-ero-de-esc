@@ -149,7 +149,7 @@ fun HomeScreen(
                     )
                     V8DashboardStat(
                         label = "Materias hoy",
-                        value = day.classes.distinctBy { it.subjectCode.ifBlank { code -> it.subjectName } }.size.toString(),
+                        value = day.classes.distinctBy { entry -> entry.subjectCode.ifBlank { entry.subjectName } }.size.toString(),
                         onClick = onOpenClassrooms,
                         modifier = Modifier.weight(1f),
                     )

@@ -28,6 +28,9 @@ import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8ClassSummary
 import org.companerodeescuela.core.designsystem.v8.V8DailyClassRow
+import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
+import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
+import org.companerodeescuela.core.designsystem.v8.V8DashboardStat
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -64,6 +67,7 @@ fun HomeScreen(
     val overview = state.overview
     val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        V8CampusBackdrop(modifier = Modifier.matchParentSize())
         val splitLayout = maxWidth >= CompaneroWindowBreakpoints.medium
         Column(
             modifier = Modifier
@@ -74,6 +78,7 @@ fun HomeScreen(
                 .align(Alignment.TopCenter),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
         ) {
+            V8BrandHeader()
             Text(
                 text = overview?.studentName
                     ?.substringBefore(" ")
@@ -121,6 +126,10 @@ fun HomeScreen(
             }
 
             overview?.let { day ->
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    V8DashboardStat(label = "Clases hoy", value = day.classes.size.toString(), onClick = onOpenSchedule, modifier = Modifier.weight(1f))
+                    V8DashboardStat(label = "Siguiente", value = day.next?.subjectName ?: "—", onClick = onOpenSchedule, modifier = Modifier.weight(1f))
+                }
                 when {
                     !day.hasSchedule -> {
                         StatusNotice(
@@ -164,26 +173,6 @@ fun HomeScreen(
                         }
                     }
                     else -> {
-                        if (splitLayout) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
-                                verticalAlignment = Alignment.Top,
-                            ) {
-                                TodayContextPanel(
-                                    day = day,
-                                    reducedMotion = reducedMotion,
-                                    modifier = Modifier.weight(1.2f),
-                                )
-                                NextClassPanel(
-                                    day = day,
-                                    modifier = Modifier.weight(1f),
-                                )
-                            }
-                        } else {
-                            TodayContextPanel(day = day, reducedMotion = reducedMotion)
-                            NextClassPanel(day = day)
-                        }
                         DayTimeline(day, onOpenSchedule)
                     }
                 }

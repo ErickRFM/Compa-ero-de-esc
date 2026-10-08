@@ -654,9 +654,9 @@ private fun DayTimeGrid(
 
         entries.forEachIndexed { index, entry ->
             val start = runCatching { LocalTime.parse(entry.startsAt) }.getOrNull()
-                ?: return@forEachIndexedIndexed
+                ?: return@forEachIndexed
             val end = runCatching { LocalTime.parse(entry.endsAt) }.getOrNull()
-                ?: return@forEach
+                ?: return@forEachIndexed
             if (!start.isBefore(end)) return@forEachIndexed
 
             val minutesFromStart = (start.hour * 60 + start.minute - startHour * 60)

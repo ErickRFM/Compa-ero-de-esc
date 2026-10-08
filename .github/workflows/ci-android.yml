@@ -182,7 +182,6 @@ jobs:
     name: Android instrumentation smoke test
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -202,11 +201,26 @@ jobs:
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
 
       - name: Run Instrumentation Tests
-        timeout-minutes: 8
-        continue-on-error: true
+        timeout-minutes: 10
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 31
           target: google_apis
           arch: x86_64
-          script: ./gradlew connectedDebugAndroidTest --console=plain
+          # App contains the smoke tests. Root task also launches empty library
+          # suites concurrently against the same emulator and can stall ADB.
+          script: ./gradlew :apps:android:app:connectedDebugAndroidTest --max-workers=2 --console=plain
+
+      - name: Verify instrumentation tests actually executed
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          reports = Path('apps/android/app/build/outputs/androidTest-results/connected').rglob('TEST-*.xml')
+          suites = [ET.parse(path).getroot() for path in reports]
+          tests = sum(int(suite.get('tests', 0)) for suite in suites)
+          failures = sum(int(suite.get('failures', 0)) + int(suite.get('errors', 0)) for suite in suites)
+          print(f'instrumentation tests={tests} failures={failures}')
+          if tests == 0 or failures != 0:
+              raise SystemExit('Instrumentation must execute tests without failures')
+          PY

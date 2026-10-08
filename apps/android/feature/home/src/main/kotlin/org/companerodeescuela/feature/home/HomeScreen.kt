@@ -21,6 +21,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
+import org.companerodeescuela.core.designsystem.v8.V8RedColors
+import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -73,12 +78,14 @@ fun HomeScreen(
                     ?.let { "Hola, $it" }
                     ?: "Hoy",
                 modifier = Modifier.padding(end = 52.dp),
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.headlineLarge,
+                color = V8RedColors.TextPrimary,
+                fontWeight = FontWeight.Bold,
             )
             Text(
                 text = todayLabel(),
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = V8RedColors.TextSecondary,
             )
 
             Button(

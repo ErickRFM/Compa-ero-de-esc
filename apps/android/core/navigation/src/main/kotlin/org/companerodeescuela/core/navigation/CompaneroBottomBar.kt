@@ -15,12 +15,18 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -61,7 +67,7 @@ fun CompaneroBottomBar(
     val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
 
     Surface(
-        modifier = modifier.padding(
+        modifier = modifier.navigationBarsPadding().padding(
             horizontal = CompaneroSpacing.sm,
             vertical = CompaneroSpacing.xxs,
         ),
@@ -73,7 +79,7 @@ fun CompaneroBottomBar(
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(74.dp)
+                    .heightIn(min = 82.dp)
                 .padding(CompaneroSpacing.xxs),
         ) {
             val itemWidth = maxWidth / destinations.size
@@ -109,7 +115,7 @@ fun CompaneroBottomBar(
                     Box(
                         modifier = Modifier
                             .width(itemWidth)
-                            .height(48.dp)
+                            .heightIn(min = 74.dp)
                             .clip(MaterialTheme.shapes.extraLarge)
                             .clickable {
                                 navController.navigate(topLevel.destination.route) {
@@ -132,7 +138,7 @@ fun CompaneroBottomBar(
                             val isQr = topLevel == TopLevelDestination.Attendance
                             Box(
                                 modifier = Modifier
-                                    .size(if (isQr) 45.dp else 37.dp)
+                                    .size(if (isQr) 52.dp else 36.dp)
                                     .clip(CircleShape)
                                     .background(if (isQr) V8RedColors.DeepCrimson else Color.Transparent),
                                 contentAlignment = Alignment.Center,
@@ -147,6 +153,7 @@ fun CompaneroBottomBar(
                                         TopLevelDestination.Classrooms -> Icons.Filled.School
                                         TopLevelDestination.Channel -> Icons.Filled.Forum
                                         TopLevelDestination.Attendance -> Icons.Filled.QrCodeScanner
+                                        TopLevelDestination.Profile -> Icons.Filled.PersonOutline
                                     },
                                     contentDescription = topLevel.label,
                                     modifier = Modifier.size(if (isQr) 26.dp else 22.dp),
@@ -154,7 +161,7 @@ fun CompaneroBottomBar(
                                 )
                             }
                             Text(
-                                text = topLevel.label,
+                                text = if (isQr) "QR" else topLevel.label,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = if (selected) V8RedColors.Crimson else V8RedColors.TextSecondary,
                                 maxLines = 1,

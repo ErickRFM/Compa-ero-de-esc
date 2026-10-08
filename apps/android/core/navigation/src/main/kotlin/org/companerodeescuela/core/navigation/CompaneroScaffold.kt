@@ -10,6 +10,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.MaterialTheme
+import org.companerodeescuela.core.designsystem.v8.V8ColorScheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -29,6 +31,7 @@ fun CompaneroScaffold(
     navController: NavHostController = rememberNavController(),
     startDestination: Destination = Destination.Home,
     topLevelDestinations: List<TopLevelDestination> = TopLevelDestination.entries,
+    highContrast: Boolean = false,
     destinations: NavGraphBuilder.() -> Unit,
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -39,8 +42,13 @@ fun CompaneroScaffold(
         Destination.DesignSystemCatalog.route -> "Sistema visual"
         else -> null
     }
-    val onSecondaryScreen = secondaryTitle != null
+    val onSecondaryScreen = secondaryTitle != null && currentDestination?.route != Destination.Profile.route
 
+    val studentColors = if (highContrast) V8ColorScheme.copy(
+        outline = V8ColorScheme.onSurfaceVariant,
+        outlineVariant = V8ColorScheme.onSurface.copy(alpha = 0.65f),
+    ) else V8ColorScheme
+    MaterialTheme(colorScheme = if (startDestination == Destination.Home) studentColors else MaterialTheme.colorScheme) {
     Scaffold(
         topBar = {
             if (onSecondaryScreen) {
@@ -98,5 +106,6 @@ fun CompaneroScaffold(
                 }
             }
         }
+    }
     }
 }

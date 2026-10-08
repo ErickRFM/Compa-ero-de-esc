@@ -52,7 +52,9 @@ class SchoolPresenceService(
         val method = networkVerifier.verify(request.network)
         val now = clock.instant()
 
-        repository.findActiveForStudent(studentId, now.epochSecond)?.let { return it }
+        repository.findActiveForStudent(studentId, now.epochSecond)?.let {
+            return it.copy(serverTimeEpochSeconds = now.epochSecond)
+        }
 
         return repository.save(
             SchoolPresenceResponse(
@@ -65,12 +67,12 @@ class SchoolPresenceService(
                 networkVerified = true,
                 networkVerificationMethod = method,
             ),
-        )
+        ).copy(serverTimeEpochSeconds = now.epochSecond)
     }
 
     suspend fun activeFor(studentId: String): SchoolPresenceResponse? {
         val now = clock.instant().epochSecond
-        return repository.findActiveForStudent(studentId, now)
+        return repository.findActiveForStudent(studentId, now)?.copy(serverTimeEpochSeconds = now)
     }
 
     suspend fun requireActive(studentId: String): SchoolPresenceResponse =
@@ -84,6 +86,7 @@ class SchoolPresenceService(
         val closed = current.copy(
             status = SchoolPresenceStatus.CLOSED,
             closedAtEpochSeconds = clock.instant().epochSecond,
+            serverTimeEpochSeconds = clock.instant().epochSecond,
         )
         repository.replace(closed)
         return closed

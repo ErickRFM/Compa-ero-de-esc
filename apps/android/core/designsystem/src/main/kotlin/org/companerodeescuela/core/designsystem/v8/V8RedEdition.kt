@@ -12,7 +12,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.MaterialTheme
+import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -49,18 +52,20 @@ fun V8GlassCard(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = V8RedDimensions.CardCorner,
     contentPadding: PaddingValues = PaddingValues(16.dp),
+    emphasized: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val shape = RoundedCornerShape(cornerRadius)
+    val outline = if (LocalCompaneroHighContrast.current) MaterialTheme.colorScheme.onSurface else V8RedColors.Outline.copy(alpha = 0.72f)
     Box(
         modifier = modifier
             .background(
                 brush = Brush.linearGradient(
-                    listOf(V8RedColors.Card, V8RedColors.Surface, V8RedColors.DeepCrimson.copy(alpha = 0.15f))
+                    listOf(V8RedColors.DeepCrimson.copy(alpha = 0.24f), V8RedColors.Surface.copy(alpha = 0.72f), V8RedColors.DeepCrimson.copy(alpha = 0.13f))
                 ),
                 shape = shape,
             )
-            .border(BorderStroke(1.dp, V8RedColors.Outline.copy(alpha = 0.72f)), shape)
+            .border(BorderStroke(if (LocalCompaneroHighContrast.current) 2.dp else 1.dp, if (emphasized) V8RedColors.Crimson else outline), shape)
             .padding(contentPadding),
         content = content,
     )
@@ -73,15 +78,20 @@ fun V8RedPrimaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
+    val shape = RoundedCornerShape(V8RedDimensions.ControlCorner)
+    val accent = if (enabled) V8RedColors.Crimson else V8RedColors.DeepCrimson.copy(alpha = 0.4f)
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier,
+        modifier = modifier
+            .shadow(if (enabled) 12.dp else 0.dp, shape, ambientColor = V8RedColors.Crimson, spotColor = V8RedColors.Crimson)
+            .background(Brush.horizontalGradient(listOf(V8RedColors.DeepCrimson.copy(alpha = if (enabled) 1f else .4f), accent)), shape)
+            .border(1.dp, V8RedColors.Crimson.copy(alpha = if (enabled) 1f else .5f), shape),
         shape = RoundedCornerShape(V8RedDimensions.ControlCorner),
         colors = ButtonDefaults.buttonColors(
-            containerColor = V8RedColors.Crimson,
+            containerColor = Color.Transparent,
             contentColor = Color.White,
-            disabledContainerColor = V8RedColors.Outline,
+            disabledContainerColor = Color.Transparent,
         ),
         contentPadding = PaddingValues(horizontal = 22.dp, vertical = 16.dp),
     ) {

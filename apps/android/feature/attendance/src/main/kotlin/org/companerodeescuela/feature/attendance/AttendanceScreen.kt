@@ -43,6 +43,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -172,6 +173,17 @@ private fun StudentAttendance(
         state.occurrences.associateBy { it.id }
     }
     var showPasteDialog by remember { mutableStateOf(false) }
+    // A monotonic interval advances the server timestamp even if the device wall clock changes.
+    var monotonicNow by remember { mutableLongStateOf(android.os.SystemClock.elapsedRealtime()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1_000)
+            monotonicNow = android.os.SystemClock.elapsedRealtime()
+        }
+    }
+    val schoolVerified = state.schoolPresenceReceivedRealtime?.let {
+        schoolDayVerifiedAtServerTime(state.schoolPresence, (monotonicNow - it) / 1_000)
+    } ?: false
 
     Box(modifier = modifier.fillMaxSize()) {
         V8CampusBackdrop(modifier = Modifier.matchParentSize())
@@ -184,16 +196,20 @@ private fun StudentAttendance(
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
         V8BrandHeader()
+        org.companerodeescuela.core.designsystem.v8.V8HeroTitle("Pase de", "lista")
         V8AttendanceEvidence(
-            schoolNetworkVerified = if (state.schoolPresence == null) null else true,
+            schoolNetworkVerified = schoolVerified,
             locationVerified = null,
-            ready = state.schoolPresence != null && state.activeSessions.isNotEmpty(),
+            ready = schoolVerified && state.activeSessions.isNotEmpty(),
         )
-        AttendanceHeader(
-            title = "Pase de lista",
-            subtitle = "Al escanear guardamos la evidencia primero. El servidor confirma después el estado final.",
-            loading = state.loading,
-            onRefresh = onRefresh,
+        TextButton(onClick = onRefresh, enabled = !state.loading, modifier = Modifier.align(Alignment.End)) {
+            Text(if (state.loading) "Actualizando…" else "Actualizar")
+        }
+
+        QrCenterCard(
+            onScan = onGenericScan,
+            onImage = onPickImage,
+            onPaste = { showPasteDialog = true },
         )
 
         state.successMessage?.let {
@@ -212,7 +228,7 @@ private fun StudentAttendance(
         }
 
         SchoolDayPresenceCard(
-            active = state.schoolPresence != null,
+            active = schoolVerified,
             ssid = state.schoolNetworkSsid,
             expiresAtEpochSeconds = state.schoolPresence?.expiresAtEpochSeconds,
             busy = state.actionInProgress,
@@ -248,12 +264,6 @@ private fun StudentAttendance(
                 onScan = { onScan(session.id) },
             )
         }
-
-        QrCenterCard(
-            onScan = onGenericScan,
-            onImage = onPickImage,
-            onPaste = { showPasteDialog = true },
-        )
 
         if (state.localRecords.isNotEmpty()) {
             Text(
@@ -419,27 +429,42 @@ private fun QrCenterCard(
     onImage: () -> Unit,
     onPaste: () -> Unit,
 ) {
-    V8GlassCard(modifier = Modifier.fillMaxWidth()) {
+    V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
         Column(
             modifier = Modifier.padding(CompaneroSpacing.md),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
         ) {
-            Icon(Icons.Filled.QrCodeScanner, contentDescription = null, tint = V8RedColors.Crimson, modifier = Modifier.size(78.dp).align(Alignment.CenterHorizontally))
+            Box(Modifier.size(124.dp).align(Alignment.CenterHorizontally)
+                .then(Modifier.drawBehind {
+                    val length = 20.dp.toPx(); val inset = 4.dp.toPx(); val stroke = 3.dp.toPx()
+                    for (x in listOf(inset, size.width - inset)) for (y in listOf(inset, size.height - inset)) {
+                        val sx = if (x == inset) 1 else -1; val sy = if (y == inset) 1 else -1
+                        drawLine(V8RedColors.Crimson, androidx.compose.ui.geometry.Offset(x,y), androidx.compose.ui.geometry.Offset(x + sx * length,y), stroke)
+                        drawLine(V8RedColors.Crimson, androidx.compose.ui.geometry.Offset(x,y), androidx.compose.ui.geometry.Offset(x,y + sy * length), stroke)
+                    }
+                }), contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.QrCodeScanner, contentDescription = null, tint = V8RedColors.TextPrimary, modifier = Modifier.size(78.dp))
+            }
             Text("Escanea el código QR", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary, modifier = Modifier.align(Alignment.CenterHorizontally))
             Text(
                 text = "Escanéalo, elige una captura o pega el código. La evidencia se guarda primero y se verifica después.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = V8RedColors.TextSecondary,
             )
-            Button(onClick = onScan, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.QrCodeScanner, contentDescription = null)
-                Text(" Escanear código QR")
+            BoxWithConstraints {
+                if (maxWidth >= 300.dp && androidx.compose.ui.platform.LocalDensity.current.fontScale <= 1.2f) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton("Escanear código QR", onScan, Modifier.weight(1.8f))
+                        OutlinedButton(onClick = onImage, modifier = Modifier.weight(1f)) { Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Filled.Image, contentDescription = null); Text("Desde galería")
+                        } }
+                    }
+                } else Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton("Escanear código QR", onScan, Modifier.fillMaxWidth())
+                    OutlinedButton(onClick = onImage, modifier = Modifier.fillMaxWidth()) { Text("Desde galería") }
+                }
             }
-            OutlinedButton(onClick = onImage, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.Image, contentDescription = null)
-                Text(" Desde galería")
-            }
-            OutlinedButton(onClick = onPaste, modifier = Modifier.fillMaxWidth()) {
+            TextButton(onClick = onPaste, modifier = Modifier.fillMaxWidth()) {
                 Text("Pegar código")
             }
         }

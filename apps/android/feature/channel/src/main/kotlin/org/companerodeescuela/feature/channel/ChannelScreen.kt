@@ -36,6 +36,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
@@ -59,124 +64,64 @@ fun ChannelScreen(
     val selected = state.channels.firstOrNull { it.id == state.selectedChannelId }
     var selectedTab by remember(state.selectedChannelId) { mutableIntStateOf(0) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        V8CampusBackdrop(modifier = Modifier.matchParentSize())
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(
-                horizontal = CompaneroSpacing.page,
-                vertical = CompaneroSpacing.sm,
-            ),
-        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
-    ) {
-        V8BrandHeader()
-        ChannelHeader(
-            loading = state.loading,
-            onRefresh = viewModel::refreshChannels,
-        )
-
-        if (state.channels.isNotEmpty()) {
-            ChannelSelector(
-                channels = state.channels,
-                selectedId = state.selectedChannelId,
-                onSelect = viewModel::selectChannel,
-            )
-        }
-
-        state.successMessage?.let {
-            StatusNotice(
-                title = "Listo",
-                message = it,
-                tone = NoticeTone.SUCCESS,
-            )
-        }
-        state.errorMessage?.let {
-            StatusNotice(
-                title = "No pudimos completar la acción",
-                message = it,
-                tone = NoticeTone.ERROR,
-            )
-        }
-
-        when {
-            state.loading && selected == null -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    CircularProgressIndicator()
-                    Text(
-                        text = "Cargando tus canales…",
-                        modifier = Modifier.padding(top = CompaneroSpacing.xs),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
+    Box(Modifier.fillMaxSize()) {
+        V8CampusBackdrop(Modifier.matchParentSize())
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(horizontal = CompaneroSpacing.page),
+            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = CompaneroSpacing.sm),
+        ) {
+            item { V8BrandHeader() }
+            item { ChannelHeader(state.loading, viewModel::refreshChannels) }
+            if (state.channels.isNotEmpty()) item {
+                ChannelSelector(state.channels, state.selectedChannelId, viewModel::selectChannel)
             }
-
-            selected == null -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    StatusNotice(
-                        title = "Todavía no hay canales",
-                        message = "Cuando tengas materias asignadas, sus avisos aparecerán aquí.",
-                    )
-                }
-            }
-
-            else -> {
-                ChannelIdentity(selected)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    FilterChip(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
-                        label = { Text("Avisos") },
-                        modifier = Modifier.weight(1f),
-                    )
-                    FilterChip(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
-                        label = { Text("Chat · respuestas rápidas") },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                ChannelFeed(
-                    posts = state.posts,
-                    canPublish = selected.canPublish,
-                    allowQuickReplies = selectedTab == 1,
-                    busy = state.actionInProgress,
-                    loading = state.loading,
-                    onAcknowledge = viewModel::acknowledge,
-                    onRefresh = viewModel::refreshPosts,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
+            state.successMessage?.let { message -> item {
+                StatusNotice(title = "Listo", message = message, tone = NoticeTone.SUCCESS)
+            } }
+            state.errorMessage?.let { message -> item {
+                StatusNotice(title = "No pudimos completar la acción", message = message, tone = NoticeTone.ERROR)
+            } }
+            if (selected == null) item {
+                if (state.loading) CircularProgressIndicator()
+                StatusNotice(
+                    title = if (state.loading) "Cargando tus canales…" else "Todavía no hay canales",
+                    message = "Cuando tengas materias asignadas, sus avisos aparecerán aquí.",
                 )
-
-                if (selected.canPublish) {
-                    TeacherComposer(
-                        body = state.draftBody,
-                        resourceLabel = state.draftResourceLabel,
-                        resourceUrl = state.draftResourceUrl,
-                        busy = state.actionInProgress,
-                        onBodyChange = viewModel::updateDraftBody,
-                        onResourceLabelChange = viewModel::updateDraftResourceLabel,
-                        onResourceUrlChange = viewModel::updateDraftResourceUrl,
-                        onPublish = viewModel::publish,
+            } else {
+                item { ChannelIdentity(selected) }
+                item {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        listOf("Avisos", "Chat").forEachIndexed { index, label ->
+                            OutlinedButton(
+                                onClick = { selectedTab = index },
+                                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, if (selectedTab == index) V8RedColors.Crimson else V8RedColors.Outline),
+                                colors = ButtonDefaults.outlinedButtonColors(containerColor = if (selectedTab == index) V8RedColors.DeepCrimson.copy(alpha = .3f) else V8RedColors.Surface.copy(alpha = .5f)),
+                            ) { Text(label, color = V8RedColors.TextPrimary) }
+                        }
+                    }
+                }
+                if (state.posts.isEmpty()) item {
+                    StatusNotice(
+                        title = if (state.loading) "Cargando publicaciones…" else "Sin publicaciones",
+                        message = if (selected.canPublish) "Comparte el primer aviso o recurso con este grupo."
+                            else "Tu docente todavía no ha publicado información para esta materia.",
                     )
-                } else {
-                    StudentChannelFooter()
+                }
+                items(state.posts, key = ChannelPost::id) { post ->
+                    ChannelPostCard(post, !selected.canPublish && selectedTab == 1, state.actionInProgress, viewModel::acknowledge)
+                }
+                item {
+                    if (selected.canPublish) TeacherComposer(
+                        state.draftBody, state.draftResourceLabel, state.draftResourceUrl, state.actionInProgress,
+                        viewModel::updateDraftBody, viewModel::updateDraftResourceLabel,
+                        viewModel::updateDraftResourceUrl, viewModel::publish,
+                    ) else StudentChannelFooter()
                 }
             }
         }
-    }
     }
 }
 
@@ -238,14 +183,13 @@ private fun ChannelSelector(
 
 @Composable
 private fun ChannelIdentity(channel: ClassChannelSummary) {
-    V8GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(CompaneroSpacing.card),
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
         ) {
             Text(
                 text = channel.subjectName,
-                style = MaterialTheme.typography.headlineSmall,
+                fontSize = 28.sp,
                 color = V8RedColors.TextPrimary,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -255,58 +199,6 @@ private fun ChannelIdentity(channel: ClassChannelSummary) {
                 color = V8RedColors.TextSecondary,
             )
         }
-    }
-}
-
-@Composable
-private fun ChannelFeed(
-    posts: List<ChannelPost>,
-    canPublish: Boolean,
-    allowQuickReplies: Boolean,
-    busy: Boolean,
-    loading: Boolean,
-    onAcknowledge: (ChannelPost, ChannelPresetResponse) -> Unit,
-    onRefresh: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    if (posts.isEmpty()) {
-        Column(
-            modifier = modifier,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            StatusNotice(
-                title = if (loading) "Cargando publicaciones…" else "Sin publicaciones",
-                message = if (canPublish) {
-                    "Comparte el primer aviso o recurso con este grupo."
-                } else {
-                    "Tu docente todavía no ha publicado información para esta materia."
-                },
-            )
-            if (!loading) {
-                OutlinedButton(
-                    onClick = onRefresh,
-                    modifier = Modifier.padding(top = CompaneroSpacing.xs),
-                ) {
-                    Text("Actualizar")
-                }
-            }
-        }
-        return
-    }
-
-    LazyColumn(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
-    ) {
-        items(posts, key = ChannelPost::id) { post ->
-            ChannelPostCard(
-                post = post,
-                showStudentActions = !canPublish && allowQuickReplies,
-                busy = busy,
-                onAcknowledge = onAcknowledge,
-            )
-        }
-    }
 }
 
 @Composable
@@ -320,7 +212,7 @@ private fun ChannelPostCard(
 
     V8GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(CompaneroSpacing.card),
+            modifier = Modifier,
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
         ) {
             Row(

@@ -51,7 +51,9 @@ object RoleExperienceResolver {
                 topLevelDestinations = listOf(
                     TopLevelDestination.Home,
                     TopLevelDestination.Schedule,
+                    TopLevelDestination.Attendance,
                     TopLevelDestination.Classrooms,
+                    TopLevelDestination.Profile,
                 ),
             )
             AppExperience.TEACHER -> RoleExperienceConfig(

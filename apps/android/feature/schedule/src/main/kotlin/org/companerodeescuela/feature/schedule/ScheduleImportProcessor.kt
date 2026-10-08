@@ -140,6 +140,7 @@ private object TimetableOcrReconstructor {
             .sortedBy { it.second }
 
         if (dayHeaders.size < MIN_DAY_HEADERS || rowAnchors.size < MIN_TIME_ROWS) return null
+        if (!timetableHeadersShareRow(dayHeaders.map { it.second.centerX to it.second.centerY }, rowBand(rowAnchors) * 2)) return null
 
         val leftMostDay = dayHeaders.minOf { it.second.centerX }
         val timeRows = rowAnchors

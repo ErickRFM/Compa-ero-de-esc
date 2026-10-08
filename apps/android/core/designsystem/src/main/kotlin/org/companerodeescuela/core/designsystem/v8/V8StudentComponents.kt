@@ -28,6 +28,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -53,8 +55,11 @@ fun V8AcademicField(
     isPassword: Boolean = false,
     isError: Boolean = false,
     enabled: Boolean = true,
+    errorMessage: String? = null,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
 ) {
-    var passwordVisible by remember { mutableStateOf(false) }
+    var passwordVisible by rememberSaveable { mutableStateOf(false) }
     val shape = RoundedCornerShape(V8RedDimensions.FieldCorner)
     OutlinedTextField(
         value = value,
@@ -72,9 +77,9 @@ fun V8AcademicField(
             }
         } else null,
         visualTransformation = if (isPassword && !passwordVisible) PasswordVisualTransformation() else VisualTransformation.None,
-        keyboardOptions = KeyboardOptions(
-            keyboardType = if (isPassword) KeyboardType.Password else KeyboardType.Text,
-        ),
+        keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
+        supportingText = errorMessage?.let { message -> { Text(message) } },
         singleLine = true,
         isError = isError,
         enabled = enabled,
@@ -82,8 +87,8 @@ fun V8AcademicField(
         colors = OutlinedTextFieldDefaults.colors(
             focusedTextColor = V8RedColors.TextPrimary,
             unfocusedTextColor = V8RedColors.TextPrimary,
-            focusedContainerColor = V8RedColors.Surface.copy(alpha = 0.94f),
-            unfocusedContainerColor = V8RedColors.Surface.copy(alpha = 0.88f),
+            focusedContainerColor = V8RedColors.Surface.copy(alpha = 0.70f),
+            unfocusedContainerColor = V8RedColors.Surface.copy(alpha = 0.55f),
             focusedBorderColor = V8RedColors.Crimson,
             unfocusedBorderColor = V8RedColors.Outline,
             focusedLabelColor = V8RedColors.TextSecondary,
@@ -105,18 +110,15 @@ fun V8SectionTitle(title: String, modifier: Modifier = Modifier, action: String?
 }
 
 @Composable
-fun V8StatePill(text: String, active: Boolean, modifier: Modifier = Modifier) {
-    val color = if (active) V8RedColors.Success else V8RedColors.TextSecondary
-    Row(modifier = modifier.semantics { contentDescription = text }.background(V8RedColors.Surface, RoundedCornerShape(50)).border(BorderStroke(1.dp, color.copy(alpha = 0.6f)), RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-        Box(Modifier.size(7.dp).background(color, CircleShape))
-        Text(text, color = color, fontSize = 12.sp)
-    }
-}
-
-@Composable
 fun V8HeroTitle(leading: String, accent: String, modifier: Modifier = Modifier) {
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(leading, color = V8RedColors.TextPrimary, fontSize = 32.sp, fontWeight = FontWeight.Bold)
-        Text(accent, color = V8RedColors.Crimson, fontSize = 32.sp, fontWeight = FontWeight.Bold)
-    }
+    Text(
+        text = androidx.compose.ui.text.buildAnnotatedString {
+            append(leading + " ")
+            pushStyle(androidx.compose.ui.text.SpanStyle(color = V8RedColors.Crimson))
+            append(accent)
+            pop()
+        },
+        modifier = modifier,
+        color = V8RedColors.TextPrimary, fontSize = 32.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold,
+    )
 }

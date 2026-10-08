@@ -63,6 +63,7 @@ data class AttendanceUiState(
     val roster: AttendanceRosterResponse? = null,
     val localRecords: List<LocalAttendanceRecord> = emptyList(),
     val schoolPresence: SchoolPresenceResponse? = null,
+    val schoolPresenceReceivedRealtime: Long? = null,
     val schoolNetworkSsid: String? = null,
     val scannerOpen: Boolean = false,
     val scannerPurpose: ScannerPurpose = ScannerPurpose.ATTENDANCE,
@@ -274,6 +275,7 @@ class AttendanceViewModel @Inject constructor(
                         actionInProgress = false,
                         scannerOpen = false,
                         schoolPresence = result.value,
+                        schoolPresenceReceivedRealtime = android.os.SystemClock.elapsedRealtime(),
                         schoolNetworkSsid = repository.currentSchoolNetwork()?.ssid,
                         successMessage = "Jornada escolar iniciada. Tu red y el QR institucional fueron verificados.",
                     )
@@ -517,6 +519,7 @@ class AttendanceViewModel @Inject constructor(
                         activeSessions = sessions.value,
                         occurrences = occurrences,
                         schoolPresence = presence.valueOrNull(),
+                        schoolPresenceReceivedRealtime = android.os.SystemClock.elapsedRealtime(),
                         schoolNetworkSsid = network?.ssid,
                     )
                 }

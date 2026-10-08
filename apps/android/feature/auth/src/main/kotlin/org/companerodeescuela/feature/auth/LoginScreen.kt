@@ -1,74 +1,27 @@
 package org.companerodeescuela.feature.auth
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Brush
-import org.companerodeescuela.core.designsystem.v8.V8RedColors
-import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.companerodeescuela.core.designsystem.brand.UptlaxBrand
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
-import org.companerodeescuela.core.motion.CompaneroMotionDuration
-
-private val UptlaxBackground = V8RedColors.Background
-private val UptlaxSurface = V8RedColors.Surface.copy(alpha = 0.94f)
-private val UptlaxAccent = V8RedColors.Crimson
-private val UptlaxAccentSoft = V8RedColors.TextSecondary
-private val UptlaxPaper = V8RedColors.Surface.copy(alpha = 0.91f)
-private val UptlaxInk = V8RedColors.TextPrimary
-private val UptlaxMuted = V8RedColors.TextSecondary
-private val UptlaxBorder = V8RedColors.Outline
+import org.companerodeescuela.core.designsystem.v8.*
 
 @Composable
 fun LoginScreen(
@@ -77,301 +30,90 @@ fun LoginScreen(
     onCreateAccount: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
-
-    val focusManager = LocalFocusManager.current
+    var username by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    var recoveryHelp by rememberSaveable { mutableStateOf(false) }
+    val focus = LocalFocusManager.current
     val usernameError = InstitutionalCredentialValidator.identifierError(username)
     val passwordError = InstitutionalCredentialValidator.passwordError(password)
     val canSubmit = !state.submitting && usernameError == null && passwordError == null
-    val hasSessionNotice = !state.noticeMessage.isNullOrBlank()
-
     fun submit() {
-        if (!canSubmit) return
-        focusManager.clearFocus()
-        onLogin(username, password)
-    }
-
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(UptlaxBackground, Color(0xFF16070C), UptlaxBackground)))
-            .imePadding(),
-    ) {
-        CampusLoginBackdrop()
-
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .widthIn(max = CompaneroSize.loginContentMaxWidth)
-                .align(Alignment.TopCenter)
-                .statusBarsPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 10.dp),
-        ) {
-            V8BrandHeader()
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Text(
-                text = "Tu vida universitaria,",
-                color = Color.White,
-                fontSize = 30.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = "más simple.",
-                modifier = Modifier.padding(top = 3.dp),
-                color = UptlaxAccent,
-                fontSize = 30.sp,
-                fontWeight = FontWeight.Bold,
-            )
-
-            Text(
-                "Organiza tus clases, mantente al día y alcanza tus metas. Todo en un solo lugar.",
-                color = UptlaxMuted,
-                fontSize = 15.sp,
-                lineHeight = 21.sp,
-                modifier = Modifier.padding(top = 13.dp, bottom = 12.dp),
-            )
-
-            if (hasSessionNotice) Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = UptlaxSurface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-            ) {
-                Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = if (hasSessionNotice) "ACCESO REQUERIDO" else "TU DÍA ACADÉMICO",
-                            color = UptlaxAccentSoft,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            text = if (hasSessionNotice) "SESIÓN" else "ACCESO",
-                            color = UptlaxAccent,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-
-                    Text(
-                        text = if (hasSessionNotice) {
-                            "Vuelve a iniciar sesión"
-                        } else {
-                            "Pendiente de iniciar sesión"
-                        },
-                        modifier = Modifier.padding(top = 8.dp),
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-
-                    Text(
-                        text = state.noticeMessage
-                            ?: "Ingresa con tu cuenta de Compañero para consultar clases, horario y asistencia.",
-                        modifier = Modifier.padding(top = 4.dp),
-                        color = Color(0xFFADB4BF),
-                        fontSize = 13.sp,
-                        lineHeight = 18.sp,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = UptlaxPaper),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-            ) {
-                Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp)) {
-                    Text(
-                        text = "Iniciar sesión",
-                        color = UptlaxInk,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        text = "Accede con tu cuenta escolar o matrícula.",
-                        modifier = Modifier.padding(top = 3.dp, bottom = 14.dp),
-                        color = UptlaxMuted,
-                        fontSize = 13.sp,
-                    )
-
-                    OutlinedTextField(
-                        value = username,
-                        onValueChange = {
-                            username = InstitutionalCredentialValidator.sanitizeIdentifier(it)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !state.submitting,
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        label = { Text("Correo / usuario") },
-                        isError = username.isNotEmpty() && usernameError != null,
-                        supportingText = usernameError
-                            ?.takeIf { username.isNotEmpty() }
-                            ?.let { error -> { Text(error) } },
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Email,
-                            imeAction = ImeAction.Next,
-                        ),
-                        colors = institutionalFieldColors(),
-                    )
-
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = {
-                            password = InstitutionalCredentialValidator.sanitizePassword(it)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 10.dp),
-                        enabled = !state.submitting,
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        label = { Text("Contraseña") },
-                        isError = password.isNotEmpty() && passwordError != null,
-                        supportingText = passwordError
-                            ?.takeIf { password.isNotEmpty() }
-                            ?.let { error -> { Text(error) } },
-                        visualTransformation = if (passwordVisible) {
-                            VisualTransformation.None
-                        } else {
-                            PasswordVisualTransformation()
-                        },
-                        trailingIcon = {
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                Icon(
-                                    imageVector = if (passwordVisible) {
-                                        Icons.Filled.VisibilityOff
-                                    } else {
-                                        Icons.Filled.Visibility
-                                    },
-                                    contentDescription = if (passwordVisible) {
-                                        "Ocultar contraseña"
-                                    } else {
-                                        "Mostrar contraseña"
-                                    },
-                                    tint = UptlaxMuted,
-                                )
-                            }
-                        },
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Password,
-                            imeAction = ImeAction.Done,
-                        ),
-                        keyboardActions = KeyboardActions(onDone = { submit() }),
-                        colors = institutionalFieldColors(),
-                    )
-
-                    state.errorMessage?.let { message ->
-                        Text(
-                            text = message,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 10.dp),
-                            color = V8RedColors.Error,
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp,
-                        )
-                    }
-
-                    Button(
-                        onClick = ::submit,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 14.dp)
-                            .height(50.dp),
-                        enabled = canSubmit,
-                        shape = RoundedCornerShape(18.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = UptlaxAccent,
-                            contentColor = Color.White,
-                            disabledContainerColor = UptlaxAccent.copy(alpha = 0.30f),
-                            disabledContentColor = Color.White.copy(alpha = 0.82f),
-                        ),
-                    ) {
-                        AnimatedContent(
-                            targetState = state.submitting,
-                            transitionSpec = {
-                                fadeIn(tween(CompaneroMotionDuration.FAST))
-                                    .togetherWith(fadeOut(tween(CompaneroMotionDuration.FAST)))
-                            },
-                            label = "loginSubmitState",
-                        ) { submitting ->
-                            if (submitting) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp,
-                                    color = Color.White,
-                                )
-                            } else {
-                                Text(
-                                    text = "Iniciar sesión  →",
-                                    fontWeight = FontWeight.Bold,
-                                )
-                            }
-                        }
-                    }
-
-                    Text(
-                        text = "¿Nuevo en Compañero de Clase?",
-                        modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
-                        color = UptlaxMuted,
-                        fontSize = 12.sp,
-                    )
-
-                    OutlinedButton(
-                        onClick = onCreateAccount,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        enabled = !state.submitting,
-                        shape = RoundedCornerShape(12.dp),
-                    ) {
-                        Text(
-                            text = "Crear cuenta",
-                            color = UptlaxAccent,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                }
-            }
-
-            Text(
-                text = "DISCIPLINA HOY, MEJORES MAÑANAS",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 14.dp, bottom = 18.dp),
-                color = Color(0xFFCDC4CA),
-                fontSize = 11.sp,
-            )
+        if (canSubmit) {
+            focus.clearFocus()
+            onLogin(username, password)
         }
     }
+    MaterialTheme(colorScheme = V8ColorScheme) {
+        Box(modifier.fillMaxSize().background(V8RedColors.Background)) {
+            V8CampusBackdrop(Modifier.matchParentSize(), login = true)
+            Column(
+                modifier = Modifier.widthIn(max = CompaneroSize.loginContentMaxWidth)
+                    .fillMaxWidth().align(Alignment.TopCenter)
+                    .safeDrawingPadding().imePadding().verticalScroll(rememberScrollState())
+                    .padding(horizontal = 22.dp, vertical = 32.dp),
+            ) {
+                V8BrandHeader(stacked = true)
+                Spacer(Modifier.height(32.dp))
+                Text("Tu vida\nuniversitaria,", color = V8RedColors.TextPrimary,
+                    fontSize = 32.sp, lineHeight = 34.sp, fontWeight = FontWeight.Bold)
+                Text("más simple.", color = V8RedColors.Crimson,
+                    fontSize = 32.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold)
+                Text("Organiza tus clases, mantente al día y alcanza tus metas. Todo en un solo lugar.",
+                    color = V8RedColors.TextSecondary, fontSize = 14.sp, lineHeight = 20.sp,
+                    modifier = Modifier.padding(top = 12.dp))
+                Box(Modifier.padding(top = 12.dp, bottom = 24.dp).size(32.dp, 2.dp).background(V8RedColors.Crimson))
+                state.noticeMessage?.let { Text(it, color = V8RedColors.TextSecondary, modifier = Modifier.padding(bottom = 12.dp)) }
+                V8GlassCard(modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(16.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        V8AcademicField(
+                            value = username,
+                            onValueChange = { username = InstitutionalCredentialValidator.sanitizeIdentifier(it) },
+                            label = "Correo electrónico o matrícula", icon = Icons.Outlined.Email,
+                            enabled = !state.submitting,
+                            isError = username.isNotEmpty() && usernameError != null,
+                            errorMessage = usernameError?.takeIf { username.isNotEmpty() },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                        )
+                        V8AcademicField(
+                            value = password,
+                            onValueChange = { password = InstitutionalCredentialValidator.sanitizePassword(it) },
+                            label = "Contraseña", icon = Icons.Outlined.Lock, isPassword = true,
+                            enabled = !state.submitting,
+                            isError = password.isNotEmpty() && passwordError != null,
+                            errorMessage = passwordError?.takeIf { password.isNotEmpty() },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = { submit() }),
+                        )
+                        TextButton(onClick = { recoveryHelp = true }, modifier = Modifier.align(Alignment.End)) {
+                            Text("¿Olvidaste tu contraseña?", color = V8RedColors.TextSecondary)
+                        }
+                        state.errorMessage?.let { Text(it, color = V8RedColors.Error) }
+                        V8RedPrimaryButton(
+                            text = if (state.submitting) "Iniciando sesión…" else "Iniciar sesión",
+                            onClick = ::submit, enabled = canSubmit, modifier = Modifier.fillMaxWidth(),
+                        )
+                        if (state.submitting) CircularProgressIndicator(Modifier.size(24.dp).align(Alignment.CenterHorizontally))
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            HorizontalDivider(Modifier.weight(1f))
+                            Text("o", color = V8RedColors.TextSecondary)
+                            HorizontalDivider(Modifier.weight(1f))
+                        }
+                        OutlinedButton(onClick = onCreateAccount, enabled = !state.submitting,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                            Text("Crear cuenta", color = V8RedColors.TextPrimary)
+                        }
+                    }
+                }
+                Text("DISCIPLINA HOY,\nMEJORES MAÑANAS", color = V8RedColors.TextSecondary,
+                    fontSize = 10.sp, letterSpacing = 2.sp,
+                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 28.dp, bottom = 16.dp))
+            }
+        }
+        if (recoveryHelp) AlertDialog(
+            onDismissRequest = { recoveryHelp = false },
+            title = { Text("Recuperar acceso") },
+            text = { Text("La recuperación automática todavía no está disponible. Solicita ayuda al administrador de tu escuela para recuperar tu cuenta.") },
+            confirmButton = { TextButton(onClick = { recoveryHelp = false }) { Text("Entendido") } },
+        )
+    }
 }
-
-@Composable
-private fun institutionalFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedTextColor = UptlaxInk,
-    unfocusedTextColor = UptlaxInk,
-    focusedContainerColor = Color(0xE01C151B),
-    unfocusedContainerColor = Color(0xD71C151B),
-    disabledContainerColor = Color(0xD71C151B),
-    focusedBorderColor = UptlaxAccent,
-    unfocusedBorderColor = UptlaxBorder,
-    focusedLabelColor = UptlaxAccent,
-    unfocusedLabelColor = UptlaxMuted,
-    cursorColor = UptlaxAccent,
-    errorBorderColor = V8RedColors.Error,
-    errorLabelColor = V8RedColors.Error,
-)

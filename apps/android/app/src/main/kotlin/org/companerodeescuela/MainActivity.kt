@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.SystemBarStyle
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -96,6 +98,12 @@ class MainActivity : ComponentActivity() {
                     ) {
                         val sessionViewModel: SessionViewModel = hiltViewModel()
                         val session by sessionViewModel.state.collectAsStateWithLifecycle()
+                        SideEffect {
+                            val v8Dark = !session.authenticated || session.roles == setOf(org.companerodeescuela.shared.contracts.UserRole.STUDENT)
+                            val style = if (v8Dark || darkTheme) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                                else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+                            enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+                        }
                         var activatingAccess by remember { mutableStateOf(false) }
 
                         LaunchedEffect(session.authenticated) {
@@ -162,11 +170,18 @@ class MainActivity : ComponentActivity() {
                                         )
                                     }
                                     val navController = rememberNavController()
+                                    SideEffect {
+                                        val isDark = roleConfig.startDestination == Destination.Home || darkTheme
+                                        val style = if (isDark) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                                            else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+                                        enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+                                    }
 
                                     CompaneroScaffold(
                                         navController = navController,
                                         startDestination = roleConfig.startDestination,
                                         topLevelDestinations = roleConfig.topLevelDestinations,
+                                        highContrast = appearance.highContrast,
                                     ) {
                                         composable(Destination.Home.route) {
                                             HomeScreen(
@@ -251,7 +266,10 @@ class MainActivity : ComponentActivity() {
                                         }
                                         composable(Destination.Schedule.route) { ScheduleScreen() }
                                         composable(Destination.Classrooms.route) {
-                                            ClassroomScreen(roles = session.roles)
+                                            ClassroomScreen(
+                                                roles = session.roles,
+                                                onOpenChannel = { navController.navigate(Destination.Channel.route) { launchSingleTop = true } },
+                                            )
                                         }
                                         composable(Destination.Grading.route) { GradebookScreen() }
                                         composable(Destination.Channel.route) { ChannelScreen() }

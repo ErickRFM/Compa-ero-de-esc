@@ -30,6 +30,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Description
@@ -103,6 +105,7 @@ fun ScheduleScreen(
     val scope = rememberCoroutineScope()
     val importProcessor = remember(context) { ScheduleImportProcessor(context) }
     var mode by remember { mutableStateOf(AgendaMode.WEEK) }
+    var subjectFilter by remember { mutableStateOf<String?>(null) }
     var showEditor by remember { mutableStateOf(false) }
     var editingEntry by remember { mutableStateOf<ScheduleEntry?>(null) }
     var editingImportIndex by remember { mutableStateOf<Int?>(null) }
@@ -166,13 +169,14 @@ fun ScheduleScreen(
         )
 
         val monday = LocalDate.now().minusDays((LocalDate.now().dayOfWeek.value - 1).toLong())
+        val displayedDays = weeklyAgendaDays(state.entries)
         V8DaySelector(
-            days = listOf("Lun", "Mar", "Mié", "Jue", "Vie").mapIndexed { index, label ->
-                label to monday.plusDays(index.toLong()).dayOfMonth.toString()
+            days = displayedDays.map { day ->
+                dayShortLabelV8(day) to monday.plusDays(java.time.DayOfWeek.valueOf(day).value.toLong() - 1).dayOfMonth.toString()
             },
-            selectedIndex = academicDaysV8.indexOf(selectedDay).coerceAtLeast(0),
+            selectedIndex = displayedDays.indexOf(selectedDay).coerceAtLeast(0),
             onSelect = { index ->
-                selectedDay = academicDaysV8[index]
+                selectedDay = displayedDays[index]
                 mode = AgendaMode.DAY
             },
         )
@@ -224,6 +228,13 @@ fun ScheduleScreen(
                 },
             )
         } else {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                item { FilterChip(selected = subjectFilter == null, onClick = { subjectFilter = null }, label = { Text("Todas") }) }
+                items(state.entries.map { it.subjectName }.distinct().sorted()) { name ->
+                    FilterChip(selected = subjectFilter == name, onClick = { subjectFilter = name }, label = { Text(name) })
+                }
+            }
+            val visibleEntries = state.entries.filter { subjectFilter == null || it.subjectName == subjectFilter }
             val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
             AnimatedContent(
                 targetState = mode,
@@ -245,7 +256,7 @@ fun ScheduleScreen(
             ) { currentMode ->
                 when (currentMode) {
                     AgendaMode.DAY -> DayAgenda(
-                        entries = state.entries,
+                        entries = visibleEntries,
                         selectedDay = selectedDay,
                         onSelectedDay = { selectedDay = it },
                         onEdit = {
@@ -254,17 +265,21 @@ fun ScheduleScreen(
                             showEditor = true
                         },
                         onDelete = { deleteTarget = it },
-                        onMoveRequest = { moveProposal = it },
+                        onMoveRequest = { proposal ->
+                            moveProposal = AgendaEditingRules.proposeMove(proposal.entry, proposal.targetDay, proposal.targetStart, state.entries)
+                        },
                     )
                     AgendaMode.WEEK -> WeekAgenda(
-                        entries = state.entries,
+                        entries = visibleEntries,
                         onEdit = {
                             editingEntry = it
                             editingImportIndex = null
                             showEditor = true
                         },
                         onDelete = { deleteTarget = it },
-                        onMoveRequest = { moveProposal = it },
+                        onMoveRequest = { proposal ->
+                            moveProposal = AgendaEditingRules.proposeMove(proposal.entry, proposal.targetDay, proposal.targetStart, state.entries)
+                        },
                     )
                 }
             }
@@ -479,7 +494,7 @@ private fun DayAgenda(
     onDelete: (ScheduleEntry) -> Unit,
     onMoveRequest: (AgendaMoveProposal) -> Unit,
 ) {
-    val days = academicDaysV8
+    val days = weeklyAgendaDays(entries)
     val dayEntries = entries.filter { it.dayOfWeek == selectedDay }
 
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -586,8 +601,9 @@ private fun DayTimeGrid(
     onEdit: (ScheduleEntry) -> Unit,
     onMoveRequest: (AgendaMoveProposal) -> Unit,
 ) {
-    val startHour = 6
-    val endHour = 22
+    val placements = remember(entries) { agendaGridLayout(entries) }
+    val startHour = (placements.minOfOrNull { it.startMinute / 60 } ?: 6).coerceAtMost(6)
+    val endHour = (((placements.maxOfOrNull { it.startMinute + it.durationMinutes } ?: 1320) + 59) / 60).coerceAtLeast(22)
     val hourHeight = 96.dp
     val totalHours = endHour - startHour
     val railWidth = 58.dp
@@ -767,35 +783,7 @@ private fun WeekAgenda(
     onDelete: (ScheduleEntry) -> Unit,
     onMoveRequest: (AgendaMoveProposal) -> Unit,
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
-    ) {
-        academicDaysV8.forEach { day ->
-            val dayEntries = entries.filter { it.dayOfWeek == day }
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
-            ) {
-                Text(dayLabel(day), style = MaterialTheme.typography.titleMedium)
-                if (dayEntries.isEmpty()) {
-                    Text(
-                        text = "Sin clases",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    AgendaTimeline(
-                        entries = dayEntries,
-                        allEntries = entries,
-                        onEdit = onEdit,
-                        onDelete = onDelete,
-                        onMoveRequest = onMoveRequest,
-                    )
-                }
-            }
-        }
-    }
+    WeeklyAgendaGrid(entries, onEdit, onDelete, onMoveRequest)
 }
 
 @Composable

@@ -43,6 +43,7 @@ import org.companerodeescuela.shared.contracts.UserRole
 @Composable
 fun ClassroomScreen(
     roles: Set<UserRole>,
+    onOpenChannel: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ClassroomViewModel = hiltViewModel(),
 ) {
@@ -79,6 +80,9 @@ fun ClassroomScreen(
             text = "Mis clases",
             style = MaterialTheme.typography.headlineSmall,
         )
+        OutlinedButton(onClick = onOpenChannel, modifier = Modifier.fillMaxWidth()) {
+            Text("Canal de clase")
+        }
         Text(
             text = "Tus materias, grupo, docente, aula y acceso académico en un solo lugar.",
             style = MaterialTheme.typography.bodyMedium,

@@ -38,21 +38,3 @@ fun V8DaySelector(days: List<Pair<String, String>>, selectedIndex: Int, onSelect
         }
     }
 }
-
-/** Interactive schedule building block, not a replacement for the canonical collision-aware schedule engine. */
-@Composable
-fun V8ScheduleClassCard(info: V8ClassSummary, selected: Boolean, onClick: (String) -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(14.dp)
-    Column(
-        modifier = modifier.fillMaxWidth()
-            .background(if (selected) V8RedColors.DeepCrimson.copy(alpha = .35f) else V8RedColors.Surface, shape)
-            .border(BorderStroke(1.dp, if (selected) V8RedColors.Crimson else V8RedColors.Outline), shape)
-            .clickable { onClick(info.id) }
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
-        Text(info.title, color = V8RedColors.TextPrimary, fontWeight = FontWeight.Bold, maxLines = 2)
-        Text("${info.start} – ${info.end}", color = V8RedColors.TextSecondary, fontSize = 12.sp)
-        Text(info.room, color = V8RedColors.TextSecondary, fontSize = 12.sp, maxLines = 1)
-    }
-}

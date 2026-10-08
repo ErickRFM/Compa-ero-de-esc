@@ -66,6 +66,10 @@ class GradebookViewModel @Inject constructor(
                             assignedClassrooms = allowed,
                             classroomId = selection,
                             classroomLoadError = null,
+                            categories = if (selection == current.classroomId) current.categories else emptyList(),
+                            preview = if (selection == current.classroomId) current.preview else null,
+                            importedFileName = if (selection == current.classroomId) current.importedFileName else null,
+                            gradingPeriod = if (selection == current.classroomId) current.gradingPeriod else "",
                         )
                     }
                 }
@@ -82,8 +86,18 @@ class GradebookViewModel @Inject constructor(
     }
 
     fun setClassroomId(value: String) = _state.update { current ->
-        if (current.assignedClassrooms.any { it.id == value }) current.copy(classroomId = value)
-        else current
+        if (!current.assignedClassrooms.any { it.id == value }) return@update current
+        if (current.classroomId == value) return@update current
+        // Do not carry one class's grade import or weighting into another class.
+        current.copy(
+            classroomId = value,
+            categories = emptyList(),
+            preview = null,
+            importedFileName = null,
+            gradingPeriod = "",
+            errorMessage = null,
+            successMessage = null,
+        )
     }
     fun setGradingPeriod(value: String) = _state.update { it.copy(gradingPeriod = value.take(80)) }
 

@@ -11,7 +11,7 @@ fun NavHostController.navigateToTopLevel(destination: Destination) {
     val start = graph.findStartDestination()
     if (destination.route == start.route) {
         if (currentDestination?.route == start.route) return
-        if (popBackStack(start.id, inclusive = false)) return
+        if (popBackStack(start.id, inclusive = false, saveState = true)) return
     }
 
     navigate(destination.route) {

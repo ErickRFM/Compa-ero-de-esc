@@ -26,6 +26,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8ClassSummary
+import org.companerodeescuela.core.designsystem.v8.V8DailyClassRow
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -182,7 +184,7 @@ fun HomeScreen(
                             TodayContextPanel(day = day, reducedMotion = reducedMotion)
                             NextClassPanel(day = day)
                         }
-                        DayTimeline(day)
+                        DayTimeline(day, onOpenSchedule)
                     }
                 }
 
@@ -281,21 +283,25 @@ private fun NextClassPanel(
 }
 
 @Composable
-private fun DayTimeline(day: TodayOverview) {
+private fun DayTimeline(day: TodayOverview, onOpenSchedule: () -> Unit) {
     Text(
-        text = "Tu día",
+        text = "Horario de hoy",
         style = MaterialTheme.typography.titleLarge,
+        color = V8RedColors.TextPrimary,
+        fontWeight = FontWeight.Bold,
     )
     day.classes.forEach { entry ->
         val status = classStatus(entry, day.current, day.next)
-        AcademicTimelineItem(
-            time = entry.startsAt,
-            title = entry.subjectName,
-            subtitle = locationLabel(entry),
-            status = status.label,
-            highlighted = status.highlighted,
-            subjectKey = entry.subjectCode.ifBlank { entry.subjectName },
-            modifier = Modifier.fillMaxWidth(),
+        V8DailyClassRow(
+            classInfo = V8ClassSummary(
+                id = entry.subjectCode.ifBlank { entry.subjectName },
+                title = entry.subjectName,
+                start = entry.startsAt,
+                end = entry.endsAt,
+                room = locationLabel(entry),
+            ),
+            isNext = status.highlighted || status.label == "Siguiente",
+            onClick = { onOpenSchedule() },
         )
     }
 }

@@ -54,7 +54,10 @@ class GradebookViewModel @Inject constructor(
             _state.update { it.copy(loadingClassrooms = true, classroomLoadError = null) }
             when (val result = classroomRepository.classrooms()) {
                 is Outcome.Success -> _state.update { current ->
-                    val allowed = result.value.filter { it.canManage && it.status == ClassroomStatus.ACTIVE }
+                    val currentUserId = SessionTokenInspector.inspect(tokenStore.readAccessToken().orEmpty())?.userId
+                    val allowed = result.value.filter {
+                        it.canManage && it.status == ClassroomStatus.ACTIVE && it.teacherId == currentUserId
+                    }
                     val selection = current.classroomId.takeIf { id -> allowed.any { it.id == id } }
                         ?: allowed.singleOrNull()?.id.orEmpty()
                     current.copy(

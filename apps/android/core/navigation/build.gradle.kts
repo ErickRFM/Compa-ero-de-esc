@@ -43,3 +43,7 @@ dependencies {
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlin.test)
 }
+
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
+}

@@ -51,6 +51,7 @@ fun Application.module(
     val academicGraph = buildAcademicFeatureGraph(
         settings = settings,
         mongoConnection = mongoConnection,
+        accounts = identityGraph.accounts,
     )
     val classroomGraph = buildClassroomFeatureGraph(
         settings = settings,
@@ -67,12 +68,14 @@ fun Application.module(
         mongoConnection = mongoConnection,
         academicProvider = providerRegistry.academic,
         schoolPresenceService = presenceGraph?.service,
+        groupRepository = academicGraph.groupRepository,
     )
 
     val operationsGraph = buildOperationsFeatureGraph(
         settings = settings,
         mongoConnection = mongoConnection,
         tutoringService = academicGraph.tutoringService,
+        groupRepository = academicGraph.groupRepository,
     )
 
     monitor.subscribe(ApplicationStopped) {
@@ -101,6 +104,7 @@ fun Application.module(
             studentService = attendanceGraph.studentService,
             reviewService = attendanceGraph.reviewService,
             qrService = attendanceGraph.qrService,
+            campusRoster = attendanceGraph.campusRoster,
         )
         presenceGraph?.let { graph ->
             schoolPresenceRoutes(

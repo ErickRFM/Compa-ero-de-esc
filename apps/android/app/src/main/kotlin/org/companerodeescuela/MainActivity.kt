@@ -54,6 +54,8 @@ import org.companerodeescuela.feature.grading.GradebookScreen
 import org.companerodeescuela.feature.profile.ActiveExperiencePreferences
 import org.companerodeescuela.feature.profile.ProfileScreen
 import org.companerodeescuela.feature.schedule.ScheduleScreen
+import org.companerodeescuela.feature.tutoring.TutorHomeScreen
+import org.companerodeescuela.feature.tutoring.TutorRequestsScreen
 import org.companerodeescuela.feature.settings.AppThemeMode
 import org.companerodeescuela.feature.settings.AppearancePreferences
 import org.companerodeescuela.feature.settings.AppearanceSettingsScreen
@@ -219,7 +221,25 @@ class MainActivity : ComponentActivity() {
                                                         launchSingleTop = true
                                                     }
                                                 },
+                                                onOpenSchedule = {
+                                                    navController.navigate(Destination.Schedule.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                                displayName = session.displayName,
                                             )
+                                        }
+                                        composable(Destination.TutorHome.route) {
+                                            TutorHomeScreen(
+                                                onOpenRequests = {
+                                                    navController.navigate(Destination.TutorRequests.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                            )
+                                        }
+                                        composable(Destination.TutorRequests.route) {
+                                            TutorRequestsScreen()
                                         }
                                         composable(Destination.CoordinatorHome.route) {
                                             CoordinatorHomeScreen(
@@ -360,6 +380,7 @@ private fun RoleUnavailableScreen(experience: AppExperience) {
         AppExperience.UNSUPPORTED -> "Acceso no disponible"
         AppExperience.STUDENT -> "Estudiante"
         AppExperience.TEACHER -> "Docente"
+        AppExperience.TUTOR -> "Tutor académico"
     }
     Column(
         modifier = Modifier
@@ -425,6 +446,7 @@ private fun ExperiencePickerScreen(
 private fun experienceLabel(experience: AppExperience): String = when (experience) {
     AppExperience.STUDENT -> "Continuar como estudiante"
     AppExperience.TEACHER -> "Continuar como docente"
+    AppExperience.TUTOR -> "Continuar como tutor académico"
     AppExperience.COORDINATOR -> "Continuar como coordinación"
     AppExperience.ADMIN -> "Continuar como administración"
     AppExperience.SUPER_ADMIN -> "Continuar como administración general"

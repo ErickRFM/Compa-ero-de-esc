@@ -1,0 +1,61 @@
+package org.companerodeescuela.feature.tutoring
+
+import io.ktor.client.HttpClient
+import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.get
+import io.ktor.client.request.patch
+import io.ktor.client.request.setBody
+import org.companerodeescuela.core.common.result.Outcome
+import org.companerodeescuela.core.network.SessionRefreshCoordinator
+import org.companerodeescuela.core.network.apiCall
+import org.companerodeescuela.core.network.requireBody
+import org.companerodeescuela.core.security.SessionTokenStore
+import org.companerodeescuela.shared.contracts.ApiResponse
+import org.companerodeescuela.shared.contracts.ExcuseRequestSummary
+import org.companerodeescuela.shared.contracts.ExcuseStatus
+import org.companerodeescuela.shared.contracts.ReviewExcuseRequest
+import org.companerodeescuela.shared.contracts.TutorScopeSummary
+
+class TutorRepository(
+    private val client: HttpClient,
+    private val tokenStore: SessionTokenStore,
+    private val refreshCoordinator: SessionRefreshCoordinator =
+        SessionRefreshCoordinator(client, tokenStore),
+) {
+    suspend fun scope(): Outcome<TutorScopeSummary> = authorized { token ->
+        apiCall {
+            client.get("tutoring/me") { bearerAuth(token) }
+                .requireBody<ApiResponse<TutorScopeSummary>>()
+        }.map { it.data }
+    }
+
+    suspend fun requests(): Outcome<List<ExcuseRequestSummary>> = authorized { token ->
+        apiCall {
+            client.get("excuses") { bearerAuth(token) }
+                .requireBody<ApiResponse<List<ExcuseRequestSummary>>>()
+        }.map { it.data }
+    }
+
+    suspend fun review(id: String, approved: Boolean, comment: String?): Outcome<ExcuseRequestSummary> =
+        authorized { token ->
+            apiCall {
+                client.patch("excuses/$id/review") {
+                    bearerAuth(token)
+                    setBody(
+                        ReviewExcuseRequest(
+                            status = if (approved) ExcuseStatus.APPROVED else ExcuseStatus.REJECTED,
+                            comment = comment?.trim()?.takeIf(String::isNotBlank),
+                        ),
+                    )
+                }.requireBody<ApiResponse<ExcuseRequestSummary>>()
+            }.map { it.data }
+        }
+
+    private suspend fun <T> authorized(block: suspend (String) -> Outcome<T>): Outcome<T> {
+        val token = when (val result = refreshCoordinator.currentAccessToken()) {
+            is Outcome.Success -> result.value
+            is Outcome.Failure -> return result
+        }
+        return refreshCoordinator.execute(token, block)
+    }
+}

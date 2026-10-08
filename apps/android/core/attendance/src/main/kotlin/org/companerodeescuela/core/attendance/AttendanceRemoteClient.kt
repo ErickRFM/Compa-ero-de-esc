@@ -27,6 +27,8 @@ import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
 import org.companerodeescuela.shared.contracts.AttendanceRosterResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
+import org.companerodeescuela.shared.contracts.ClassCallConfirmationRequest
+import org.companerodeescuela.shared.contracts.TeacherCampusRosterResponse
 import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
 import org.companerodeescuela.shared.contracts.SchoolPresenceResponse
 import org.companerodeescuela.shared.contracts.StartSchoolPresenceRequest
@@ -132,6 +134,37 @@ class AttendanceRemoteClient @Inject constructor(
                 bearerAuth(accessToken)
                 setBody(request)
             }.requireBody<ApiResponse<AttendanceQrInspectionResponse>>()
+        }.map { it.data }
+    }
+
+    suspend fun confirmClassCall(
+        token: String, sessionId: String, request: ClassCallConfirmationRequest,
+    ): Outcome<AttendanceRecordResponse> = authorized(token) { accessToken ->
+        apiCall {
+            client.post("attendance/sessions/$sessionId/confirm") {
+                bearerAuth(accessToken)
+                setBody(request)
+            }.requireBody<ApiResponse<AttendanceRecordResponse>>()
+        }.map { it.data }
+    }
+
+    suspend fun campusRoster(
+        token: String, occurrenceId: String, date: String,
+    ): Outcome<TeacherCampusRosterResponse> = authorized(token) { accessToken ->
+        apiCall {
+            client.get("attendance/occurrences/$occurrenceId/campus-roster?date=$date") {
+                bearerAuth(accessToken)
+            }.requireBody<ApiResponse<TeacherCampusRosterResponse>>()
+        }.map { it.data }
+    }
+
+    suspend fun myClassRecord(
+        token: String, sessionId: String,
+    ): Outcome<AttendanceRecordResponse?> = authorized(token) { accessToken ->
+        apiCall {
+            client.get("attendance/sessions/$sessionId/mine") {
+                bearerAuth(accessToken)
+            }.requireBody<ApiResponse<AttendanceRecordResponse?>>()
         }.map { it.data }
     }
 

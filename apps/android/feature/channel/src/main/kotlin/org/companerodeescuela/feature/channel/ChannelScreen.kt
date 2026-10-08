@@ -1,18 +1,26 @@
 package org.companerodeescuela.feature.channel
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -32,6 +40,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
@@ -39,7 +49,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -93,13 +102,7 @@ fun ChannelScreen(
                 item {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         listOf("Avisos", "Chat").forEachIndexed { index, label ->
-                            OutlinedButton(
-                                onClick = { selectedTab = index },
-                                modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, if (selectedTab == index) V8RedColors.Crimson else V8RedColors.Outline),
-                                colors = ButtonDefaults.outlinedButtonColors(containerColor = if (selectedTab == index) V8RedColors.DeepCrimson.copy(alpha = .3f) else V8RedColors.Surface.copy(alpha = .5f)),
-                            ) { Text(label, color = V8RedColors.TextPrimary) }
+                            V8ChannelTab(label, selectedTab == index, { selectedTab = index }, Modifier.weight(1f))
                         }
                     }
                 }
@@ -138,13 +141,14 @@ private fun ChannelHeader(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "Canal de clase",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = V8RedColors.TextPrimary,
             )
             Text(
                 text = "Avisos y recursos de tus materias",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                color = V8RedColors.TextSecondary,
             )
         }
         TextButton(
@@ -183,22 +187,66 @@ private fun ChannelSelector(
 
 @Composable
 private fun ChannelIdentity(channel: ClassChannelSummary) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = channel.subjectName,
+            style = MaterialTheme.typography.headlineLarge,
+            color = V8RedColors.TextPrimary,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            text = channel.groupName + " · " + channel.teacherDisplayName,
+            style = MaterialTheme.typography.bodyMedium,
+            color = V8RedColors.TextSecondary,
+        )
+    }
+}
+
+@Composable
+private fun V8ChannelTab(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(16.dp)
+    val activeColor = if (selected) V8RedColors.Crimson else V8RedColors.Outline
+    Box(
+        modifier = modifier
+            .heightIn(min = 52.dp)
+            .clip(shape)
+            .background(
+                if (selected) Color(0xFF341118) else V8RedColors.Surface.copy(alpha = 0.96f),
+            )
+            .border(
+                width = if (selected) 1.5.dp else 1.dp,
+                color = activeColor.copy(alpha = if (selected) 1f else 0.75f),
+                shape = shape,
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = channel.subjectName,
-                fontSize = 28.sp,
-                color = V8RedColors.TextPrimary,
-                fontWeight = FontWeight.SemiBold,
+            Icon(
+                imageVector = if (label == "Avisos") Icons.Filled.Campaign else Icons.Filled.Forum,
+                contentDescription = null,
+                tint = if (selected) V8RedColors.Crimson else V8RedColors.TextSecondary,
             )
             Text(
-                text = channel.groupName + " · " + channel.teacherDisplayName,
-                style = MaterialTheme.typography.bodyMedium,
-                color = V8RedColors.TextSecondary,
+                label,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                color = if (selected) V8RedColors.TextPrimary else V8RedColors.TextSecondary,
             )
         }
+    }
 }
 
 @Composable
@@ -225,6 +273,7 @@ private fun ChannelPostCard(
                         text = post.authorDisplayName,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
+                        color = V8RedColors.TextPrimary,
                     )
                     Text(
                         text = postTypeLabel(post.type),
@@ -236,7 +285,7 @@ private fun ChannelPostCard(
                     Icon(
                         imageVector = Icons.Filled.PushPin,
                         contentDescription = "Publicación fijada",
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = V8RedColors.Crimson,
                     )
                 }
             }
@@ -246,12 +295,14 @@ private fun ChannelPostCard(
                     text = it,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
+                    color = V8RedColors.TextPrimary,
                 )
             }
             post.body?.let {
                 Text(
                     text = it,
                     style = MaterialTheme.typography.bodyLarge,
+                    color = V8RedColors.TextSecondary,
                 )
             }
 
@@ -273,7 +324,7 @@ private fun ChannelPostCard(
                 Text(
                     text = "Respuesta rápida",
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = V8RedColors.TextSecondary,
                 )
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
@@ -302,20 +353,16 @@ private fun TeacherComposer(
     onResourceUrlChange: (String) -> Unit,
     onPublish: () -> Unit,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        tonalElevation = CompaneroElevation.card,
-        shadowElevation = CompaneroElevation.raised,
-    ) {
+    V8GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(CompaneroSpacing.card),
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
         ) {
             Text(
                 text = "Publicar para el grupo",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
+                color = V8RedColors.TextPrimary,
             )
             OutlinedTextField(
                 value = body,

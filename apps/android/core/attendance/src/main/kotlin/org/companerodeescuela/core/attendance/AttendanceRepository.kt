@@ -17,6 +17,8 @@ import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
 import org.companerodeescuela.shared.contracts.AttendanceRosterResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
+import org.companerodeescuela.shared.contracts.ClassCallConfirmationRequest
+import org.companerodeescuela.shared.contracts.TeacherCampusRosterResponse
 import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
 import org.companerodeescuela.shared.contracts.SchoolNetworkEvidence
 import org.companerodeescuela.shared.contracts.SchoolPresenceResponse
@@ -79,6 +81,23 @@ class AttendanceRepository(
         request: CreateAttendanceSessionRequest,
     ): Outcome<AttendanceSessionResponse> =
         withToken { token -> remoteClient.openSession(token, request) }
+
+    /** Online confirmation requires live Wi-Fi evidence; do not queue as an auto-present. */
+    suspend fun confirmClassCall(sessionId: String): Outcome<AttendanceRecordResponse> {
+        val network = networkEvidenceProvider.current()
+            ?: return Outcome.Failure(AppError.Network("Conéctate al Wi-Fi escolar para confirmar tu asistencia."))
+        val request = ClassCallConfirmationRequest(
+            operationId = newOperationId(),
+            schoolNetwork = network,
+        )
+        return withToken { token -> remoteClient.confirmClassCall(token, sessionId, request) }
+    }
+
+    suspend fun campusRoster(occurrenceId: String, date: String): Outcome<TeacherCampusRosterResponse> =
+        withToken { token -> remoteClient.campusRoster(token, occurrenceId, date) }
+
+    suspend fun myClassRecord(sessionId: String): Outcome<AttendanceRecordResponse?> =
+        withToken { token -> remoteClient.myClassRecord(token, sessionId) }
 
     suspend fun issueQr(sessionId: String): Outcome<AttendanceQrResponse> =
         withToken { token -> remoteClient.issueQr(token, sessionId) }

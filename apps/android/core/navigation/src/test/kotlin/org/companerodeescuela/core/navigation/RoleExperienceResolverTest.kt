@@ -32,11 +32,45 @@ class RoleExperienceResolverTest {
         assertEquals(
             listOf(
                 TopLevelDestination.TeacherHome,
-                TopLevelDestination.Classrooms,
                 TopLevelDestination.Schedule,
+                TopLevelDestination.Attendance,
+                TopLevelDestination.Classrooms,
+                TopLevelDestination.Channel,
             ),
             config.topLevelDestinations,
         )
+    }
+
+    @Test
+    fun `pending teacher does not get QR or channel actions`() {
+        val config = RoleExperienceResolver.resolve(setOf(UserRole.TEACHER_PENDING))
+
+        assertEquals(AppExperience.TEACHER, config.experience)
+        assertEquals(Destination.TeacherHome, config.startDestination)
+        assertEquals(listOf(TopLevelDestination.TeacherHome), config.topLevelDestinations)
+    }
+
+    @Test
+    fun `tutor-only account gets tutoring workspace`() {
+        val result = RoleExperienceResolver.resolve(setOf(UserRole.TUTOR))
+        assertEquals(AppExperience.TUTOR, result.experience)
+        assertEquals(Destination.TutorHome, result.startDestination)
+        assertEquals(
+            listOf(TopLevelDestination.TutorHome, TopLevelDestination.TutorRequests),
+            result.topLevelDestinations,
+        )
+    }
+
+    @Test
+    fun `teacher tutor account can switch experiences`() {
+        val roles = setOf(UserRole.TEACHER, UserRole.TUTOR)
+        assertEquals(listOf(AppExperience.TEACHER, AppExperience.TUTOR), RoleExperienceResolver.available(roles))
+        assertEquals(AppExperience.TUTOR, RoleExperienceResolver.resolve(roles, AppExperience.TUTOR).experience)
+    }
+
+    @Test
+    fun `pending teacher is not automatically tutor`() {
+        assertEquals(listOf(AppExperience.TEACHER), RoleExperienceResolver.available(setOf(UserRole.TEACHER_PENDING)))
     }
 
     @Test

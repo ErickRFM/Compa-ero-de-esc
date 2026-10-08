@@ -5,6 +5,7 @@ import org.companerodeescuela.shared.contracts.UserRole
 enum class AppExperience {
     STUDENT,
     TEACHER,
+    TUTOR,
     COORDINATOR,
     ADMIN,
     SUPER_ADMIN,
@@ -29,6 +30,7 @@ object RoleExperienceResolver {
         if (UserRole.TEACHER in roles || UserRole.TEACHER_PENDING in roles) {
             add(AppExperience.TEACHER)
         }
+        if (UserRole.TUTOR in roles) add(AppExperience.TUTOR)
         if (UserRole.COORDINATOR in roles) add(AppExperience.COORDINATOR)
         if (UserRole.ADMIN in roles) add(AppExperience.ADMIN)
         if (UserRole.SUPER_ADMIN in roles) add(AppExperience.SUPER_ADMIN)
@@ -59,10 +61,25 @@ object RoleExperienceResolver {
             AppExperience.TEACHER -> RoleExperienceConfig(
                 experience = selected,
                 startDestination = Destination.TeacherHome,
+                topLevelDestinations = if (UserRole.TEACHER in roles) {
+                    listOf(
+                        TopLevelDestination.TeacherHome,
+                        TopLevelDestination.Schedule,
+                        TopLevelDestination.Attendance,
+                        TopLevelDestination.Classrooms,
+                        TopLevelDestination.Channel,
+                    )
+                } else {
+                    // Pending approval is not a teacher permission grant.
+                    listOf(TopLevelDestination.TeacherHome)
+                },
+            )
+            AppExperience.TUTOR -> RoleExperienceConfig(
+                experience = selected,
+                startDestination = Destination.TutorHome,
                 topLevelDestinations = listOf(
-                    TopLevelDestination.TeacherHome,
-                    TopLevelDestination.Classrooms,
-                    TopLevelDestination.Schedule,
+                    TopLevelDestination.TutorHome,
+                    TopLevelDestination.TutorRequests,
                 ),
             )
             AppExperience.COORDINATOR -> RoleExperienceConfig(

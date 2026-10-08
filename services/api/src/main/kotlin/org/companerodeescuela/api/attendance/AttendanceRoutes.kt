@@ -22,6 +22,7 @@ import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
+import org.companerodeescuela.shared.contracts.ClassCallConfirmationRequest
 import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
 import org.companerodeescuela.shared.contracts.UserRole
 
@@ -31,6 +32,7 @@ fun Route.attendanceRoutes(
     studentService: AttendanceStudentService,
     reviewService: AttendanceReviewService,
     qrService: AttendanceQrService? = null,
+    campusRoster: TeacherCampusRosterService? = null,
 ) {
     route("/attendance") {
         if (!settings.hasAuthentication) {
@@ -71,6 +73,27 @@ fun Route.attendanceRoutes(
                         data = studentService.inspectQr(
                             studentId = principal.subjectId(),
                             request = call.receive<AttendanceQrInspectionRequest>(),
+                        ),
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
+
+            get("/occurrences/{occurrenceId}/campus-roster") {
+                val principal = call.requirePlatformPrincipal()
+                principal.requireRole(UserRole.TEACHER)
+                val occurrenceId = call.parameters["occurrenceId"]
+                    ?: throw ApiException.Validation("occurrenceId is required")
+                val occurrenceDate = call.request.queryParameters["date"]
+                    ?: throw ApiException.Validation("date is required")
+                val rosterService = campusRoster
+                    ?: throw ApiException.DependencyUnavailable("School presence verification is not configured")
+                call.respond(
+                    ApiResponse(
+                        data = rosterService.forTeacher(
+                            teacherId = principal.subjectId(),
+                            occurrenceId = occurrenceId,
+                            date = occurrenceDate,
                         ),
                         requestId = call.requestId(),
                     ),
@@ -134,6 +157,36 @@ fun Route.attendanceRoutes(
                             studentId = principal.subjectId(),
                             sessionId = sessionId,
                             request = call.receive<AttendanceAttemptRequest>(),
+                        ),
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
+
+            get("/sessions/{sessionId}/mine") {
+                val principal = call.requirePlatformPrincipal()
+                principal.requireRole(UserRole.STUDENT)
+                val sessionId = call.parameters["sessionId"]
+                    ?: throw ApiException.Validation("sessionId is required")
+                call.respond(
+                    ApiResponse(
+                        data = studentService.myClassRecord(principal.subjectId(), sessionId),
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
+
+            post("/sessions/{sessionId}/confirm") {
+                val principal = call.requirePlatformPrincipal()
+                principal.requireRole(UserRole.STUDENT)
+                val sessionId = call.parameters["sessionId"]
+                    ?: throw ApiException.Validation("sessionId is required")
+                call.respond(
+                    ApiResponse(
+                        data = studentService.confirmClassCall(
+                            studentId = principal.subjectId(),
+                            sessionId = sessionId,
+                            request = call.receive<ClassCallConfirmationRequest>(),
                         ),
                         requestId = call.requestId(),
                     ),

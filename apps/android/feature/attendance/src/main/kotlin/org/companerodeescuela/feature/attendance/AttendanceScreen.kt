@@ -4,9 +4,13 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -45,6 +49,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -66,6 +72,7 @@ import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8AttendanceEvidence
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
+import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
@@ -134,6 +141,7 @@ fun AttendanceScreen(
             onScan = viewModel::openScanner,
             onGenericScan = viewModel::openGenericScanner,
             onStartSchoolDay = viewModel::openSchoolDayScanner,
+            onConfirmClassCall = viewModel::confirmClassCall,
             onPickImage = { imageLauncher.launch(arrayOf("image/*")) },
             onInspectToken = viewModel::inspectQr,
             onDismissInspection = viewModel::clearQrInspection,
@@ -164,6 +172,7 @@ private fun StudentAttendance(
     onScan: (String?) -> Unit,
     onGenericScan: () -> Unit,
     onStartSchoolDay: () -> Unit,
+    onConfirmClassCall: (String) -> Unit,
     onPickImage: () -> Unit,
     onInspectToken: (String) -> Unit,
     onDismissInspection: () -> Unit,
@@ -206,12 +215,6 @@ private fun StudentAttendance(
             Text(if (state.loading) "Actualizando…" else "Actualizar")
         }
 
-        QrCenterCard(
-            onScan = onGenericScan,
-            onImage = onPickImage,
-            onPaste = { showPasteDialog = true },
-        )
-
         state.successMessage?.let {
             StatusNotice(
                 title = "Pase guardado",
@@ -226,6 +229,12 @@ private fun StudentAttendance(
                 tone = NoticeTone.ERROR,
             )
         }
+
+        QrCenterCard(
+            onScan = onGenericScan,
+            onImage = onPickImage,
+            onPaste = { showPasteDialog = true },
+        )
 
         SchoolDayPresenceCard(
             active = schoolVerified,
@@ -246,8 +255,8 @@ private fun StudentAttendance(
 
         if (!state.loading && state.activeSessions.isEmpty()) {
             StatusNotice(
-                title = "Sin sesión activa",
-                message = "Cuando tu docente abra asistencia aparecerá aquí. También puedes comprobar un QR ahora.",
+                title = "Sin sesión de clase activa",
+                message = "Puedes iniciar la jornada escolar con el QR institucional. El pase de clase aparecerá cuando lo abra tu docente.",
             )
         }
 
@@ -262,6 +271,10 @@ private fun StudentAttendance(
                 occurrence = occurrence,
                 local = local,
                 onScan = { onScan(session.id) },
+                onConfirm = { onConfirmClassCall(session.id) },
+                confirmed = state.confirmedClassCalls[session.id],
+                busy = state.actionInProgress,
+                schoolPresenceActive = schoolVerified,
             )
         }
 
@@ -295,6 +308,10 @@ private fun StudentSessionCard(
     occurrence: ClassOccurrenceContract?,
     local: LocalAttendanceRecord?,
     onScan: () -> Unit,
+    onConfirm: () -> Unit,
+    confirmed: AttendanceRecordResponse?,
+    busy: Boolean,
+    schoolPresenceActive: Boolean,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -336,8 +353,21 @@ private fun StudentSessionCard(
                 }
 
                 Button(
+                    onClick = onConfirm,
+                    enabled = !busy && confirmed == null && local == null && schoolPresenceActive,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(if (confirmed == null) "Confirmar pase desde la app" else
+                        if (confirmed.disposition == AttendanceDisposition.LATE) "Retardo confirmado" else "Asistencia confirmada")
+                }
+                if (!schoolPresenceActive) {
+                    Text("Primero registra tu entrada escolar con el QR institucional.",
+                        style = MaterialTheme.typography.bodySmall)
+                }
+
+                OutlinedButton(
                     onClick = onScan,
-                    enabled = local == null,
+                    enabled = !busy && local == null && confirmed == null,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(
@@ -431,8 +461,9 @@ private fun QrCenterCard(
 ) {
     V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
         Column(
-            modifier = Modifier.padding(CompaneroSpacing.md),
-            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Box(Modifier.size(124.dp).align(Alignment.CenterHorizontally)
                 .then(Modifier.drawBehind {
@@ -445,11 +476,17 @@ private fun QrCenterCard(
                 }), contentAlignment = Alignment.Center) {
                 Icon(Icons.Filled.QrCodeScanner, contentDescription = null, tint = V8RedColors.TextPrimary, modifier = Modifier.size(78.dp))
             }
-            Text("Escanea el código QR", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary, modifier = Modifier.align(Alignment.CenterHorizontally))
             Text(
-                text = "Escanéalo, elige una captura o pega el código. La evidencia se guarda primero y se verifica después.",
+                "Escanea el código QR",
+                style = MaterialTheme.typography.titleLarge,
+                color = V8RedColors.TextPrimary,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = "Apunta la cámara al código de la escuela o de tu clase.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = V8RedColors.TextSecondary,
+                modifier = Modifier.padding(horizontal = 8.dp),
             )
             BoxWithConstraints {
                 if (maxWidth >= 300.dp && androidx.compose.ui.platform.LocalDensity.current.fontScale <= 1.2f) {
@@ -618,18 +655,32 @@ private fun TeacherAttendance(
     onMark: (AttendanceRecordResponse, AttendanceDisposition) -> Unit,
     modifier: Modifier,
 ) {
+    Box(modifier = modifier.fillMaxSize()) {
+        V8CampusBackdrop(modifier = Modifier.matchParentSize())
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
     ) {
-        AttendanceHeader(
-            title = "Pase de lista",
-            subtitle = "Abre una sesión para una clase concreta. El QR se firma en el servidor y rota automáticamente.",
-            loading = state.loading,
-            onRefresh = onRefresh,
+        V8BrandHeader()
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Pase de lista",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+                color = V8RedColors.TextPrimary,
+            )
+            TextButton(onClick = onRefresh, enabled = !state.loading) {
+                Text("Actualizar", color = V8RedColors.Crimson)
+            }
+        }
+        Text(
+            "Abre el pase para tu grupo. Los alumnos pueden confirmar desde la app con entrada y Wi-Fi escolar; el QR sigue disponible.",
+            color = V8RedColors.TextSecondary,
+            style = MaterialTheme.typography.bodyMedium,
         )
 
         state.successMessage?.let {
@@ -644,6 +695,46 @@ private fun TeacherAttendance(
                 title = "No pudimos completar la acción",
                 message = it,
                 tone = NoticeTone.ERROR,
+            )
+        }
+
+        val campus = state.campusRoster
+        if (campus != null) {
+            V8GlassCard(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(CompaneroSpacing.md),
+                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+                ) {
+                    Text("Entrada escolar: ${campus.groupName}",
+                        style = MaterialTheme.typography.titleMedium, color = V8RedColors.TextPrimary)
+                    Text("${campus.students.size} inscritos · ${campus.students.count { it.campusEntryAtEpochSeconds != null }} con entrada registrada",
+                        style = MaterialTheme.typography.bodySmall, color = V8RedColors.TextSecondary)
+                    campus.students.forEach { student ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(student.studentId, style = MaterialTheme.typography.bodyMedium,
+                                color = V8RedColors.TextPrimary)
+                            Text(
+                                when {
+                                    student.classRecord?.disposition == AttendanceDisposition.PRESENT -> "Presente"
+                                    student.classRecord?.disposition == AttendanceDisposition.LATE -> "Retardo"
+                                    student.classRecord?.disposition == AttendanceDisposition.ABSENT -> "Ausente"
+                                    student.campusEntryAtEpochSeconds != null -> "En escuela"
+                                    else -> "Sin entrada"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = V8RedColors.TextSecondary,
+                            )
+                        }
+                    }
+                }
+            }
+        } else if (state.campusRosterError != null) {
+            StatusNotice(
+                title = "Padrón escolar no disponible",
+                message = state.campusRosterError!!,
             )
         }
 
@@ -669,6 +760,7 @@ private fun TeacherAttendance(
                 onOpen = onOpen,
             )
         }
+    }
     }
 }
 
@@ -785,10 +877,7 @@ private fun TeacherSessionCard(
     onRefreshRoster: () -> Unit,
     onRequestClose: () -> Unit,
 ) {
-    CompaneroHeroSurface(
-        modifier = Modifier.fillMaxWidth(),
-        containerColor = CompanionColors.graphite,
-    ) {
+    V8GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(CompaneroSpacing.md),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
@@ -797,7 +886,7 @@ private fun TeacherSessionCard(
             Text(
                 text = "PASE EN VIVO",
                 style = MaterialTheme.typography.labelLarge,
-                color = CompanionColors.crimsonContainer,
+                color = V8RedColors.Crimson,
             )
             Text(
                 text = occurrence?.subjectName ?: "Grupo ${session.groupName}",
@@ -821,18 +910,19 @@ private fun TeacherSessionCard(
                     Text(
                         text = "El QR cambia automáticamente. No contiene datos del alumno.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = CompanionColors.onDarkSurfaceVariant,
+                        color = V8RedColors.TextSecondary,
                     )
                 }
                 qrState == QrVisualState.UNAVAILABLE -> {
                     Text(
                         text = "QR temporalmente no disponible",
                         style = MaterialTheme.typography.titleMedium,
+                    color = V8RedColors.TextPrimary,
                     )
                     Text(
                         text = "Reconectando automáticamente. No uses un código anterior.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = CompanionColors.onDarkSurfaceVariant,
+                        color = V8RedColors.TextSecondary,
                     )
                 }
                 else -> {
@@ -919,7 +1009,7 @@ private fun RosterRecord(
     onReview: (AttendanceRecordResponse, AttendanceStatus) -> Unit,
     onMark: (AttendanceRecordResponse, AttendanceDisposition) -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    V8GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(CompaneroSpacing.md),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
@@ -931,6 +1021,7 @@ private fun RosterRecord(
                 Text(
                     text = record.studentId,
                     style = MaterialTheme.typography.titleMedium,
+                    color = V8RedColors.TextPrimary,
                 )
                 Text(
                     text = attendanceDisplayLabel(record),
@@ -942,13 +1033,13 @@ private fun RosterRecord(
                 text = "Evidencia: " + attendanceStatusLabel(record.status) +
                     " · " + record.reasonCode.name.lowercase().replace('_', ' '),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = V8RedColors.TextSecondary,
             )
             record.reviewedBy?.let {
                 Text(
                     text = "Último ajuste docente: $it",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = V8RedColors.TextSecondary,
                 )
             }
 
@@ -1004,6 +1095,7 @@ private fun TeacherOccurrenceList(
     Text(
         text = if (todayOccurrences.isNotEmpty()) "Clases de hoy" else "Clases de la semana",
         style = MaterialTheme.typography.titleMedium,
+                    color = V8RedColors.TextPrimary,
     )
 
     if (visible.isEmpty()) {
@@ -1015,7 +1107,7 @@ private fun TeacherOccurrenceList(
     }
 
     visible.forEach { occurrence ->
-        Card(modifier = Modifier.fillMaxWidth()) {
+        V8GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier.padding(CompaneroSpacing.md),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
@@ -1023,12 +1115,13 @@ private fun TeacherOccurrenceList(
                 Text(
                     text = occurrence.subjectName,
                     style = MaterialTheme.typography.titleMedium,
+                    color = V8RedColors.TextPrimary,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     text = "${dateLabel(occurrence.date)} · ${occurrence.startsAt} – ${occurrence.endsAt}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = V8RedColors.TextSecondary,
                 )
                 Text(
                     text = listOfNotNull(occurrence.classroomName, occurrence.buildingName)
@@ -1064,20 +1157,21 @@ private fun AttendanceHeader(
             modifier = Modifier.padding(
                 end = CompaneroSpacing.hero + CompaneroSpacing.sm,
             ),
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.headlineLarge,
+            color = V8RedColors.TextPrimary,
             fontWeight = FontWeight.Bold,
         )
         Text(
             text = subtitle,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = V8RedColors.TextSecondary,
         )
         TextButton(
             onClick = onRefresh,
             enabled = !loading,
             modifier = Modifier.align(Alignment.End),
         ) {
-            Text(if (loading) "…" else "Actualizar")
+            Text(if (loading) "…" else "Actualizar", color = V8RedColors.Crimson)
         }
     }
 }

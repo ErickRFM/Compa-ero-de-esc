@@ -23,7 +23,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,7 +31,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
@@ -45,7 +43,6 @@ import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
-import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
@@ -61,7 +58,6 @@ fun ChannelScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val selected = state.channels.firstOrNull { it.id == state.selectedChannelId }
     var selectedTab by remember(state.selectedChannelId) { mutableIntStateOf(0) }
-    var composerExpanded by remember(state.selectedChannelId) { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         V8CampusBackdrop(modifier = Modifier.matchParentSize())
@@ -147,7 +143,7 @@ fun ChannelScreen(
                     FilterChip(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
-                        label = { Text("Respuestas") },
+                        label = { Text("Chat · respuestas rápidas") },
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -165,25 +161,16 @@ fun ChannelScreen(
                 )
 
                 if (selected.canPublish) {
-                    if (!composerExpanded) {
-                        V8RedPrimaryButton(
-                            text = "Redactar aviso",
-                            onClick = { composerExpanded = true },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    } else {
-                        TeacherComposer(
-                            body = state.draftBody,
-                            resourceLabel = state.draftResourceLabel,
-                            resourceUrl = state.draftResourceUrl,
-                            busy = state.actionInProgress,
-                            onBodyChange = viewModel::updateDraftBody,
-                            onResourceLabelChange = viewModel::updateDraftResourceLabel,
-                            onResourceUrlChange = viewModel::updateDraftResourceUrl,
-                            onPublish = viewModel::publish,
-                            onCollapse = { composerExpanded = false },
-                        )
-                    }
+                    TeacherComposer(
+                        body = state.draftBody,
+                        resourceLabel = state.draftResourceLabel,
+                        resourceUrl = state.draftResourceUrl,
+                        busy = state.actionInProgress,
+                        onBodyChange = viewModel::updateDraftBody,
+                        onResourceLabelChange = viewModel::updateDraftResourceLabel,
+                        onResourceUrlChange = viewModel::updateDraftResourceUrl,
+                        onPublish = viewModel::publish,
+                    )
                 } else {
                     StudentChannelFooter()
                 }
@@ -422,91 +409,58 @@ private fun TeacherComposer(
     onResourceLabelChange: (String) -> Unit,
     onResourceUrlChange: (String) -> Unit,
     onPublish: () -> Unit,
-    onCollapse: () -> Unit,
 ) {
-    var showResourceFields by remember { mutableStateOf(resourceLabel.isNotBlank() || resourceUrl.isNotBlank()) }
-    V8GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        tonalElevation = CompaneroElevation.card,
+        shadowElevation = CompaneroElevation.raised,
+    ) {
+        Column(
+            modifier = Modifier.padding(CompaneroSpacing.card),
+            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+        ) {
             Text(
-                text = "Nuevo aviso",
-                style = MaterialTheme.typography.titleMedium,
-                color = V8RedColors.TextPrimary,
+                text = "Publicar para el grupo",
+                style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = "Lo verá el grupo seleccionado. Los alumnos solo pueden utilizar respuestas rápidas.",
-                style = MaterialTheme.typography.bodySmall,
-                color = V8RedColors.TextSecondary,
             )
             OutlinedTextField(
                 value = body,
                 onValueChange = onBodyChange,
                 modifier = Modifier.fillMaxWidth(),
-                minLines = 3,
-                maxLines = 5,
+                minLines = 2,
+                maxLines = 4,
                 enabled = !busy,
-                label = { Text("Mensaje para el grupo") },
-                placeholder = { Text("Información, cambio de aula o recordatorio…") },
-                colors = channelTeacherFieldColors(),
+                label = { Text("Aviso o información") },
+                placeholder = { Text("Escribe lo que verá toda la clase") },
             )
-            if (showResourceFields) {
-                OutlinedTextField(
-                    value = resourceLabel,
-                    onValueChange = onResourceLabelChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    enabled = !busy,
-                    label = { Text("Nombre del recurso") },
-                    colors = channelTeacherFieldColors(),
-                )
-                OutlinedTextField(
-                    value = resourceUrl,
-                    onValueChange = onResourceUrlChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    enabled = !busy,
-                    label = { Text("Enlace HTTPS") },
-                    colors = channelTeacherFieldColors(),
-                )
-            }
-            TextButton(
-                onClick = { showResourceFields = !showResourceFields },
-                enabled = !busy,
-            ) {
-                Text(if (showResourceFields) "Ocultar campos de enlace" else "+ Añadir enlace opcional")
-            }
-            Row(
+            OutlinedTextField(
+                value = resourceLabel,
+                onValueChange = onResourceLabelChange,
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
+                singleLine = true,
+                enabled = !busy,
+                label = { Text("Nombre del recurso (opcional)") },
+            )
+            OutlinedTextField(
+                value = resourceUrl,
+                onValueChange = onResourceUrlChange,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                enabled = !busy,
+                label = { Text("Enlace HTTPS del recurso (opcional)") },
+            )
+            Button(
+                onClick = onPublish,
+                enabled = !busy && (body.isNotBlank() || resourceUrl.isNotBlank()),
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                OutlinedButton(
-                    onClick = onCollapse,
-                    enabled = !busy,
-                    modifier = Modifier.weight(1f),
-                ) { Text("Cerrar") }
-                Button(
-                    onClick = onPublish,
-                    enabled = !busy && (body.isNotBlank() || resourceUrl.isNotBlank()),
-                    modifier = Modifier.weight(1f),
-                ) { Text(if (busy) "Publicando…" else "Publicar aviso") }
+                Text(if (busy) "Publicando…" else "Publicar")
             }
         }
     }
 }
-
-@Composable
-private fun channelTeacherFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedTextColor = V8RedColors.TextPrimary,
-    unfocusedTextColor = V8RedColors.TextPrimary,
-    focusedLabelColor = V8RedColors.Crimson,
-    unfocusedLabelColor = V8RedColors.TextSecondary,
-    focusedBorderColor = V8RedColors.Crimson,
-    unfocusedBorderColor = V8RedColors.Outline,
-    cursorColor = V8RedColors.Crimson,
-    focusedContainerColor = V8RedColors.Surface,
-    unfocusedContainerColor = V8RedColors.Surface,
-)
 
 @Composable
 private fun StudentChannelFooter() {

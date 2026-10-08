@@ -521,7 +521,10 @@ class AttendanceViewModel @Inject constructor(
                     }
                     observeLocalRecords(claims.userId)
                     when (mode) {
-                        AttendanceMode.STUDENT -> refreshStudent()
+                        AttendanceMode.STUDENT -> {
+                            refreshStudent()
+                            startStudentPolling()
+                        }
                         AttendanceMode.TEACHER -> refreshTeacher()
                         else -> Unit
                     }
@@ -695,6 +698,15 @@ class AttendanceViewModel @Inject constructor(
                 when (val result = repository.roster(sessionId)) {
                     is Outcome.Success -> _state.update { it.copy(roster = result.value) }
                     is Outcome.Failure -> Unit
+                }
+                val occurrence = _state.value.occurrences.firstOrNull { it.id == _state.value.teacherSession?.occurrenceId }
+                if (occurrence != null) {
+                    when (val campus = repository.campusRoster(occurrence.id, occurrence.date)) {
+                        is Outcome.Success -> _state.update {
+                            it.copy(campusRoster = campus.value, campusRosterError = null)
+                        }
+                        is Outcome.Failure -> Unit // Do not wipe a valid roster on network drops.
+                    }
                 }
                 delay(ROSTER_POLL_INTERVAL_MS)
             }

@@ -16,6 +16,8 @@ import org.companerodeescuela.api.excuses.excuseRoutes
 import org.companerodeescuela.api.devices.deviceRoutes
 import org.companerodeescuela.api.health.HealthService
 import org.companerodeescuela.api.health.healthRoutes
+import org.companerodeescuela.api.grading.UnavailableGradeSyncGateway
+import org.companerodeescuela.api.grading.gradingRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
 import org.companerodeescuela.api.plugins.configurePlugins
 import org.companerodeescuela.api.presence.schoolPresenceRoutes
@@ -114,5 +116,6 @@ fun Application.module(
         academicEventRoutes(settings = settings, service = operationsGraph.eventService)
         excuseRoutes(settings = settings, service = operationsGraph.excuseService)
         deviceRoutes(settings = settings, repository = operationsGraph.deviceTokenRepository)
+        gradingRoutes(settings = settings, syncGateway = UnavailableGradeSyncGateway)
     }
 }

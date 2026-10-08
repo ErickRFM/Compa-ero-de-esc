@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlinx.coroutines.test.runTest
 import org.companerodeescuela.api.academic.groups.AcademicGroupRecord
+import org.companerodeescuela.api.academic.groups.AcademicGroupMembershipRecord
 import org.companerodeescuela.api.academic.groups.InMemoryAcademicGroupRepository
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.auth.InMemoryPlatformAccountRepository
@@ -24,6 +25,8 @@ class TutorAssignmentServiceTest {
         groups.create(AcademicGroupRecord("6B", "6B", true, Instant.EPOCH))
         val accounts = InMemoryPlatformAccountRepository()
         accounts.create(PlatformAccount(TUTOR.id, TUTOR.displayName, "tutor@example.edu", "test-only", TUTOR.roles))
+        accounts.create(PlatformAccount("student-1", "Ana", "ana@example.edu", "test-only", setOf(UserRole.STUDENT)))
+        groups.assign(AcademicGroupMembershipRecord("6A", "student-1", Instant.EPOCH))
         val service = TutorAssignmentService(
             repository = InMemoryTutorAssignmentRepository(),
             groupRepository = groups,
@@ -35,6 +38,9 @@ class TutorAssignmentServiceTest {
 
         assertEquals(listOf("6A"), service.scopeFor(TUTOR).groups.map { it.id })
         assertEquals(1, service.listFor(TUTOR).size)
+        val roster = service.studentsForGroup(TUTOR, "6A")
+        assertEquals(listOf("Ana"), roster.map { it.displayName })
+        assertFailsWith<ApiException.Forbidden> { service.studentsForGroup(TUTOR, "6B") }
         service.requireCanAccessGroup(TUTOR, "6A")
         assertFailsWith<ApiException.Forbidden> {
             service.requireCanAccessGroup(TUTOR, "6B")

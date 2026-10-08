@@ -35,6 +35,7 @@ interface AcademicGroupRepository {
     suspend fun assign(membership: AcademicGroupMembershipRecord): AcademicGroupMembershipRecord
     suspend fun listGroupsForUser(userId: String): List<AcademicGroupRecord>
     suspend fun isUserInGroup(userId: String, groupId: String): Boolean
+    suspend fun listMembers(groupId: String): List<AcademicGroupMembershipRecord> = emptyList()
 }
 
 class InMemoryAcademicGroupRepository : AcademicGroupRepository {
@@ -64,6 +65,9 @@ class InMemoryAcademicGroupRepository : AcademicGroupRepository {
 
     override suspend fun isUserInGroup(userId: String, groupId: String): Boolean =
         memberships.containsKey(key(groupId, userId))
+
+    override suspend fun listMembers(groupId: String): List<AcademicGroupMembershipRecord> =
+        memberships.values.filter { it.groupId == groupId }.sortedBy { it.userId }
 
     private fun key(groupId: String, userId: String): String = "$groupId::$userId"
 }
@@ -138,6 +142,12 @@ class MongoAcademicGroupRepository(
         ensureIndexes()
         return memberships.find(and(eq("groupId", groupId), eq("userId", userId)))
             .firstOrNull() != null
+    }
+
+    override suspend fun listMembers(groupId: String): List<AcademicGroupMembershipRecord> {
+        ensureIndexes()
+        return memberships.find(eq("groupId", groupId)).toList()
+            .map(Document::toMembership).sortedBy { it.userId }
     }
 
     private suspend fun ensureIndexes() {

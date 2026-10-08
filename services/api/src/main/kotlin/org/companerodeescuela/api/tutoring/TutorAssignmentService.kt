@@ -9,6 +9,7 @@ import org.companerodeescuela.shared.contracts.AcademicGroupSummary
 import org.companerodeescuela.shared.contracts.CreateTutorAssignmentRequest
 import org.companerodeescuela.shared.contracts.TutorAssignmentSummary
 import org.companerodeescuela.shared.contracts.TutorScopeSummary
+import org.companerodeescuela.shared.contracts.TutorStudentSummary
 import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
 
@@ -80,6 +81,25 @@ class TutorAssignmentService(
         val groupName = groupRepository.find(updated.academicGroupId)?.name
             ?: updated.academicGroupId
         return updated.toSummary(groupName)
+    }
+
+    suspend fun studentsForGroup(actor: UserSummary, rawGroupId: String): List<TutorStudentSummary> {
+        val groupId = rawGroupId.trim().uppercase()
+        if (groupId.isBlank()) throw ApiException.Validation("Group ID is required")
+        requireCanAccessGroup(actor, groupId)
+        return groupRepository.listMembers(groupId).mapNotNull { member ->
+            val platformAccount = accounts?.findById(member.userId)
+            if (platformAccount != null &&
+                (!platformAccount.active || UserRole.STUDENT !in platformAccount.roles)) {
+                return@mapNotNull null
+            }
+            TutorStudentSummary(
+                userId = member.userId,
+                academicGroupId = groupId,
+                displayName = platformAccount?.displayName,
+                verifiedPlatformStudent = platformAccount != null,
+            )
+        }
     }
 
     suspend fun scopeFor(actor: UserSummary): TutorScopeSummary {

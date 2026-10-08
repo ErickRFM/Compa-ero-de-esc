@@ -578,7 +578,7 @@ w: file:///C:/proyectos/esc/apps/android/app/src/main/kotlin/org/companerodeescu
 > Task :apps:android:app:packageDebug
 > Task :apps:android:app:assembleDebug
 > Task :apps:android:app:createDebugApkListingFileRedirect UP-TO-DATE
-w: Detected multiple Kotlin daemon sessions at 
+w: Detected multiple Kotlin daemon sessions at
 
 [Incubating] Problems report is available at: file:///C:/proyectos/esc/build/reports/problems/problems-report.html
 

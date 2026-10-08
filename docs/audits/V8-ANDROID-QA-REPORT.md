@@ -39,7 +39,7 @@ PDF e imagen de QA: seis días, lunes15min, viernes3h, sábado23:30; render insp
 
 Red escolar/signing no configurados: suites del servicio prueban validación/autorización/temporalidad y outbox, pero no sustituyen una red autorizada ni un QR físico. Sesión creada por docente vía JWT local es fixture, no asistencia confirmada. Nunca se marcaron ubicación/red/asistencia verificadas sin evidencia. `serverTimeEpochSeconds` es aditivo; frente a servidor viejo que no lo envía, el badge queda pendiente.
 
-Crashes: buffer `logcat -b crash` revisado durante recorrido; archivo `v8-evidence/logs/crashes.txt` sin entradas observadas. Esto describe esta ejecución, no garantiza ausencia de crashes en otras configuraciones.
+Crashes: buffer `logcat -b crash` revisado durante recorrido; archivo `v8-evidence/logs/crashes.txt` contiene una excepción de `com.android.commands.uiautomator.DumpCommand`: dos dumps simultáneos intentaron registrar UiAutomation. Corresponde al harness, no al proceso de la app; se corrigió serializando dumps y usando XML único. No se observaron stacks de crash de `org.companerodeescuela`; no se afirma buffer vacío ni ausencia de crashes en otras configuraciones.
 
 ## Cierre
 
@@ -62,3 +62,5 @@ En fuente200% el acceso “Canal de clase” de Clases exige desplazar su conten
 Las cinco comparativas fueron inspeccionadas visualmente (referencia/Android/overlay/diff). Resultado **PARCIAL en todas**: el fondo no coincide; el Login sitúa formulario más abajo y carece de decoración; Inicio no tiene fuentes de avisos/porcentajes; la semana exige scroll y los bloques cortos no contienen todo el texto; Canal cambia densidad; Pase carece de cohortes/progreso y su panel es más alto. No se obtuvo ni se afirma equivalencia visual.
 
 APK final y manifiesto local: `dist/v8-audit/V8-audit-debug.apk`, `dist/v8-audit/manifest.json`. El manifiesto se genera después del commit final para evitar referencia circular, con SHA-256, commit de entrega, commit de código, base de main, variante/baseURL, verificaciones e instalación. No se empaquetan las referencias o fixtures en la app.
+
+CI inicial del PR#100 falló antes de compilar por whitespace de logs y PDF ReportLab detectado como texto. Se preserva el PDF sin editar sus bytes, declarando `*.pdf binary` en atributos Git, como el resto de recursos binarios; se retiran espacios finales de logs. El check del rango completo del PR se repite, sin desactivar checks ni borrar fallos. Las compilaciones y pruebas locales siguen válidas porque no cambia el código compilado.

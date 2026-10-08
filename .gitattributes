@@ -17,3 +17,4 @@ gradlew text eol=lf
 *.webp binary
 *.keystore binary
 *.jks binary
+*.pdf binary

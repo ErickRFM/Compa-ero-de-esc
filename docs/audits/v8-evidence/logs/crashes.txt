@@ -22,7 +22,7 @@
 10-08 11:39:42.191 16950 16950 E AndroidRuntime: 	at android.view.accessibility.IAccessibilityManager$Stub.onTransact(IAccessibilityManager.java:371)
 10-08 11:39:42.191 16950 16950 E AndroidRuntime: 	at android.os.Binder.execTransactInternal(Binder.java:1154)
 10-08 11:39:42.191 16950 16950 E AndroidRuntime: 	at android.os.Binder.execTransact(Binder.java:1123)
-10-08 11:39:42.191 16950 16950 E AndroidRuntime: 
+10-08 11:39:42.191 16950 16950 E AndroidRuntime:
 10-08 11:39:42.199 16950 16950 E AndroidRuntime: Error reporting crash
 10-08 11:39:42.199 16950 16950 E AndroidRuntime: java.lang.RuntimeException: Bad file descriptor
 10-08 11:39:42.199 16950 16950 E AndroidRuntime: 	at android.os.BinderProxy.transactNative(Native Method)

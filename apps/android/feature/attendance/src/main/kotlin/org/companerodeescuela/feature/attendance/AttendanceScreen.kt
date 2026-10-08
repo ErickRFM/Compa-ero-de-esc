@@ -639,7 +639,7 @@ private fun TeacherAttendance(
             }
         }
         Text(
-            "Genera el QR firmado para tus clases asignadas y revisa la asistencia en vivo.",
+            "Abre el pase para tu grupo. Los alumnos pueden confirmar desde la app con entrada y Wi-Fi escolar; el QR sigue disponible.",
             color = V8RedColors.TextSecondary,
             style = MaterialTheme.typography.bodyMedium,
         )
@@ -656,6 +656,46 @@ private fun TeacherAttendance(
                 title = "No pudimos completar la acción",
                 message = it,
                 tone = NoticeTone.ERROR,
+            )
+        }
+
+        val campus = state.campusRoster
+        if (campus != null) {
+            V8GlassCard(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(CompaneroSpacing.md),
+                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+                ) {
+                    Text("Entrada escolar: ${campus.groupName}",
+                        style = MaterialTheme.typography.titleMedium, color = V8RedColors.TextPrimary)
+                    Text("${campus.students.size} inscritos · ${campus.students.count { it.campusEntryAtEpochSeconds != null }} con entrada registrada",
+                        style = MaterialTheme.typography.bodySmall, color = V8RedColors.TextSecondary)
+                    campus.students.forEach { student ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(student.studentId, style = MaterialTheme.typography.bodyMedium,
+                                color = V8RedColors.TextPrimary)
+                            Text(
+                                when {
+                                    student.classRecord?.disposition == AttendanceDisposition.PRESENT -> "Presente"
+                                    student.classRecord?.disposition == AttendanceDisposition.LATE -> "Retardo"
+                                    student.classRecord?.disposition == AttendanceDisposition.ABSENT -> "Ausente"
+                                    student.campusEntryAtEpochSeconds != null -> "En escuela"
+                                    else -> "Sin entrada"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = V8RedColors.TextSecondary,
+                            )
+                        }
+                    }
+                }
+            }
+        } else if (state.campusRosterError != null) {
+            StatusNotice(
+                title = "Padrón escolar no disponible",
+                message = state.campusRosterError!!,
             )
         }
 

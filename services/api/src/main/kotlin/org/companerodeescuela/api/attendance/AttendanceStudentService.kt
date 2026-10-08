@@ -23,6 +23,7 @@ class AttendanceStudentService(
     private val qrService: AttendanceQrService? = null,
     private val schoolPresenceService: SchoolPresenceService? = null,
     private val clock: Clock = Clock.systemUTC(),
+    private val classCallGraceSeconds: Long = 300L,
 ) {
     suspend fun activeFor(studentId: String): List<AttendanceSessionResponse> {
         schoolPresenceService?.requireActive(studentId)
@@ -218,7 +219,7 @@ class AttendanceStudentService(
         }
         presence.requireActive(studentId)
         presence.verifyNetworkForAttendance(request.schoolNetwork)
-        val late = now > session.openedAtEpochSeconds + CLASS_CALL_GRACE_SECONDS
+        val late = now > session.openedAtEpochSeconds + classCallGraceSeconds
         val candidate = AttendanceRecordResponse(
             id = session.id + ":" + studentId,
             operationId = operationId,
@@ -313,6 +314,5 @@ class AttendanceStudentService(
         const val MAX_OPERATION_ID_LENGTH = 128
         const val MAX_QR_TOKEN_LENGTH = 2_048
         const val LATE_SYNC_REVIEW_WINDOW_SECONDS = 24L * 60L * 60L
-        const val CLASS_CALL_GRACE_SECONDS = 5L * 60L
     }
 }

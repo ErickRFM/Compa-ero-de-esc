@@ -86,6 +86,7 @@ class AttendanceViewModel @Inject constructor(
     private var localRecordsJob: Job? = null
     private var qrRotationJob: Job? = null
     private var rosterPollingJob: Job? = null
+    private var studentPollingJob: Job? = null
 
     init {
         bootstrap()
@@ -124,7 +125,10 @@ class AttendanceViewModel @Inject constructor(
                     }
                     observeLocalRecords(claims.userId)
                     when (requestedMode) {
-                        AttendanceMode.STUDENT -> refreshStudent()
+                        AttendanceMode.STUDENT -> {
+                            refreshStudent()
+                            startStudentPolling()
+                        }
                         AttendanceMode.TEACHER -> refreshTeacher()
                         else -> Unit
                     }
@@ -619,6 +623,32 @@ class AttendanceViewModel @Inject constructor(
         }
     }
 
+    private fun startStudentPolling() {
+        studentPollingJob?.cancel()
+        studentPollingJob = viewModelScope.launch {
+            while (_state.value.mode == AttendanceMode.STUDENT) {
+                delay(STUDENT_POLL_INTERVAL_MS)
+                if (_state.value.actionInProgress || _state.value.scannerOpen) continue
+                when (val result = repository.activeStudentSessions()) {
+                    is Outcome.Success -> {
+                        val sessions = result.value
+                        val priorIds = _state.value.activeSessions.map { it.id }.toSet()
+                        val newSessions = sessions.filterNot { it.id in priorIds }
+                        _state.update {
+                            it.copy(
+                                activeSessions = sessions,
+                                successMessage = if (newSessions.isNotEmpty()) {
+                                    "Nuevo pase de lista disponible. Confirma desde tu clase."
+                                } else it.successMessage,
+                            )
+                        }
+                    }
+                    is Outcome.Failure -> Unit // Keep last known data on transient failures.
+                }
+            }
+        }
+    }
+
     private fun startQrRotation(sessionId: String) {
         qrRotationJob?.cancel()
         qrRotationJob = viewModelScope.launch {
@@ -674,6 +704,7 @@ class AttendanceViewModel @Inject constructor(
     override fun onCleared() {
         qrRotationJob?.cancel()
         rosterPollingJob?.cancel()
+        studentPollingJob?.cancel()
         localRecordsJob?.cancel()
         super.onCleared()
     }
@@ -681,5 +712,6 @@ class AttendanceViewModel @Inject constructor(
     private companion object {
         const val QR_RETRY_DELAY_MS = 5_000L
         const val ROSTER_POLL_INTERVAL_MS = 4_000L
+        const val STUDENT_POLL_INTERVAL_MS = 20_000L
     }
 }

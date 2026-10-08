@@ -632,7 +632,7 @@ private fun DayTimeGrid(
 
         entries.forEachIndexed { index, entry ->
             val start = runCatching { LocalTime.parse(entry.startsAt) }.getOrNull()
-                ?: return@forEachIndexed
+                ?: return@forEachIndexedIndexed
             val end = runCatching { LocalTime.parse(entry.endsAt) }.getOrNull()
                 ?: return@forEach
             if (!start.isBefore(end)) return@forEachIndexed

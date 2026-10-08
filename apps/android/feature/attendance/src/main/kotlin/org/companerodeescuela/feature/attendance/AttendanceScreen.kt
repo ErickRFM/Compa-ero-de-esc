@@ -133,6 +133,7 @@ fun AttendanceScreen(
             onScan = viewModel::openScanner,
             onGenericScan = viewModel::openGenericScanner,
             onStartSchoolDay = viewModel::openSchoolDayScanner,
+            onConfirmClassCall = viewModel::confirmClassCall,
             onPickImage = { imageLauncher.launch(arrayOf("image/*")) },
             onInspectToken = viewModel::inspectQr,
             onDismissInspection = viewModel::clearQrInspection,
@@ -163,6 +164,7 @@ private fun StudentAttendance(
     onScan: (String?) -> Unit,
     onGenericScan: () -> Unit,
     onStartSchoolDay: () -> Unit,
+    onConfirmClassCall: (String) -> Unit,
     onPickImage: () -> Unit,
     onInspectToken: (String) -> Unit,
     onDismissInspection: () -> Unit,
@@ -246,6 +248,10 @@ private fun StudentAttendance(
                 occurrence = occurrence,
                 local = local,
                 onScan = { onScan(session.id) },
+                onConfirm = { onConfirmClassCall(session.id) },
+                confirmed = state.confirmedClassCalls[session.id],
+                busy = state.actionInProgress,
+                schoolPresenceActive = state.schoolPresence != null,
             )
         }
 
@@ -285,6 +291,10 @@ private fun StudentSessionCard(
     occurrence: ClassOccurrenceContract?,
     local: LocalAttendanceRecord?,
     onScan: () -> Unit,
+    onConfirm: () -> Unit,
+    confirmed: AttendanceRecordResponse?,
+    busy: Boolean,
+    schoolPresenceActive: Boolean,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -326,8 +336,21 @@ private fun StudentSessionCard(
                 }
 
                 Button(
+                    onClick = onConfirm,
+                    enabled = !busy && confirmed == null && local == null && schoolPresenceActive,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(if (confirmed == null) "Confirmar pase desde la app" else
+                        if (confirmed.disposition == AttendanceDisposition.LATE) "Retardo confirmado" else "Asistencia confirmada")
+                }
+                if (!schoolPresenceActive) {
+                    Text("Primero registra tu entrada escolar con el QR institucional.",
+                        style = MaterialTheme.typography.bodySmall)
+                }
+
+                OutlinedButton(
                     onClick = onScan,
-                    enabled = local == null,
+                    enabled = !busy && local == null && confirmed == null,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(

@@ -108,6 +108,7 @@ fun TeacherHomeScreen(
                 val records = state.roster?.records.orEmpty()
                 val review = records.count { it.status == AttendanceStatus.REVIEW_REQUIRED }
                 val active = state.teacherSession
+                val campus = state.campusRoster
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -142,6 +143,25 @@ fun TeacherHomeScreen(
                         onClick = onOpenAttendance,
                         modifier = Modifier.weight(1f),
                     )
+                }
+
+                if (campus != null) {
+                    V8GlassCard(modifier = Modifier.fillMaxWidth()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Entrada escolar · ${campus.groupName}",
+                                style = MaterialTheme.typography.titleMedium, color = V8RedColors.TextPrimary)
+                            Text("${campus.students.count { it.campusEntryAtEpochSeconds != null }} de ${campus.students.size} integrantes con entrada validada",
+                                style = MaterialTheme.typography.bodyMedium, color = V8RedColors.TextSecondary)
+                            campus.students.take(3).forEach { student ->
+                                Text("${student.studentId} · " +
+                                    (if (student.campusEntryAtEpochSeconds != null) "Registró entrada" else "Sin registro activo"),
+                                    style = MaterialTheme.typography.bodySmall, color = V8RedColors.TextSecondary)
+                            }
+                        }
+                    }
+                } else if (state.campusRosterError != null) {
+                    StatusNotice(title = "Padrón escolar no disponible",
+                        message = state.campusRosterError!!)
                 }
 
                 Text("Pase de lista", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary)

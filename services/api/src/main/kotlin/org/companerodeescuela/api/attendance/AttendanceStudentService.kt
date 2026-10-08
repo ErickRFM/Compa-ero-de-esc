@@ -242,6 +242,16 @@ class AttendanceStudentService(
         }
     }
 
+    /** Existing canonical decision; only the enrolled student can read their own row. */
+    suspend fun myClassRecord(studentId: String, sessionId: String): AttendanceRecordResponse? {
+        val session = repository.findSession(sessionId)
+            ?: throw ApiException.NotFound("Attendance session was not found")
+        if (!enrollmentResolver.isEnrolled(studentId, session.courseId, session.groupName)) {
+            throw ApiException.Forbidden("You are not enrolled in this class")
+        }
+        return repository.findRecord("$sessionId:$studentId")
+    }
+
     private fun classifyEvidence(
         request: AttendanceAttemptRequest,
         sessionId: String,

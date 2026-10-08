@@ -163,6 +163,19 @@ fun Route.attendanceRoutes(
                 )
             }
 
+            get("/sessions/{sessionId}/mine") {
+                val principal = call.requirePlatformPrincipal()
+                principal.requireRole(UserRole.STUDENT)
+                val sessionId = call.parameters["sessionId"]
+                    ?: throw ApiException.Validation("sessionId is required")
+                call.respond(
+                    ApiResponse(
+                        data = studentService.myClassRecord(principal.subjectId(), sessionId),
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
+
             post("/sessions/{sessionId}/confirm") {
                 val principal = call.requirePlatformPrincipal()
                 principal.requireRole(UserRole.STUDENT)

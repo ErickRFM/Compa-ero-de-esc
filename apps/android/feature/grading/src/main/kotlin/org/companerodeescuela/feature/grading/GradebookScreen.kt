@@ -129,6 +129,7 @@ fun GradebookScreen(
                             state.assignedClassrooms.forEach { classroom ->
                                 FilterChip(
                                     selected = classroom.id == state.classroomId,
+                                    enabled = !state.submitting,
                                     onClick = { viewModel.setClassroomId(classroom.id) },
                                     label = { Text(classroom.name + " · " + classroom.groupName.orEmpty()) },
                                 )
@@ -147,6 +148,7 @@ fun GradebookScreen(
                     OutlinedTextField(
                         value = state.gradingPeriod,
                         onValueChange = viewModel::setGradingPeriod,
+                        enabled = !state.submitting,
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         colors = teacherFieldColors(),
@@ -197,23 +199,23 @@ fun GradebookScreen(
                                 BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                                     if (maxWidth < 340.dp) {
                                         Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
-                                            CategoryNameField(category.name, { viewModel.updateCategory(index, name = it) }, Modifier.fillMaxWidth())
-                                            CategoryWeightField(category.weightPercent, { viewModel.updateCategory(index, weight = it) }, Modifier.fillMaxWidth())
+                                            CategoryNameField(category.name, { viewModel.updateCategory(index, name = it) }, Modifier.fillMaxWidth(), enabled = !state.submitting)
+                                            CategoryWeightField(category.weightPercent, { viewModel.updateCategory(index, weight = it) }, Modifier.fillMaxWidth(), enabled = !state.submitting)
                                         }
                                     } else {
                                         Row(horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
-                                            CategoryNameField(category.name, { viewModel.updateCategory(index, name = it) }, Modifier.weight(2f))
-                                            CategoryWeightField(category.weightPercent, { viewModel.updateCategory(index, weight = it) }, Modifier.weight(1f))
+                                            CategoryNameField(category.name, { viewModel.updateCategory(index, name = it) }, Modifier.weight(2f), enabled = !state.submitting)
+                                            CategoryWeightField(category.weightPercent, { viewModel.updateCategory(index, weight = it) }, Modifier.weight(1f), enabled = !state.submitting)
                                         }
                                     }
                                 }
-                                OutlinedButton(onClick = { viewModel.removeCategory(index) }) {
+                                OutlinedButton(onClick = { viewModel.removeCategory(index) }, enabled = !state.submitting) {
                                     Text("Quitar actividad")
                                 }
                             }
                         }
                     }
-                    OutlinedButton(onClick = viewModel::addCategory, modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(onClick = viewModel::addCategory, enabled = !state.submitting, modifier = Modifier.fillMaxWidth()) {
                         Text("+ Agregar actividad")
                     }
                     if (state.categories.isNotEmpty() && !state.schemeComplete) {
@@ -288,7 +290,7 @@ fun GradebookScreen(
             )
             Button(
                 onClick = { confirmSync = true },
-                enabled = !state.submitting && state.schemeComplete && state.preview?.rows?.isNotEmpty() == true && state.preview?.warnings?.isEmpty() == true &&
+                enabled = !state.submitting && !state.loadingClassrooms && state.schemeComplete && state.preview?.rows?.isNotEmpty() == true && state.preview?.warnings?.isEmpty() == true &&
                     state.gradingPeriod.isNotBlank() &&
                     state.assignedClassrooms.any { it.id == state.classroomId },
                 modifier = Modifier.fillMaxWidth(),
@@ -316,10 +318,11 @@ private fun TeacherGradingSectionTitle(number: String, title: String) {
 }
 
 @Composable
-private fun CategoryNameField(value: String, change: (String) -> Unit, modifier: Modifier) {
+private fun CategoryNameField(value: String, change: (String) -> Unit, modifier: Modifier, enabled: Boolean = true) {
     OutlinedTextField(
         value = value,
         onValueChange = change,
+        enabled = enabled,
         modifier = modifier,
         singleLine = true,
         colors = teacherFieldColors(),
@@ -329,9 +332,10 @@ private fun CategoryNameField(value: String, change: (String) -> Unit, modifier:
 }
 
 @Composable
-private fun CategoryWeightField(value: Double, change: (Double) -> Unit, modifier: Modifier) {
+private fun CategoryWeightField(value: Double, change: (Double) -> Unit, modifier: Modifier, enabled: Boolean = true) {
     OutlinedTextField(
         value = if (value == 0.0) "" else formatWeight(value),
+        enabled = enabled,
         onValueChange = { raw -> raw.replace(',', '.').toDoubleOrNull()?.let { change(it.coerceIn(0.0, 100.0)) } },
         modifier = modifier,
         singleLine = true,

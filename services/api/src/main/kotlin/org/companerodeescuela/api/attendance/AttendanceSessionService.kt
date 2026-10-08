@@ -63,6 +63,12 @@ class AttendanceSessionService(
                 if (result.session.openedBy != teacherId) {
                     throw ApiException.Conflict("Attendance session already belongs to another teacher")
                 }
+                if (result.session.status != AttendanceSessionStatus.OPEN ||
+                    result.session.closedAtEpochSeconds != null ||
+                    result.session.closesAtEpochSeconds <= now.epochSecond
+                ) {
+                    throw ApiException.Conflict("Attendance session for this occurrence has already ended")
+                }
                 result.session
             }
         }

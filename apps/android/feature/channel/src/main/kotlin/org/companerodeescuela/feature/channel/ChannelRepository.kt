@@ -1,5 +1,7 @@
 package org.companerodeescuela.feature.channel
 
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import io.ktor.client.HttpClient
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
@@ -50,6 +52,7 @@ class ChannelRepository(
             apiCall {
                 client.post("channels/$channelId/posts") {
                     bearerAuth(token)
+                    contentType(ContentType.Application.Json)
                     setBody(request)
                 }.requireBody<ApiResponse<ChannelPost>>()
             }.map { it.data }
@@ -64,6 +67,7 @@ class ChannelRepository(
             apiCall {
                 client.put("channels/$channelId/posts/$postId/acknowledgement") {
                     bearerAuth(token)
+                    contentType(ContentType.Application.Json)
                     setBody(request)
                 }.requireBody<ApiResponse<ChannelAcknowledgement>>()
             }.map { it.data }

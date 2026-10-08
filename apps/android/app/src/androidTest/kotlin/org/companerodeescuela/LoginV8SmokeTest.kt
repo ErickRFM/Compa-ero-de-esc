@@ -19,8 +19,8 @@ class LoginV8SmokeTest {
         ActivityScenario.launch(MainActivity::class.java).use {
             val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
 
-            assertTrue(device.wait(Until.hasObject(By.text("Compañero\nde Clase")), 10_000))
-            assertTrue(device.hasObject(By.text("Tu vida\nuniversitaria,")))
+            assertTrue(device.wait(Until.hasObject(By.textContains("Compañero")), 10_000))
+            assertTrue(device.hasObject(By.textContains("universitaria,")))
             assertTrue(device.hasObject(By.text("Correo electrónico o matrícula")))
         }
     }
@@ -30,8 +30,10 @@ class LoginV8SmokeTest {
         ActivityScenario.launch(MainActivity::class.java).use {
             val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
 
-            device.wait(Until.hasObject(By.text("Tu vida\nuniversitaria,")), 10_000)
-            UiScrollable(UiSelector().scrollable(true)).scrollTextIntoView("Crear cuenta")
+            assertTrue(device.wait(Until.hasObject(By.textContains("universitaria,")), 10_000))
+            if (!device.hasObject(By.text("Crear cuenta"))) {
+                UiScrollable(UiSelector().scrollable(true)).scrollTextIntoView("Crear cuenta")
+            }
             val activate = device.findObject(By.text("Crear cuenta"))
             assertTrue(activate != null)
             activate.click()

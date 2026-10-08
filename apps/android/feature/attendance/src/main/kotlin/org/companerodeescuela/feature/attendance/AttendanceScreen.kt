@@ -780,7 +780,7 @@ private fun TeacherSessionCard(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text = "PASE EN VIVO",
+                text = if (now < session.closesAtEpochSeconds) "PASE EN VIVO" else "PASE FINALIZADO",
                 style = MaterialTheme.typography.labelLarge,
                 color = V8RedColors.Crimson,
             )
@@ -799,8 +799,8 @@ private fun TeacherSessionCard(
                     AttendanceQrCode(
                         token = qrToken,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .widthIn(max = CompaneroSize.qrMaxWidth),
+                            .widthIn(max = 200.dp)
+                            .fillMaxWidth(),
                     )
                     QrCountdown(qrExpiresAt)
                     Text(

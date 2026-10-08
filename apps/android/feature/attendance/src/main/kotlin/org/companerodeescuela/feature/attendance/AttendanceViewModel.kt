@@ -654,9 +654,11 @@ class AttendanceViewModel @Inject constructor(
             ensureActive()
 
             val context = requestedClassroom
-            val occurrences = week.valueOrNull()?.occurrences.orEmpty().filter {
+            val matching = week.valueOrNull()?.occurrences.orEmpty().filter {
                 context == null || context.matches(it.subjectName, it.groupName)
             }
+            val ambiguous = context != null && matching.map { it.courseId }.distinct().size > 1
+            val occurrences = if (ambiguous) emptyList() else matching
             val activeSessions = active.valueOrNull().orEmpty().filter {
                 it.closedAtEpochSeconds == null && it.closesAtEpochSeconds > System.currentTimeMillis() / 1000 &&
                     (context == null || occurrences.any { occurrence -> occurrence.id == it.occurrenceId })
@@ -674,6 +676,7 @@ class AttendanceViewModel @Inject constructor(
                     errorMessage = when {
                         week is Outcome.Failure -> week.error.userMessage
                         active is Outcome.Failure -> active.error.userMessage
+                        ambiguous -> "No hay una vinculación inequívoca entre esta clase y el horario institucional."
                         context != null && occurrences.isEmpty() -> "No hay horario autorizado para ${context.subjectName} · ${context.groupName.orEmpty()}."
                         else -> null
                     },
@@ -771,6 +774,11 @@ class AttendanceViewModel @Inject constructor(
         rosterPollingJob?.cancel()
         rosterPollingJob = launchTeacherRequest {
             while (_state.value.teacherSession?.id == sessionId) {
+                if ((_state.value.teacherSession?.closesAtEpochSeconds ?: 0) <= System.currentTimeMillis() / 1000) {
+                    _state.update { it.copy(teacherSession = null, qr = null, roster = null, qrVisualState = QrVisualState.IDLE) }
+                    refreshTeacher()
+                    return@launchTeacherRequest
+                }
                 val result = repository.roster(sessionId)
                 ensureActive()
                 when (result) {

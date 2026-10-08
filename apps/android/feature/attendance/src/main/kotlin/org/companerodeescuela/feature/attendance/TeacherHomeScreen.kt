@@ -115,7 +115,9 @@ fun TeacherHomeScreen(
                 val upcoming = upcomingTeacherClasses(sessions, java.time.LocalDateTime.now())
                 val records = state.roster?.records.orEmpty()
                 val review = records.count { it.status == AttendanceStatus.REVIEW_REQUIRED }
-                val active = state.teacherSession
+                val active = state.teacherSession?.takeIf {
+                    it.closedAtEpochSeconds == null && it.closesAtEpochSeconds > System.currentTimeMillis() / 1000
+                }
                 val campus = state.campusRoster
 
                 V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {

@@ -52,6 +52,7 @@ class GradebookViewModel @Inject constructor(
     private var requestedClassroomId: String? = null
 
     fun requestClassroom(id: String) {
+        if (_state.value.submitting) return
         requestedClassroomId = id
         if (!_state.value.loadingClassrooms) {
             if (_state.value.assignedClassrooms.any { it.id == id }) setClassroomId(id)
@@ -64,8 +65,9 @@ class GradebookViewModel @Inject constructor(
     init { refreshClassrooms() }
 
     fun refreshClassrooms() {
+        if (_state.value.submitting) return
+        _state.update { it.copy(loadingClassrooms = true, classroomLoadError = null) }
         viewModelScope.launch {
-            _state.update { it.copy(loadingClassrooms = true, classroomLoadError = null) }
             when (val result = classroomRepository.classrooms()) {
                 is Outcome.Success -> {
                     val currentUserId = SessionTokenInspector.inspect(tokenStore.readAccessToken().orEmpty())?.userId
@@ -121,17 +123,18 @@ class GradebookViewModel @Inject constructor(
             successMessage = null,
         )
     }
-    fun setGradingPeriod(value: String) = _state.update { it.copy(gradingPeriod = value.take(80)) }
+    fun setGradingPeriod(value: String) = _state.update { if (it.submitting) it else it.copy(gradingPeriod = value.take(80)) }
 
     fun addCategory() = _state.update {
-        it.copy(categories = it.categories + GradeCategoryDraft("", 0.0), errorMessage = null)
+        if (it.submitting) it else it.copy(categories = it.categories + GradeCategoryDraft("", 0.0), errorMessage = null)
     }
 
     fun removeCategory(index: Int) = _state.update {
-        it.copy(categories = it.categories.filterIndexed { position, _ -> position != index })
+        if (it.submitting) it else it.copy(categories = it.categories.filterIndexed { position, _ -> position != index })
     }
 
     fun updateCategory(index: Int, name: String? = null, weight: Double? = null) = _state.update { current ->
+        if (current.submitting) return@update current
         current.copy(
             categories = current.categories.mapIndexed { position, category ->
                 if (position != index) category
@@ -167,7 +170,7 @@ class GradebookViewModel @Inject constructor(
 
     fun sync() {
         val current = _state.value
-        if (current.submitting) return
+        if (current.submitting || current.loadingClassrooms) return
         if (!current.schemeComplete) {
             _state.update { it.copy(errorMessage = "La ponderación debe sumar exactamente 100%.") }
             return
@@ -199,8 +202,8 @@ class GradebookViewModel @Inject constructor(
             return
         }
 
+        _state.update { it.copy(submitting = true, errorMessage = null, successMessage = null) }
         viewModelScope.launch {
-            _state.update { it.copy(submitting = true, errorMessage = null, successMessage = null) }
             when (
                 val result = repository.sync(
                     GradeSyncRequest(

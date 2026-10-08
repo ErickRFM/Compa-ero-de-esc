@@ -1,5 +1,7 @@
 package org.companerodeescuela.feature.grading
 
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import io.ktor.client.HttpClient
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.post
@@ -24,6 +26,7 @@ class GradebookRepository(
             apiCall {
                 client.post("grading/sync") {
                     bearerAuth(token)
+                    contentType(ContentType.Application.Json)
                     setBody(request)
                 }.requireBody<ApiResponse<GradeSyncResult>>()
             }.map { it.data }

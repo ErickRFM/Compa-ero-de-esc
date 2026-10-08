@@ -200,7 +200,7 @@ private fun ChannelSelector(
                 onClick = { onSelect(channel.id) },
                 label = {
                     Text(
-                        text = channel.subjectCode.ifBlank { channel.subjectName },
+                        text = channel.groupName.ifBlank { channel.subjectName },
                         maxLines = 1,
                     )
                 },

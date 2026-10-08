@@ -13,6 +13,8 @@ import org.companerodeescuela.api.academic.groups.AcademicGroupMembershipRecord
 import org.companerodeescuela.api.academic.groups.AcademicGroupRecord
 import org.companerodeescuela.api.academic.groups.InMemoryAcademicGroupRepository
 import org.companerodeescuela.api.errors.ApiException
+import org.companerodeescuela.api.channel.ChannelAccessPolicy
+import org.companerodeescuela.api.integrations.mock.MockAcademicProvider
 import org.companerodeescuela.shared.contracts.CreateClassInviteRequest
 import org.companerodeescuela.shared.contracts.CreateClassroomRequest
 import org.companerodeescuela.shared.contracts.UserRole
@@ -35,6 +37,11 @@ class ClassroomServiceTest {
         assertEquals(classroom.id, teacherClasses.single().id)
         assertTrue(teacherClasses.single().canManage)
         assertFalse(teacherClasses.single().canManageEnrollment)
+        val nativeChannel = ChannelAccessPolicy(MockAcademicProvider(), service)
+            .channelsFor(TEACHER.id, TEACHER.roles).single { it.id == classroom.id }
+        assertEquals("9A", nativeChannel.groupName)
+        assertEquals(classroom.id, nativeChannel.courseId)
+        assertTrue(nativeChannel.canPublish)
     }
 
     @Test

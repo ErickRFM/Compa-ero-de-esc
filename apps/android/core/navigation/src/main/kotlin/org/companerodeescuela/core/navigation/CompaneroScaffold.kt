@@ -16,6 +16,7 @@ import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
 import org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -72,6 +73,10 @@ fun CompaneroScaffold(
         topBar = {
             if (onSecondaryScreen) {
                 TopAppBar(
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = if (studentGlass) Color.Transparent else MaterialTheme.colorScheme.surface,
+                        scrolledContainerColor = if (studentGlass) Color.Transparent else MaterialTheme.colorScheme.surface,
+                    ),
                     title = { Text(secondaryTitle.orEmpty()) },
                     navigationIcon = {
                         IconButton(onClick = { navController.popBackStack() }) {

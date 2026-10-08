@@ -74,22 +74,56 @@ object SpreadsheetReader {
     }
 
     private fun readCsv(text: String): GradeImportPreview {
-        val lines = text.lineSequence().filter { it.isNotBlank() }.toList()
-        require(lines.isNotEmpty()) { "El CSV está vacío." }
-        val delimiter = if (lines.first().count { it == ';' } > lines.first().count { it == ',' }) ';' else ','
-        val rows = lines.map { line -> line.split(delimiter).map(String::trim) }
+        val clean = text.removePrefix("\uFEFF")
+        require(clean.isNotBlank()) { "El CSV está vacío." }
+        val firstLine = clean.lineSequence().first()
+        val delimiter = if (firstLine.count { it == ';' } > firstLine.count { it == ',' }) ';' else ','
+        val rows = parseCsv(clean, delimiter).filter { row -> row.any(String::isNotBlank) }
+        require(rows.isNotEmpty()) { "El CSV está vacío." }
         return toPreview(rows.first(), rows.drop(1))
+    }
+
+    private fun parseCsv(text: String, delimiter: Char): List<List<String>> {
+        val rows = mutableListOf<List<String>>()
+        val row = mutableListOf<String>()
+        val cell = StringBuilder()
+        var quoted = false
+        var index = 0
+        fun finishCell() { row += cell.toString().trim(); cell.setLength(0) }
+        fun finishRow() { finishCell(); rows += row.toList(); row.clear() }
+        while (index < text.length) {
+            val char = text[index]
+            when {
+                char == '"' && quoted && text.getOrNull(index + 1) == '"' -> { cell.append('"'); index++ }
+                char == '"' -> quoted = !quoted
+                char == delimiter && !quoted -> finishCell()
+                char == '\n' && !quoted -> finishRow()
+                char == '\r' && !quoted -> {
+                    finishRow()
+                    if (text.getOrNull(index + 1) == '\n') index++
+                }
+                else -> cell.append(char)
+            }
+            index++
+        }
+        require(!quoted) { "El CSV contiene comillas sin cerrar." }
+        if (cell.isNotEmpty() || row.isNotEmpty()) finishRow()
+        return rows
     }
 
     private fun toPreview(headers: List<String>, body: List<List<String>>): GradeImportPreview {
         val normalized = headers.map { it.lowercase().trim() }
+        require(normalized.none(String::isBlank)) { "El archivo contiene encabezados vacíos." }
+        require(normalized.distinct().size == normalized.size) { "El archivo contiene encabezados duplicados." }
         val idIndex = normalized.indexOfFirst { it in idAliases }
         require(idIndex >= 0) { "El archivo necesita una columna Matrícula/ID." }
         val nameIndex = normalized.indexOfFirst { it in nameAliases }
         val gradeIndexes = headers.indices.filter { it != idIndex && it != nameIndex && headers[it].isNotBlank() }
+        require(gradeIndexes.isNotEmpty()) { "El archivo necesita al menos una columna de calificaciones." }
         val warnings = mutableListOf<String>()
         val ids = mutableSetOf<String>()
         val rows = body.mapIndexedNotNull { rowIndex, row ->
+            if (row.size != headers.size) warnings += "Fila ${rowIndex + 2}: el número de celdas no coincide con los encabezados."
             val studentId = row.getOrNull(idIndex).orEmpty().trim()
             if (studentId.isBlank()) {
                 warnings += "Fila ${rowIndex + 2}: falta matrícula."

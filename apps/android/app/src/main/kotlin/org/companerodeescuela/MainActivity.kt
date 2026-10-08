@@ -271,7 +271,13 @@ class MainActivity : ComponentActivity() {
                                         }
                                         composable(Destination.Schedule.route) { ScheduleScreen() }
                                         composable(Destination.Classrooms.route) {
-                                            ClassroomScreen(roles = session.roles)
+                                            ClassroomScreen(
+                                                roles = session.roles,
+                                                teacherExperience = roleConfig.experience == AppExperience.TEACHER,
+                                                onOpenAttendance = { navController.navigate(Destination.Attendance.route) { launchSingleTop = true } },
+                                                onOpenChannel = { navController.navigate(Destination.Channel.route) { launchSingleTop = true } },
+                                                onOpenGrading = { navController.navigate(Destination.Grading.route) { launchSingleTop = true } },
+                                            )
                                         }
                                         composable(Destination.Grading.route) { GradebookScreen() }
                                         composable(Destination.Channel.route) { ChannelScreen() }

@@ -5,10 +5,9 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -21,6 +20,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.font.FontWeight
+import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
+import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
+import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8RedColors
+import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
+import org.companerodeescuela.core.ui.component.StatusNotice
+import org.companerodeescuela.shared.contracts.ClassroomStatus
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,9 +51,24 @@ import org.companerodeescuela.shared.contracts.UserRole
 fun ClassroomScreen(
     roles: Set<UserRole>,
     modifier: Modifier = Modifier,
+    teacherExperience: Boolean = false,
+    onOpenAttendance: () -> Unit = {},
+    onOpenChannel: () -> Unit = {},
+    onOpenGrading: () -> Unit = {},
     viewModel: ClassroomViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    if (teacherExperience && UserRole.TEACHER in roles) {
+        TeacherAssignedClassrooms(
+            state = state,
+            onRefresh = viewModel::refresh,
+            onOpenAttendance = onOpenAttendance,
+            onOpenChannel = onOpenChannel,
+            onOpenGrading = onOpenGrading,
+            modifier = modifier,
+        )
+        return
+    }
     val context = LocalContext.current
     val isStudent = UserRole.STUDENT in roles
     val canCreate = UserRole.ADMIN in roles || UserRole.SUPER_ADMIN in roles
@@ -382,6 +404,113 @@ fun ClassroomScreen(
             )
             if (index != state.classrooms.lastIndex) {
                 HorizontalDivider()
+            }
+        }
+    }
+}
+
+
+/**
+ * Teacher experience is read-only with respect to academic assignments:
+ * control escolar creates groups; teachers operate only assigned active classes.
+ */
+@Composable
+private fun TeacherAssignedClassrooms(
+    state: ClassroomUiState,
+    onRefresh: () -> Unit,
+    onOpenAttendance: () -> Unit,
+    onOpenChannel: () -> Unit,
+    onOpenGrading: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val assigned = state.classrooms.filter {
+        it.canManage && it.status == ClassroomStatus.ACTIVE
+    }
+    Box(modifier = modifier.fillMaxSize()) {
+        V8CampusBackdrop(modifier = Modifier.matchParentSize())
+        Column(
+            modifier = Modifier.fillMaxSize()
+                .widthIn(max = CompaneroSize.homeContentMaxWidth)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
+        ) {
+            V8BrandHeader()
+            Text(
+                text = "Mis clases",
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+                color = V8RedColors.TextPrimary,
+            )
+            Text(
+                text = "Tus materias y grupos asignados por control escolar. Desde aquí puedes pasar lista, publicar avisos y evaluar.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = V8RedColors.TextSecondary,
+            )
+            if (state.loading) CircularProgressIndicator(color = V8RedColors.Crimson)
+            state.errorMessage?.let { StatusNotice(title = "Datos sin actualizar", message = it) }
+            if (!state.loading && state.errorMessage == null && assigned.isEmpty()) {
+                StatusNotice(
+                    title = "Todavía no tienes clases asignadas",
+                    message = "Cuando control escolar te asigne materias activas, aparecerán aquí automáticamente.",
+                )
+            }
+            if (assigned.isNotEmpty()) {
+                V8GlassCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
+                        Text(
+                            text = "${assigned.size} materias activas",
+                            color = V8RedColors.TextPrimary,
+                            style = MaterialTheme.typography.titleLarge,
+                        )
+                        Text(
+                            text = assigned.mapNotNull { it.groupName }.distinct().size.toString() +
+                                " grupos vinculados · permisos de docente",
+                            color = V8RedColors.TextSecondary,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+                assigned.forEach { classroom ->
+                    V8GlassCard(modifier = Modifier.fillMaxWidth()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
+                            Text(
+                                text = classroom.name,
+                                color = V8RedColors.TextPrimary,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                text = listOfNotNull(
+                                    classroom.groupName?.takeIf(String::isNotBlank),
+                                    classroom.room?.takeIf(String::isNotBlank)?.let { "Aula $it" },
+                                ).joinToString(" · ").ifBlank { "Clase asignada" },
+                                color = V8RedColors.TextSecondary,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            V8RedPrimaryButton(
+                                text = "Pase de lista",
+                                onClick = onOpenAttendance,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                            ) {
+                                OutlinedButton(onClick = onOpenChannel, modifier = Modifier.weight(1f)) {
+                                    Text("Canal")
+                                }
+                                OutlinedButton(onClick = onOpenGrading, modifier = Modifier.weight(1f)) {
+                                    Text("Evaluar")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            OutlinedButton(onClick = onRefresh, enabled = !state.loading && !state.submitting,
+                modifier = Modifier.fillMaxWidth()) {
+                Text("Actualizar clases")
             }
         }
     }

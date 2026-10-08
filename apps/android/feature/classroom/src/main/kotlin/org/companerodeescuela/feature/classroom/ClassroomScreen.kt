@@ -429,7 +429,7 @@ private fun TeacherAssignedClassrooms(
     modifier: Modifier = Modifier,
 ) {
     val assigned = state.classrooms.filter {
-        it.canManage && it.status == ClassroomStatus.ACTIVE
+        it.canManage && it.status == ClassroomStatus.ACTIVE && it.teacherId == teacherUserId
     }
     Box(modifier = modifier.fillMaxSize()) {
         V8CampusBackdrop(modifier = Modifier.matchParentSize())

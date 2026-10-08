@@ -15,7 +15,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -24,15 +23,23 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import org.companerodeescuela.core.designsystem.theme.CompanionColors
+import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
-import org.companerodeescuela.core.ui.component.CompaneroGroupedList
-import org.companerodeescuela.core.ui.component.CompaneroHeroSurface
+import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
+import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
+import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8RedColors
+import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.shared.contracts.UserRole
 
+/**
+ * Consistent V8 account surface; navigation and role switching retain their existing callbacks.
+ * No hard-coded identity or client-only role privilege changes.
+ */
 @Composable
 fun ProfileScreen(
     displayName: String?,
@@ -44,107 +51,123 @@ fun ProfileScreen(
     onLogout: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .widthIn(max = CompaneroSize.homeContentMaxWidth)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
-        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
-    ) {
-        CompaneroHeroSurface(
-            modifier = Modifier.fillMaxWidth(),
-            containerColor = CompanionColors.graphite,
+    Box(modifier = modifier.fillMaxSize()) {
+        V8CampusBackdrop(modifier = Modifier.matchParentSize())
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .widthIn(max = CompaneroSize.homeContentMaxWidth)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
         ) {
-            Row(
-                modifier = Modifier.padding(CompaneroSpacing.md),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
-            ) {
-                Surface(
-                    modifier = Modifier.size(CompaneroSize.avatar),
-                    shape = CircleShape,
-                    color = CompanionColors.crimson,
+            V8BrandHeader()
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "Mi perfil",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = V8RedColors.TextPrimary,
+                )
+                Text(
+                    text = "Tus datos, preferencias y acceso escolar en un solo lugar.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = V8RedColors.TextSecondary,
+                )
+            }
+
+            V8GlassCard(modifier = Modifier.fillMaxWidth(), highlighted = true) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
+                    Surface(
+                        modifier = Modifier.size(CompaneroSize.avatar),
+                        shape = CircleShape,
+                        color = V8RedColors.DeepCrimson,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = initials(displayName),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = V8RedColors.TextPrimary,
+                            )
+                        }
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(3.dp),
+                    ) {
                         Text(
-                            text = initials(displayName),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = CompanionColors.onDarkSurface,
+                            text = displayName?.takeIf(String::isNotBlank)
+                                ?: "Cuenta de Compañero",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = V8RedColors.TextPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = roleSummary(roles),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = V8RedColors.TextSecondary,
+                        )
+                        Text(
+                            text = "Sesión activa",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = V8RedColors.Success,
                         )
                     }
                 }
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
-                ) {
-                    Text(
-                        text = displayName?.takeIf(String::isNotBlank)
-                            ?: "Cuenta de Compañero",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = CompanionColors.onDarkSurface,
-                    )
-                    Text(
-                        text = roleSummary(roles),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = CompanionColors.onDarkSurfaceVariant,
-                    )
-                    Text(
-                        text = "Cuenta de Compañero activa",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = CompanionColors.crimsonContainer,
+            }
+
+            ProfileGroup(title = "Cuenta") {
+                ProfileRow(
+                    title = "Cuenta",
+                    detail = "Compañero de Clase",
+                    trailingLabel = "Activa",
+                )
+                GroupDivider()
+                ProfileRow(
+                    title = "Sistema escolar",
+                    detail = "Estado, sincronización y fuentes académicas.",
+                    onClick = onIntegrations,
+                )
+                GroupDivider()
+                ProfileRow(
+                    title = "Privacidad",
+                    detail = "Datos académicos separados por cuenta.",
+                )
+            }
+
+            if (canSwitchExperience) {
+                ProfileGroup(title = "Modo de uso") {
+                    ProfileRow(
+                        title = "Cambiar perfil activo",
+                        detail = "Alterna entre tus roles autorizados sin cerrar sesión.",
+                        onClick = onSwitchExperience,
                     )
                 }
             }
-        }
 
-        ProfileGroup(title = "Cuenta") {
-            ProfileRow(
-                title = "Cuenta",
-                detail = "Compañero de Clase",
-                trailingLabel = "Activa",
-            )
-            GroupDivider()
-            ProfileRow(
-                title = "Sistema escolar",
-                detail = "Opcional · estado, sincronización y fuentes académicas.",
-                onClick = onIntegrations,
-            )
-            GroupDivider()
-            ProfileRow(
-                title = "Privacidad",
-                detail = "Datos académicos separados por cuenta.",
-            )
-        }
-
-        if (canSwitchExperience) {
-            ProfileGroup(title = "Modo de uso") {
+            ProfileGroup(title = "Aplicación") {
                 ProfileRow(
-                    title = "Cambiar perfil activo",
-                    detail = "Alterna entre tus experiencias autorizadas sin cerrar sesión.",
-                    onClick = onSwitchExperience,
+                    title = "Tema y accesibilidad",
+                    detail = "Tema, texto, contraste y movimiento.",
+                    onClick = onAppearance,
+                )
+                GroupDivider()
+                ProfileRow(
+                    title = "Acerca de Compañero",
+                    detail = "Compañero de Clase · interfaz V8",
                 )
             }
-        }
 
-        ProfileGroup(title = "Aplicación") {
-            ProfileRow(
-                title = "Tema y accesibilidad",
-                detail = "Tema, texto, contraste y movimiento.",
-                onClick = onAppearance,
+            V8RedPrimaryButton(
+                text = "Cerrar sesión",
+                onClick = onLogout,
+                modifier = Modifier.fillMaxWidth(),
             )
-            GroupDivider()
-            ProfileRow(
-                title = "Acerca de Compañero",
-                detail = "Compañero de Clase · UPTlax · UI V5.3 / V6",
-            )
-        }
-
-        Button(
-            onClick = onLogout,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text("Cerrar sesión")
         }
     }
 }
@@ -155,8 +178,15 @@ private fun ProfileGroup(
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
-        Text(title, style = MaterialTheme.typography.titleMedium)
-        CompaneroGroupedList(content = content)
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleLarge,
+            color = V8RedColors.TextPrimary,
+            fontWeight = FontWeight.SemiBold,
+        )
+        V8GlassCard(modifier = Modifier.fillMaxWidth()) {
+            Column(content = content)
+        }
     }
 }
 
@@ -169,14 +199,8 @@ private fun ProfileRow(
 ) {
     val rowModifier = Modifier
         .fillMaxWidth()
-        .then(
-            if (onClick != null) {
-                Modifier.clickable(onClick = onClick)
-            } else {
-                Modifier
-            },
-        )
-        .padding(horizontal = CompaneroSpacing.sm, vertical = CompaneroSpacing.sm)
+        .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+        .padding(vertical = CompaneroSpacing.sm)
 
     Row(
         modifier = rowModifier,
@@ -187,25 +211,30 @@ private fun ProfileRow(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
         ) {
-            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(
+                title,
+                style = MaterialTheme.typography.titleSmall,
+                color = V8RedColors.TextPrimary,
+                fontWeight = FontWeight.Medium,
+            )
             Text(
                 detail,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = V8RedColors.TextSecondary,
             )
         }
         trailingLabel?.let {
             Text(
                 text = it,
                 style = MaterialTheme.typography.labelLarge,
-                color = CompanionColors.crimson,
+                color = V8RedColors.Success,
             )
         }
         if (onClick != null) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = V8RedColors.TextSecondary,
             )
         }
     }
@@ -213,7 +242,7 @@ private fun ProfileRow(
 
 @Composable
 private fun GroupDivider() {
-    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    HorizontalDivider(color = V8RedColors.Outline.copy(alpha = 0.5f))
 }
 
 private fun roleSummary(roles: Set<UserRole>): String = roles

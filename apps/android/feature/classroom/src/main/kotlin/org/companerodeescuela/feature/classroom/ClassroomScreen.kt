@@ -421,6 +421,7 @@ fun ClassroomScreen(
 @Composable
 private fun TeacherAssignedClassrooms(
     state: ClassroomUiState,
+    teacherUserId: String?,
     onRefresh: () -> Unit,
     onOpenAttendance: () -> Unit,
     onOpenChannel: () -> Unit,

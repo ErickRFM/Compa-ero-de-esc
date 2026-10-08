@@ -48,6 +48,7 @@ include(":apps:android:feature:classroom")
 include(":apps:android:feature:profile")
 include(":apps:android:feature:settings")
 include(":apps:android:feature:grading")
+include(":apps:android:feature:tutoring")
 
 include(":apps:android:core:academic")
 include(":apps:android:core:attendance")

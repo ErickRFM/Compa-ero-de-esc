@@ -110,6 +110,7 @@ dependencies {
     implementation(project(":apps:android:feature:profile"))
     implementation(project(":apps:android:feature:settings"))
     implementation(project(":apps:android:feature:grading"))
+    implementation(project(":apps:android:feature:tutoring"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

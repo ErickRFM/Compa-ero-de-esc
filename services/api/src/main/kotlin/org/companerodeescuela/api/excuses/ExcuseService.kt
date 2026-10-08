@@ -1,6 +1,9 @@
 package org.companerodeescuela.api.excuses
 
 import java.time.Clock
+import java.time.LocalDate
+import java.time.format.DateTimeParseException
+import org.companerodeescuela.api.academic.groups.AcademicGroupRepository
 import java.util.UUID
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.tutoring.TutorAssignmentService
@@ -15,6 +18,7 @@ class ExcuseService(
     private val repository: ExcuseRepository,
     private val tutoring: TutorAssignmentService,
     private val clock: Clock = Clock.systemUTC(),
+    private val groupRepository: AcademicGroupRepository? = null,
 ) {
     suspend fun submit(
         actor: UserSummary,
@@ -26,9 +30,24 @@ class ExcuseService(
         val groupId = request.academicGroupId.trim().uppercase()
             .takeIf(String::isNotBlank)
             ?: throw ApiException.Validation("academicGroupId is required")
+        val groupRepository = groupRepository
+            ?: throw ApiException.DependencyUnavailable("Academic group verification is not configured")
+        val group = groupRepository.find(groupId)
+            ?: throw ApiException.NotFound("Academic group was not found")
+        if (!group.active || !groupRepository.isUserInGroup(actor.id, group.id)) {
+            throw ApiException.Forbidden("Student is not enrolled in this active academic group")
+        }
         val date = request.attendanceDateIso.trim()
-            .takeIf(String::isNotBlank)
-            ?: throw ApiException.Validation("attendanceDateIso is required")
+        try {
+            LocalDate.parse(date)
+        } catch (_: DateTimeParseException) {
+            throw ApiException.Validation("attendanceDateIso must be a real ISO date")
+        }
+        // There is no authenticated upload/ownership service for attachmentRefs yet.
+        // Reject untrusted file references rather than exposing another student's document.
+        if (request.attachmentRefs.isNotEmpty()) {
+            throw ApiException.Validation("File attachments are not available until secure upload is configured")
+        }
         val reason = request.reason.trim()
         if (reason.length !in 5..1000) {
             throw ApiException.Validation("reason must contain between 5 and 1000 characters")
@@ -40,7 +59,7 @@ class ExcuseService(
             academicGroupId = groupId,
             attendanceDateIso = date,
             reason = reason,
-            attachmentRefs = request.attachmentRefs.map(String::trim).filter(String::isNotBlank).take(5),
+            attachmentRefs = emptyList(),
             status = ExcuseStatus.PENDING,
             submittedAt = clock.instant(),
         )
@@ -50,19 +69,16 @@ class ExcuseService(
 
     suspend fun listFor(actor: UserSummary): List<ExcuseRequestSummary> =
         when {
-            UserRole.STUDENT in actor.roles ->
-                repository.listForStudent(actor.id).map { it.toSummary() }
-
             isAdmin(actor) ->
                 repository.listAll().map { it.toSummary() }
 
-            UserRole.TUTOR in actor.roles ->
-                repository.listAll().filter { record ->
-                    runCatching {
-                        tutoring.requireCanAccessGroup(actor, record.academicGroupId)
-                        true
-                    }.getOrDefault(false)
-                }.map { it.toSummary() }
+            UserRole.STUDENT in actor.roles ->
+                repository.listForStudent(actor.id).map { it.toSummary() }
+
+            UserRole.TUTOR in actor.roles -> {
+                val authorizedGroups = tutoring.scopeFor(actor).groups.map { it.id }.toSet()
+                repository.listForGroups(authorizedGroups).map { it.toSummary() }
+            }
 
             else -> throw ApiException.Forbidden("Excuse access is not allowed for this account")
         }
@@ -91,8 +107,10 @@ class ExcuseService(
             reviewedAt = clock.instant(),
             reviewedBy = actor.id,
             reviewComment = request.comment?.trim()?.takeIf(String::isNotBlank)?.take(1000),
+            version = current.version + 1,
         )
-        return repository.update(updated).toSummary()
+        return (repository.compareAndUpdate(current, updated)
+            ?: throw ApiException.Conflict("Excuse request changed; reload before reviewing")).toSummary()
     }
 
     private fun isAdmin(actor: UserSummary): Boolean =

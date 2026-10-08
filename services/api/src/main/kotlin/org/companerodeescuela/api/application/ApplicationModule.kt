@@ -74,6 +74,7 @@ fun Application.module(
         settings = settings,
         mongoConnection = mongoConnection,
         tutoringService = academicGraph.tutoringService,
+        groupRepository = academicGraph.groupRepository,
     )
 
     monitor.subscribe(ApplicationStopped) {

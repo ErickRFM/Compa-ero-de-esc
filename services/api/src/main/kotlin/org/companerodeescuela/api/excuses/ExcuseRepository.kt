@@ -1,6 +1,12 @@
 package org.companerodeescuela.api.excuses
 
 import com.mongodb.client.model.Filters.eq
+import com.mongodb.client.model.Filters.exists
+import com.mongodb.client.model.Filters.or
+import com.mongodb.client.model.Filters.and
+import com.mongodb.client.model.Filters.`in`
+import com.mongodb.client.model.FindOneAndReplaceOptions
+import com.mongodb.client.model.ReturnDocument
 import com.mongodb.kotlin.client.coroutine.MongoCollection
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import java.time.Instant
@@ -22,12 +28,15 @@ data class ExcuseRecord(
     val reviewedAt: Instant? = null,
     val reviewedBy: String? = null,
     val reviewComment: String? = null,
+    val version: Long = 0L,
 )
 
 interface ExcuseRepository {
     suspend fun create(record: ExcuseRecord): ExcuseRecord
     suspend fun find(id: String): ExcuseRecord?
     suspend fun update(record: ExcuseRecord): ExcuseRecord
+    suspend fun compareAndUpdate(expected: ExcuseRecord, updated: ExcuseRecord): ExcuseRecord?
+    suspend fun listForGroups(groupIds: Set<String>): List<ExcuseRecord>
     suspend fun listForStudent(studentId: String): List<ExcuseRecord>
     suspend fun listAll(): List<ExcuseRecord>
 }
@@ -46,6 +55,21 @@ class InMemoryExcuseRepository : ExcuseRepository {
         records[record.id] = record
         return record
     }
+
+    override suspend fun compareAndUpdate(expected: ExcuseRecord, updated: ExcuseRecord): ExcuseRecord? {
+        var changed = false
+        records.computeIfPresent(expected.id) { _, current ->
+            if (current.version == expected.version && current.status == expected.status) {
+                changed = true
+                updated
+            } else current
+        }
+        return if (changed) updated else null
+    }
+
+    override suspend fun listForGroups(groupIds: Set<String>): List<ExcuseRecord> =
+        records.values.filter { it.academicGroupId in groupIds }
+            .sortedByDescending(ExcuseRecord::submittedAt)
 
     override suspend fun listForStudent(studentId: String): List<ExcuseRecord> =
         records.values.filter { it.studentId == studentId }.sortedByDescending(ExcuseRecord::submittedAt)
@@ -70,6 +94,23 @@ class MongoExcuseRepository(database: MongoDatabase) : ExcuseRepository {
         return record
     }
 
+    override suspend fun compareAndUpdate(expected: ExcuseRecord, updated: ExcuseRecord): ExcuseRecord? {
+        val versionGate = if (expected.version == 0L) {
+            or(eq("version", 0L), exists("version", false))
+        } else {
+            eq("version", expected.version)
+        }
+        return collection.findOneAndReplace(
+            and(eq("_id", expected.id), eq("status", expected.status.name), versionGate),
+            updated.toDocument(),
+            FindOneAndReplaceOptions().returnDocument(ReturnDocument.AFTER),
+        )?.toRecord()
+    }
+
+    override suspend fun listForGroups(groupIds: Set<String>): List<ExcuseRecord> =
+        if (groupIds.isEmpty()) emptyList() else collection.find(`in`("academicGroupId", groupIds))
+            .toList().map { it.toRecord() }.sortedByDescending(ExcuseRecord::submittedAt)
+
     override suspend fun listForStudent(studentId: String): List<ExcuseRecord> =
         collection.find(eq("studentId", studentId)).toList()
             .map { it.toRecord() }
@@ -93,6 +134,7 @@ class MongoExcuseRepository(database: MongoDatabase) : ExcuseRepository {
             .append("reviewedAt", reviewedAt?.let(Date::from))
             .append("reviewedBy", reviewedBy)
             .append("reviewComment", reviewComment)
+            .append("version", version)
 
     private fun Document.toRecord(): ExcuseRecord =
         ExcuseRecord(
@@ -107,5 +149,6 @@ class MongoExcuseRepository(database: MongoDatabase) : ExcuseRepository {
             reviewedAt = getDate("reviewedAt")?.toInstant(),
             reviewedBy = getString("reviewedBy"),
             reviewComment = getString("reviewComment"),
+            version = (get("version") as? Number)?.toLong() ?: 0L,
         )
 }

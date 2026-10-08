@@ -1,0 +1,35 @@
+{
+  "tests": 126,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "suites": 32,
+  "lint": {
+    "Fatal": 0,
+    "Error": 0,
+    "Warning": 8
+  },
+  "commandPassed": true,
+  "sourceCodeCommit": "99b198c",
+  "mainBase": "eb9c8f3",
+  "nativeStudentQa": "PASS",
+  "nativeTeacherQa": "PASS",
+  "themePreferenceRestored": "system",
+  "highContrastChecked": true,
+  "fontScaleRestored": 1.0,
+  "teacherTouchTargets": {
+    "refresh": [
+      694,
+      96,
+      912,
+      222
+    ],
+    "profile": [
+      913,
+      96,
+      1039,
+      222
+    ],
+    "intersect": false
+  }
+}

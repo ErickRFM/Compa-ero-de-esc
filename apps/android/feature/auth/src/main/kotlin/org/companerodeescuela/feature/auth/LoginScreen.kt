@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +32,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,9 +48,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
+import org.companerodeescuela.core.designsystem.v8.V8FrostedGlassPanel
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -65,7 +69,6 @@ private val UptlaxBackground = V8RedColors.Background
 private val UptlaxSurface = V8RedColors.Surface.copy(alpha = 0.94f)
 private val UptlaxAccent = V8RedColors.Crimson
 private val UptlaxAccentSoft = V8RedColors.TextSecondary
-private val UptlaxPaper = V8RedColors.Surface.copy(alpha = 0.91f)
 private val UptlaxInk = V8RedColors.TextPrimary
 private val UptlaxMuted = V8RedColors.TextSecondary
 private val UptlaxBorder = V8RedColors.Outline
@@ -187,13 +190,8 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = UptlaxPaper),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-            ) {
-                Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp)) {
+            V8FrostedGlassPanel(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 22.dp)) {
                     Text(
                         text = "Iniciar sesión",
                         color = UptlaxInk,
@@ -215,8 +213,8 @@ fun LoginScreen(
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !state.submitting,
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        label = { Text("Correo / usuario") },
+                        shape = RoundedCornerShape(18.dp),
+                        label = { Text("Correo electrónico o matrícula") },
                         isError = username.isNotEmpty() && usernameError != null,
                         supportingText = usernameError
                             ?.takeIf { username.isNotEmpty() }
@@ -238,7 +236,7 @@ fun LoginScreen(
                             .padding(top = 10.dp),
                         enabled = !state.submitting,
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(18.dp),
                         label = { Text("Contraseña") },
                         isError = password.isNotEmpty() && passwordError != null,
                         supportingText = passwordError
@@ -290,8 +288,14 @@ fun LoginScreen(
                         onClick = ::submit,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 14.dp)
-                            .height(50.dp),
+                            .padding(top = 20.dp)
+                            .height(56.dp)
+                            .shadow(
+                                elevation = if (canSubmit) 11.dp else 0.dp,
+                                shape = RoundedCornerShape(18.dp),
+                                ambientColor = UptlaxAccent.copy(alpha = 0.48f),
+                                spotColor = UptlaxAccent.copy(alpha = 0.40f),
+                            ),
                         enabled = canSubmit,
                         shape = RoundedCornerShape(18.dp),
                         colors = ButtonDefaults.buttonColors(
@@ -324,24 +328,40 @@ fun LoginScreen(
                         }
                     }
 
-                    Text(
-                        text = "¿Nuevo en Compañero de Clase?",
-                        modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
-                        color = UptlaxMuted,
-                        fontSize = 12.sp,
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 22.dp, bottom = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        HorizontalDivider(
+                            modifier = Modifier.weight(1f),
+                            color = Color(0x665B5360),
+                        )
+                        Text("O", color = UptlaxMuted, fontSize = 13.sp)
+                        HorizontalDivider(
+                            modifier = Modifier.weight(1f),
+                            color = Color(0x665B5360),
+                        )
+                    }
 
                     OutlinedButton(
                         onClick = onCreateAccount,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp),
+                            .height(54.dp),
                         enabled = !state.submitting,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(18.dp),
+                        border = BorderStroke(1.dp, UptlaxAccent.copy(alpha = 0.53f)),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color(0xEF1A121A),
+                            contentColor = UptlaxInk,
+                        ),
                     ) {
                         Text(
                             text = "Crear cuenta",
-                            color = UptlaxAccent,
+                            color = UptlaxInk,
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
@@ -364,11 +384,11 @@ fun LoginScreen(
 private fun institutionalFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedTextColor = UptlaxInk,
     unfocusedTextColor = UptlaxInk,
-    focusedContainerColor = Color(0xE01C151B),
-    unfocusedContainerColor = Color(0xD71C151B),
-    disabledContainerColor = Color(0xD71C151B),
+    focusedContainerColor = Color(0xF31A1118),
+    unfocusedContainerColor = Color(0xED171419),
+    disabledContainerColor = Color(0xED171419),
     focusedBorderColor = UptlaxAccent,
-    unfocusedBorderColor = UptlaxBorder,
+    unfocusedBorderColor = Color(0xFF71616C),
     focusedLabelColor = UptlaxAccent,
     unfocusedLabelColor = UptlaxMuted,
     cursorColor = UptlaxAccent,

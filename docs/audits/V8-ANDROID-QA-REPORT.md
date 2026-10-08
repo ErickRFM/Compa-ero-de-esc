@@ -64,3 +64,7 @@ Las cinco comparativas fueron inspeccionadas visualmente (referencia/Android/ove
 APK final y manifiesto local: `dist/v8-audit/V8-audit-debug.apk`, `dist/v8-audit/manifest.json`. El manifiesto se genera después del commit final para evitar referencia circular, con SHA-256, commit de entrega, commit de código, base de main, variante/baseURL, verificaciones e instalación. No se empaquetan las referencias o fixtures en la app.
 
 CI inicial del PR#100 falló antes de compilar por whitespace de logs y PDF ReportLab detectado como texto. Se preserva el PDF sin editar sus bytes, declarando `*.pdf binary` en atributos Git, como el resto de recursos binarios; se retiran espacios finales de logs. El check del rango completo del PR se repite, sin desactivar checks ni borrar fallos. Las compilaciones y pruebas locales siguen válidas porque no cambia el código compilado.
+
+## Actualización: vidrio global y Render (2026-10-08)
+
+La entrega de la ampliación visual usa `https://compa-ero-de-esc.onrender.com/` mediante `COMPANERO_API_BASE_URL`; reemplaza la configuración local de las APK anteriores solo para este binario de entrega. Cuenta de desarrollo autorizada y login por formulario. Alcance, comprobaciones y evidencia nuevos en [V8-GLOBAL-GLASS-QA.md](V8-GLOBAL-GLASS-QA.md). Los resultados de las etapas anteriores conservan sus propios commits y configuración; no se presentan como verificaciones del nuevo binario.

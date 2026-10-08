@@ -1,5 +1,6 @@
 package org.companerodeescuela.feature.admin
 
+import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,10 +39,12 @@ fun AdminHomeScreen(
             .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
-        Text(
-            text = "Administración de Plataforma",
-            style = MaterialTheme.typography.headlineSmall,
-        )
+        V8ScreenHeader {
+            Text(
+                text = "Administración de Plataforma",
+                style = MaterialTheme.typography.headlineSmall,
+            )
+        }
         Text(
             text = "Organiza grupos, clases, docentes y horarios desde una sola estructura académica.",
             style = MaterialTheme.typography.bodyMedium,

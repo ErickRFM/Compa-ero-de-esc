@@ -1,5 +1,6 @@
 package org.companerodeescuela.feature.tutoring
 
+import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -49,7 +50,9 @@ fun TutorRequestsScreen(
             .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
-        Text("Justificantes", style = MaterialTheme.typography.headlineSmall)
+        V8ScreenHeader {
+            Text("Justificantes", style = MaterialTheme.typography.headlineSmall)
+        }
         Text("Revisa las solicitudes de tus grupos. Una justificación no cambia la presencia verificada por QR.",
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (state.loading) CircularProgressIndicator()

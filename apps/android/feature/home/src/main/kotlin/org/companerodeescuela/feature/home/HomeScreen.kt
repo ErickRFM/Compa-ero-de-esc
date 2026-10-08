@@ -32,7 +32,6 @@ import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8ClassSummary
 import org.companerodeescuela.core.designsystem.v8.V8DailyClassRow
-import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
 import org.companerodeescuela.core.designsystem.v8.V8DashboardStat
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -84,7 +83,6 @@ fun HomeScreen(
                 .align(Alignment.TopCenter),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
         ) {
-            V8BrandHeader()
             val firstName = overview?.studentName?.substringBefore(" ")?.takeIf { it.isNotBlank() }
             Text(
                 text = buildAnnotatedString {

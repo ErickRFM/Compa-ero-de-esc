@@ -1,5 +1,6 @@
 package org.companerodeescuela.feature.classroom
 
+import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -26,7 +27,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MenuBook
 import org.companerodeescuela.core.designsystem.v8.V8IconTile
 import androidx.compose.ui.text.font.FontWeight
-import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
 import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
@@ -105,10 +105,12 @@ fun ClassroomScreen(
             ),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
-        Text(
-            text = "Mis clases",
-            style = MaterialTheme.typography.headlineSmall,
-        )
+        V8ScreenHeader {
+            Text(
+                text = "Mis clases",
+                style = MaterialTheme.typography.headlineSmall,
+            )
+        }
         OutlinedButton(onClick = { onOpenChannel(null) }, modifier = Modifier.fillMaxWidth()) {
             Text("Canal de clase")
         }
@@ -439,7 +441,9 @@ private fun TeacherAssignedClassrooms(
         it.canManage && it.status == ClassroomStatus.ACTIVE && it.teacherId == teacherUserId
     }
     Box(modifier = modifier.fillMaxSize()) {
-        V8CampusBackdrop(modifier = Modifier.matchParentSize())
+        if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current) {
+            V8CampusBackdrop(modifier = Modifier.matchParentSize())
+        }
         Column(
             modifier = Modifier.align(Alignment.TopCenter)
                 .widthIn(max = CompaneroSize.homeContentMaxWidth).fillMaxSize()
@@ -447,13 +451,14 @@ private fun TeacherAssignedClassrooms(
                 .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
         ) {
-            V8BrandHeader()
-            Text(
-                text = "Mis clases",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = V8RedColors.TextPrimary,
-            )
+            V8ScreenHeader {
+                Text(
+                    text = "Mis clases",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = V8RedColors.TextPrimary,
+                )
+            }
             Text(
                 text = "Tus materias y grupos asignados por control escolar. Desde aquí puedes pasar lista, publicar avisos y evaluar.",
                 style = MaterialTheme.typography.bodyMedium,

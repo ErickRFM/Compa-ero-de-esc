@@ -133,6 +133,7 @@ fun AttendanceScreen(
             onScan = viewModel::openScanner,
             onGenericScan = viewModel::openGenericScanner,
             onStartSchoolDay = viewModel::openSchoolDayScanner,
+            onConfirmClassCall = viewModel::confirmClassCall,
             onPickImage = { imageLauncher.launch(arrayOf("image/*")) },
             onInspectToken = viewModel::inspectQr,
             onDismissInspection = viewModel::clearQrInspection,
@@ -163,6 +164,7 @@ private fun StudentAttendance(
     onScan: (String?) -> Unit,
     onGenericScan: () -> Unit,
     onStartSchoolDay: () -> Unit,
+    onConfirmClassCall: (String) -> Unit,
     onPickImage: () -> Unit,
     onInspectToken: (String) -> Unit,
     onDismissInspection: () -> Unit,
@@ -246,6 +248,10 @@ private fun StudentAttendance(
                 occurrence = occurrence,
                 local = local,
                 onScan = { onScan(session.id) },
+                onConfirm = { onConfirmClassCall(session.id) },
+                confirmed = state.confirmedClassCalls[session.id],
+                busy = state.actionInProgress,
+                schoolPresenceActive = state.schoolPresence != null,
             )
         }
 
@@ -285,6 +291,10 @@ private fun StudentSessionCard(
     occurrence: ClassOccurrenceContract?,
     local: LocalAttendanceRecord?,
     onScan: () -> Unit,
+    onConfirm: () -> Unit,
+    confirmed: AttendanceRecordResponse?,
+    busy: Boolean,
+    schoolPresenceActive: Boolean,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -326,8 +336,21 @@ private fun StudentSessionCard(
                 }
 
                 Button(
+                    onClick = onConfirm,
+                    enabled = !busy && confirmed == null && local == null && schoolPresenceActive,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(if (confirmed == null) "Confirmar pase desde la app" else
+                        if (confirmed.disposition == AttendanceDisposition.LATE) "Retardo confirmado" else "Asistencia confirmada")
+                }
+                if (!schoolPresenceActive) {
+                    Text("Primero registra tu entrada escolar con el QR institucional.",
+                        style = MaterialTheme.typography.bodySmall)
+                }
+
+                OutlinedButton(
                     onClick = onScan,
-                    enabled = local == null,
+                    enabled = !busy && local == null && confirmed == null,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(
@@ -616,7 +639,7 @@ private fun TeacherAttendance(
             }
         }
         Text(
-            "Genera el QR firmado para tus clases asignadas y revisa la asistencia en vivo.",
+            "Abre el pase para tu grupo. Los alumnos pueden confirmar desde la app con entrada y Wi-Fi escolar; el QR sigue disponible.",
             color = V8RedColors.TextSecondary,
             style = MaterialTheme.typography.bodyMedium,
         )
@@ -633,6 +656,46 @@ private fun TeacherAttendance(
                 title = "No pudimos completar la acción",
                 message = it,
                 tone = NoticeTone.ERROR,
+            )
+        }
+
+        val campus = state.campusRoster
+        if (campus != null) {
+            V8GlassCard(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(CompaneroSpacing.md),
+                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+                ) {
+                    Text("Entrada escolar: ${campus.groupName}",
+                        style = MaterialTheme.typography.titleMedium, color = V8RedColors.TextPrimary)
+                    Text("${campus.students.size} inscritos · ${campus.students.count { it.campusEntryAtEpochSeconds != null }} con entrada registrada",
+                        style = MaterialTheme.typography.bodySmall, color = V8RedColors.TextSecondary)
+                    campus.students.forEach { student ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(student.studentId, style = MaterialTheme.typography.bodyMedium,
+                                color = V8RedColors.TextPrimary)
+                            Text(
+                                when {
+                                    student.classRecord?.disposition == AttendanceDisposition.PRESENT -> "Presente"
+                                    student.classRecord?.disposition == AttendanceDisposition.LATE -> "Retardo"
+                                    student.classRecord?.disposition == AttendanceDisposition.ABSENT -> "Ausente"
+                                    student.campusEntryAtEpochSeconds != null -> "En escuela"
+                                    else -> "Sin entrada"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = V8RedColors.TextSecondary,
+                            )
+                        }
+                    }
+                }
+            }
+        } else if (state.campusRosterError != null) {
+            StatusNotice(
+                title = "Padrón escolar no disponible",
+                message = state.campusRosterError!!,
             )
         }
 

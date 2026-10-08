@@ -55,6 +55,7 @@ data class ApiSettings(
     val schoolPresenceQrSha256: String = "",
     val schoolWifiSsids: Set<String> = emptySet(),
     val schoolWifiBssids: Set<String> = emptySet(),
+    val attendanceGraceMinutes: Int = 5,
 ) {
     val hasAuthentication: Boolean
         get() = jwtSecret != null
@@ -81,7 +82,8 @@ data class ApiSettings(
             hasAttendanceQrSigning == other.hasAttendanceQrSigning &&
             schoolPresenceQrSha256 == other.schoolPresenceQrSha256 &&
             schoolWifiSsids == other.schoolWifiSsids &&
-            schoolWifiBssids == other.schoolWifiBssids
+            schoolWifiBssids == other.schoolWifiBssids &&
+            attendanceGraceMinutes == other.attendanceGraceMinutes
     }
 
     override fun hashCode(): Int {
@@ -99,6 +101,7 @@ data class ApiSettings(
         result = 31 * result + schoolPresenceQrSha256.hashCode()
         result = 31 * result + schoolWifiSsids.hashCode()
         result = 31 * result + schoolWifiBssids.hashCode()
+        result = 31 * result + attendanceGraceMinutes
         return result
     }
 
@@ -144,6 +147,10 @@ class SettingsLoader(
         val schoolPresenceQrSha256 = env("SCHOOL_PRESENCE_QR_SHA256")?.trim().orEmpty().lowercase()
         val schoolWifiSsids = parseCsv(env("SCHOOL_WIFI_SSIDS"))
         val schoolWifiBssids = parseCsv(env("SCHOOL_WIFI_BSSIDS")).map { it.lowercase() }.toSet()
+        val attendanceGraceMinutes = env("ATTENDANCE_GRACE_MINUTES")?.trim()?.toIntOrNull() ?: 5
+        if (attendanceGraceMinutes !in 0..15) {
+            throw ConfigurationException("ATTENDANCE_GRACE_MINUTES must be between 0 and 15")
+        }
 
         val results = listOf(
             Validators.port(ENV_API_PORT, portText),
@@ -187,6 +194,7 @@ class SettingsLoader(
             schoolPresenceQrSha256 = schoolPresenceQrSha256,
             schoolWifiSsids = schoolWifiSsids,
             schoolWifiBssids = schoolWifiBssids,
+            attendanceGraceMinutes = attendanceGraceMinutes,
         )
     }
 

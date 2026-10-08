@@ -27,6 +27,7 @@ import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
 import org.companerodeescuela.shared.contracts.AttendanceStatus
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
+import org.companerodeescuela.shared.contracts.ClassCallConfirmationRequest
 import org.companerodeescuela.shared.contracts.SchoolNetworkEvidence
 import org.companerodeescuela.shared.contracts.StartSchoolPresenceRequest
 import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
@@ -366,6 +367,81 @@ class AttendanceServiceTest {
         )
 
         assertEquals(listOf(real.id), service.activeFor("2020-10455").map { it.id })
+    }
+
+
+    @Test
+    fun `class call requires verified campus entry and fresh school WiFi`() = runTest {
+        val repository = InMemoryAttendanceRepository()
+        val presence = SchoolPresenceService(
+            repository = InMemorySchoolPresenceRepository(),
+            policy = SchoolPresencePolicy(
+                entryQrSha256 = sha256("school-entry"),
+                allowedSsids = setOf("UD4-Alumno"),
+                allowedBssids = emptySet(),
+            ),
+            clock = Clock.fixed(initialInstant, ZoneOffset.UTC),
+        )
+        val services = service(repository = repository, schoolPresenceService = presence)
+        val session = services.openSession("T-0001", requestFor(teacherOccurrence()))
+        val request = ClassCallConfirmationRequest("confirm-1", SchoolNetworkEvidence(ssid = "UD4-Alumno"))
+
+        assertFailsWith<ApiException.Forbidden> {
+            services.student.confirmClassCall("2020-10455", session.id, request)
+        }
+        presence.start(
+            "2020-10455",
+            StartSchoolPresenceRequest(
+                "presence-1", "school-entry",
+                SchoolNetworkEvidence(ssid = "UD4-Alumno"), initialInstant.epochSecond,
+            ),
+        )
+        assertFailsWith<ApiException.Forbidden> {
+            services.student.confirmClassCall(
+                "2020-10455", session.id,
+                request.copy(schoolNetwork = SchoolNetworkEvidence(ssid = "Home")),
+            )
+        }
+        val confirmed = services.student.confirmClassCall("2020-10455", session.id, request)
+        assertEquals(AttendanceStatus.VERIFIED, confirmed.status)
+        assertEquals(AttendanceDisposition.PRESENT, confirmed.disposition)
+        assertEquals(AttendanceReasonCode.CLASS_CALL_CONFIRMED, confirmed.reasonCode)
+        assertEquals(confirmed, services.student.confirmClassCall("2020-10455", session.id, request))
+        assertEquals(1, repository.recordsForSession(session.id).size)
+    }
+
+    @Test
+    fun `class call beyond grace period is late according to server clock`() = runTest {
+        val repository = InMemoryAttendanceRepository()
+        val presence = SchoolPresenceService(
+            repository = InMemorySchoolPresenceRepository(),
+            policy = SchoolPresencePolicy(
+                entryQrSha256 = sha256("school-entry"),
+                allowedSsids = setOf("UD4-Alumno"),
+                allowedBssids = emptySet(),
+            ),
+            clock = Clock.fixed(initialInstant, ZoneOffset.UTC),
+        )
+        val services = service(repository = repository, schoolPresenceService = presence)
+        val session = services.openSession("T-0001", requestFor(teacherOccurrence()).copy(durationMinutes = 15))
+        presence.start(
+            "2020-10455",
+            StartSchoolPresenceRequest(
+                "presence-2", "school-entry",
+                SchoolNetworkEvidence(ssid = "UD4-Alumno"), initialInstant.epochSecond,
+            ),
+        )
+        val later = AttendanceStudentService(
+            repository = repository,
+            enrollmentResolver = AttendanceEnrollmentResolver(provider),
+            schoolPresenceService = presence,
+            clock = Clock.fixed(initialInstant.plusSeconds(360), ZoneOffset.UTC),
+        )
+        val confirmed = later.confirmClassCall(
+            "2020-10455", session.id,
+            ClassCallConfirmationRequest("confirm-late", SchoolNetworkEvidence(ssid = "UD4-Alumno")),
+        )
+        assertEquals(AttendanceDisposition.LATE, confirmed.disposition)
     }
 
     private suspend fun teacherOccurrence(): ClassOccurrence {

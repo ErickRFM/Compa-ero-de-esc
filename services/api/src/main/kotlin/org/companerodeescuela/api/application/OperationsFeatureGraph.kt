@@ -1,5 +1,6 @@
 package org.companerodeescuela.api.application
 
+import org.companerodeescuela.api.academic.groups.AcademicGroupRepository
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.database.MongoConnection
@@ -23,6 +24,7 @@ fun buildOperationsFeatureGraph(
     settings: ApiSettings,
     mongoConnection: MongoConnection,
     tutoringService: TutorAssignmentService,
+    groupRepository: AcademicGroupRepository? = null,
 ): OperationsFeatureGraph {
     val eventRepository = when {
         !settings.hasAuthentication -> InMemoryAcademicEventRepository()
@@ -42,6 +44,7 @@ fun buildOperationsFeatureGraph(
         excuseService = ExcuseService(
             repository = excuseRepository,
             tutoring = tutoringService,
+            groupRepository = groupRepository,
         ),
         deviceTokenRepository = InMemoryDeviceTokenRepository(),
     )

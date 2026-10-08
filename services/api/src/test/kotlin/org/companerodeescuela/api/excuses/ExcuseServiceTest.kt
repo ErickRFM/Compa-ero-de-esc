@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlinx.coroutines.test.runTest
 import org.companerodeescuela.api.academic.groups.AcademicGroupRecord
+import org.companerodeescuela.api.academic.groups.AcademicGroupMembershipRecord
 import org.companerodeescuela.api.academic.groups.InMemoryAcademicGroupRepository
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.tutoring.InMemoryTutorAssignmentRepository
@@ -29,7 +30,6 @@ class ExcuseServiceTest {
                 academicGroupId = "6A",
                 attendanceDateIso = "2026-10-06",
                 reason = "Consulta médica con comprobante",
-                attachmentRefs = listOf("attachment-1"),
             ),
         )
 
@@ -68,6 +68,31 @@ class ExcuseServiceTest {
     }
 
     @Test
+    fun submitRejectsWrongGroupMalformedDateAndUnverifiedFiles() = runTest {
+        val service = setup().service
+        assertFailsWith<ApiException.Forbidden> {
+            service.submit(STUDENT, SubmitExcuseRequest("6B", "2026-10-06", "Wrong group"))
+        }
+        assertFailsWith<ApiException.Validation> {
+            service.submit(STUDENT, SubmitExcuseRequest("6A", "2026-02-31", "Bad calendar date"))
+        }
+        assertFailsWith<ApiException.Validation> {
+            service.submit(STUDENT, SubmitExcuseRequest("6A", "2026-10-06", "Valid reason", listOf("foreign-file")))
+        }
+    }
+
+    @Test
+    fun staleReviewIsRejectedByOptimisticLock() = runTest {
+        val repository = InMemoryExcuseRepository()
+        val initial = ExcuseRecord("e1", STUDENT.id, "6A", "2026-10-06", "Test reason", emptyList(), ExcuseStatus.PENDING, Instant.EPOCH)
+        repository.create(initial)
+        val first = initial.copy(status = ExcuseStatus.APPROVED, version = 1)
+        val competing = initial.copy(status = ExcuseStatus.REJECTED, version = 1)
+        assertEquals(first, repository.compareAndUpdate(initial, first))
+        assertEquals(null, repository.compareAndUpdate(initial, competing))
+    }
+
+    @Test
     fun teacherWithoutTutorRoleCannotListExcuses() = runTest {
         val setup = setup()
         assertFailsWith<ApiException.Forbidden> {
@@ -80,6 +105,8 @@ class ExcuseServiceTest {
             it.create(AcademicGroupRecord("6A", "6A", true, Instant.EPOCH))
             it.create(AcademicGroupRecord("6B", "6B", true, Instant.EPOCH))
         }
+        groups.assign(AcademicGroupMembershipRecord("6A", STUDENT.id, Instant.EPOCH))
+        groups.assign(AcademicGroupMembershipRecord("6B", OTHER_STUDENT.id, Instant.EPOCH))
         val assignments = InMemoryTutorAssignmentRepository().also {
             it.create(
                 TutorAssignmentRecord(
@@ -97,6 +124,7 @@ class ExcuseServiceTest {
             repository = InMemoryExcuseRepository(),
             tutoring = tutoring,
             clock = Clock.fixed(Instant.parse("2026-10-06T19:00:00Z"), ZoneOffset.UTC),
+            groupRepository = groups,
         )
         return Setup(service)
     }

@@ -54,6 +54,7 @@ fun ClassroomScreen(
     roles: Set<UserRole>,
     modifier: Modifier = Modifier,
     teacherExperience: Boolean = false,
+    teacherUserId: String? = null,
     onOpenAttendance: () -> Unit = {},
     onOpenChannel: () -> Unit = {},
     onOpenGrading: () -> Unit = {},

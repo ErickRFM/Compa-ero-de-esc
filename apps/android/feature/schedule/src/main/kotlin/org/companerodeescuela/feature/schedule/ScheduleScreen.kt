@@ -575,7 +575,7 @@ private fun DayTimeGrid(
     val quarterHourPx = with(density) { hourHeight.toPx() / 4f }
     val horizontalThresholdPx = with(density) { 72.dp.toPx() }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .height(hourHeight * totalHours.toFloat())
@@ -603,12 +603,39 @@ private fun DayTimeGrid(
             )
         }
 
-        entries.sortedBy { it.startsAt }.forEach { entry ->
+        // Assign simultaneous events to separate lanes instead of painting over one another.
+        val laneMap = mutableMapOf<Int, Pair<Int, Int>>()
+        val ordered = entries.indices.sortedWith(compareBy({ entries[it].startsAt }, { entries[it].endsAt }))
+        val groups = mutableListOf<MutableList<Int>>()
+        var groupEnd = ""
+        ordered.forEach { index ->
+            val item = entries[index]
+            if (groups.isEmpty() || item.startsAt >= groupEnd) {
+                groups.add(mutableListOf())
+                groupEnd = item.endsAt
+            }
+            groups.last().add(index)
+            if (item.endsAt > groupEnd) groupEnd = item.endsAt
+        }
+        groups.forEach { group ->
+            val laneEnds = mutableListOf<String>()
+            val assignment = mutableMapOf<Int, Int>()
+            group.forEach { index ->
+                val startAt = entries[index].startsAt
+                val lane = laneEnds.indexOfFirst { it <= startAt }.takeIf { it >= 0 }
+                    ?: laneEnds.size.also { laneEnds.add("") }
+                laneEnds[lane] = entries[index].endsAt
+                assignment[index] = lane
+            }
+            group.forEach { index -> laneMap[index] = assignment.getValue(index) to laneEnds.size }
+        }
+
+        entries.forEachIndexed { index, entry ->
             val start = runCatching { LocalTime.parse(entry.startsAt) }.getOrNull()
-                ?: return@forEach
+                ?: return@forEachIndexed
             val end = runCatching { LocalTime.parse(entry.endsAt) }.getOrNull()
                 ?: return@forEach
-            if (!start.isBefore(end)) return@forEach
+            if (!start.isBefore(end)) return@forEachIndexed
 
             val minutesFromStart = (start.hour * 60 + start.minute - startHour * 60)
                 .coerceAtLeast(0)
@@ -616,7 +643,7 @@ private fun DayTimeGrid(
             val top = hourHeight * (minutesFromStart / 60f)
             val blockHeight = maxOf(
                 hourHeight * (durationMinutes / 60f),
-                72.dp,
+                24.dp,
             )
 
             var dragOffset by remember(entry.courseId) { mutableStateOf(Offset.Zero) }
@@ -664,11 +691,14 @@ private fun DayTimeGrid(
                     }
             }
 
+            val (lane, laneCount) = laneMap[index] ?: (0 to 1)
+            val availableWidth = (maxWidth - railWidth - CompaneroSpacing.xs)
+            val laneWidth = availableWidth / laneCount
             Surface(
                 modifier = Modifier
                     .padding(start = railWidth + CompaneroSpacing.xs)
-                    .offset(y = top)
-                    .fillMaxWidth()
+                    .offset(x = laneWidth * lane, y = top)
+                    .width(laneWidth)
                     .height(blockHeight)
                     .then(dragModifier)
                     .then(
@@ -694,6 +724,7 @@ private fun DayTimeGrid(
                     Text(
                         entry.subjectName,
                         style = MaterialTheme.typography.titleSmall,
+                        maxLines = if (durationMinutes < 45) 1 else 2,
                     )
                     Text(
                         locationAndTeacher(entry),

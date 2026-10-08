@@ -7,6 +7,12 @@ import org.companerodeescuela.shared.contracts.ScheduleSource
 
 class ScheduleOcrParserTest {
     @Test
+    fun `Ingles subject is not split as engineering teacher title`() {
+        val result = ScheduleOcrParser.parse("Miércoles\n12:00-13:00 QA Ingles Aula QA-103")
+        assertEquals("QA Ingles Aula QA-103", result.single().subjectName)
+        assertEquals("", result.single().teacherName)
+    }
+    @Test
     fun `parses Spanish day time subject and optional context`() {
         val result = ScheduleOcrParser.parse(
             """

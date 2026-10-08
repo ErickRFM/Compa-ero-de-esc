@@ -48,6 +48,7 @@ import org.companerodeescuela.feature.classroom.ClassroomScreen
 import org.companerodeescuela.feature.coordinator.CoordinatorHomeScreen
 import org.companerodeescuela.feature.designsystem.DesignSystemCatalogScreen
 import org.companerodeescuela.feature.home.HomeScreen
+import org.companerodeescuela.feature.grading.GradebookScreen
 import org.companerodeescuela.feature.profile.ActiveExperiencePreferences
 import org.companerodeescuela.feature.profile.ProfileScreen
 import org.companerodeescuela.feature.schedule.ScheduleScreen
@@ -179,6 +180,11 @@ class MainActivity : ComponentActivity() {
                                                         launchSingleTop = true
                                                     }
                                                 },
+                                                onOpenGrading = {
+                                                    navController.navigate(Destination.Grading.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
                                             )
                                         }
                                         composable(Destination.TeacherHome.route) {
@@ -247,6 +253,7 @@ class MainActivity : ComponentActivity() {
                                         composable(Destination.Classrooms.route) {
                                             ClassroomScreen(roles = session.roles)
                                         }
+                                        composable(Destination.Grading.route) { GradebookScreen() }
                                         composable(Destination.Channel.route) { ChannelScreen() }
                                         composable(Destination.Attendance.route) {
                                             AttendanceScreen(

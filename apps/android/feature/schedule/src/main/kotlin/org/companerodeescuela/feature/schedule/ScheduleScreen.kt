@@ -40,6 +40,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.font.FontWeight
+import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -143,9 +145,9 @@ fun ScheduleScreen(
             .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
-        Text("Agenda", style = MaterialTheme.typography.headlineSmall)
+        Text("Mi horario", style = MaterialTheme.typography.headlineLarge, color = V8RedColors.Crimson, fontWeight = FontWeight.Bold)
         Text(
-            text = "Tu horario académico, incluso sin conexión.",
+            text = "Organiza tu semana, consulta tus clases incluso sin conexión.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

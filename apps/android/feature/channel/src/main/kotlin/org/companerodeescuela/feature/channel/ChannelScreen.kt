@@ -28,6 +28,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
@@ -53,6 +56,7 @@ fun ChannelScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val selected = state.channels.firstOrNull { it.id == state.selectedChannelId }
+    var selectedTab by remember(state.selectedChannelId) { mutableIntStateOf(0) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         V8CampusBackdrop(modifier = Modifier.matchParentSize())
@@ -128,9 +132,24 @@ fun ChannelScreen(
 
             else -> {
                 ChannelIdentity(selected)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FilterChip(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        label = { Text("Avisos") },
+                        modifier = Modifier.weight(1f),
+                    )
+                    FilterChip(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        label = { Text("Chat · respuestas rápidas") },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
                 ChannelFeed(
                     posts = state.posts,
                     canPublish = selected.canPublish,
+                    allowQuickReplies = selectedTab == 1,
                     busy = state.actionInProgress,
                     loading = state.loading,
                     onAcknowledge = viewModel::acknowledge,
@@ -242,6 +261,7 @@ private fun ChannelIdentity(channel: ClassChannelSummary) {
 private fun ChannelFeed(
     posts: List<ChannelPost>,
     canPublish: Boolean,
+    allowQuickReplies: Boolean,
     busy: Boolean,
     loading: Boolean,
     onAcknowledge: (ChannelPost, ChannelPresetResponse) -> Unit,
@@ -280,7 +300,7 @@ private fun ChannelFeed(
         items(posts, key = ChannelPost::id) { post ->
             ChannelPostCard(
                 post = post,
-                showStudentActions = !canPublish,
+                showStudentActions = !canPublish && allowQuickReplies,
                 busy = busy,
                 onAcknowledge = onAcknowledge,
             )

@@ -36,13 +36,23 @@ fun CompaneroScaffold(
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
+    val onSecondaryScreen = isSecondaryRoute(
+        currentRoute = currentDestination?.route,
+        startRoute = startDestination.route,
+        topLevelRoutes = topLevelDestinations.map { it.destination.route },
+    )
     val secondaryTitle = when (currentDestination?.route) {
         Destination.Profile.route -> "Perfil"
         Destination.AppearanceSettings.route -> "Tema y accesibilidad"
+        Destination.IntegrationSettings.route -> "Integración institucional"
         Destination.DesignSystemCatalog.route -> "Sistema visual"
-        else -> null
+        Destination.Grading.route -> "Calificaciones"
+        Destination.Channel.route -> "Canal"
+        Destination.Classrooms.route -> "Clases"
+        Destination.Schedule.route -> "Horario"
+        Destination.Attendance.route -> "Asistencia"
+        else -> "Volver"
     }
-    val onSecondaryScreen = secondaryTitle != null && currentDestination?.route != Destination.Profile.route
 
     val studentColors = if (highContrast) V8ColorScheme.copy(
         outline = V8ColorScheme.onSurfaceVariant,
@@ -88,7 +98,7 @@ fun CompaneroScaffold(
                 destinations()
             }
 
-            if (!onSecondaryScreen) {
+            if (!onSecondaryScreen && topLevelDestinations.none { it.destination == Destination.Profile }) {
                 IconButton(
                     onClick = {
                         navController.navigate(Destination.Profile.route) {

@@ -64,6 +64,7 @@ fun ClassroomScreen(
     if (teacherExperience && UserRole.TEACHER in roles) {
         TeacherAssignedClassrooms(
             state = state,
+            teacherUserId = teacherUserId,
             onRefresh = viewModel::refresh,
             onOpenAttendance = onOpenAttendance,
             onOpenChannel = onOpenChannel,

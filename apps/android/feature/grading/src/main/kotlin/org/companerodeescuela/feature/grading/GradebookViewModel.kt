@@ -42,6 +42,7 @@ data class GradebookUiState(
 class GradebookViewModel @Inject constructor(
     private val repository: GradebookRepository,
     private val classroomRepository: ClassroomRepository,
+    private val tokenStore: SessionTokenStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(GradebookUiState())
     val state: StateFlow<GradebookUiState> = _state.asStateFlow()

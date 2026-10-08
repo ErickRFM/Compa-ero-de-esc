@@ -19,17 +19,17 @@ import androidx.compose.ui.unit.sp
 /** Student-facing V8 brand identity shared by all five approved surfaces. */
 @Composable
 fun V8BrandHeader(modifier: Modifier = Modifier) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Icon(
                 imageVector = Icons.Filled.School,
                 contentDescription = null,
                 tint = V8RedColors.Crimson,
-                modifier = Modifier.size(47.dp),
+                modifier = Modifier.size(52.dp),
             )
             Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-                Text("Compañero", color = V8RedColors.TextPrimary, fontSize = 21.sp, fontWeight = FontWeight.Bold, lineHeight = 21.sp)
-                Text("de Clase", color = V8RedColors.TextPrimary, fontSize = 21.sp, fontWeight = FontWeight.Bold, lineHeight = 21.sp)
+                Text("Compañero", color = V8RedColors.TextPrimary, fontSize = 24.sp, fontWeight = FontWeight.Bold, lineHeight = 24.sp)
+                Text("de Clase", color = V8RedColors.TextPrimary, fontSize = 24.sp, fontWeight = FontWeight.Bold, lineHeight = 24.sp)
             }
         }
         Text(

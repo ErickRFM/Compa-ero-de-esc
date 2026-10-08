@@ -30,11 +30,22 @@ class RoleExperienceResolverTest {
         assertEquals(
             listOf(
                 TopLevelDestination.TeacherHome,
-                TopLevelDestination.Classrooms,
                 TopLevelDestination.Schedule,
+                TopLevelDestination.Attendance,
+                TopLevelDestination.Classrooms,
+                TopLevelDestination.Channel,
             ),
             config.topLevelDestinations,
         )
+    }
+
+    @Test
+    fun `pending teacher does not get QR or channel actions`() {
+        val config = RoleExperienceResolver.resolve(setOf(UserRole.TEACHER_PENDING))
+
+        assertEquals(AppExperience.TEACHER, config.experience)
+        assertEquals(Destination.TeacherHome, config.startDestination)
+        assertEquals(listOf(TopLevelDestination.TeacherHome), config.topLevelDestinations)
     }
 
     @Test

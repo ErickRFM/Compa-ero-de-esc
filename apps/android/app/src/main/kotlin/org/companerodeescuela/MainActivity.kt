@@ -204,6 +204,12 @@ class MainActivity : ComponentActivity() {
                                                         launchSingleTop = true
                                                     }
                                                 },
+                                                onOpenSchedule = {
+                                                    navController.navigate(Destination.Schedule.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                                displayName = session.displayName,
                                             )
                                         }
                                         composable(Destination.CoordinatorHome.route) {

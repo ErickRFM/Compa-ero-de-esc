@@ -3,6 +3,7 @@ package org.companerodeescuela.feature.grading
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +17,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -24,6 +26,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
+import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
+import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
+import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8RedColors
 
 @Composable
 fun GradebookScreen(
@@ -51,17 +57,20 @@ fun GradebookScreen(
         }
     }
 
+    Box(modifier = modifier.fillMaxSize()) {
+        V8CampusBackdrop(modifier = Modifier.matchParentSize())
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
     ) {
-        Text("Evaluación y calificaciones", style = MaterialTheme.typography.headlineSmall)
+        V8BrandHeader()
+        Text("Evaluación y calificaciones", style = MaterialTheme.typography.headlineLarge, color = V8RedColors.TextPrimary)
         Text(
-            "Configura el 100%, importa Excel/CSV y revisa el resultado antes de enviarlo al sistema escolar.",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            "Configura el 100%, importa Excel/CSV y revisa antes de sincronizar con el sistema escolar.",
+            color = V8RedColors.TextSecondary,
         )
 
         OutlinedTextField(
@@ -69,23 +78,25 @@ fun GradebookScreen(
             onValueChange = viewModel::setClassroomId,
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            label = { Text("ID de clase") },
+            colors = teacherFieldColors(),
+            label = { Text("ID de clase asignada") },
         )
         OutlinedTextField(
             value = state.gradingPeriod,
             onValueChange = viewModel::setGradingPeriod,
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
+            colors = teacherFieldColors(),
             label = { Text("Periodo") },
             placeholder = { Text("Parcial 1") },
         )
 
-        Card(modifier = Modifier.fillMaxWidth()) {
+        V8GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier.padding(CompaneroSpacing.md),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
-                Text("Esquema de evaluación", style = MaterialTheme.typography.titleMedium)
+                Text("Esquema de evaluación", style = MaterialTheme.typography.titleMedium, color = V8RedColors.TextPrimary)
                 Text(
                     "Total: ${formatWeight(state.totalWeight)}%",
                     color = if (state.schemeComplete) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
@@ -100,6 +111,7 @@ fun GradebookScreen(
                             onValueChange = { viewModel.updateCategory(index, name = it) },
                             modifier = Modifier.weight(2f),
                             singleLine = true,
+            colors = teacherFieldColors(),
                             label = { Text("Actividad") },
                             placeholder = { Text("Proyecto") },
                         )
@@ -112,6 +124,7 @@ fun GradebookScreen(
                             },
                             modifier = Modifier.weight(1f),
                             singleLine = true,
+            colors = teacherFieldColors(),
                             label = { Text("%") },
                         )
                     }
@@ -127,15 +140,15 @@ fun GradebookScreen(
             }
         }
 
-        Card(modifier = Modifier.fillMaxWidth()) {
+        V8GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier.padding(CompaneroSpacing.md),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
-                Text("Importar calificaciones", style = MaterialTheme.typography.titleMedium)
+                Text("Importar calificaciones", style = MaterialTheme.typography.titleMedium, color = V8RedColors.TextPrimary)
                 Text(
                     "El archivo debe incluir Matrícula/ID y columnas con los mismos nombres de tus actividades. Se admite .xlsx y .csv.",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = V8RedColors.TextSecondary,
                 )
                 Button(
                     onClick = {
@@ -180,7 +193,22 @@ fun GradebookScreen(
             else Text("Revisar y sincronizar calificaciones")
         }
     }
+    }
+
 }
 
 private fun formatWeight(value: Double): String =
     if (value % 1.0 == 0.0) value.toInt().toString() else value.toString()
+
+@Composable
+private fun teacherFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = V8RedColors.TextPrimary,
+    unfocusedTextColor = V8RedColors.TextPrimary,
+    focusedLabelColor = V8RedColors.Crimson,
+    unfocusedLabelColor = V8RedColors.TextSecondary,
+    focusedBorderColor = V8RedColors.Crimson,
+    unfocusedBorderColor = V8RedColors.Outline,
+    cursorColor = V8RedColors.Crimson,
+    focusedContainerColor = V8RedColors.Surface,
+    unfocusedContainerColor = V8RedColors.Surface,
+)

@@ -11,6 +11,8 @@ data class TutorAssignmentSummary(
     val active: Boolean,
     val assignedBy: String,
     val assignedAtEpochSeconds: Long,
+    val revokedAtEpochSeconds: Long? = null,
+    val revokedBy: String? = null,
 )
 
 @Serializable

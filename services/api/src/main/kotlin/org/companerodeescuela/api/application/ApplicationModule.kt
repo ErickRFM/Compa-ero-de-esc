@@ -51,6 +51,7 @@ fun Application.module(
     val academicGraph = buildAcademicFeatureGraph(
         settings = settings,
         mongoConnection = mongoConnection,
+        accounts = identityGraph.accounts,
     )
     val classroomGraph = buildClassroomFeatureGraph(
         settings = settings,

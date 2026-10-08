@@ -2,6 +2,9 @@ package org.companerodeescuela.api.tutoring
 
 import com.mongodb.client.model.Filters.and
 import com.mongodb.client.model.Filters.eq
+import com.mongodb.client.model.FindOneAndUpdateOptions
+import com.mongodb.client.model.ReturnDocument
+import com.mongodb.client.model.Updates
 import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
 import com.mongodb.kotlin.client.coroutine.MongoCollection
@@ -22,6 +25,8 @@ data class TutorAssignmentRecord(
     val active: Boolean,
     val assignedBy: String,
     val assignedAt: Instant,
+    val revokedAt: Instant? = null,
+    val revokedBy: String? = null,
 )
 
 interface TutorAssignmentRepository {
@@ -29,16 +34,20 @@ interface TutorAssignmentRepository {
     suspend fun listForTutor(tutorUserId: String): List<TutorAssignmentRecord>
     suspend fun listAll(): List<TutorAssignmentRecord>
     suspend fun findActive(tutorUserId: String, academicGroupId: String): TutorAssignmentRecord?
+    suspend fun findById(id: String): TutorAssignmentRecord?
+    suspend fun revoke(id: String, actorId: String, now: Instant): TutorAssignmentRecord?
 }
 
 class InMemoryTutorAssignmentRepository : TutorAssignmentRepository {
     private val records = ConcurrentHashMap<String, TutorAssignmentRecord>()
 
-    override suspend fun create(record: TutorAssignmentRecord): TutorAssignmentRecord {
-        val existing = findActive(record.tutorUserId, record.academicGroupId)
-        if (existing != null) return existing
+    private val mutationMutex = Mutex()
+
+    override suspend fun create(record: TutorAssignmentRecord): TutorAssignmentRecord = mutationMutex.withLock {
+        records.values.firstOrNull { it.tutorUserId == record.tutorUserId &&
+            it.academicGroupId == record.academicGroupId && it.active }?.let { return@withLock it }
         records[record.id] = record
-        return record
+        record
     }
 
     override suspend fun listForTutor(tutorUserId: String): List<TutorAssignmentRecord> =
@@ -52,6 +61,18 @@ class InMemoryTutorAssignmentRepository : TutorAssignmentRepository {
         records.values.firstOrNull {
             it.tutorUserId == tutorUserId && it.academicGroupId == academicGroupId && it.active
         }
+
+    override suspend fun findById(id: String): TutorAssignmentRecord? = records[id]
+
+    override suspend fun revoke(id: String, actorId: String, now: Instant): TutorAssignmentRecord? =
+        mutationMutex.withLock {
+            val previous = records[id] ?: return@withLock null
+            val updated = if (previous.active) previous.copy(
+                active = false, revokedBy = actorId, revokedAt = now,
+            ) else previous
+            records[id] = updated
+            updated
+        }
 }
 
 class MongoTutorAssignmentRepository(database: MongoDatabase) : TutorAssignmentRepository {
@@ -64,8 +85,12 @@ class MongoTutorAssignmentRepository(database: MongoDatabase) : TutorAssignmentR
     override suspend fun create(record: TutorAssignmentRecord): TutorAssignmentRecord {
         ensureIndexes()
         findActive(record.tutorUserId, record.academicGroupId)?.let { return it }
-        collection.insertOne(record.toDocument())
-        return record
+        return try {
+            collection.insertOne(record.toDocument())
+            record
+        } catch (error: com.mongodb.MongoWriteException) {
+            findActive(record.tutorUserId, record.academicGroupId) ?: throw error
+        }
     }
 
     override suspend fun listForTutor(tutorUserId: String): List<TutorAssignmentRecord> {
@@ -92,6 +117,24 @@ class MongoTutorAssignmentRepository(database: MongoDatabase) : TutorAssignmentR
         ).firstOrNull()?.toRecord()
     }
 
+    override suspend fun findById(id: String): TutorAssignmentRecord? {
+        ensureIndexes()
+        return collection.find(eq("_id", id)).firstOrNull()?.toRecord()
+    }
+
+    override suspend fun revoke(id: String, actorId: String, now: Instant): TutorAssignmentRecord? {
+        ensureIndexes()
+        return collection.findOneAndUpdate(
+            and(eq("_id", id), eq("active", true)),
+            Updates.combine(
+                Updates.set("active", false),
+                Updates.set("revokedAt", Date.from(now)),
+                Updates.set("revokedBy", actorId),
+            ),
+            FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
+        )?.toRecord() ?: findById(id)
+    }
+
     private suspend fun ensureIndexes() {
         if (indexesReady) return
         indexMutex.withLock {
@@ -103,6 +146,13 @@ class MongoTutorAssignmentRepository(database: MongoDatabase) : TutorAssignmentR
                     Indexes.ascending("active"),
                 ),
                 IndexOptions().name("ix_tutor_assignment_scope"),
+            )
+            collection.createIndex(
+                Indexes.compoundIndex(
+                    Indexes.ascending("tutorUserId"), Indexes.ascending("academicGroupId"),
+                ),
+                IndexOptions().unique(true).partialFilterExpression(eq("active", true))
+                    .name("uq_tutor_assignment_active"),
             )
             indexesReady = true
         }
@@ -116,6 +166,8 @@ class MongoTutorAssignmentRepository(database: MongoDatabase) : TutorAssignmentR
             .append("active", active)
             .append("assignedBy", assignedBy)
             .append("assignedAt", Date.from(assignedAt))
+            .append("revokedAt", revokedAt?.let(Date::from))
+            .append("revokedBy", revokedBy)
 
     private fun Document.toRecord(): TutorAssignmentRecord =
         TutorAssignmentRecord(
@@ -125,5 +177,7 @@ class MongoTutorAssignmentRepository(database: MongoDatabase) : TutorAssignmentR
             active = getBoolean("active", true),
             assignedBy = getString("assignedBy"),
             assignedAt = getDate("assignedAt")?.toInstant() ?: Instant.EPOCH,
+            revokedAt = getDate("revokedAt")?.toInstant(),
+            revokedBy = getString("revokedBy"),
         )
 }

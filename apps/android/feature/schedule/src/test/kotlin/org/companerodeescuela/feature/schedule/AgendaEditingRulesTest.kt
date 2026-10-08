@@ -54,6 +54,29 @@ class AgendaEditingRulesTest {
         )
     }
 
+    @Test
+    fun `move does not wrap beyond midnight`() {
+        val moving = entry("A", "MONDAY", "20:00", "22:00")
+        assertEquals(
+            null,
+            AgendaEditingRules.proposeMove(moving, "MONDAY", "23:45", listOf(moving)),
+        )
+        assertEquals(
+            null,
+            AgendaEditingRules.shiftFromDrag(moving, 4000f, 24f),
+        )
+    }
+
+    @Test
+    fun `move detects second occurrence of same course`() {
+        val moving = entry("A", "MONDAY", "09:00", "10:00")
+        val later = entry("A", "MONDAY", "12:00", "13:00")
+        val proposal = AgendaEditingRules.proposeMove(
+            moving, "MONDAY", "12:00", listOf(moving, later),
+        )!!
+        assertEquals(1, proposal.conflicts.size)
+    }
+
     private fun entry(
         id: String,
         day: String,

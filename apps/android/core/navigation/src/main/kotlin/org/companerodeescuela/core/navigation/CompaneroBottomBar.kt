@@ -145,7 +145,8 @@ fun CompaneroBottomBar(
                                         TopLevelDestination.CoordinatorHome,
                                         TopLevelDestination.AdminHome -> Icons.Filled.Home
                                         TopLevelDestination.Schedule -> Icons.Filled.DateRange
-                                        TopLevelDestination.Classrooms -> Icons.Filled.School
+                                        TopLevelDestination.Classrooms,
+                                        TopLevelDestination.TutorGroups -> Icons.Filled.School
                                         TopLevelDestination.Channel,
                                         TopLevelDestination.TutorRequests -> Icons.Filled.Forum
                                         TopLevelDestination.Attendance -> Icons.Filled.QrCodeScanner

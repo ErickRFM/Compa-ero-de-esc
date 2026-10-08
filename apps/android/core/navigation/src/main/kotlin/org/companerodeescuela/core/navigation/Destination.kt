@@ -7,6 +7,7 @@ sealed class Destination(val route: String) {
     data object Home : Destination("home")
     data object TeacherHome : Destination("teacher-home")
     data object TutorHome : Destination("tutor-home")
+    data object TutorGroups : Destination("tutor-groups")
     data object TutorRequests : Destination("tutor-requests")
     data object CoordinatorHome : Destination("coordinator-home")
     data object AdminHome : Destination("admin-home")
@@ -36,6 +37,7 @@ enum class TopLevelDestination(
     Home(Destination.Home, "Hoy"),
     TeacherHome(Destination.TeacherHome, "Hoy"),
     TutorHome(Destination.TutorHome, "Tutoría"),
+    TutorGroups(Destination.TutorGroups, "Mi grupo"),
     TutorRequests(Destination.TutorRequests, "Solicitudes"),
     CoordinatorHome(Destination.CoordinatorHome, "Gestión"),
     AdminHome(Destination.AdminHome, "Administración"),

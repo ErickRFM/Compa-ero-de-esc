@@ -77,6 +77,7 @@ object RoleExperienceResolver {
                 startDestination = Destination.TutorHome,
                 topLevelDestinations = listOf(
                     TopLevelDestination.TutorHome,
+                    TopLevelDestination.TutorGroups,
                     TopLevelDestination.TutorRequests,
                 ),
             )

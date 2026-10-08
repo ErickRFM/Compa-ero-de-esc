@@ -593,18 +593,32 @@ private fun TeacherAttendance(
     onMark: (AttendanceRecordResponse, AttendanceDisposition) -> Unit,
     modifier: Modifier,
 ) {
+    Box(modifier = modifier.fillMaxSize()) {
+        V8CampusBackdrop(modifier = Modifier.matchParentSize())
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
     ) {
-        AttendanceHeader(
-            title = "Pase de lista",
-            subtitle = "Abre una sesión para una clase concreta. El QR se firma en el servidor y rota automáticamente.",
-            loading = state.loading,
-            onRefresh = onRefresh,
+        V8BrandHeader()
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Pase de lista",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+                color = V8RedColors.TextPrimary,
+            )
+            TextButton(onClick = onRefresh, enabled = !state.loading) {
+                Text("Actualizar", color = V8RedColors.Crimson)
+            }
+        }
+        Text(
+            "Genera el QR firmado para tus clases asignadas y revisa la asistencia en vivo.",
+            color = V8RedColors.TextSecondary,
+            style = MaterialTheme.typography.bodyMedium,
         )
 
         state.successMessage?.let {
@@ -644,6 +658,7 @@ private fun TeacherAttendance(
                 onOpen = onOpen,
             )
         }
+    }
     }
 }
 
@@ -760,10 +775,7 @@ private fun TeacherSessionCard(
     onRefreshRoster: () -> Unit,
     onRequestClose: () -> Unit,
 ) {
-    CompaneroHeroSurface(
-        modifier = Modifier.fillMaxWidth(),
-        containerColor = CompanionColors.graphite,
-    ) {
+    V8GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(CompaneroSpacing.md),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
@@ -772,7 +784,7 @@ private fun TeacherSessionCard(
             Text(
                 text = "PASE EN VIVO",
                 style = MaterialTheme.typography.labelLarge,
-                color = CompanionColors.crimsonContainer,
+                color = V8RedColors.Crimson,
             )
             Text(
                 text = occurrence?.subjectName ?: "Grupo ${session.groupName}",
@@ -796,18 +808,19 @@ private fun TeacherSessionCard(
                     Text(
                         text = "El QR cambia automáticamente. No contiene datos del alumno.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = CompanionColors.onDarkSurfaceVariant,
+                        color = V8RedColors.TextSecondary,
                     )
                 }
                 qrState == QrVisualState.UNAVAILABLE -> {
                     Text(
                         text = "QR temporalmente no disponible",
                         style = MaterialTheme.typography.titleMedium,
+                    color = V8RedColors.TextPrimary,
                     )
                     Text(
                         text = "Reconectando automáticamente. No uses un código anterior.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = CompanionColors.onDarkSurfaceVariant,
+                        color = V8RedColors.TextSecondary,
                     )
                 }
                 else -> {
@@ -894,7 +907,7 @@ private fun RosterRecord(
     onReview: (AttendanceRecordResponse, AttendanceStatus) -> Unit,
     onMark: (AttendanceRecordResponse, AttendanceDisposition) -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    V8GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(CompaneroSpacing.md),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
@@ -906,6 +919,7 @@ private fun RosterRecord(
                 Text(
                     text = record.studentId,
                     style = MaterialTheme.typography.titleMedium,
+                    color = V8RedColors.TextPrimary,
                 )
                 Text(
                     text = attendanceDisplayLabel(record),
@@ -917,13 +931,13 @@ private fun RosterRecord(
                 text = "Evidencia: " + attendanceStatusLabel(record.status) +
                     " · " + record.reasonCode.name.lowercase().replace('_', ' '),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = V8RedColors.TextSecondary,
             )
             record.reviewedBy?.let {
                 Text(
                     text = "Último ajuste docente: $it",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = V8RedColors.TextSecondary,
                 )
             }
 
@@ -979,6 +993,7 @@ private fun TeacherOccurrenceList(
     Text(
         text = if (todayOccurrences.isNotEmpty()) "Clases de hoy" else "Clases de la semana",
         style = MaterialTheme.typography.titleMedium,
+                    color = V8RedColors.TextPrimary,
     )
 
     if (visible.isEmpty()) {
@@ -990,7 +1005,7 @@ private fun TeacherOccurrenceList(
     }
 
     visible.forEach { occurrence ->
-        Card(modifier = Modifier.fillMaxWidth()) {
+        V8GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier.padding(CompaneroSpacing.md),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
@@ -998,12 +1013,13 @@ private fun TeacherOccurrenceList(
                 Text(
                     text = occurrence.subjectName,
                     style = MaterialTheme.typography.titleMedium,
+                    color = V8RedColors.TextPrimary,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     text = "${dateLabel(occurrence.date)} · ${occurrence.startsAt} – ${occurrence.endsAt}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = V8RedColors.TextSecondary,
                 )
                 Text(
                     text = listOfNotNull(occurrence.classroomName, occurrence.buildingName)

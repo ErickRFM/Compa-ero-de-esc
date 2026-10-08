@@ -57,11 +57,18 @@ object RoleExperienceResolver {
             AppExperience.TEACHER -> RoleExperienceConfig(
                 experience = selected,
                 startDestination = Destination.TeacherHome,
-                topLevelDestinations = listOf(
-                    TopLevelDestination.TeacherHome,
-                    TopLevelDestination.Classrooms,
-                    TopLevelDestination.Schedule,
-                ),
+                topLevelDestinations = if (UserRole.TEACHER in roles) {
+                    listOf(
+                        TopLevelDestination.TeacherHome,
+                        TopLevelDestination.Schedule,
+                        TopLevelDestination.Attendance,
+                        TopLevelDestination.Classrooms,
+                        TopLevelDestination.Channel,
+                    )
+                } else {
+                    // Pending approval is not a teacher permission grant.
+                    listOf(TopLevelDestination.TeacherHome)
+                },
             )
             AppExperience.COORDINATOR -> RoleExperienceConfig(
                 experience = selected,

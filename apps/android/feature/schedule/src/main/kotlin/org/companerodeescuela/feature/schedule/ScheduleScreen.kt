@@ -42,6 +42,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.ui.text.font.FontWeight
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
+import org.companerodeescuela.core.designsystem.v8.V8HeroTitle
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -98,7 +99,7 @@ fun ScheduleScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val importProcessor = remember(context) { ScheduleImportProcessor(context) }
-    var mode by remember { mutableStateOf(AgendaMode.DAY) }
+    var mode by remember { mutableStateOf(AgendaMode.WEEK) }
     var showEditor by remember { mutableStateOf(false) }
     var editingEntry by remember { mutableStateOf<ScheduleEntry?>(null) }
     var editingImportIndex by remember { mutableStateOf<Int?>(null) }
@@ -145,7 +146,7 @@ fun ScheduleScreen(
             .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
-        Text("Mi horario", style = MaterialTheme.typography.headlineLarge, color = V8RedColors.Crimson, fontWeight = FontWeight.Bold)
+        V8HeroTitle(leading = "Mi", accent = "horario")
         Text(
             text = "Organiza tu semana, consulta tus clases incluso sin conexión.",
             style = MaterialTheme.typography.bodyMedium,
@@ -153,9 +154,9 @@ fun ScheduleScreen(
         )
 
         ExpressiveSegmentedControl(
-            options = listOf("Día", "Semana"),
-            selectedIndex = if (mode == AgendaMode.DAY) 0 else 1,
-            onSelected = { mode = if (it == 0) AgendaMode.DAY else AgendaMode.WEEK },
+            options = listOf("Semana", "Día"),
+            selectedIndex = if (mode == AgendaMode.WEEK) 0 else 1,
+            onSelected = { mode = if (it == 0) AgendaMode.WEEK else AgendaMode.DAY },
         )
 
         if (state.fromCache) {

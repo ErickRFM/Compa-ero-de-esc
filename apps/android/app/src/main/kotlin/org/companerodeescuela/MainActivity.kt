@@ -180,11 +180,6 @@ class MainActivity : ComponentActivity() {
                                                         launchSingleTop = true
                                                     }
                                                 },
-                                                onOpenGrading = {
-                                                    navController.navigate(Destination.Grading.route) {
-                                                        launchSingleTop = true
-                                                    }
-                                                },
                                             )
                                         }
                                         composable(Destination.TeacherHome.route) {
@@ -201,6 +196,11 @@ class MainActivity : ComponentActivity() {
                                                 },
                                                 onOpenClassrooms = {
                                                     navController.navigate(Destination.Classrooms.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                                onOpenGrading = {
+                                                    navController.navigate(Destination.Grading.route) {
                                                         launchSingleTop = true
                                                     }
                                                 },

@@ -105,9 +105,8 @@ fun CompaneroBottomBar(
                         .offset(x = pillOffset)
                         .width(itemWidth)
                         .height(68.dp)
-                        .clip(MaterialTheme.shapes.extraLarge)
                         .then(if (glass) Modifier.v8GlassSurface(cornerRadius = 20.dp, emphasized = true, elevation = 0.dp)
-                            else Modifier.background(V8RedColors.DeepCrimson.copy(alpha = 0.30f))),
+                            else Modifier.clip(MaterialTheme.shapes.extraLarge).background(V8RedColors.DeepCrimson.copy(alpha = 0.30f))),
                 )
             }
 
@@ -170,7 +169,7 @@ fun CompaneroBottomBar(
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
                                 textAlign = TextAlign.Center,
                                 color = if (selected) V8RedColors.Crimson else V8RedColors.TextSecondary,
-                                maxLines = 2,
+                                maxLines = if (compactLabels) 1 else 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }

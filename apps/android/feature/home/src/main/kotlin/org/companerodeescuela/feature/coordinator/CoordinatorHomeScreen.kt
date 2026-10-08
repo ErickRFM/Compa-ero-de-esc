@@ -1,5 +1,6 @@
 package org.companerodeescuela.feature.coordinator
 
+import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,10 +39,12 @@ fun CoordinatorHomeScreen(
             .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
-        Text(
-            text = "Coordinación Académica",
-            style = MaterialTheme.typography.headlineSmall,
-        )
+        V8ScreenHeader {
+            Text(
+                text = "Coordinación Académica",
+                style = MaterialTheme.typography.headlineSmall,
+            )
+        }
         Text(
             text = "Supervisión de grupos, asistencia docente y seguimiento de incidencias.",
             style = MaterialTheme.typography.bodyMedium,

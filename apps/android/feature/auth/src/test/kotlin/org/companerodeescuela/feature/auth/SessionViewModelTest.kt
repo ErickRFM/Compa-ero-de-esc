@@ -6,6 +6,10 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.runBlocking
 import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -34,6 +38,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 @OptIn(ExperimentalCoroutinesApi::class)
 class SessionViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
+    private val viewModels = mutableListOf<SessionViewModel>()
 
     @BeforeEach
     fun setUp() {
@@ -41,7 +46,9 @@ class SessionViewModelTest {
     }
 
     @AfterEach
-    fun tearDown() {
+    fun tearDown() = runBlocking {
+        // Finish session observers before removing their Main dispatcher.
+        viewModels.forEach { it.viewModelScope.coroutineContext[Job]?.cancelAndJoin() }
         Dispatchers.resetMain()
     }
 
@@ -89,7 +96,7 @@ class SessionViewModelTest {
             repository = repository,
             tokenStore = tokenStore,
             clock = clock,
-        )
+        ).also(viewModels::add)
         val state = viewModel.state.first { !it.checking }
 
         assertTrue(
@@ -140,7 +147,7 @@ class SessionViewModelTest {
             repository = repository,
             tokenStore = tokenStore,
             clock = clock,
-        )
+        ).also(viewModels::add)
         val state = viewModel.state.first { !it.checking }
 
         assertTrue(!state.authenticated)

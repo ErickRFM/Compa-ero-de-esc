@@ -58,3 +58,4 @@ desktop.ini
 # Local Kotlin/Python QA caches
 .kotlin/
 __pycache__/
+dist/v8-audit/

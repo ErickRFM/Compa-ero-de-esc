@@ -1,0 +1,16 @@
+{
+  "environment": "LOCAL QA; not an institutional attendance validation",
+  "session": {
+    "id": "6b88f190-e5ad-45cc-8b5e-20ae007ddb21",
+    "occurrenceId": "14c63202d5e0bf9fe1a374c0b3364ff9",
+    "courseId": "C-9001",
+    "groupName": "101-A",
+    "occurrenceDate": "2026-10-08",
+    "scheduledStartsAt": "09:00",
+    "scheduledEndsAt": "10:30",
+    "openedBy": "T-0001",
+    "openedAtEpochSeconds": 1791478386,
+    "closesAtEpochSeconds": 1791479286,
+    "status": "open"
+  }
+}

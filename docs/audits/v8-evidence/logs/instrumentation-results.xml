@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuite name="org.companerodeescuela.LoginV8SmokeTest" tests="2" failures="0" errors="0" skipped="0" time="7.651" timestamp="2026-10-08T17:17:24" hostname="localhost">
+  <properties>
+    <property name="device" value="manecomb_ptt_api30(AVD) - 11" />
+    <property name="flavor" value="" />
+    <property name="project" value=":apps:android:app" />
+  </properties>
+  <testcase name="signedOutUserSeesInstitutionalLogin" classname="org.companerodeescuela.LoginV8SmokeTest" time="3.551" />
+  <testcase name="firstAccessOpensInstitutionalIdentityValidation" classname="org.companerodeescuela.LoginV8SmokeTest" time="2.798" />
+</testsuite>

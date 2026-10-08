@@ -1,0 +1,29 @@
+{
+  "environment": "LOCAL QA ONLY; existing development identities; in-memory data",
+  "channels": [
+    {
+      "id": "C-9002",
+      "subjectName": "Historia Contempor\u00e1nea",
+      "postId": "d9df924d-f331-4a4c-8262-44168d29d879"
+    },
+    {
+      "id": "C-9001",
+      "subjectName": "\u00c1lgebra Lineal",
+      "postId": "83d217c2-c924-4aac-94a2-eb384028ba68"
+    }
+  ],
+  "student_publish_status": 403,
+  "session": {
+    "id": "9d83074f-273b-4673-8a7e-cd595bbfa225",
+    "occurrenceId": "14c63202d5e0bf9fe1a374c0b3364ff9",
+    "courseId": "C-9001",
+    "groupName": "101-A",
+    "occurrenceDate": "2026-10-08",
+    "scheduledStartsAt": "09:00",
+    "scheduledEndsAt": "10:30",
+    "openedBy": "T-0001",
+    "openedAtEpochSeconds": 1791479216,
+    "closesAtEpochSeconds": 1791480116,
+    "status": "open"
+  }
+}

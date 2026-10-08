@@ -1,0 +1,41 @@
+--------- beginning of crash
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: FATAL EXCEPTION: main
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: PID: 16950
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: java.lang.IllegalStateException: UiAutomationService android.accessibilityservice.IAccessibilityServiceClient$Stub$Proxy@f0fab7calready registered!
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: 	at android.os.Parcel.createExceptionOrNull(Parcel.java:2381)
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: 	at android.os.Parcel.createException(Parcel.java:2357)
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: 	at android.os.Parcel.readException(Parcel.java:2340)
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: 	at android.os.Parcel.readException(Parcel.java:2282)
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: 	at android.view.accessibility.IAccessibilityManager$Stub$Proxy.registerUiTestAutomationService(IAccessibilityManager.java:739)
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: 	at android.app.UiAutomationConnection.registerUiTestAutomationServiceLocked(UiAutomationConnection.java:456)
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: 	at android.app.UiAutomationConnection.connect(UiAutomationConnection.java:106)
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: 	at android.app.UiAutomation.connect(UiAutomation.java:243)
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: 	at android.app.UiAutomation.connect(UiAutomation.java:219)
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: 	at com.android.uiautomator.core.UiAutomationShellWrapper.connect(UiAutomationShellWrapper.java:31)
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: 	at com.android.commands.uiautomator.DumpCommand.run(DumpCommand.java:78)
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: 	at com.android.commands.uiautomator.Launcher.main(Launcher.java:83)
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: 	at com.android.internal.os.RuntimeInit.nativeFinishInit(Native Method)
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: 	at com.android.internal.os.RuntimeInit.main(RuntimeInit.java:399)
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: Caused by: android.os.RemoteException: Remote stack trace:
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: 	at com.android.server.accessibility.UiAutomationManager.registerUiTestAutomationServiceLocked(UiAutomationManager.java:97)
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: 	at com.android.server.accessibility.AccessibilityManagerService.registerUiTestAutomationService(AccessibilityManagerService.java:868)
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: 	at android.view.accessibility.IAccessibilityManager$Stub.onTransact(IAccessibilityManager.java:371)
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: 	at android.os.Binder.execTransactInternal(Binder.java:1154)
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: 	at android.os.Binder.execTransact(Binder.java:1123)
+10-08 11:39:42.191 16950 16950 E AndroidRuntime: 
+10-08 11:39:42.199 16950 16950 E AndroidRuntime: Error reporting crash
+10-08 11:39:42.199 16950 16950 E AndroidRuntime: java.lang.RuntimeException: Bad file descriptor
+10-08 11:39:42.199 16950 16950 E AndroidRuntime: 	at android.os.BinderProxy.transactNative(Native Method)
+10-08 11:39:42.199 16950 16950 E AndroidRuntime: 	at android.os.BinderProxy.transact(BinderProxy.java:540)
+10-08 11:39:42.199 16950 16950 E AndroidRuntime: 	at android.os.IServiceManager$Stub$Proxy.checkService(IServiceManager.java:348)
+10-08 11:39:42.199 16950 16950 E AndroidRuntime: 	at android.os.ServiceManagerProxy.getService(ServiceManagerNative.java:63)
+10-08 11:39:42.199 16950 16950 E AndroidRuntime: 	at android.os.ServiceManager.rawGetService(ServiceManager.java:306)
+10-08 11:39:42.199 16950 16950 E AndroidRuntime: 	at android.os.ServiceManager.getService(ServiceManager.java:134)
+10-08 11:39:42.199 16950 16950 E AndroidRuntime: 	at android.app.ActivityManager$1.create(ActivityManager.java:4558)
+10-08 11:39:42.199 16950 16950 E AndroidRuntime: 	at android.app.ActivityManager$1.create(ActivityManager.java:4555)
+10-08 11:39:42.199 16950 16950 E AndroidRuntime: 	at android.util.Singleton.get(Singleton.java:43)
+10-08 11:39:42.199 16950 16950 E AndroidRuntime: 	at android.app.ActivityManager.getService(ActivityManager.java:4546)
+10-08 11:39:42.199 16950 16950 E AndroidRuntime: 	at com.android.internal.os.RuntimeInit$KillApplicationHandler.uncaughtException(RuntimeInit.java:158)
+10-08 11:39:42.199 16950 16950 E AndroidRuntime: 	at java.lang.ThreadGroup.uncaughtException(ThreadGroup.java:1073)
+10-08 11:39:42.199 16950 16950 E AndroidRuntime: 	at java.lang.ThreadGroup.uncaughtException(ThreadGroup.java:1068)
+10-08 11:39:42.199 16950 16950 E AndroidRuntime: 	at java.lang.Thread.dispatchUncaughtException(Thread.java:2203)

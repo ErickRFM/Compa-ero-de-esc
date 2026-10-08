@@ -1,0 +1,75 @@
+{
+  "method": "Crop phone frame; normalize both full screen images to 390x874. Overlay alpha=.5. RGB absolute difference amplified 3x. No similarity percentage; live data and system bars unmasked.",
+  "screens": {
+    "login": {
+      "capture": "after/login/initial-390.png",
+      "reference_crop": [
+        40,
+        30,
+        824,
+        1788
+      ],
+      "normalized": [
+        390,
+        874
+      ],
+      "status": "Compared manually; not a pass percentage"
+    },
+    "home": {
+      "capture": "after/home/final-390.png",
+      "reference_crop": [
+        40,
+        30,
+        824,
+        1788
+      ],
+      "normalized": [
+        390,
+        874
+      ],
+      "status": "Compared manually; not a pass percentage"
+    },
+    "schedule": {
+      "capture": "after/schedule/final-week-390.png",
+      "reference_crop": [
+        40,
+        30,
+        824,
+        1788
+      ],
+      "normalized": [
+        390,
+        874
+      ],
+      "status": "Compared manually; not a pass percentage"
+    },
+    "channel": {
+      "capture": "after/channel/final-notices-390.png",
+      "reference_crop": [
+        40,
+        30,
+        824,
+        1788
+      ],
+      "normalized": [
+        390,
+        874
+      ],
+      "status": "Compared manually; not a pass percentage"
+    },
+    "attendance": {
+      "capture": "after/attendance/final-no-session-390.png",
+      "reference_crop": [
+        40,
+        30,
+        824,
+        1788
+      ],
+      "normalized": [
+        390,
+        874
+      ],
+      "status": "Compared manually; not a pass percentage"
+    }
+  }
+}

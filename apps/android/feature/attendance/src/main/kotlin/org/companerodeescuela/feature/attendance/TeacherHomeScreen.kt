@@ -34,6 +34,7 @@ fun TeacherHomeScreen(
     onOpenAttendance: () -> Unit,
     onOpenChannel: () -> Unit,
     onOpenClassrooms: () -> Unit = {},
+    onOpenGrading: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: AttendanceViewModel = hiltViewModel(),
 ) {
@@ -63,6 +64,13 @@ fun TeacherHomeScreen(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text("Mis clases")
+        }
+
+        Button(
+            onClick = onOpenGrading,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Evaluación y calificaciones")
         }
 
         if (state.loading && state.mode == AttendanceMode.LOADING) {

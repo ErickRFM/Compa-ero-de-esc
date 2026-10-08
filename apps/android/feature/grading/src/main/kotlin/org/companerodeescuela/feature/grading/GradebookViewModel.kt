@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.math.round
 import org.companerodeescuela.core.common.result.Outcome
+import org.companerodeescuela.feature.classroom.ClassroomRepository
+import org.companerodeescuela.shared.contracts.ClassroomStatus
+import org.companerodeescuela.shared.contracts.ClassroomSummary
 import org.companerodeescuela.shared.contracts.GradeCategoryDraft
 import org.companerodeescuela.shared.contracts.GradeImportPreview
 import org.companerodeescuela.shared.contracts.GradeSyncRequest
@@ -18,6 +21,9 @@ import org.companerodeescuela.shared.contracts.GradeSyncRow
 
 data class GradebookUiState(
     val classroomId: String = "",
+    val assignedClassrooms: List<ClassroomSummary> = emptyList(),
+    val loadingClassrooms: Boolean = true,
+    val classroomLoadError: String? = null,
     val gradingPeriod: String = "",
     val categories: List<GradeCategoryDraft> = emptyList(),
     val preview: GradeImportPreview? = null,
@@ -33,11 +39,44 @@ data class GradebookUiState(
 @HiltViewModel
 class GradebookViewModel @Inject constructor(
     private val repository: GradebookRepository,
+    private val classroomRepository: ClassroomRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(GradebookUiState())
     val state: StateFlow<GradebookUiState> = _state.asStateFlow()
 
-    fun setClassroomId(value: String) = _state.update { it.copy(classroomId = value.trim().take(120)) }
+    init { refreshClassrooms() }
+
+    fun refreshClassrooms() {
+        viewModelScope.launch {
+            _state.update { it.copy(loadingClassrooms = true, classroomLoadError = null) }
+            when (val result = classroomRepository.classrooms()) {
+                is Outcome.Success -> _state.update { current ->
+                    val allowed = result.value.filter { it.canManage && it.status == ClassroomStatus.ACTIVE }
+                    val selection = current.classroomId.takeIf { id -> allowed.any { it.id == id } }
+                        ?: allowed.singleOrNull()?.id.orEmpty()
+                    current.copy(
+                        loadingClassrooms = false,
+                        assignedClassrooms = allowed,
+                        classroomId = selection,
+                        classroomLoadError = null,
+                    )
+                }
+                is Outcome.Failure -> _state.update {
+                    it.copy(
+                        loadingClassrooms = false,
+                        assignedClassrooms = emptyList(),
+                        classroomId = "",
+                        classroomLoadError = result.error.userMessage,
+                    )
+                }
+            }
+        }
+    }
+
+    fun setClassroomId(value: String) = _state.update { current ->
+        if (current.assignedClassrooms.any { it.id == value }) current.copy(classroomId = value)
+        else current
+    }
     fun setGradingPeriod(value: String) = _state.update { it.copy(gradingPeriod = value.take(80)) }
 
     fun addCategory() = _state.update {
@@ -87,8 +126,8 @@ class GradebookViewModel @Inject constructor(
             _state.update { it.copy(errorMessage = "La ponderación debe sumar exactamente 100%.") }
             return
         }
-        if (current.classroomId.isBlank() || current.gradingPeriod.isBlank()) {
-            _state.update { it.copy(errorMessage = "Selecciona/indica la clase y el periodo de evaluación.") }
+        if (current.assignedClassrooms.none { it.id == current.classroomId } || current.gradingPeriod.isBlank()) {
+            _state.update { it.copy(errorMessage = "Selecciona una clase asignada y un periodo de evaluación.") }
             return
         }
         val preview = current.preview ?: run {

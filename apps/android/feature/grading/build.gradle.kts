@@ -30,6 +30,7 @@ dependencies {
     implementation(project(":apps:android:core:network"))
     implementation(project(":apps:android:core:security"))
     implementation(project(":apps:android:core:designsystem"))
+    implementation(project(":apps:android:feature:classroom"))
 
     implementation(platform(libs.ktor.bom))
     implementation(libs.ktor.client.core)

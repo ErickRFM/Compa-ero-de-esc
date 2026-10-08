@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.shadow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
@@ -49,18 +50,29 @@ fun V8GlassCard(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = V8RedDimensions.CardCorner,
     contentPadding: PaddingValues = PaddingValues(16.dp),
+    highlighted: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val shape = RoundedCornerShape(cornerRadius)
     Box(
         modifier = modifier
+            .shadow(if (highlighted) 10.dp else 2.dp, shape, ambientColor = V8RedColors.DeepCrimson)
             .background(
+                // All stops are nearly opaque so the hero photograph cannot
+                // interfere with small text, QR codes or schedule entries.
                 brush = Brush.linearGradient(
-                    listOf(V8RedColors.Card, V8RedColors.Surface, V8RedColors.DeepCrimson.copy(alpha = 0.15f))
+                    if (highlighted) listOf(
+                        Color(0xFF38131A), Color(0xFF1B141A), Color(0xFF270E16)
+                    ) else listOf(
+                        Color(0xF71D1E23), Color(0xF813151A), Color(0xF51F1118)
+                    )
                 ),
                 shape = shape,
             )
-            .border(BorderStroke(1.dp, V8RedColors.Outline.copy(alpha = 0.72f)), shape)
+            .border(
+                BorderStroke(1.dp, if (highlighted) V8RedColors.Crimson else V8RedColors.Outline.copy(alpha = 0.72f)),
+                shape,
+            )
             .padding(contentPadding),
         content = content,
     )

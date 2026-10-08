@@ -76,7 +76,7 @@ fun ProfileScreen(
                 )
             }
 
-            V8GlassCard(modifier = Modifier.fillMaxWidth(), highlighted = true) {
+            V8GlassCard(modifier = Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,

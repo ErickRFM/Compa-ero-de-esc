@@ -21,6 +21,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.motion.CompaneroMotion
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
+import org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled
+import org.companerodeescuela.core.designsystem.v8.v8GlassSurface
 
 @Composable
 fun ExpressiveSegmentedControl(
@@ -32,13 +34,15 @@ fun ExpressiveSegmentedControl(
     require(options.isNotEmpty()) { "options must not be empty" }
     val safeIndex = selectedIndex.coerceIn(options.indices)
     val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
+    val glass = LocalV8GlassEnabled.current
 
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .height(48.dp)
             .clip(MaterialTheme.shapes.extraLarge)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .then(if (glass) Modifier.v8GlassSurface(cornerRadius = 26.dp, elevation = 0.dp)
+                else Modifier.background(MaterialTheme.colorScheme.surfaceVariant)),
     ) {
         val segmentWidth = maxWidth / options.size
         val targetOffset = segmentWidth * safeIndex
@@ -58,7 +62,8 @@ fun ExpressiveSegmentedControl(
                 .width(segmentWidth)
                 .height(48.dp)
                 .clip(MaterialTheme.shapes.extraLarge)
-                .background(MaterialTheme.colorScheme.primaryContainer),
+                .then(if (glass) Modifier.v8GlassSurface(cornerRadius = 26.dp, emphasized = true, elevation = 0.dp)
+                    else Modifier.background(MaterialTheme.colorScheme.primaryContainer)),
         )
 
         Row(modifier = Modifier.fillMaxWidth()) {

@@ -53,8 +53,7 @@ internal fun WeeklyAgendaGrid(entries: List<ScheduleEntry>, onEdit: (ScheduleEnt
         val gridWidth = widths.fold(rail) { total, width -> total + width }
         val widthsPx = widths.map { with(density) { it.toPx() } }
         Column(Modifier.horizontalScroll(rememberScrollState()).width(gridWidth)
-            .background(V8RedColors.Surface.copy(alpha = 0.6f), RoundedCornerShape(14.dp))
-            .border(1.dp, V8RedColors.Outline.copy(alpha = 0.7f), RoundedCornerShape(14.dp))) {
+            .v8GlassSurface(cornerRadius = 14.dp, elevation = 0.dp)) {
             Row(Modifier.padding(vertical = 12.dp)) {
                 Text("Hora", Modifier.width(rail).padding(start = 4.dp), fontSize = 10.sp, color = V8RedColors.TextSecondary)
                 days.forEachIndexed { i, day -> Text(dayLabelGrid(day), Modifier.width(widths[i]).padding(start = 4.dp), fontSize = 10.sp, fontWeight = FontWeight.Bold) }
@@ -96,9 +95,8 @@ internal fun WeeklyAgendaGrid(entries: List<ScheduleEntry>, onEdit: (ScheduleEnt
                             val accent = entry.source != ScheduleSource.INSTITUTIONAL || entry.subjectCode.hashCode() % 2 == 0
                             Box(Modifier.offset(x = laneWidth * placement.lane, y = hourHeight * ((placement.startMinute - startHour * 60) / 60f))
                                 .width(laneWidth).height(hourHeight * (placement.durationMinutes / 60f)).then(dragModifier).padding(2.dp)
-                                .background(if (accent) V8RedColors.DeepCrimson.copy(alpha = 0.42f) else V8RedColors.Surface.copy(alpha = 0.8f), RoundedCornerShape(8.dp))
-                                .border(1.dp, if (accent) V8RedColors.Crimson else V8RedColors.Outline, RoundedCornerShape(8.dp))
-                                .clip(RoundedCornerShape(8.dp)).clickable { detail = entry }.padding(5.dp)) {
+                                .v8GlassSurface(cornerRadius = 8.dp, emphasized = accent, elevation = 0.dp)
+                                .clickable { detail = entry }.padding(5.dp)) {
                                 Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                     Text(entry.subjectName, fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.Bold)
                                     if (placement.durationMinutes >= 60) {

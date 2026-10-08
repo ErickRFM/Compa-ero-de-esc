@@ -12,12 +12,16 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.MaterialTheme
 import org.companerodeescuela.core.designsystem.v8.V8ColorScheme
+import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
+import org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
@@ -58,8 +62,13 @@ fun CompaneroScaffold(
         outline = V8ColorScheme.onSurfaceVariant,
         outlineVariant = V8ColorScheme.onSurface.copy(alpha = 0.65f),
     ) else V8ColorScheme
-    MaterialTheme(colorScheme = if (startDestination == Destination.Home) studentColors else MaterialTheme.colorScheme) {
+    val studentGlass = startDestination == Destination.Home || startDestination == Destination.TeacherHome
+    MaterialTheme(colorScheme = if (studentGlass) studentColors else MaterialTheme.colorScheme) {
+    CompositionLocalProvider(LocalV8GlassEnabled provides studentGlass) {
+    Box(Modifier.fillMaxSize()) {
+    if (studentGlass) V8CampusBackdrop(Modifier.matchParentSize())
     Scaffold(
+        containerColor = if (studentGlass) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
             if (onSecondaryScreen) {
                 TopAppBar(
@@ -116,6 +125,8 @@ fun CompaneroScaffold(
                 }
             }
         }
+    }
+    }
     }
     }
 }

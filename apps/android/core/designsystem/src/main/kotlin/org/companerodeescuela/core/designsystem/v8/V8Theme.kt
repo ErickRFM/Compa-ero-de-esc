@@ -1,6 +1,10 @@
 package org.companerodeescuela.core.designsystem.v8
 
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.staticCompositionLocalOf
+
+/** Enables the V8 finish for shared surfaces inside the student scaffold. */
+val LocalV8GlassEnabled = staticCompositionLocalOf { false }
 
 /** Fixed Red Edition palette; font scale and motion preferences remain inherited. */
 val V8ColorScheme = darkColorScheme(

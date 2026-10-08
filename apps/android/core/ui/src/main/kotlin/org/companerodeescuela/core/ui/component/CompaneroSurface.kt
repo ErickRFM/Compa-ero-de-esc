@@ -11,6 +11,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
+import org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled
+import org.companerodeescuela.core.designsystem.v8.V8FrostedGlassPanel
 
 enum class CompaneroSurfaceRole {
     BASE,
@@ -26,6 +28,12 @@ fun CompaneroSurface(
     role: CompaneroSurfaceRole = CompaneroSurfaceRole.CARD,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    if (LocalV8GlassEnabled.current && role != CompaneroSurfaceRole.BASE) {
+        V8FrostedGlassPanel(modifier = modifier) {
+            Column(modifier = Modifier.fillMaxWidth(), content = content)
+        }
+        return
+    }
     val color = when (role) {
         CompaneroSurfaceRole.BASE -> MaterialTheme.colorScheme.surface
         CompaneroSurfaceRole.INSET -> MaterialTheme.colorScheme.surfaceContainerLow
@@ -69,6 +77,12 @@ fun CompaneroHeroSurface(
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    if (LocalV8GlassEnabled.current) {
+        V8FrostedGlassPanel(modifier = modifier, cornerRadius = 26.dp) {
+            Column(modifier = Modifier.fillMaxWidth(), content = content)
+        }
+        return
+    }
     Surface(
         modifier = modifier,
         shape = MaterialTheme.shapes.extraLarge,

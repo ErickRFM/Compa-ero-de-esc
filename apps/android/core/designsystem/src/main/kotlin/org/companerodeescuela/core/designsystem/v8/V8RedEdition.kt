@@ -1,19 +1,14 @@
 package org.companerodeescuela.core.designsystem.v8
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.material3.MaterialTheme
-import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -55,18 +50,11 @@ fun V8GlassCard(
     emphasized: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val shape = RoundedCornerShape(cornerRadius)
-    val outline = if (LocalCompaneroHighContrast.current) MaterialTheme.colorScheme.onSurface else V8RedColors.Outline.copy(alpha = 0.72f)
-    Box(
-        modifier = modifier
-            .background(
-                brush = Brush.linearGradient(
-                    listOf(V8RedColors.DeepCrimson.copy(alpha = 0.24f), V8RedColors.Surface.copy(alpha = 0.72f), V8RedColors.DeepCrimson.copy(alpha = 0.13f))
-                ),
-                shape = shape,
-            )
-            .border(BorderStroke(if (LocalCompaneroHighContrast.current) 2.dp else 1.dp, if (emphasized) V8RedColors.Crimson else outline), shape)
-            .padding(contentPadding),
+    V8FrostedGlassPanel(
+        modifier = modifier,
+        cornerRadius = cornerRadius,
+        contentPadding = contentPadding,
+        emphasized = emphasized,
         content = content,
     )
 }

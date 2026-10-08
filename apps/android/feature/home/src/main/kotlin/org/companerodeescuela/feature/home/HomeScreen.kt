@@ -28,7 +28,6 @@ import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8ClassSummary
 import org.companerodeescuela.core.designsystem.v8.V8DailyClassRow
-import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
 import org.companerodeescuela.core.designsystem.v8.V8DashboardStat
 import androidx.compose.material3.TextButton
@@ -70,7 +69,6 @@ fun HomeScreen(
     val overview = state.overview
     val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        V8CampusBackdrop(modifier = Modifier.matchParentSize())
         val splitLayout = maxWidth >= CompaneroWindowBreakpoints.medium
         Column(
             modifier = Modifier

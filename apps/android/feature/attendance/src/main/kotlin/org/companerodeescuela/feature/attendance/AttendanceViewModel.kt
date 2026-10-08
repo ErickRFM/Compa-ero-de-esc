@@ -6,6 +6,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDate
 import javax.inject.Inject
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +33,7 @@ import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
 import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
 import org.companerodeescuela.shared.contracts.SchoolPresenceResponse
 import org.companerodeescuela.shared.contracts.UserRole
+import org.companerodeescuela.shared.contracts.TeacherClassContext
 
 enum class AttendanceMode {
     LOADING,
@@ -58,6 +62,8 @@ data class AttendanceUiState(
     val userId: String? = null,
     val activeSessions: List<AttendanceSessionResponse> = emptyList(),
     val occurrences: List<ClassOccurrenceContract> = emptyList(),
+    val occurrencesLoaded: Boolean = false,
+    val sessionsLoaded: Boolean = false,
     val teacherSession: AttendanceSessionResponse? = null,
     val qr: AttendanceQrResponse? = null,
     val qrVisualState: QrVisualState = QrVisualState.IDLE,
@@ -88,6 +94,26 @@ class AttendanceViewModel @Inject constructor(
     private var qrRotationJob: Job? = null
     private var rosterPollingJob: Job? = null
     private var studentPollingJob: Job? = null
+    private var requestedClassroom: TeacherClassContext? = null
+    private var modeGeneration = 0L
+    private var teacherRequests = SupervisorJob(viewModelScope.coroutineContext[Job])
+
+    private fun launchTeacherRequest(block: suspend CoroutineScope.() -> Unit): Job =
+        CoroutineScope(viewModelScope.coroutineContext + teacherRequests).launch(block = block)
+
+    fun setClassroomContext(selection: TeacherClassContext?) {
+        modeGeneration++
+        studentPollingJob?.cancel()
+        teacherRequests.cancel()
+        teacherRequests = SupervisorJob(viewModelScope.coroutineContext[Job])
+        requestedClassroom = selection
+        qrRotationJob?.cancel()
+        rosterPollingJob?.cancel()
+        _state.update { it.copy(teacherSession = null, roster = null, campusRoster = null, qr = null,
+            activeSessions = emptyList(), occurrences = emptyList(), occurrencesLoaded = false,
+            sessionsLoaded = false, actionInProgress = false, campusRosterError = null,
+            qrVisualState = QrVisualState.IDLE, successMessage = null, errorMessage = null) }
+    }
 
     init {
         bootstrap()
@@ -95,9 +121,13 @@ class AttendanceViewModel @Inject constructor(
 
     fun selectMode(requestedMode: AttendanceMode) {
         if (requestedMode !in setOf(AttendanceMode.STUDENT, AttendanceMode.TEACHER)) return
+        val generation = ++modeGeneration
+        studentPollingJob?.cancel()
 
         viewModelScope.launch {
-            when (val claimsResult = repository.localSessionClaims()) {
+            val claimsResult = repository.localSessionClaims()
+            if (generation != modeGeneration) return@launch
+            when (claimsResult) {
                 is Outcome.Success -> {
                     val claims = claimsResult.value
                     val allowed = when (requestedMode) {
@@ -308,7 +338,9 @@ class AttendanceViewModel @Inject constructor(
     }
 
     fun openAttendance(occurrence: ClassOccurrenceContract) {
-        viewModelScope.launch {
+        if (_state.value.actionInProgress || _state.value.mode != AttendanceMode.TEACHER ||
+            _state.value.occurrences.none { it.id == occurrence.id }) return
+        launchTeacherRequest {
             _state.update {
                 it.copy(
                     actionInProgress = true,
@@ -320,7 +352,9 @@ class AttendanceViewModel @Inject constructor(
                 occurrenceId = occurrence.id,
                 occurrenceDate = occurrence.date,
             )
-            when (val result = repository.openSession(request)) {
+            val result = repository.openSession(request)
+            ensureActive()
+            when (result) {
                 is Outcome.Success -> {
                     _state.update {
                         it.copy(
@@ -369,8 +403,10 @@ class AttendanceViewModel @Inject constructor(
     }
 
     private fun refreshCampusRoster(occurrenceId: String, date: String) {
-        viewModelScope.launch {
-            when (val result = repository.campusRoster(occurrenceId, date)) {
+        launchTeacherRequest {
+            val result = repository.campusRoster(occurrenceId, date)
+            ensureActive()
+            when (result) {
                 is Outcome.Success -> _state.update {
                     it.copy(campusRoster = result.value, campusRosterError = null)
                 }
@@ -383,9 +419,11 @@ class AttendanceViewModel @Inject constructor(
 
     fun closeTeacherSession() {
         val sessionId = _state.value.teacherSession?.id ?: return
-        viewModelScope.launch {
+        launchTeacherRequest {
             _state.update { it.copy(actionInProgress = true, errorMessage = null) }
-            when (val result = repository.closeSession(sessionId)) {
+            val result = repository.closeSession(sessionId)
+            ensureActive()
+            when (result) {
                 is Outcome.Success -> {
                     qrRotationJob?.cancel()
                     rosterPollingJob?.cancel()
@@ -415,8 +453,10 @@ class AttendanceViewModel @Inject constructor(
 
     fun refreshRoster() {
         val sessionId = _state.value.teacherSession?.id ?: return
-        viewModelScope.launch {
-            when (val result = repository.roster(sessionId)) {
+        launchTeacherRequest {
+            val result = repository.roster(sessionId)
+            ensureActive()
+            when (result) {
                 is Outcome.Success -> _state.update { it.copy(roster = result.value) }
                 is Outcome.Failure -> _state.update { it.copy(errorMessage = result.error.userMessage) }
             }
@@ -426,18 +466,22 @@ class AttendanceViewModel @Inject constructor(
     fun markRecord(
         record: AttendanceRecordResponse,
         disposition: AttendanceDisposition,
+        note: String,
     ) {
-        viewModelScope.launch {
+        if (_state.value.actionInProgress || note.trim().length !in 3..500 ||
+            _state.value.roster?.records?.none { it.id == record.id } != false) return
+        launchTeacherRequest {
             _state.update { it.copy(actionInProgress = true, errorMessage = null) }
-            when (
-                val result = repository.review(
+            val result = repository.review(
                     recordId = record.id,
                     request = ReviewAttendanceRequest(
                         status = record.status,
                         disposition = disposition,
+                        note = note,
                     ),
                 )
-            ) {
+            ensureActive()
+            when (result) {
                 is Outcome.Success -> {
                     _state.update {
                         val current = it.roster
@@ -469,15 +513,18 @@ class AttendanceViewModel @Inject constructor(
     fun reviewRecord(
         record: AttendanceRecordResponse,
         status: AttendanceStatus,
+        note: String,
     ) {
-        viewModelScope.launch {
+        if (_state.value.actionInProgress || note.trim().length !in 3..500 ||
+            _state.value.roster?.records?.none { it.id == record.id } != false) return
+        launchTeacherRequest {
             _state.update { it.copy(actionInProgress = true, errorMessage = null) }
-            when (
-                val result = repository.review(
+            val result = repository.review(
                     recordId = record.id,
-                    request = ReviewAttendanceRequest(status = status),
+                    request = ReviewAttendanceRequest(status = status, note = note),
                 )
-            ) {
+            ensureActive()
+            when (result) {
                 is Outcome.Success -> {
                     _state.update {
                         val current = it.roster
@@ -503,9 +550,13 @@ class AttendanceViewModel @Inject constructor(
     }
 
     private fun bootstrap() {
+        val generation = modeGeneration
         viewModelScope.launch {
+            if (generation != modeGeneration) return@launch
             _state.update { it.copy(mode = AttendanceMode.LOADING, loading = true) }
-            when (val claimsResult = repository.localSessionClaims()) {
+            val claimsResult = repository.localSessionClaims()
+            if (generation != modeGeneration) return@launch
+            when (claimsResult) {
                 is Outcome.Success -> {
                     val claims = claimsResult.value
                     val mode = when {
@@ -552,11 +603,15 @@ class AttendanceViewModel @Inject constructor(
     }
 
     private fun refreshStudent() {
+        val generation = modeGeneration
         viewModelScope.launch {
+            if (_state.value.mode != AttendanceMode.STUDENT || generation != modeGeneration) return@launch
             _state.update { it.copy(loading = true, errorMessage = null) }
             val week = repository.academicWeek(LocalDate.now().toString())
+            if (_state.value.mode != AttendanceMode.STUDENT || generation != modeGeneration) return@launch
             val sessions = repository.activeStudentSessions()
             val presence = repository.schoolPresence()
+            if (_state.value.mode != AttendanceMode.STUDENT || generation != modeGeneration) return@launch
             val presenceReceivedRealtime = android.os.SystemClock.elapsedRealtime()
             val network = repository.currentSchoolNetwork()
 
@@ -567,6 +622,7 @@ class AttendanceViewModel @Inject constructor(
                         ?.let { record -> session.id to record }
                 }.toMap()
             } else emptyMap()
+            if (_state.value.mode != AttendanceMode.STUDENT || generation != modeGeneration) return@launch
             when (sessions) {
                 is Outcome.Success -> _state.update {
                     it.copy(
@@ -591,24 +647,34 @@ class AttendanceViewModel @Inject constructor(
     }
 
     private fun refreshTeacher() {
-        viewModelScope.launch {
+        launchTeacherRequest {
             _state.update { it.copy(loading = true, errorMessage = null) }
             val week = repository.academicWeek(LocalDate.now().toString())
             val active = repository.activeTeacherSessions()
+            ensureActive()
 
-            val occurrences = week.valueOrNull()?.occurrences.orEmpty()
-            val activeSessions = active.valueOrNull().orEmpty()
+            val context = requestedClassroom
+            val occurrences = week.valueOrNull()?.occurrences.orEmpty().filter {
+                context == null || context.matches(it.subjectName, it.groupName)
+            }
+            val activeSessions = active.valueOrNull().orEmpty().filter {
+                it.closedAtEpochSeconds == null && it.closesAtEpochSeconds > System.currentTimeMillis() / 1000 &&
+                    (context == null || occurrences.any { occurrence -> occurrence.id == it.occurrenceId })
+            }
             val activeSession = activeSessions.firstOrNull()
 
             _state.update {
                 it.copy(
                     loading = false,
                     occurrences = occurrences,
+                    occurrencesLoaded = week is Outcome.Success,
+                    sessionsLoaded = active is Outcome.Success,
                     activeSessions = activeSessions,
                     teacherSession = activeSession,
                     errorMessage = when {
                         week is Outcome.Failure -> week.error.userMessage
                         active is Outcome.Failure -> active.error.userMessage
+                        context != null && occurrences.isEmpty() -> "No hay horario autorizado para ${context.subjectName} · ${context.groupName.orEmpty()}."
                         else -> null
                     },
                 )
@@ -617,6 +683,10 @@ class AttendanceViewModel @Inject constructor(
             if (activeSession != null) {
                 startQrRotation(activeSession.id)
                 startRosterPolling(activeSession.id)
+            } else {
+                qrRotationJob?.cancel()
+                rosterPollingJob?.cancel()
+                _state.update { it.copy(qr = null, roster = null, qrVisualState = QrVisualState.IDLE) }
             }
             val campusOccurrence = activeSession?.let { session ->
                 occurrences.firstOrNull { it.id == session.occurrenceId }
@@ -658,7 +728,7 @@ class AttendanceViewModel @Inject constructor(
 
     private fun startQrRotation(sessionId: String) {
         qrRotationJob?.cancel()
-        qrRotationJob = viewModelScope.launch {
+        qrRotationJob = launchTeacherRequest {
             while (_state.value.teacherSession?.id == sessionId) {
                 _state.update {
                     it.copy(
@@ -669,7 +739,9 @@ class AttendanceViewModel @Inject constructor(
                         },
                     )
                 }
-                when (val result = repository.issueQr(sessionId)) {
+                val result = repository.issueQr(sessionId)
+                ensureActive()
+                when (result) {
                     is Outcome.Success -> {
                         _state.update {
                             it.copy(
@@ -697,15 +769,19 @@ class AttendanceViewModel @Inject constructor(
 
     private fun startRosterPolling(sessionId: String) {
         rosterPollingJob?.cancel()
-        rosterPollingJob = viewModelScope.launch {
+        rosterPollingJob = launchTeacherRequest {
             while (_state.value.teacherSession?.id == sessionId) {
-                when (val result = repository.roster(sessionId)) {
+                val result = repository.roster(sessionId)
+                ensureActive()
+                when (result) {
                     is Outcome.Success -> _state.update { it.copy(roster = result.value) }
                     is Outcome.Failure -> Unit
                 }
                 val occurrence = _state.value.occurrences.firstOrNull { it.id == _state.value.teacherSession?.occurrenceId }
                 if (occurrence != null) {
-                    when (val campus = repository.campusRoster(occurrence.id, occurrence.date)) {
+                    val campus = repository.campusRoster(occurrence.id, occurrence.date)
+                    ensureActive()
+                    when (campus) {
                         is Outcome.Success -> _state.update {
                             it.copy(campusRoster = campus.value, campusRosterError = null)
                         }
@@ -718,6 +794,7 @@ class AttendanceViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        teacherRequests.cancel()
         qrRotationJob?.cancel()
         rosterPollingJob?.cancel()
         studentPollingJob?.cancel()

@@ -88,15 +88,24 @@ object SpreadsheetReader {
         val nameIndex = normalized.indexOfFirst { it in nameAliases }
         val gradeIndexes = headers.indices.filter { it != idIndex && it != nameIndex && headers[it].isNotBlank() }
         val warnings = mutableListOf<String>()
+        val ids = mutableSetOf<String>()
         val rows = body.mapIndexedNotNull { rowIndex, row ->
             val studentId = row.getOrNull(idIndex).orEmpty().trim()
-            if (studentId.isBlank()) return@mapIndexedNotNull null
+            if (studentId.isBlank()) {
+                warnings += "Fila ${rowIndex + 2}: falta matrícula."
+                return@mapIndexedNotNull null
+            }
+            if (!ids.add(studentId)) warnings += "Fila ${rowIndex + 2}: matrícula duplicada ($studentId)."
             val values = linkedMapOf<String, Double?>()
             gradeIndexes.forEach { column ->
                 val raw = row.getOrNull(column)?.trim().orEmpty()
                 val number = raw.replace(',', '.').toDoubleOrNull()
-                if (raw.isNotBlank() && number == null) {
+                if (raw.isBlank()) {
+                    warnings += "Fila ${rowIndex + 2}: ${headers[column]} tiene una celda vacía."
+                } else if (number == null) {
                     warnings += "Fila ${rowIndex + 2}: ${headers[column]} no es numérica."
+                } else if (!number.isFinite() || number !in 0.0..10.0) {
+                    warnings += "Fila ${rowIndex + 2}: ${headers[column]} debe estar entre 0 y 10."
                 }
                 values[headers[column]] = number
             }

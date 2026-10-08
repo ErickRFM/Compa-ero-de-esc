@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.PaddingValues
@@ -39,6 +40,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
+import org.companerodeescuela.shared.contracts.TeacherClassContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
@@ -56,8 +60,10 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
 import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.v8GlassSurface
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
+import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ChannelPost
@@ -67,21 +73,27 @@ import org.companerodeescuela.shared.contracts.ClassChannelSummary
 
 @Composable
 fun ChannelScreen(
+    requestedClassroom: TeacherClassContext? = null,
     viewModel: ChannelViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(requestedClassroom) { requestedClassroom?.let(viewModel::requestClassroom) }
     val selected = state.channels.firstOrNull { it.id == state.selectedChannelId }
     var selectedTab by remember(state.selectedChannelId) { mutableIntStateOf(0) }
+    var composerOpen by remember(state.selectedChannelId) { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
-        V8CampusBackdrop(Modifier.matchParentSize())
+        if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current) {
+            V8CampusBackdrop(Modifier.matchParentSize())
+        }
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(horizontal = CompaneroSpacing.page),
+            modifier = Modifier.align(Alignment.TopCenter).widthIn(max = CompaneroSize.homeContentMaxWidth)
+                .fillMaxSize().padding(horizontal = CompaneroSpacing.page),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = CompaneroSpacing.sm),
         ) {
             item { V8BrandHeader() }
-            item { ChannelHeader(state.loading, viewModel::refreshChannels) }
+            item { ChannelHeader(state.loading || state.actionInProgress, viewModel::refreshChannels) }
             if (state.channels.isNotEmpty()) item {
                 ChannelSelector(state.channels, state.selectedChannelId, viewModel::selectChannel)
             }
@@ -99,7 +111,23 @@ fun ChannelScreen(
                 )
             } else {
                 item { ChannelIdentity(selected) }
-                item {
+                if (selected.canPublish) item {
+                    V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Comunica con tu grupo", color = V8RedColors.TextPrimary, style = MaterialTheme.typography.titleLarge)
+                            Text("Publica avisos y materiales. Los estudiantes responden con opciones predeterminadas.", color = V8RedColors.TextSecondary)
+                            Button(onClick = { composerOpen = !composerOpen }, modifier = Modifier.fillMaxWidth()) {
+                                Text(if (composerOpen) "Cerrar redacción" else "Redactar aviso")
+                            }
+                            if (composerOpen) TeacherComposer(
+                                state.draftBody, state.draftResourceLabel, state.draftResourceUrl, state.actionInProgress,
+                                viewModel::updateDraftBody, viewModel::updateDraftResourceLabel,
+                                viewModel::updateDraftResourceUrl, viewModel::publish,
+                            )
+                        }
+                    }
+                }
+                if (!selected.canPublish) item {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         listOf("Avisos", "Chat").forEachIndexed { index, label ->
                             V8ChannelTab(label, selectedTab == index, { selectedTab = index }, Modifier.weight(1f))
@@ -117,11 +145,7 @@ fun ChannelScreen(
                     ChannelPostCard(post, !selected.canPublish && selectedTab == 1, state.actionInProgress, viewModel::acknowledge)
                 }
                 item {
-                    if (selected.canPublish) TeacherComposer(
-                        state.draftBody, state.draftResourceLabel, state.draftResourceUrl, state.actionInProgress,
-                        viewModel::updateDraftBody, viewModel::updateDraftResourceLabel,
-                        viewModel::updateDraftResourceUrl, viewModel::publish,
-                    ) else StudentChannelFooter()
+                    if (!selected.canPublish) StudentChannelFooter()
                 }
             }
         }
@@ -140,8 +164,8 @@ private fun ChannelHeader(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "Canal de clase",
-                style = MaterialTheme.typography.titleMedium,
+                text = "Canal",
+                style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.SemiBold,
                 color = V8RedColors.TextPrimary,
             )
@@ -212,20 +236,10 @@ private fun V8ChannelTab(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(16.dp)
-    val activeColor = if (selected) V8RedColors.Crimson else V8RedColors.Outline
     Box(
         modifier = modifier
             .heightIn(min = 52.dp)
-            .clip(shape)
-            .background(
-                if (selected) Color(0xFF341118) else V8RedColors.Surface.copy(alpha = 0.96f),
-            )
-            .border(
-                width = if (selected) 1.5.dp else 1.dp,
-                color = activeColor.copy(alpha = if (selected) 1f else 0.75f),
-                shape = shape,
-            )
+            .v8GlassSurface(cornerRadius = 16.dp, emphasized = selected, elevation = 0.dp)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {

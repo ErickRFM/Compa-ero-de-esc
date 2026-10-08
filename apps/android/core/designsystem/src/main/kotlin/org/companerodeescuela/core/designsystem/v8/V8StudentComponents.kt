@@ -43,6 +43,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 
 /** Common V8 building blocks. Every control receives real state/events from its feature. */
 @Composable
@@ -61,6 +62,7 @@ fun V8AcademicField(
 ) {
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
     val shape = RoundedCornerShape(V8RedDimensions.FieldCorner)
+    val highContrast = LocalCompaneroHighContrast.current
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
@@ -87,10 +89,12 @@ fun V8AcademicField(
         colors = OutlinedTextFieldDefaults.colors(
             focusedTextColor = V8RedColors.TextPrimary,
             unfocusedTextColor = V8RedColors.TextPrimary,
-            focusedContainerColor = V8RedColors.Surface.copy(alpha = 0.70f),
-            unfocusedContainerColor = V8RedColors.Surface.copy(alpha = 0.55f),
+            focusedContainerColor = V8RedColors.Surface.copy(alpha = if (highContrast) 1f else 0.96f),
+            unfocusedContainerColor = V8RedColors.Surface.copy(alpha = if (highContrast) 1f else 0.92f),
+            disabledContainerColor = V8RedColors.Surface,
+            errorContainerColor = V8RedColors.Surface,
             focusedBorderColor = V8RedColors.Crimson,
-            unfocusedBorderColor = V8RedColors.Outline,
+            unfocusedBorderColor = if (highContrast) V8RedColors.TextPrimary else V8RedColors.TextSecondary.copy(alpha = 0.50f),
             focusedLabelColor = V8RedColors.TextSecondary,
             unfocusedLabelColor = V8RedColors.TextSecondary,
             cursorColor = V8RedColors.Crimson,

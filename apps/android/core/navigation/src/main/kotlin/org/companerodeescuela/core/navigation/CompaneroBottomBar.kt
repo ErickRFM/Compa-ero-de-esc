@@ -40,6 +40,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.CircleShape
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
+import org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled
+import org.companerodeescuela.core.designsystem.v8.v8GlassSurface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
@@ -67,16 +69,17 @@ fun CompaneroBottomBar(
     }
     val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
     val compactLabels = LocalDensity.current.fontScale > 1.3f
+    val glass = LocalV8GlassEnabled.current
 
     Surface(
         modifier = modifier.navigationBarsPadding().padding(
             horizontal = CompaneroSpacing.sm,
             vertical = CompaneroSpacing.xxs,
-        ),
+        ).then(if (glass) Modifier.v8GlassSurface(cornerRadius = 28.dp) else Modifier),
         shape = MaterialTheme.shapes.extraLarge,
-        color = V8RedColors.Background,
-        tonalElevation = CompaneroElevation.raised,
-        shadowElevation = CompaneroElevation.immersive,
+        color = if (glass) Color.Transparent else V8RedColors.Background,
+        tonalElevation = if (glass) 0.dp else CompaneroElevation.raised,
+        shadowElevation = if (glass) 0.dp else CompaneroElevation.immersive,
     ) {
         BoxWithConstraints(
             modifier = Modifier
@@ -103,7 +106,8 @@ fun CompaneroBottomBar(
                         .width(itemWidth)
                         .height(68.dp)
                         .clip(MaterialTheme.shapes.extraLarge)
-                        .background(V8RedColors.DeepCrimson.copy(alpha = 0.30f)),
+                        .then(if (glass) Modifier.v8GlassSurface(cornerRadius = 20.dp, emphasized = true, elevation = 0.dp)
+                            else Modifier.background(V8RedColors.DeepCrimson.copy(alpha = 0.30f))),
                 )
             }
 

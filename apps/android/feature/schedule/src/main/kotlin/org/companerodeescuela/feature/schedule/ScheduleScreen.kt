@@ -145,7 +145,9 @@ fun ScheduleScreen(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        V8CampusBackdrop(modifier = Modifier.matchParentSize())
+        if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current) {
+            V8CampusBackdrop(modifier = Modifier.matchParentSize())
+        }
     Column(
         modifier = Modifier
             .fillMaxSize()

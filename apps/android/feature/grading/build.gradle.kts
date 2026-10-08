@@ -49,6 +49,8 @@ dependencies {
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlin.test)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.ktor.client.mock)
 }
 
 tasks.withType<Test>().configureEach { useJUnitPlatform() }

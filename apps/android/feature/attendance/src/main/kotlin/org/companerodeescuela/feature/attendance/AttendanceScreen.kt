@@ -19,6 +19,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.material3.FilterChip
+import org.companerodeescuela.shared.contracts.TeacherClassContext
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Image
@@ -93,11 +98,13 @@ import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
 fun AttendanceScreen(
     modifier: Modifier = Modifier,
     requestedMode: AttendanceMode? = null,
+    requestedClassroom: TeacherClassContext? = null,
     viewModel: AttendanceViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    LaunchedEffect(requestedMode) {
+    LaunchedEffect(requestedMode, requestedClassroom) {
+        viewModel.setClassroomContext(requestedClassroom)
         requestedMode?.let(viewModel::selectMode)
     }
     val context = LocalContext.current
@@ -195,7 +202,9 @@ private fun StudentAttendance(
     } ?: false
 
     Box(modifier = modifier.fillMaxSize()) {
-        V8CampusBackdrop(modifier = Modifier.matchParentSize())
+        if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current) {
+            V8CampusBackdrop(modifier = Modifier.matchParentSize())
+        }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -651,219 +660,104 @@ private fun TeacherAttendance(
     onOpen: (ClassOccurrenceContract) -> Unit,
     onClose: () -> Unit,
     onRefreshRoster: () -> Unit,
-    onReview: (AttendanceRecordResponse, AttendanceStatus) -> Unit,
-    onMark: (AttendanceRecordResponse, AttendanceDisposition) -> Unit,
+    onReview: (AttendanceRecordResponse, AttendanceStatus, String) -> Unit,
+    onMark: (AttendanceRecordResponse, AttendanceDisposition, String) -> Unit,
     modifier: Modifier,
 ) {
+    var filter by remember(state.teacherSession?.id) { mutableStateOf("Recibidos") }
+    var confirmClose by remember { mutableStateOf(false) }
+    val active = state.teacherSession
+    val campus = state.campusRoster
+    val records = state.roster?.takeIf { it.session.id == active?.id }?.records.orEmpty()
+    val review = records.filter { it.status == AttendanceStatus.REVIEW_REQUIRED }
     Box(modifier = modifier.fillMaxSize()) {
-        V8CampusBackdrop(modifier = Modifier.matchParentSize())
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md),
-        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
-    ) {
-        V8BrandHeader()
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "Pase de lista",
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = V8RedColors.TextPrimary,
-            )
-            TextButton(onClick = onRefresh, enabled = !state.loading) {
-                Text("Actualizar", color = V8RedColors.Crimson)
+        V8CampusBackdrop(Modifier.matchParentSize())
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().widthIn(max = CompaneroSize.homeContentMaxWidth)
+                .align(Alignment.TopCenter),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(CompaneroSpacing.page),
+            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+        ) {
+            item { V8BrandHeader() }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Asistencia", style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold, color = V8RedColors.TextPrimary)
+                    Text("Pase de lista · " + (active?.groupName ?: campus?.groupName ?: "Tus grupos"), color = V8RedColors.TextSecondary)
+                }
             }
-        }
-        Text(
-            "Abre el pase para tu grupo. Los alumnos pueden confirmar desde la app con entrada y Wi-Fi escolar; el QR sigue disponible.",
-            color = V8RedColors.TextSecondary,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-
-        state.successMessage?.let {
-            StatusNotice(
-                title = "Listo",
-                message = it,
-                tone = NoticeTone.SUCCESS,
-            )
-        }
-        state.errorMessage?.let {
-            StatusNotice(
-                title = "No pudimos completar la acción",
-                message = it,
-                tone = NoticeTone.ERROR,
-            )
-        }
-
-        val campus = state.campusRoster
-        if (campus != null) {
-            V8GlassCard(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(CompaneroSpacing.md),
-                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
-                ) {
-                    Text("Entrada escolar: ${campus.groupName}",
-                        style = MaterialTheme.typography.titleMedium, color = V8RedColors.TextPrimary)
-                    Text("${campus.students.size} inscritos · ${campus.students.count { it.campusEntryAtEpochSeconds != null }} con entrada registrada",
-                        style = MaterialTheme.typography.bodySmall, color = V8RedColors.TextSecondary)
-                    campus.students.forEach { student ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(student.studentId, style = MaterialTheme.typography.bodyMedium,
-                                color = V8RedColors.TextPrimary)
-                            Text(
-                                when {
-                                    student.classRecord?.disposition == AttendanceDisposition.PRESENT -> "Presente"
-                                    student.classRecord?.disposition == AttendanceDisposition.LATE -> "Retardo"
-                                    student.classRecord?.disposition == AttendanceDisposition.ABSENT -> "Ausente"
-                                    student.campusEntryAtEpochSeconds != null -> "En escuela"
-                                    else -> "Sin entrada"
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = V8RedColors.TextSecondary,
-                            )
+            state.errorMessage?.let { item { StatusNotice("No pudimos actualizar", it, tone = NoticeTone.ERROR) } }
+            state.successMessage?.let { item { StatusNotice("Listo", it, tone = NoticeTone.SUCCESS) } }
+            if (active != null) item {
+                TeacherSessionCard(active, state.occurrences.firstOrNull { it.id == active.occurrenceId },
+                    state.qr?.token, state.qr?.expiresAtEpochSeconds, state.qrVisualState,
+                    state.actionInProgress, onRefreshRoster, { confirmClose = true })
+            } else item {
+                TeacherOccurrenceList(state.occurrences, state.actionInProgress, onOpen)
+            }
+            item {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(listOf("Recibidos", "Por revisar", "Entrada escolar")) { label ->
+                        val count = when (label) {
+                            "Recibidos" -> if (state.roster != null) records.size.toString() else "—"
+                            "Por revisar" -> if (state.roster != null) review.size.toString() else "—"
+                            else -> campus?.students?.count { it.campusEntryAtEpochSeconds != null }?.toString() ?: "—"
+                        }
+                        FilterChip(selected = filter == label, onClick = { filter = label },
+                            label = { Text("$label · $count") })
+                    }
+                }
+            }
+            if (filter == "Entrada escolar") {
+                item { Text("Entrada escolar", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary) }
+                if (campus == null) item { StatusNotice("Padrón no disponible", state.campusRosterError ?: "Selecciona una clase para consultar su padrón autorizado.") }
+                else items(campus.students, key = { "campus:" + it.studentId }) { student ->
+                    V8GlassCard(Modifier.fillMaxWidth()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(student.studentId, color = V8RedColors.TextPrimary, style = MaterialTheme.typography.titleMedium)
+                            Text(student.campusEntryAtEpochSeconds?.let { "Entrada registrada · " + java.time.Instant.ofEpochSecond(it).atZone(java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("HH:mm")) }
+                                ?: "Sin entrada registrada", color = V8RedColors.TextSecondary)
+                        }
+                    }
+                }
+            } else {
+                val shown = if (filter == "Por revisar") review else records
+                item { Text("Lista de estudiantes · ${shown.size}", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary) }
+                if (shown.isEmpty()) item { StatusNotice("Sin registros en este filtro", "Los registros aparecen al recibirse del servidor. Actualiza para volver a consultar.") }
+                items(shown, key = AttendanceRecordResponse::id) { record ->
+                    RosterRecord(record, state.actionInProgress, onReview, onMark)
+                }
+                if (filter == "Recibidos" && active != null && campus?.sessionId == active.id) {
+                    items(campus.students.filter { student -> records.none { it.studentId == student.studentId } }, key = { "missing:" + it.studentId }) { student ->
+                        V8GlassCard(Modifier.fillMaxWidth()) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(student.studentId, Modifier.weight(1f), color = V8RedColors.TextPrimary)
+                                Text("Sin registro", color = V8RedColors.TextSecondary)
+                            }
                         }
                     }
                 }
             }
-        } else if (state.campusRosterError != null) {
-            StatusNotice(
-                title = "Padrón escolar no disponible",
-                message = state.campusRosterError!!,
-            )
-        }
-
-        val active = state.teacherSession
-        if (active != null) {
-            TeacherActiveSession(
-                session = active,
-                occurrence = state.occurrences.firstOrNull { it.id == active.occurrenceId },
-                qrToken = state.qr?.token,
-                qrExpiresAt = state.qr?.expiresAtEpochSeconds,
-                qrState = state.qrVisualState,
-                roster = state.roster?.records.orEmpty(),
-                busy = state.actionInProgress,
-                onClose = onClose,
-                onRefreshRoster = onRefreshRoster,
-                onReview = onReview,
-                onMark = onMark,
-            )
-        } else {
-            TeacherOccurrenceList(
-                occurrences = state.occurrences,
-                busy = state.actionInProgress,
-                onOpen = onOpen,
-            )
-        }
-    }
-    }
-}
-
-@Composable
-private fun TeacherActiveSession(
-    session: AttendanceSessionResponse,
-    occurrence: ClassOccurrenceContract?,
-    qrToken: String?,
-    qrExpiresAt: Long?,
-    qrState: QrVisualState,
-    roster: List<AttendanceRecordResponse>,
-    busy: Boolean,
-    onClose: () -> Unit,
-    onRefreshRoster: () -> Unit,
-    onReview: (AttendanceRecordResponse, AttendanceStatus) -> Unit,
-    onMark: (AttendanceRecordResponse, AttendanceDisposition) -> Unit,
-) {
-    var showCloseConfirmation by remember { mutableStateOf(false) }
-
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        if (maxWidth >= CompaneroWindowBreakpoints.expanded) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
-                verticalAlignment = Alignment.Top,
-            ) {
-                Column(
-                    modifier = Modifier.weight(1.2f),
-                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
-                ) {
-                    TeacherSessionCard(
-                        session = session,
-                        occurrence = occurrence,
-                        qrToken = qrToken,
-                        qrExpiresAt = qrExpiresAt,
-                        qrState = qrState,
-                        busy = busy,
-                        onRefreshRoster = onRefreshRoster,
-                        onRequestClose = { showCloseConfirmation = true },
-                    )
-                }
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
-                ) {
-                    TeacherRosterPanel(
-                        roster = roster,
-                        busy = busy,
-                        onReview = onReview,
-                        onMark = onMark,
-                    )
+            if (campus != null) item {
+                V8GlassCard(Modifier.fillMaxWidth()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Entrada escolar · ${campus.groupName}", color = V8RedColors.TextPrimary, style = MaterialTheme.typography.titleMedium)
+                        val validated = campus.students.count { it.campusEntryAtEpochSeconds != null }
+                        Text("$validated de ${campus.students.size} con entrada registrada", color = V8RedColors.TextSecondary)
+                        androidx.compose.material3.LinearProgressIndicator(
+                            progress = { if (campus.students.isEmpty()) 0f else validated.toFloat() / campus.students.size },
+                            modifier = Modifier.fillMaxWidth(), color = V8RedColors.Success)
+                        OutlinedButton(onClick = { filter = "Entrada escolar" }, modifier = Modifier.fillMaxWidth()) { Text("Ver padrón escolar") }
+                    }
                 }
             }
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md)) {
-                TeacherSessionCard(
-                    session = session,
-                    occurrence = occurrence,
-                    qrToken = qrToken,
-                    qrExpiresAt = qrExpiresAt,
-                    qrState = qrState,
-                    busy = busy,
-                    onRefreshRoster = onRefreshRoster,
-                    onRequestClose = { showCloseConfirmation = true },
-                )
-                TeacherRosterPanel(
-                    roster = roster,
-                    busy = busy,
-                    onReview = onReview,
-                    onMark = onMark,
-                )
-            }
+            item { OutlinedButton(onClick = onRefresh, enabled = !state.loading, modifier = Modifier.fillMaxWidth()) { Text("Actualizar asistencia") } }
         }
     }
-
-    if (showCloseConfirmation) {
-        AlertDialog(
-            onDismissRequest = { if (!busy) showCloseConfirmation = false },
-            title = { Text("¿Cerrar el pase?") },
-            text = {
-                Text("El QR dejará de estar disponible y no se recibirán nuevos intentos.")
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showCloseConfirmation = false
-                        onClose()
-                    },
-                    enabled = !busy,
-                ) {
-                    Text("Cerrar pase")
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showCloseConfirmation = false },
-                    enabled = !busy,
-                ) {
-                    Text("Seguir con el pase")
-                }
-            },
-        )
-    }
+    if (confirmClose) AlertDialog(onDismissRequest = { confirmClose = false },
+        title = { Text("¿Cerrar el pase?") }, text = { Text("El QR dejará de recibir nuevos intentos.") },
+        confirmButton = { Button(onClick = { confirmClose = false; onClose() }, enabled = !state.actionInProgress) { Text("Cerrar pase") } },
+        dismissButton = { TextButton(onClick = { confirmClose = false }) { Text("Seguir con el pase") } })
 }
 
 @Composable
@@ -877,9 +771,11 @@ private fun TeacherSessionCard(
     onRefreshRoster: () -> Unit,
     onRequestClose: () -> Unit,
 ) {
-    V8GlassCard(modifier = Modifier.fillMaxWidth()) {
+    var now by remember { mutableLongStateOf(System.currentTimeMillis() / 1000) }
+    LaunchedEffect(qrExpiresAt) { while (true) { now = System.currentTimeMillis() / 1000; delay(1000) } }
+    val qrValid = qrExpiresAt != null && now < qrExpiresAt && now < session.closesAtEpochSeconds
+    V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
         Column(
-            modifier = Modifier.padding(CompaneroSpacing.md),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -899,7 +795,7 @@ private fun TeacherSessionCard(
             )
 
             when {
-                qrState == QrVisualState.ACTIVE && qrToken != null -> {
+                qrState == QrVisualState.ACTIVE && qrToken != null && qrValid -> {
                     AttendanceQrCode(
                         token = qrToken,
                         modifier = Modifier
@@ -913,7 +809,7 @@ private fun TeacherSessionCard(
                         color = V8RedColors.TextSecondary,
                     )
                 }
-                qrState == QrVisualState.UNAVAILABLE -> {
+                qrState == QrVisualState.UNAVAILABLE || !qrValid && qrToken != null -> {
                     Text(
                         text = "QR temporalmente no disponible",
                         style = MaterialTheme.typography.titleMedium,
@@ -962,124 +858,54 @@ private fun TeacherSessionCard(
 }
 
 @Composable
-private fun TeacherRosterPanel(
-    roster: List<AttendanceRecordResponse>,
-    busy: Boolean,
-    onReview: (AttendanceRecordResponse, AttendanceStatus) -> Unit,
-    onMark: (AttendanceRecordResponse, AttendanceDisposition) -> Unit,
-) {
-    val present = roster.count { it.disposition == AttendanceDisposition.PRESENT }
-    val late = roster.count { it.disposition == AttendanceDisposition.LATE }
-    val absent = roster.count { it.disposition == AttendanceDisposition.ABSENT }
-    val pending = roster.size - present - late - absent
-
-    Text(
-        text = "Registros recibidos (${roster.size})",
-        style = MaterialTheme.typography.titleMedium,
-    )
-    if (roster.isNotEmpty()) {
-        Text(
-            text = "Presentes $present · Retardos $late · Ausentes $absent · Sin decidir $pending",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-
-    if (roster.isEmpty()) {
-        StatusNotice(
-            title = "Aún sin registros",
-            message = "Los intentos aparecerán después de ser recibidos por el servidor.",
-        )
-    } else {
-        roster.forEach { record ->
-            RosterRecord(
-                record = record,
-                busy = busy,
-                onReview = onReview,
-                onMark = onMark,
-            )
-        }
-    }
-}
-
-@Composable
 private fun RosterRecord(
     record: AttendanceRecordResponse,
     busy: Boolean,
-    onReview: (AttendanceRecordResponse, AttendanceStatus) -> Unit,
-    onMark: (AttendanceRecordResponse, AttendanceDisposition) -> Unit,
+    onReview: (AttendanceRecordResponse, AttendanceStatus, String) -> Unit,
+    onMark: (AttendanceRecordResponse, AttendanceDisposition, String) -> Unit,
 ) {
+    var expanded by remember(record.id) { mutableStateOf(false) }
+    var decision by remember(record.id) { mutableStateOf<AttendanceDisposition?>(null) }
+    var verify by remember(record.id) { mutableStateOf(false) }
+    var reason by remember(record.id) { mutableStateOf("") }
     V8GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(CompaneroSpacing.md),
-            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = record.studentId,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = V8RedColors.TextPrimary,
-                )
-                Text(
-                    text = attendanceDisplayLabel(record),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = attendanceDisplayColor(record),
-                )
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text(record.studentId, style = MaterialTheme.typography.titleMedium, color = V8RedColors.TextPrimary)
+                    Text(java.time.Instant.ofEpochSecond(record.receivedAtEpochSeconds).atZone(java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("HH:mm")), color = V8RedColors.TextSecondary)
+                }
+                Text(attendanceDisplayLabel(record), style = MaterialTheme.typography.labelLarge, color = attendanceDisplayColor(record))
             }
-            Text(
-                text = "Evidencia: " + attendanceStatusLabel(record.status) +
-                    " · " + record.reasonCode.name.lowercase().replace('_', ' '),
-                style = MaterialTheme.typography.bodySmall,
-                color = V8RedColors.TextSecondary,
-            )
-            record.reviewedBy?.let {
-                Text(
-                    text = "Último ajuste docente: $it",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = V8RedColors.TextSecondary,
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
-            ) {
-                FilledTonalButton(
-                    onClick = { onMark(record, AttendanceDisposition.PRESENT) },
-                    enabled = !busy && record.disposition != AttendanceDisposition.PRESENT,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("Presente")
+            TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Ocultar revisión" else "Revisar registro") }
+            if (expanded) {
+                Text("Evidencia original: " + attendanceStatusLabel(record.originalStatus ?: record.status) + " · " + (record.originalReasonCode ?: record.reasonCode).name.lowercase().replace('_', ' '), color = V8RedColors.TextSecondary)
+                record.reviewHistory.lastOrNull()?.let { audit ->
+                    Text("Último ajuste: ${audit.reviewerId} · ${audit.note}", color = V8RedColors.TextSecondary)
                 }
-                OutlinedButton(
-                    onClick = { onMark(record, AttendanceDisposition.LATE) },
-                    enabled = !busy && record.disposition != AttendanceDisposition.LATE,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("Retardo")
+                FilledTonalButton(onClick = { decision = AttendanceDisposition.PRESENT }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Marcar presente") }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { decision = AttendanceDisposition.LATE }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Retardo") }
+                    OutlinedButton(onClick = { decision = AttendanceDisposition.ABSENT }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Ausente") }
                 }
-                OutlinedButton(
-                    onClick = { onMark(record, AttendanceDisposition.ABSENT) },
-                    enabled = !busy && record.disposition != AttendanceDisposition.ABSENT,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("Ausente")
-                }
-            }
-
-            if (record.status == AttendanceStatus.REVIEW_REQUIRED) {
-                TextButton(
-                    onClick = { onReview(record, AttendanceStatus.VERIFIED) },
-                    enabled = !busy,
-                ) {
-                    Text("Validar evidencia")
-                }
+                if (record.status == AttendanceStatus.REVIEW_REQUIRED) OutlinedButton(onClick = { verify = true }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Validar por excepción docente") }
             }
         }
     }
+    if (decision != null || verify) AlertDialog(
+        onDismissRequest = { decision = null; verify = false; reason = "" },
+        title = { Text("Motivo del ajuste") },
+        text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("El servidor registrará tu identidad, fecha y motivo. La evidencia original se conserva.")
+            OutlinedTextField(value = reason, onValueChange = { reason = it.take(500) }, label = { Text("Motivo") }, modifier = Modifier.fillMaxWidth())
+        } },
+        confirmButton = { Button(onClick = {
+            if (verify) onReview(record, AttendanceStatus.VERIFIED, reason.trim())
+            else decision?.let { onMark(record, it, reason.trim()) }
+            decision = null; verify = false; reason = ""
+        }, enabled = !busy && reason.trim().length >= 3) { Text("Confirmar ajuste") } },
+        dismissButton = { TextButton(onClick = { decision = null; verify = false; reason = "" }) { Text("Cancelar") } },
+    )
 }
 
 @Composable

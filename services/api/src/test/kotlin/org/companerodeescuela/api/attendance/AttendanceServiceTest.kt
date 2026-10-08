@@ -10,6 +10,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlinx.coroutines.test.runTest
 import org.companerodeescuela.api.academic.AcademicOccurrenceProjection
 import org.companerodeescuela.api.errors.ApiException
@@ -213,6 +216,9 @@ class AttendanceServiceTest {
         assertEquals(AttendanceStatus.VERIFIED, reviewed.status)
         assertEquals("T-0001", reviewed.reviewedBy)
         assertEquals(AttendanceReasonCode.TEACHER_REVIEW, reviewed.reasonCode)
+        val wire = Json.encodeToString(reviewed)
+        assertTrue(wire.contains("\"originalStatus\":\"" + record.status.name.lowercase() + "\""), wire)
+        assertTrue(wire.contains("reviewHistory"), wire)
     }
 
     @Test

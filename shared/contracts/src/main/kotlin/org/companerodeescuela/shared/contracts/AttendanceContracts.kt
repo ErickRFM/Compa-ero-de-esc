@@ -165,6 +165,18 @@ data class AttendanceRecordResponse(
     val reviewedBy: String? = null,
     val reviewedAtEpochSeconds: Long? = null,
     val disposition: AttendanceDisposition? = null,
+    val originalStatus: AttendanceStatus? = null,
+    val originalReasonCode: AttendanceReasonCode? = null,
+    val reviewHistory: List<AttendanceReviewEntry> = emptyList(),
+)
+
+@Serializable
+data class AttendanceReviewEntry(
+    val reviewerId: String,
+    val reviewedAtEpochSeconds: Long,
+    val note: String,
+    val status: AttendanceStatus,
+    val disposition: AttendanceDisposition? = null,
 )
 
 @Serializable
@@ -178,6 +190,7 @@ data class ReviewAttendanceRequest(
     val status: AttendanceStatus,
     val reasonCode: AttendanceReasonCode = AttendanceReasonCode.TEACHER_REVIEW,
     val disposition: AttendanceDisposition? = null,
+    val note: String? = null,
 )
 
 /** A class check-in must be verified server-side; receiving a notification does not count. */

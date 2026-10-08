@@ -109,7 +109,7 @@ fun CompaneroBottomBar(
                     Box(
                         modifier = Modifier
                             .width(itemWidth)
-                            .height(48.dp)
+                            .height(68.dp)
                             .clip(MaterialTheme.shapes.extraLarge)
                             .clickable {
                                 navController.navigate(topLevel.destination.route) {

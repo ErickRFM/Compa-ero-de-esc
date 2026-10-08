@@ -28,12 +28,12 @@ object AgendaEditingRules {
         val snapped = snap(requested, SNAP_MINUTES)
         val duration = Duration.between(start, end)
         val targetEnd = snapped.plus(duration)
-        if (targetEnd <= snapped) return null
+        if (targetEnd <= snapped || duration.toMinutes() > (24 * 60 - snapped.hour * 60 - snapped.minute)) return null
 
         val startText = format(snapped)
         val endText = format(targetEnd)
         val conflicts = existing
-            .filter { it.courseId != entry.courseId }
+            .filterNot { it === entry || (it.courseId == entry.courseId && it.dayOfWeek == entry.dayOfWeek && it.startsAt == entry.startsAt && it.endsAt == entry.endsAt) }
             .filter { it.dayOfWeek == targetDay }
             .filter { overlaps(startText, endText, it.startsAt, it.endsAt) }
             .sortedBy { it.startsAt }
@@ -55,7 +55,9 @@ object AgendaEditingRules {
         if (pixelsPerQuarterHour <= 0f) return null
         val start = parse(entry.startsAt) ?: return null
         val quarterSteps = kotlin.math.round(verticalPixels / pixelsPerQuarterHour).toLong()
-        return format(start.plusMinutes(quarterSteps * SNAP_MINUTES))
+        val target = start.hour * 60L + start.minute + quarterSteps * SNAP_MINUTES
+        if (target !in 0 until 24 * 60) return null
+        return format(LocalTime.of((target / 60).toInt(), (target % 60).toInt()))
     }
 
     fun adjacentDay(currentDay: String, horizontalPixels: Float, thresholdPixels: Float): String {

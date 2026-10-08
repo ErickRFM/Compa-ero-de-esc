@@ -16,6 +16,9 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
+import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
+import org.companerodeescuela.core.designsystem.v8.V8DaySelector
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -138,14 +141,17 @@ fun ScheduleScreen(
         )
     }
 
+    Box(modifier = modifier.fillMaxSize()) {
+        V8CampusBackdrop(modifier = Modifier.matchParentSize())
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
             .widthIn(max = CompaneroSize.homeContentMaxWidth)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
+        V8BrandHeader()
         V8HeroTitle(leading = "Mi", accent = "horario")
         Text(
             text = "Organiza tu semana, consulta tus clases incluso sin conexión.",
@@ -159,6 +165,17 @@ fun ScheduleScreen(
             onSelected = { mode = if (it == 0) AgendaMode.WEEK else AgendaMode.DAY },
         )
 
+        val monday = LocalDate.now().minusDays((LocalDate.now().dayOfWeek.value - 1).toLong())
+        V8DaySelector(
+            days = listOf("Lun", "Mar", "Mié", "Jue", "Vie").mapIndexed { index, label ->
+                label to monday.plusDays(index.toLong()).dayOfMonth.toString()
+            },
+            selectedIndex = academicDaysV8.indexOf(selectedDay).coerceAtLeast(0),
+            onSelect = { index ->
+                selectedDay = academicDaysV8[index]
+                mode = AgendaMode.DAY
+            },
+        )
         if (state.fromCache) {
             StatusNotice(
                 title = "Agenda guardada",
@@ -293,6 +310,8 @@ fun ScheduleScreen(
                 onSync = viewModel::load,
             )
         }
+    }
+
     }
 
     if (showEditor) {

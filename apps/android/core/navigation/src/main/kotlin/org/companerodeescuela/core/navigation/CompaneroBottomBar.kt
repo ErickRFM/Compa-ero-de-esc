@@ -35,6 +35,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.CircleShape
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
@@ -65,6 +67,7 @@ fun CompaneroBottomBar(
             ?.any { it.route == topLevel.destination.route } == true
     }.coerceAtLeast(0)
     val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
+    val compactLabels = LocalDensity.current.fontScale > 1.3f
 
     Surface(
         modifier = modifier.navigationBarsPadding().padding(
@@ -160,11 +163,13 @@ fun CompaneroBottomBar(
                                     tint = if (isQr) Color.White else if (selected) V8RedColors.Crimson else V8RedColors.TextSecondary,
                                 )
                             }
-                            Text(
+                            if (!compactLabels || selected) Text(
                                 text = if (isQr) "QR" else topLevel.label,
                                 style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                                textAlign = TextAlign.Center,
                                 color = if (selected) V8RedColors.Crimson else V8RedColors.TextSecondary,
-                                maxLines = 1,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }

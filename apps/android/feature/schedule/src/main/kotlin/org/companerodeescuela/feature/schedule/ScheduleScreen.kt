@@ -1179,7 +1179,7 @@ private fun MoveScheduleDialog(
                         tone = NoticeTone.WARNING,
                     )
                     Text(
-                        "Es un horario personal: puedes moverlo de todos modos, pero revisa el cruce.",
+                        "Ese espacio ya está ocupado. Cancela e intenta otra hora; el intercambio seguro estará disponible tras completar su validación.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1187,11 +1187,8 @@ private fun MoveScheduleDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onConfirm, enabled = !busy) {
-                Text(
-                    if (proposal.conflicts.isEmpty()) "Mover"
-                    else "Mover de todos modos",
-                )
+            TextButton(onClick = onConfirm, enabled = !busy && proposal.conflicts.isEmpty()) {
+                Text("Mover")
             }
         },
         dismissButton = {

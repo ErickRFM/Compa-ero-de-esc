@@ -33,14 +33,15 @@ enum class TopLevelDestination(
     val destination: Destination,
     val label: String,
 ) {
-    Home(Destination.Home, "Hoy"),
+    Home(Destination.Home, "Inicio"),
     TeacherHome(Destination.TeacherHome, "Hoy"),
     TutorHome(Destination.TutorHome, "Tutoría"),
     TutorRequests(Destination.TutorRequests, "Solicitudes"),
     CoordinatorHome(Destination.CoordinatorHome, "Gestión"),
     AdminHome(Destination.AdminHome, "Administración"),
-    Schedule(Destination.Schedule, "Agenda"),
+    Schedule(Destination.Schedule, "Horario"),
     Classrooms(Destination.Classrooms, "Clases"),
     Channel(Destination.Channel, "Canal"),
     Attendance(Destination.Attendance, "Asistencia"),
+    Profile(Destination.Profile, "Perfil"),
 }

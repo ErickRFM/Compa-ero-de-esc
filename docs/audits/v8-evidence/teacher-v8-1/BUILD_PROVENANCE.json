@@ -1,0 +1,68 @@
+{
+  "recordedAtUtc": "2026-10-08T22:05:44.255725+00:00",
+  "sourceSha": "6e25c7d50c828738ebae3e6478fc2b09205620c1",
+  "branch": "codex/teacher-v8-1-integration-20261008",
+  "baseMainSha": "d91b57b",
+  "versionName": "0.1.0",
+  "versionCode": 1,
+  "artifacts": [
+    {
+      "filename": "teacher-v8.1-validation-debug.apk",
+      "bytes": 95402141,
+      "sha256": "fe389c94974ce542452a5545d6f984ae901af68128ad93a6ac6cdff366074f33",
+      "buildType": "debug; installable; standard debug signature",
+      "apiBaseUrl": "https://compa-ero-de-esc.onrender.com/"
+    },
+    {
+      "filename": "teacher-v8.1-emulator-local-debug.apk",
+      "bytes": 95402141,
+      "sha256": "3af65c56803c7b443ca62253eb54d799596aa2d5d8f1037569c9a1abbfa5aea4",
+      "buildType": "debug; QA emulator; standard debug signature",
+      "apiBaseUrl": "http://10.0.2.2:8080/"
+    },
+    {
+      "filename": "teacher-v8.1-release-unsigned.apk",
+      "bytes": 69549628,
+      "sha256": "f61da303b06c5e71900b8bb3b54dab1d1ffb12124a52864ffd476b2ab59ce7e3",
+      "buildType": "release; R8; unsigned; distribution signature required",
+      "apiBaseUrl": "https://compa-ero-de-esc.onrender.com/"
+    }
+  ],
+  "qaInstalledSha256": "3af65c56803c7b443ca62253eb54d799596aa2d5d8f1037569c9a1abbfa5aea4",
+  "verification": {
+    "android": {
+      "tests": 126,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "api": {
+      "tests": 166,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "shared": {
+      "tests": 23,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "instrumentation": {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "result": "OK (2 tests)",
+      "seconds": 19.675
+    }
+  },
+  "visualProfiles": 6,
+  "visualScreens": 30,
+  "releaseAcceptance": "pending physical validation; public MongoDB down; institutional grade sync unavailable; system file-selection UI not completed via ADB",
+  "productionHealth": {
+    "httpStatus": 200,
+    "status": "degraded",
+    "mongodb": "down",
+    "checkedAtUtc": "2026-10-08T21:41:34.821103580Z"
+  }
+}

@@ -4,90 +4,90 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 
 /**
- * Dark frosted-glass panel for high-detail campus photography.
- *
- * Android API 30 does not support native RenderEffect backdrop blur. This
- * cross-version treatment uses a layered, deliberately high-contrast translucent
- * scrim, subtle reflection, and a fine edge light. It does not pretend to blur
- * the content behind the panel; avoid transparent text fields on busy photos.
+ * Shared finish based on the Login frosted panel: dark tint, reflected light and
+ * a fine illuminated edge. Works on API 30 without blurring foreground text or
+ * requiring RenderEffect. High contrast uses an opaque surface and a solid edge.
  */
+@Composable
+fun Modifier.v8GlassSurface(
+    cornerRadius: Dp = V8RedDimensions.CardCorner,
+    emphasized: Boolean = false,
+    elevation: Dp = 8.dp,
+): Modifier {
+    val shape = RoundedCornerShape(cornerRadius)
+    val highContrast = LocalCompaneroHighContrast.current
+    val tint = if (highContrast) {
+        listOf(V8RedColors.Surface, V8RedColors.Surface)
+    } else {
+        listOf(
+            if (emphasized) Color(0xEE491520) else Color(0xEE30171F),
+            Color(0xF015171D),
+            Color(0xF21B0B14),
+        )
+    }
+    val edge = if (highContrast) {
+        listOf(V8RedColors.TextPrimary, V8RedColors.TextPrimary)
+    } else if (emphasized) {
+        listOf(Color(0xC7FFD9DF), V8RedColors.Crimson, Color(0x9EFF5365))
+    } else {
+        listOf(Color(0x83FFD9DF), Color(0x705D424A), Color(0x66383949), Color(0x75C74959))
+    }
+    return this
+        .shadow(
+            elevation = if (highContrast) 0.dp else elevation,
+            shape = shape,
+            ambientColor = V8RedColors.DeepCrimson.copy(alpha = 0.30f),
+            spotColor = Color.Black,
+        )
+        .clip(shape)
+        .background(Brush.linearGradient(tint))
+        .drawWithCache {
+            val reflection = Brush.verticalGradient(
+                0.0f to Color.White.copy(alpha = 0.075f),
+                0.30f to Color.White.copy(alpha = 0.012f),
+                0.72f to Color.Transparent,
+                1.0f to V8RedColors.DeepCrimson.copy(alpha = 0.10f),
+            )
+            val topLight = Brush.horizontalGradient(
+                listOf(Color.Transparent, Color(0x75FFFFFF), V8RedColors.Crimson.copy(alpha = 0.30f), Color.Transparent),
+            )
+            onDrawBehind {
+                if (!highContrast) {
+                    drawRect(reflection)
+                    val inset = cornerRadius.toPx().coerceAtMost(size.width / 2)
+                    drawLine(topLight, Offset(inset, 0.5.dp.toPx()), Offset(size.width - inset, 0.5.dp.toPx()), 1.dp.toPx())
+                }
+            }
+        }
+        .border(if (highContrast) 2.dp else 1.dp, Brush.linearGradient(edge), shape)
+}
+
 @Composable
 fun V8FrostedGlassPanel(
     modifier: Modifier = Modifier,
+    cornerRadius: Dp = V8RedDimensions.CardCorner,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    emphasized: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val shape = RoundedCornerShape(26.dp)
     Box(
-        modifier = modifier
-            .shadow(
-                elevation = 18.dp,
-                shape = shape,
-                ambientColor = V8RedColors.DeepCrimson.copy(alpha = 0.36f),
-                spotColor = Color.Black,
-            )
-            .clip(shape)
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color(0xEE30171F),
-                        Color(0xF015171D),
-                        Color(0xF21B0B14),
-                    ),
-                ),
-            )
-            .border(
-                width = 1.dp,
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color(0xA7FFD9DF),
-                        V8RedColors.Crimson.copy(alpha = 0.64f),
-                        Color(0x66383949),
-                        Color(0x75FF5365),
-                    ),
-                ),
-                shape = shape,
-            ),
-    ) {
-        // Reflected light on the glass is independent of the contents.
-        Box(
-            modifier = Modifier.matchParentSize().background(
-                Brush.verticalGradient(
-                    0.0f to Color.White.copy(alpha = 0.075f),
-                    0.30f to Color.White.copy(alpha = 0.012f),
-                    0.72f to Color.Transparent,
-                    1.0f to V8RedColors.DeepCrimson.copy(alpha = 0.10f),
-                ),
-            ),
-        )
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color(0xAAFFFFFF),
-                            V8RedColors.Crimson.copy(alpha = 0.48f),
-                            Color.Transparent,
-                        ),
-                    ),
-                ),
-        )
-        content()
-    }
+        modifier = modifier.v8GlassSurface(cornerRadius, emphasized).padding(contentPadding),
+        content = content,
+    )
 }

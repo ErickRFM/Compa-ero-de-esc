@@ -9,10 +9,13 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+
+val LocalCompaneroHighContrast = staticCompositionLocalOf { false }
 
 private val LightColors = lightColorScheme(
     primary = CompanionColors.crimson,
@@ -109,7 +112,7 @@ fun CompaneroTheme(
         fontScale = density.fontScale * fontScaleMultiplier.coerceIn(0.9f, 1.2f),
     )
 
-    CompositionLocalProvider(LocalDensity provides adjustedDensity) {
+    CompositionLocalProvider(LocalDensity provides adjustedDensity, LocalCompaneroHighContrast provides highContrast) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography = CompanionTypography,

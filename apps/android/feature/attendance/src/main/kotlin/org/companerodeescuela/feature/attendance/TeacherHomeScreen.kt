@@ -15,6 +15,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.ui.graphics.vector.ImageVector
+import org.companerodeescuela.core.designsystem.v8.V8IconTile
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -68,9 +75,8 @@ fun TeacherHomeScreen(
     Box(modifier = modifier.fillMaxSize()) {
         V8CampusBackdrop(modifier = Modifier.matchParentSize())
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .widthIn(max = CompaneroSize.homeContentMaxWidth)
+            modifier = Modifier.align(Alignment.TopCenter)
+                .widthIn(max = CompaneroSize.homeContentMaxWidth).fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
@@ -106,16 +112,17 @@ fun TeacherHomeScreen(
 
                 val today = LocalDate.now().toString()
                 val sessions = state.occurrences.sortedWith(compareBy({ it.date }, { it.startsAt }))
-                val localClock = LocalTime.now().toString().take(5)
-                val upcoming = sessions.filter { it.date > today || (it.date == today && it.endsAt.take(5) >= localClock) }
+                val upcoming = upcomingTeacherClasses(sessions, java.time.LocalDateTime.now())
                 val records = state.roster?.records.orEmpty()
                 val review = records.count { it.status == AttendanceStatus.REVIEW_REQUIRED }
-                val active = state.teacherSession
+                val active = state.teacherSession?.takeIf {
+                    it.closedAtEpochSeconds == null && it.closesAtEpochSeconds > System.currentTimeMillis() / 1000
+                }
                 val campus = state.campusRoster
 
-                Text("Pase de lista", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary)
-                V8GlassCard(modifier = Modifier.fillMaxWidth()) {
+                V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Pase de lista", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary, fontWeight = FontWeight.Bold)
                         Text(
                             text = if (active != null) "EN VIVO · ${active.groupName}" else "Sin pase abierto",
                             style = MaterialTheme.typography.labelLarge,
@@ -146,7 +153,7 @@ fun TeacherHomeScreen(
                     }
                 }
 
-                val nextClass = upcoming.firstOrNull()
+                val nextClass = upcoming.firstOrNull { it.id != active?.occurrenceId }
                 if (nextClass != null) {
                     V8GlassCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenSchedule)) {
                         Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
@@ -167,6 +174,8 @@ fun TeacherHomeScreen(
                                 style = MaterialTheme.typography.labelSmall)
                         }
                     }
+                } else if (state.occurrencesLoaded) {
+                    StatusNotice(title = "Sin siguiente clase", message = "No hay más clases vigentes en el horario consultado.")
                 }
 
                 Row(
@@ -175,13 +184,15 @@ fun TeacherHomeScreen(
                 ) {
                     V8DashboardStat(
                         label = "Clases hoy",
-                        value = sessions.count { it.date == today }.toString(),
+                        compact = true,
+                        value = if (state.occurrencesLoaded) sessions.count { it.date == today }.toString() else "—",
                         onClick = onOpenSchedule,
                         modifier = Modifier.weight(1f),
                     )
                     V8DashboardStat(
                         label = "Pases activos",
-                        value = state.activeSessions.size.toString(),
+                        compact = true,
+                        value = if (state.sessionsLoaded) state.activeSessions.size.toString() else "—",
                         onClick = onOpenAttendance,
                         modifier = Modifier.weight(1f),
                     )
@@ -192,12 +203,14 @@ fun TeacherHomeScreen(
                 ) {
                     V8DashboardStat(
                         label = "Registros recibidos",
+                        compact = true,
                         value = if (active == null || state.roster == null) "—" else records.size.toString(),
                         onClick = onOpenAttendance,
                         modifier = Modifier.weight(1f),
                     )
                     V8DashboardStat(
                         label = "Por revisar",
+                        compact = true,
                         value = if (active == null || state.roster == null) "—" else review.toString(),
                         onClick = onOpenAttendance,
                         modifier = Modifier.weight(1f),
@@ -230,12 +243,12 @@ fun TeacherHomeScreen(
 
                 Text("Accesos rápidos", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TeacherToolCard("Mis clases", "Grupos asignados", onOpenClassrooms, Modifier.weight(1f))
-                    TeacherToolCard("Mi horario", "Agenda semanal", onOpenSchedule, Modifier.weight(1f))
+                    TeacherToolCard("Mis clases", "Grupos asignados", Icons.Filled.MenuBook, onOpenClassrooms, Modifier.weight(1f))
+                    TeacherToolCard("Mi horario", "Agenda semanal", Icons.Filled.CalendarMonth, onOpenSchedule, Modifier.weight(1f))
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TeacherToolCard("Canal", "Avisos y archivos", onOpenChannel, Modifier.weight(1f))
-                    TeacherToolCard("Evaluación", "Excel y calificaciones", onOpenGrading, Modifier.weight(1f))
+                    TeacherToolCard("Canal", "Avisos y archivos", Icons.Filled.Campaign, onOpenChannel, Modifier.weight(1f))
+                    TeacherToolCard("Evaluación", "Excel y calificaciones", Icons.Filled.BarChart, onOpenGrading, Modifier.weight(1f))
                 }
 
                 Text("Tu agenda", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary)
@@ -273,11 +286,13 @@ fun TeacherHomeScreen(
 private fun TeacherToolCard(
     title: String,
     subtitle: String,
+    icon: ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     V8GlassCard(modifier = modifier.heightIn(min = 76.dp).clickable(onClick = onClick)) {
         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            V8IconTile(icon)
             Text(title, color = V8RedColors.TextPrimary, style = MaterialTheme.typography.titleMedium)
             Text(subtitle, color = V8RedColors.TextSecondary, style = MaterialTheme.typography.bodySmall)
         }

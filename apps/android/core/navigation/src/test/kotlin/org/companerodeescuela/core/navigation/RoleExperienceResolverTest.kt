@@ -15,7 +15,9 @@ class RoleExperienceResolverTest {
             listOf(
                 TopLevelDestination.Home,
                 TopLevelDestination.Schedule,
+                TopLevelDestination.Attendance,
                 TopLevelDestination.Classrooms,
+                TopLevelDestination.Profile,
             ),
             config.topLevelDestinations,
         )

@@ -3,6 +3,18 @@ package org.companerodeescuela.feature.attendance
 import org.companerodeescuela.core.database.LocalAttendanceRecord
 import org.companerodeescuela.core.database.LocalAttendanceSyncState
 import org.companerodeescuela.shared.contracts.AttendanceStatus
+import org.companerodeescuela.shared.contracts.SchoolPresenceResponse
+import org.companerodeescuela.shared.contracts.SchoolPresenceStatus
+
+fun schoolDayVerified(presence: SchoolPresenceResponse?, nowEpochSeconds: Long): Boolean =
+    presence != null && presence.status == SchoolPresenceStatus.ACTIVE &&
+        presence.closedAtEpochSeconds == null && presence.qrVerified && presence.networkVerified &&
+        nowEpochSeconds >= presence.startedAtEpochSeconds && nowEpochSeconds < presence.expiresAtEpochSeconds
+
+fun schoolDayVerifiedAtServerTime(presence: SchoolPresenceResponse?, elapsedSeconds: Long): Boolean =
+    presence?.serverTimeEpochSeconds?.let { serverTime ->
+        elapsedSeconds >= 0 && schoolDayVerified(presence, serverTime + elapsedSeconds)
+    } ?: false
 
 enum class AttendanceClientVerdict {
     PENDING,

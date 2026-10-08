@@ -15,12 +15,18 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -29,16 +35,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.CircleShape
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
+import org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled
+import org.companerodeescuela.core.designsystem.v8.v8GlassSurface
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
@@ -57,23 +66,25 @@ fun CompaneroBottomBar(
         currentDestination
             ?.hierarchy
             ?.any { it.route == topLevel.destination.route } == true
-    }.coerceAtLeast(0)
+    }
     val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
+    val compactLabels = LocalDensity.current.fontScale > 1.3f
+    val glass = LocalV8GlassEnabled.current
 
     Surface(
-        modifier = modifier.padding(
+        modifier = modifier.navigationBarsPadding().padding(
             horizontal = CompaneroSpacing.sm,
             vertical = CompaneroSpacing.xxs,
-        ),
+        ).then(if (glass) Modifier.v8GlassSurface(cornerRadius = 28.dp) else Modifier),
         shape = MaterialTheme.shapes.extraLarge,
-        color = V8RedColors.Background,
-        tonalElevation = CompaneroElevation.raised,
-        shadowElevation = CompaneroElevation.immersive,
+        color = if (glass) Color.Transparent else V8RedColors.Background,
+        tonalElevation = if (glass) 0.dp else CompaneroElevation.raised,
+        shadowElevation = if (glass) 0.dp else CompaneroElevation.immersive,
     ) {
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(74.dp)
+                    .heightIn(min = 82.dp)
                 .padding(CompaneroSpacing.xxs),
         ) {
             val itemWidth = maxWidth / destinations.size
@@ -88,14 +99,17 @@ fun CompaneroBottomBar(
                 label = "navPillOffset",
             )
 
-            Box(
-                modifier = Modifier
-                    .offset(x = pillOffset)
-                    .width(itemWidth)
-                    .height(68.dp)
-                    .clip(MaterialTheme.shapes.extraLarge)
-                    .background(V8RedColors.DeepCrimson.copy(alpha = 0.30f)),
-            )
+            if (selectedIndex >= 0) {
+                Box(
+                    modifier = Modifier
+                        .offset(x = pillOffset)
+                        .width(itemWidth)
+                        .height(68.dp)
+                        .clip(MaterialTheme.shapes.extraLarge)
+                        .then(if (glass) Modifier.v8GlassSurface(cornerRadius = 20.dp, emphasized = true, elevation = 0.dp)
+                            else Modifier.background(V8RedColors.DeepCrimson.copy(alpha = 0.30f))),
+                )
+            }
 
             Row(modifier = Modifier.fillMaxWidth()) {
                 destinations.forEachIndexed { index, topLevel ->
@@ -109,16 +123,10 @@ fun CompaneroBottomBar(
                     Box(
                         modifier = Modifier
                             .width(itemWidth)
-                            .height(68.dp)
+                            .heightIn(min = 74.dp)
                             .clip(MaterialTheme.shapes.extraLarge)
                             .clickable {
-                                navController.navigate(topLevel.destination.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
+                                navController.navigateToTopLevel(topLevel.destination)
                             },
                         contentAlignment = Alignment.Center,
                     ) {
@@ -132,7 +140,7 @@ fun CompaneroBottomBar(
                             val isQr = topLevel == TopLevelDestination.Attendance
                             Box(
                                 modifier = Modifier
-                                    .size(if (isQr) 45.dp else 37.dp)
+                                    .size(if (isQr) 52.dp else 36.dp)
                                     .clip(CircleShape)
                                     .background(if (isQr) V8RedColors.DeepCrimson else Color.Transparent),
                                 contentAlignment = Alignment.Center,
@@ -149,17 +157,20 @@ fun CompaneroBottomBar(
                                         TopLevelDestination.Channel,
                                         TopLevelDestination.TutorRequests -> Icons.Filled.Forum
                                         TopLevelDestination.Attendance -> Icons.Filled.QrCodeScanner
+                                        TopLevelDestination.Profile -> Icons.Filled.PersonOutline
                                     },
                                     contentDescription = topLevel.label,
                                     modifier = Modifier.size(if (isQr) 26.dp else 22.dp),
                                     tint = if (isQr) Color.White else if (selected) V8RedColors.Crimson else V8RedColors.TextSecondary,
                                 )
                             }
-                            Text(
-                                text = topLevel.label,
+                            if (!compactLabels || selected) Text(
+                                text = if (isQr) "QR" else topLevel.label,
                                 style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                                textAlign = TextAlign.Center,
                                 color = if (selected) V8RedColors.Crimson else V8RedColors.TextSecondary,
-                                maxLines = 1,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }

@@ -16,22 +16,18 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun V8AttendanceEvidence(schoolNetworkVerified: Boolean?, locationVerified: Boolean?, ready: Boolean, modifier: Modifier = Modifier) {
     Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        V8StatePill(text = when(schoolNetworkVerified) { true -> "Red verificada"; false -> "Red no validada"; null -> "Red pendiente" }, active = schoolNetworkVerified == true, modifier = Modifier.weight(1f))
-        V8StatePill(text = when(locationVerified) { true -> "Ubicación verificada"; false -> "Ubicación no validada"; null -> "Ubicación pendiente" }, active = locationVerified == true, modifier = Modifier.weight(1f))
-        V8StatePill(text = if (ready) "Listo" else "Pendiente", active = ready, modifier = Modifier.weight(1f))
+        EvidenceCard("Jornada escolar", if (schoolNetworkVerified == true) "Verificada" else "Pendiente", schoolNetworkVerified == true, Modifier.weight(1f))
+        EvidenceCard("Ubicación", if (locationVerified == true) "Verificada" else "No utilizada", locationVerified == true, Modifier.weight(1f))
+        EvidenceCard("Sesión de clase", if (ready) "Lista para QR" else "Pendiente", ready, Modifier.weight(1f))
     }
 }
 
 @Composable
-fun V8AttendanceProgress(present: Int, total: Int, modifier: Modifier = Modifier) {
-    val boundedTotal = total.coerceAtLeast(0)
-    val boundedPresent = present.coerceIn(0, boundedTotal)
-    val ratio = if (boundedTotal == 0) 0f else boundedPresent.toFloat() / boundedTotal
-    V8GlassCard(modifier = modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            Text("Asistencia de la clase", color = V8RedColors.TextPrimary, fontWeight = FontWeight.Bold)
-            Text("$boundedPresent / $boundedTotal presentes", color = V8RedColors.TextSecondary, fontSize = 13.sp)
-            LinearProgressIndicator(progress = { ratio }, modifier = Modifier.fillMaxWidth(), color = V8RedColors.Crimson, trackColor = V8RedColors.Outline)
+private fun EvidenceCard(title: String, status: String, verified: Boolean, modifier: Modifier) {
+    V8GlassCard(modifier, contentPadding = androidx.compose.foundation.layout.PaddingValues(10.dp), cornerRadius = 14.dp) {
+        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(title, color = V8RedColors.TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            Text(status, color = if (verified) V8RedColors.Success else V8RedColors.TextSecondary, fontSize = 10.sp)
         }
     }
 }

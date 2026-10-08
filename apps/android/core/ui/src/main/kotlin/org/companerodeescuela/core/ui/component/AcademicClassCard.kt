@@ -16,8 +16,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
+import org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled
+import org.companerodeescuela.core.designsystem.v8.v8GlassSurface
 
 @Composable
 fun AcademicClassCard(
@@ -31,6 +34,7 @@ fun AcademicClassCard(
     emphasized: Boolean = false,
     subjectKey: String = subject,
 ) {
+    val glass = LocalV8GlassEnabled.current
     val containerColor = if (emphasized) {
         MaterialTheme.colorScheme.primaryContainer
     } else {
@@ -42,11 +46,11 @@ fun AcademicClassCard(
     )
 
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().then(if (glass) Modifier.v8GlassSurface(emphasized = emphasized) else Modifier),
         shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = containerColor),
+        colors = CardDefaults.cardColors(containerColor = if (glass) Color.Transparent else containerColor),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = if (emphasized) CompaneroElevation.raised else CompaneroElevation.card,
+            defaultElevation = if (glass) 0.dp else if (emphasized) CompaneroElevation.raised else CompaneroElevation.card,
         ),
     ) {
         Column(

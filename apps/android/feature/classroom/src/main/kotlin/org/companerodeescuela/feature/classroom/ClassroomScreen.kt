@@ -15,13 +15,16 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import org.companerodeescuela.core.ui.component.CompaneroSurface
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MenuBook
+import org.companerodeescuela.core.designsystem.v8.V8IconTile
 import androidx.compose.ui.text.font.FontWeight
 import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
 import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
@@ -36,6 +39,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -55,9 +59,9 @@ fun ClassroomScreen(
     modifier: Modifier = Modifier,
     teacherExperience: Boolean = false,
     teacherUserId: String? = null,
-    onOpenAttendance: () -> Unit = {},
-    onOpenChannel: () -> Unit = {},
-    onOpenGrading: () -> Unit = {},
+    onOpenAttendance: (ClassroomSummary) -> Unit = {},
+    onOpenChannel: (ClassroomSummary?) -> Unit = {},
+    onOpenGrading: (ClassroomSummary) -> Unit = {},
     viewModel: ClassroomViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -105,6 +109,9 @@ fun ClassroomScreen(
             text = "Mis clases",
             style = MaterialTheme.typography.headlineSmall,
         )
+        OutlinedButton(onClick = { onOpenChannel(null) }, modifier = Modifier.fillMaxWidth()) {
+            Text("Canal de clase")
+        }
         Text(
             text = "Tus materias, grupo, docente, aula y acceso académico en un solo lugar.",
             style = MaterialTheme.typography.bodyMedium,
@@ -131,7 +138,7 @@ fun ClassroomScreen(
         }
 
         if (isStudent && state.groups.isEmpty()) {
-            Card(modifier = Modifier.fillMaxWidth()) {
+            CompaneroSurface(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(CompaneroSpacing.md),
                     verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
@@ -170,7 +177,7 @@ fun ClassroomScreen(
         }
 
         if (isStudent && state.groups.isNotEmpty()) {
-            Card(modifier = Modifier.fillMaxWidth()) {
+            CompaneroSurface(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(CompaneroSpacing.md),
                     verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
@@ -193,7 +200,7 @@ fun ClassroomScreen(
         }
 
         if (pendingTeacher) {
-            Card(modifier = Modifier.fillMaxWidth()) {
+            CompaneroSurface(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(CompaneroSpacing.md),
                     verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
@@ -211,7 +218,7 @@ fun ClassroomScreen(
         }
 
         if (canCreate) {
-            Card(modifier = Modifier.fillMaxWidth()) {
+            CompaneroSurface(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(CompaneroSpacing.md),
                     verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
@@ -289,7 +296,7 @@ fun ClassroomScreen(
                 }
             }
 
-            Card(modifier = Modifier.fillMaxWidth()) {
+            CompaneroSurface(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(CompaneroSpacing.md),
                     verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
@@ -423,9 +430,9 @@ private fun TeacherAssignedClassrooms(
     state: ClassroomUiState,
     teacherUserId: String?,
     onRefresh: () -> Unit,
-    onOpenAttendance: () -> Unit,
-    onOpenChannel: () -> Unit,
-    onOpenGrading: () -> Unit,
+    onOpenAttendance: (ClassroomSummary) -> Unit,
+    onOpenChannel: (ClassroomSummary?) -> Unit,
+    onOpenGrading: (ClassroomSummary) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val assigned = state.classrooms.filter {
@@ -434,8 +441,8 @@ private fun TeacherAssignedClassrooms(
     Box(modifier = modifier.fillMaxSize()) {
         V8CampusBackdrop(modifier = Modifier.matchParentSize())
         Column(
-            modifier = Modifier.fillMaxSize()
-                .widthIn(max = CompaneroSize.homeContentMaxWidth)
+            modifier = Modifier.align(Alignment.TopCenter)
+                .widthIn(max = CompaneroSize.homeContentMaxWidth).fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
@@ -479,12 +486,15 @@ private fun TeacherAssignedClassrooms(
                 assigned.forEach { classroom ->
                     V8GlassCard(modifier = Modifier.fillMaxWidth()) {
                         Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
-                            Text(
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                V8IconTile(Icons.Filled.MenuBook)
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
                                 text = classroom.name,
                                 color = V8RedColors.TextPrimary,
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.SemiBold,
-                            )
+                                )
                             Text(
                                 text = listOfNotNull(
                                     classroom.groupName?.takeIf(String::isNotBlank),
@@ -492,20 +502,22 @@ private fun TeacherAssignedClassrooms(
                                 ).joinToString(" · ").ifBlank { "Clase asignada" },
                                 color = V8RedColors.TextSecondary,
                                 style = MaterialTheme.typography.bodyMedium,
-                            )
+                                )
+                                }
+                            }
                             V8RedPrimaryButton(
                                 text = "Pase de lista",
-                                onClick = onOpenAttendance,
+                                onClick = { onOpenAttendance(classroom) },
                                 modifier = Modifier.fillMaxWidth(),
                             )
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
                             ) {
-                                OutlinedButton(onClick = onOpenChannel, modifier = Modifier.weight(1f)) {
+                                OutlinedButton(onClick = { onOpenChannel(classroom) }, modifier = Modifier.weight(1f)) {
                                     Text("Canal")
                                 }
-                                OutlinedButton(onClick = onOpenGrading, modifier = Modifier.weight(1f)) {
+                                OutlinedButton(onClick = { onOpenGrading(classroom) }, modifier = Modifier.weight(1f)) {
                                     Text("Evaluar")
                                 }
                             }
@@ -527,7 +539,7 @@ private fun ClassroomCard(
     enabled: Boolean,
     onGenerateInvite: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    CompaneroSurface(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(CompaneroSpacing.md),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
@@ -579,7 +591,7 @@ private fun InviteCard(
     onRevoke: () -> Unit,
     enabled: Boolean,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    CompaneroSurface(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(CompaneroSpacing.md),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),

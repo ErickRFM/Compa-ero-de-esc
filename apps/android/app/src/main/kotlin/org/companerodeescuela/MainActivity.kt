@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.SystemBarStyle
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,6 +51,7 @@ import org.companerodeescuela.feature.coordinator.CoordinatorHomeScreen
 import org.companerodeescuela.feature.designsystem.DesignSystemCatalogScreen
 import org.companerodeescuela.feature.home.HomeScreen
 import org.companerodeescuela.feature.grading.GradebookScreen
+import org.companerodeescuela.shared.contracts.TeacherClassContext
 import org.companerodeescuela.feature.profile.ActiveExperiencePreferences
 import org.companerodeescuela.feature.profile.ProfileScreen
 import org.companerodeescuela.feature.schedule.ScheduleScreen
@@ -98,6 +101,12 @@ class MainActivity : ComponentActivity() {
                     ) {
                         val sessionViewModel: SessionViewModel = hiltViewModel()
                         val session by sessionViewModel.state.collectAsStateWithLifecycle()
+                        SideEffect {
+                            val v8Dark = !session.authenticated || session.roles == setOf(org.companerodeescuela.shared.contracts.UserRole.STUDENT)
+                            val style = if (v8Dark || darkTheme) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                                else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+                            enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+                        }
                         var activatingAccess by remember { mutableStateOf(false) }
 
                         LaunchedEffect(session.authenticated) {
@@ -164,11 +173,18 @@ class MainActivity : ComponentActivity() {
                                         )
                                     }
                                     val navController = rememberNavController()
+                                    SideEffect {
+                                        val isDark = roleConfig.startDestination in setOf(Destination.Home, Destination.TeacherHome) || darkTheme
+                                        val style = if (isDark) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                                            else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+                                        enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+                                    }
 
                                     CompaneroScaffold(
                                         navController = navController,
                                         startDestination = roleConfig.startDestination,
                                         topLevelDestinations = roleConfig.topLevelDestinations,
+                                        highContrast = appearance.highContrast,
                                     ) {
                                         composable(Destination.Home.route) {
                                             HomeScreen(
@@ -280,15 +296,32 @@ class MainActivity : ComponentActivity() {
                                                 roles = session.roles,
                                                 teacherExperience = roleConfig.experience == AppExperience.TEACHER,
                                                 teacherUserId = session.userId,
-                                                onOpenAttendance = { navController.navigate(Destination.Attendance.route) { launchSingleTop = true } },
-                                                onOpenChannel = { navController.navigate(Destination.Channel.route) { launchSingleTop = true } },
-                                                onOpenGrading = { navController.navigate(Destination.Grading.route) { launchSingleTop = true } },
+                                                onOpenAttendance = { classroom ->
+                                                    navController.navigate(Destination.Attendance.route) { launchSingleTop = true }
+                                                    navController.currentBackStackEntry?.savedStateHandle?.set(TeacherClassContext.STATE_KEY, TeacherClassContext.from(classroom))
+                                                },
+                                                onOpenChannel = { classroom ->
+                                                    navController.navigate(Destination.Channel.route) { launchSingleTop = true }
+                                                    navController.currentBackStackEntry?.savedStateHandle?.set(TeacherClassContext.STATE_KEY, classroom?.let(TeacherClassContext::from))
+                                                },
+                                                onOpenGrading = { classroom ->
+                                                    navController.navigate(Destination.Grading.route) { launchSingleTop = true }
+                                                    navController.currentBackStackEntry?.savedStateHandle?.set(TeacherClassContext.STATE_KEY, TeacherClassContext.from(classroom))
+                                                },
                                             )
                                         }
-                                        composable(Destination.Grading.route) { GradebookScreen() }
-                                        composable(Destination.Channel.route) { ChannelScreen() }
-                                        composable(Destination.Attendance.route) {
+                                        composable(Destination.Grading.route) { entry ->
+                                            val selection by entry.savedStateHandle.getStateFlow<TeacherClassContext?>(TeacherClassContext.STATE_KEY, null).collectAsStateWithLifecycle()
+                                            GradebookScreen(requestedClassroom = selection)
+                                        }
+                                        composable(Destination.Channel.route) { entry ->
+                                            val selection by entry.savedStateHandle.getStateFlow<TeacherClassContext?>(TeacherClassContext.STATE_KEY, null).collectAsStateWithLifecycle()
+                                            ChannelScreen(requestedClassroom = selection)
+                                        }
+                                        composable(Destination.Attendance.route) { entry ->
+                                            val selection by entry.savedStateHandle.getStateFlow<TeacherClassContext?>(TeacherClassContext.STATE_KEY, null).collectAsStateWithLifecycle()
                                             AttendanceScreen(
+                                                requestedClassroom = selection,
                                                 requestedMode = when (roleConfig.experience) {
                                                     AppExperience.STUDENT -> AttendanceMode.STUDENT
                                                     AppExperience.TEACHER -> AttendanceMode.TEACHER

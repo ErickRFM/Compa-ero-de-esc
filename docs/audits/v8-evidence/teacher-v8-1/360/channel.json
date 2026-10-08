@@ -1,0 +1,9 @@
+{
+  "size": "Physical size: 1080x1920\nOverride size: 720x1600",
+  "density": "Physical density: 420\nOverride density: 320",
+  "fontScale": "1.0",
+  "capturedAtUtc": "2026-10-08T21:43:58.486074+00:00",
+  "sourceSha": "6e25c7d50c828738ebae3e6478fc2b09205620c1",
+  "expectedHeading": "Canal",
+  "environment": "localhost QA; authenticated development account; real app UI"
+}

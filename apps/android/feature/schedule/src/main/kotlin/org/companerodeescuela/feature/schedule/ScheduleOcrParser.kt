@@ -11,7 +11,7 @@ object ScheduleOcrParser {
     )
 
     private val teacherTitle = Regex(
-        """(?i)(ma\.|mtr\.?|mtra\.?|mtro\.?|prof\.?|profa\.?|ing\.?|docente|dr\.?|dra\.?)""",
+        """(?i)(ma\.|mtr\.|mtra\.|mtro\.|prof\.|profa\.|ing\.|dr\.|dra\.|(?:mtr|mtra|mtro|prof|profa|ing|docente|dr|dra)(?![\p{L}]))""",
     )
 
     private val dayAliases = linkedMapOf(

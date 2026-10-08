@@ -29,7 +29,7 @@ class ChannelAccessPolicy(
                     courseId = classroom.id,
                     subjectCode = "LOCAL",
                     subjectName = classroom.name,
-                    groupName = classroom.room ?: "Clase",
+                    groupName = classroom.groupName ?: "Clase",
                     term = "Compañero",
                     teacherId = classroom.teacherId,
                     teacherDisplayName = classroom.teacherDisplayName,

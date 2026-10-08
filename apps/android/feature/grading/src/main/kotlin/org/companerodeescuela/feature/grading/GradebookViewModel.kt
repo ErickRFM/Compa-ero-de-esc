@@ -35,7 +35,10 @@ data class GradebookUiState(
     val successMessage: String? = null,
 ) {
     val totalWeight: Double get() = categories.sumOf { it.weightPercent }
-    val schemeComplete: Boolean get() = categories.isNotEmpty() && kotlin.math.abs(totalWeight - 100.0) <= 0.001
+    val schemeComplete: Boolean get() = categories.isNotEmpty() &&
+        categories.all { it.name.isNotBlank() && it.weightPercent.isFinite() && it.weightPercent in 0.0..100.0 } &&
+        categories.map { it.name.trim().lowercase() }.distinct().size == categories.size &&
+        kotlin.math.abs(totalWeight - 100.0) <= 0.001
 }
 
 @HiltViewModel
@@ -46,12 +49,25 @@ class GradebookViewModel @Inject constructor(
 ) : ViewModel() {
     private val _state = MutableStateFlow(GradebookUiState())
     val state: StateFlow<GradebookUiState> = _state.asStateFlow()
+    private var requestedClassroomId: String? = null
+
+    fun requestClassroom(id: String) {
+        if (_state.value.submitting) return
+        requestedClassroomId = id
+        if (!_state.value.loadingClassrooms) {
+            if (_state.value.assignedClassrooms.any { it.id == id }) setClassroomId(id)
+            else _state.update { it.copy(classroomId = "", categories = emptyList(), preview = null,
+                importedFileName = null, errorMessage = "La clase solicitada ya no está asignada a tu cuenta.") }
+            requestedClassroomId = null
+        }
+    }
 
     init { refreshClassrooms() }
 
     fun refreshClassrooms() {
+        if (_state.value.submitting) return
+        _state.update { it.copy(loadingClassrooms = true, classroomLoadError = null) }
         viewModelScope.launch {
-            _state.update { it.copy(loadingClassrooms = true, classroomLoadError = null) }
             when (val result = classroomRepository.classrooms()) {
                 is Outcome.Success -> {
                     val currentUserId = SessionTokenInspector.inspect(tokenStore.readAccessToken().orEmpty())?.userId
@@ -59,7 +75,9 @@ class GradebookViewModel @Inject constructor(
                         val allowed = result.value.filter {
                             it.canManage && it.status == ClassroomStatus.ACTIVE && it.teacherId == currentUserId
                         }
-                        val selection = current.classroomId.takeIf { id -> allowed.any { it.id == id } }
+                        val selection = if (requestedClassroomId != null) requestedClassroomId
+                            ?.takeIf { id -> allowed.any { it.id == id } }.orEmpty()
+                        else current.classroomId.takeIf { id -> allowed.any { it.id == id } }
                             ?: allowed.singleOrNull()?.id.orEmpty()
                         current.copy(
                             loadingClassrooms = false,
@@ -72,12 +90,17 @@ class GradebookViewModel @Inject constructor(
                             gradingPeriod = if (selection == current.classroomId) current.gradingPeriod else "",
                         )
                     }
+                    requestedClassroomId = null
                 }
                 is Outcome.Failure -> _state.update {
                     it.copy(
                         loadingClassrooms = false,
                         assignedClassrooms = emptyList(),
                         classroomId = "",
+                        categories = emptyList(),
+                        preview = null,
+                        importedFileName = null,
+                        gradingPeriod = "",
                         classroomLoadError = result.error.userMessage,
                     )
                 }
@@ -86,6 +109,7 @@ class GradebookViewModel @Inject constructor(
     }
 
     fun setClassroomId(value: String) = _state.update { current ->
+        if (current.submitting) return@update current
         if (!current.assignedClassrooms.any { it.id == value }) return@update current
         if (current.classroomId == value) return@update current
         // Do not carry one class's grade import or weighting into another class.
@@ -99,17 +123,18 @@ class GradebookViewModel @Inject constructor(
             successMessage = null,
         )
     }
-    fun setGradingPeriod(value: String) = _state.update { it.copy(gradingPeriod = value.take(80)) }
+    fun setGradingPeriod(value: String) = _state.update { if (it.submitting) it else it.copy(gradingPeriod = value.take(80)) }
 
     fun addCategory() = _state.update {
-        it.copy(categories = it.categories + GradeCategoryDraft("", 0.0), errorMessage = null)
+        if (it.submitting) it else it.copy(categories = it.categories + GradeCategoryDraft("", 0.0), errorMessage = null)
     }
 
     fun removeCategory(index: Int) = _state.update {
-        it.copy(categories = it.categories.filterIndexed { position, _ -> position != index })
+        if (it.submitting) it else it.copy(categories = it.categories.filterIndexed { position, _ -> position != index })
     }
 
     fun updateCategory(index: Int, name: String? = null, weight: Double? = null) = _state.update { current ->
+        if (current.submitting) return@update current
         current.copy(
             categories = current.categories.mapIndexed { position, category ->
                 if (position != index) category
@@ -123,6 +148,7 @@ class GradebookViewModel @Inject constructor(
     }
 
     fun importSpreadsheet(fileName: String, bytes: ByteArray) {
+        if (_state.value.submitting) return
         runCatching { SpreadsheetReader.read(fileName, bytes) }
             .onSuccess { preview ->
                 _state.update {
@@ -136,14 +162,15 @@ class GradebookViewModel @Inject constructor(
             }
             .onFailure { error ->
                 _state.update {
-                    it.copy(errorMessage = error.message ?: "No se pudo leer el archivo.", successMessage = null)
+                    it.copy(preview = null, importedFileName = null,
+                        errorMessage = error.message ?: "No se pudo leer el archivo.", successMessage = null)
                 }
             }
     }
 
     fun sync() {
         val current = _state.value
-        if (current.submitting) return
+        if (current.submitting || current.loadingClassrooms) return
         if (!current.schemeComplete) {
             _state.update { it.copy(errorMessage = "La ponderación debe sumar exactamente 100%.") }
             return
@@ -154,6 +181,10 @@ class GradebookViewModel @Inject constructor(
         }
         val preview = current.preview ?: run {
             _state.update { it.copy(errorMessage = "Importa un Excel/CSV o captura las calificaciones antes de sincronizar.") }
+            return
+        }
+        if (preview.rows.isEmpty() || preview.warnings.isNotEmpty()) {
+            _state.update { it.copy(errorMessage = "Corrige los errores del archivo antes de enviar las calificaciones.") }
             return
         }
 
@@ -171,8 +202,8 @@ class GradebookViewModel @Inject constructor(
             return
         }
 
+        _state.update { it.copy(submitting = true, errorMessage = null, successMessage = null) }
         viewModelScope.launch {
-            _state.update { it.copy(submitting = true, errorMessage = null, successMessage = null) }
             when (
                 val result = repository.sync(
                     GradeSyncRequest(
@@ -185,7 +216,15 @@ class GradebookViewModel @Inject constructor(
                 is Outcome.Success -> _state.update {
                     it.copy(
                         submitting = false,
-                        successMessage = "${result.value.acceptedStudentIds.size} calificaciones sincronizadas.",
+                        successMessage = when (result.value.status) {
+                            org.companerodeescuela.shared.contracts.GradeSyncStatus.SYNCED ->
+                                "${result.value.acceptedStudentIds.size} calificaciones sincronizadas."
+                            org.companerodeescuela.shared.contracts.GradeSyncStatus.PARTIALLY_SYNCED ->
+                                "${result.value.acceptedStudentIds.size} aceptadas · ${result.value.rejectedStudentIds.size} rechazadas. Revisa el resultado."
+                            org.companerodeescuela.shared.contracts.GradeSyncStatus.UNAVAILABLE -> null
+                        },
+                        errorMessage = if (result.value.status == org.companerodeescuela.shared.contracts.GradeSyncStatus.UNAVAILABLE)
+                            "La sincronización institucional no está disponible." else null,
                     )
                 }
                 is Outcome.Failure -> _state.update {
@@ -201,7 +240,7 @@ class GradebookViewModel @Inject constructor(
     ): Double? {
         var total = 0.0
         for (category in categories) {
-            val value = values.entries.firstOrNull { it.key.equals(category.name, ignoreCase = true) }?.value
+            val value = values.entries.firstOrNull { it.key.trim().equals(category.name.trim(), ignoreCase = true) }?.value
                 ?: return null
             if (value !in 0.0..10.0) return null
             total += value * (category.weightPercent / 100.0)

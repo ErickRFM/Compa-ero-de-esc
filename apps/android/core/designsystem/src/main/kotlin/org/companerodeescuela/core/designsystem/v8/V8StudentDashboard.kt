@@ -36,8 +36,23 @@ fun V8DashboardStat(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     progress: Float? = null,
+    compact: Boolean = false,
 ) {
     V8GlassCard(modifier = modifier.clickable(onClick = onClick), contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp)) {
+        if (compact) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = if (label.contains("clase", ignoreCase = true)) Icons.Filled.School else Icons.Filled.CheckCircle,
+                    contentDescription = null,
+                    tint = V8RedColors.Crimson,
+                    modifier = Modifier.size(26.dp),
+                )
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(label, fontSize = 12.sp, color = V8RedColors.TextSecondary)
+                    Text(value, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = V8RedColors.TextPrimary)
+                }
+            }
+        } else {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(
                 modifier = Modifier.size(34.dp).background(V8RedColors.DeepCrimson.copy(alpha = .45f), CircleShape),
@@ -72,6 +87,7 @@ fun V8DashboardStat(
                     trackColor = V8RedColors.Outline,
                 )
             }
+        }
         }
     }
 }

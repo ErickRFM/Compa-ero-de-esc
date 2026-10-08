@@ -32,7 +32,6 @@ import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8ClassSummary
 import org.companerodeescuela.core.designsystem.v8.V8DailyClassRow
-import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
 import org.companerodeescuela.core.designsystem.v8.V8DashboardStat
 import androidx.compose.material3.TextButton
@@ -68,11 +67,13 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+        viewModel.refresh()
+    }
 
     val overview = state.overview
     val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        V8CampusBackdrop(modifier = Modifier.matchParentSize())
         val splitLayout = maxWidth >= CompaneroWindowBreakpoints.medium
         Column(
             modifier = Modifier
@@ -238,95 +239,8 @@ fun HomeScreen(
 }
 
 @Composable
-private fun TodayContextPanel(
-    day: TodayOverview,
-    reducedMotion: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    val current = day.current
-    if (current == null) {
-        val next = day.next
-        StatusNotice(
-            title = if (next != null) "Entre clases" else "Terminaste tus clases de hoy",
-            message = if (next != null) {
-                "Tu siguiente clase comienza a las " + next.startsAt + "."
-            } else {
-                "No tienes más clases programadas hoy."
-            },
-            modifier = modifier,
-        )
-        return
-    }
-
-    AnimatedContent(
-        modifier = modifier,
-        targetState = current,
-        transitionSpec = {
-            val duration = if (reducedMotion) {
-                CompaneroMotionDuration.FAST
-            } else {
-                CompaneroMotionDuration.STANDARD
-            }
-            (
-                fadeIn(tween(duration)) +
-                    scaleIn(
-                        initialScale = if (reducedMotion) 1f else 0.99f,
-                        animationSpec = tween(duration),
-                    )
-                ).togetherWith(
-                    fadeOut(tween(duration)) +
-                        scaleOut(
-                            targetScale = if (reducedMotion) 1f else 0.99f,
-                            animationSpec = tween(duration),
-                        ),
-                )
-        },
-        label = "currentClassHero",
-    ) { classEntry ->
-        HeroAcademicCard(
-            subject = classEntry.subjectName,
-            time = classEntry.startsAt + " – " + classEntry.endsAt,
-            location = locationLabel(classEntry),
-            teacher = classEntry.teacherName,
-            progress = classProgress(classEntry),
-            supportingText = remainingLabel(classEntry.endsAt, "Termina"),
-        )
-    }
-}
-
-@Composable
-private fun NextClassPanel(
-    day: TodayOverview,
-    modifier: Modifier = Modifier,
-) {
-    val next = day.next?.takeIf { it != day.current } ?: return
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
-    ) {
-        Text(
-            text = "Siguiente",
-            style = MaterialTheme.typography.titleLarge,
-        )
-        AcademicClassCard(
-            subject = next.subjectName,
-            time = next.startsAt + " – " + next.endsAt,
-            location = locationLabel(next),
-            teacher = next.teacherName,
-            supportingText = remainingLabel(next.startsAt, "Comienza"),
-            subjectKey = next.subjectCode.ifBlank { next.subjectName },
-        )
-    }
-}
-
-@Composable
 private fun DayTimeline(day: TodayOverview, onOpenSchedule: () -> Unit) {
-    Text(
-        text = "Horario de hoy",
-        style = MaterialTheme.typography.titleLarge,
-        color = V8RedColors.TextPrimary,
-        fontWeight = FontWeight.Bold,
-    )
+    org.companerodeescuela.core.designsystem.v8.V8SectionTitle("Horario de hoy")
     day.classes.forEach { entry ->
         val status = classStatus(entry, day.current, day.next)
         V8DailyClassRow(
@@ -368,17 +282,6 @@ private fun locationLabel(entry: ScheduleEntry): String =
     listOfNotNull(entry.classroomName, entry.buildingName)
         .joinToString(" · ")
         .ifBlank { "Aula por confirmar" }
-
-private fun remainingLabel(time: String, verb: String): String? {
-    val target = runCatching { LocalTime.parse(time) }.getOrNull() ?: return null
-    val minutes = java.time.Duration.between(LocalTime.now(), target).toMinutes()
-    return when {
-        minutes > 1 -> verb + " en " + minutes + " min"
-        minutes == 1L -> verb + " en 1 min"
-        minutes == 0L -> verb + " ahora"
-        else -> null
-    }
-}
 
 private fun upcomingDayLabel(daysAway: Int?): String {
     if (daysAway == null) return "Próximamente"

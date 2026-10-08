@@ -10,12 +10,20 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.MaterialTheme
+import org.companerodeescuela.core.designsystem.v8.V8ColorScheme
+import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
+import org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
@@ -29,22 +37,50 @@ fun CompaneroScaffold(
     navController: NavHostController = rememberNavController(),
     startDestination: Destination = Destination.Home,
     topLevelDestinations: List<TopLevelDestination> = TopLevelDestination.entries,
+    highContrast: Boolean = false,
     destinations: NavGraphBuilder.() -> Unit,
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
+    val onSecondaryScreen = isSecondaryRoute(
+        currentRoute = currentDestination?.route,
+        startRoute = startDestination.route,
+        topLevelRoutes = topLevelDestinations.map { it.destination.route },
+    )
     val secondaryTitle = when (currentDestination?.route) {
         Destination.Profile.route -> "Perfil"
         Destination.AppearanceSettings.route -> "Tema y accesibilidad"
+        Destination.IntegrationSettings.route -> "Integración institucional"
         Destination.DesignSystemCatalog.route -> "Sistema visual"
-        else -> null
+        Destination.Grading.route -> "Calificaciones"
+        Destination.Channel.route -> "Canal"
+        Destination.Classrooms.route -> "Clases"
+        Destination.Schedule.route -> "Horario"
+        Destination.Attendance.route -> "Asistencia"
+        else -> "Volver"
     }
-    val onSecondaryScreen = secondaryTitle != null
 
+    val studentColors = if (highContrast) V8ColorScheme.copy(
+        outline = V8ColorScheme.onSurfaceVariant,
+        outlineVariant = V8ColorScheme.onSurface.copy(alpha = 0.65f),
+    ) else V8ColorScheme
+    val studentGlass = startDestination == Destination.Home || startDestination == Destination.TeacherHome
+    MaterialTheme(colorScheme = if (studentGlass) studentColors else MaterialTheme.colorScheme) {
+    CompositionLocalProvider(
+        LocalV8GlassEnabled provides studentGlass,
+        LocalContentColor provides if (studentGlass) V8ColorScheme.onSurface else LocalContentColor.current,
+    ) {
+    Box(Modifier.fillMaxSize()) {
+    if (studentGlass) V8CampusBackdrop(Modifier.matchParentSize())
     Scaffold(
+        containerColor = if (studentGlass) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
             if (onSecondaryScreen) {
                 TopAppBar(
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = if (studentGlass) Color.Transparent else MaterialTheme.colorScheme.surface,
+                        scrolledContainerColor = if (studentGlass) Color.Transparent else MaterialTheme.colorScheme.surface,
+                    ),
                     title = { Text(secondaryTitle.orEmpty()) },
                     navigationIcon = {
                         IconButton(onClick = { navController.popBackStack() }) {
@@ -80,7 +116,7 @@ fun CompaneroScaffold(
                 destinations()
             }
 
-            if (!onSecondaryScreen) {
+            if (!onSecondaryScreen && topLevelDestinations.none { it.destination == Destination.Profile }) {
                 IconButton(
                     onClick = {
                         navController.navigate(Destination.Profile.route) {
@@ -98,5 +134,8 @@ fun CompaneroScaffold(
                 }
             }
         }
+    }
+    }
+    }
     }
 }

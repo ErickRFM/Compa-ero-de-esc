@@ -10,6 +10,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlinx.coroutines.test.runTest
 import org.companerodeescuela.api.academic.AcademicOccurrenceProjection
 import org.companerodeescuela.api.errors.ApiException
@@ -38,6 +41,16 @@ class AttendanceServiceTest {
     private val provider = MockAcademicProvider()
     private val initialInstant = Instant.parse("2026-10-05T08:02:00Z")
     private val occurrenceDate = LocalDate.parse("2026-10-05")
+
+    @Test
+    fun `expired session cannot be returned as a newly opened pass`() = runTest {
+        val clock = MutableClock(initialInstant)
+        val service = service(clock = clock)
+        val request = requestFor(teacherOccurrence()).copy(durationMinutes = 1)
+        service.openSession("T-0001", request)
+        clock.advance(Duration.ofMinutes(2))
+        assertFailsWith<ApiException.Conflict> { service.openSession("T-0001", request) }
+    }
 
     @Test
     fun `teacher opens attendance only for a dated occurrence they teach`() = runTest {
@@ -213,6 +226,9 @@ class AttendanceServiceTest {
         assertEquals(AttendanceStatus.VERIFIED, reviewed.status)
         assertEquals("T-0001", reviewed.reviewedBy)
         assertEquals(AttendanceReasonCode.TEACHER_REVIEW, reviewed.reasonCode)
+        val wire = Json.encodeToString(reviewed)
+        assertTrue(wire.contains("\"originalStatus\":\"" + record.status.name.lowercase() + "\""), wire)
+        assertTrue(wire.contains("reviewHistory"), wire)
     }
 
     @Test

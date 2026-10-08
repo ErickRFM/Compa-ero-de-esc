@@ -53,6 +53,7 @@ import androidx.compose.ui.graphics.Brush
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
 import org.companerodeescuela.core.designsystem.v8.V8FrostedGlassPanel
+import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -102,7 +103,7 @@ fun LoginScreen(
             .background(Brush.verticalGradient(listOf(UptlaxBackground, Color(0xFF16070C), UptlaxBackground)))
             .imePadding(),
     ) {
-        CampusLoginBackdrop()
+        V8CampusBackdrop(modifier = Modifier.matchParentSize(), login = true)
 
         Column(
             modifier = Modifier

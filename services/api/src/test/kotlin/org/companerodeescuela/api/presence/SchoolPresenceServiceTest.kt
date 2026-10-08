@@ -34,6 +34,8 @@ class SchoolPresenceServiceTest {
         assertEquals(true, result.qrVerified)
         assertEquals(true, result.networkVerified)
         assertEquals(NetworkVerificationMethod.SSID_BSSID, result.networkVerificationMethod)
+        assertEquals(instant.epochSecond, result.serverTimeEpochSeconds)
+        assertEquals(instant.epochSecond, service.activeFor("2020-10455")?.serverTimeEpochSeconds)
     }
 
     @Test

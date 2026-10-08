@@ -9,10 +9,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
+import org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled
+import org.companerodeescuela.core.designsystem.v8.v8GlassSurface
+import androidx.compose.ui.unit.dp
 
 enum class NoticeTone {
     NEUTRAL,
@@ -29,6 +33,7 @@ fun StatusNotice(
     modifier: Modifier = Modifier,
     tone: NoticeTone = NoticeTone.NEUTRAL,
 ) {
+    val glass = LocalV8GlassEnabled.current && tone == NoticeTone.NEUTRAL
     val darkSurface = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     val container = when (tone) {
         NoticeTone.NEUTRAL -> MaterialTheme.colorScheme.surfaceContainerLow
@@ -62,16 +67,16 @@ fun StatusNotice(
     }
 
     Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = container,
+        modifier = modifier.fillMaxWidth().then(if (glass) Modifier.v8GlassSurface() else Modifier),
+        color = if (glass) Color.Transparent else container,
         shape = MaterialTheme.shapes.large,
-        tonalElevation = CompaneroElevation.subtle,
-        shadowElevation = if (tone == NoticeTone.NEUTRAL) {
+        tonalElevation = if (glass) 0.dp else CompaneroElevation.subtle,
+        shadowElevation = if (glass) 0.dp else if (tone == NoticeTone.NEUTRAL) {
             CompaneroElevation.subtle
         } else {
             CompaneroElevation.card
         },
-        border = border,
+        border = if (glass) null else border,
     ) {
         Column(modifier = Modifier.padding(CompaneroSpacing.sm)) {
             Text(

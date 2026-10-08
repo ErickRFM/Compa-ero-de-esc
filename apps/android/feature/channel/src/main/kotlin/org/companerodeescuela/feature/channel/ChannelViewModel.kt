@@ -17,6 +17,7 @@ import org.companerodeescuela.shared.contracts.ChannelPost
 import org.companerodeescuela.shared.contracts.ChannelPresetResponse
 import org.companerodeescuela.shared.contracts.ClassChannelSummary
 import org.companerodeescuela.shared.contracts.CreateChannelPostRequest
+import org.companerodeescuela.shared.contracts.TeacherClassContext
 
 data class ChannelUiState(
     val loading: Boolean = true,
@@ -37,12 +38,36 @@ class ChannelViewModel @Inject constructor(
 ) : ViewModel() {
     private val _state = MutableStateFlow(ChannelUiState())
     val state: StateFlow<ChannelUiState> = _state.asStateFlow()
+    private var requestedClassroom: TeacherClassContext? = null
+
+    fun requestClassroom(selection: TeacherClassContext) {
+        requestedClassroom = selection
+        if (_state.value.channels.isNotEmpty()) resolveRequestedChannel()
+    }
+
+    private fun resolveRequestedChannel(): String? {
+        val context = requestedClassroom ?: return _state.value.selectedChannelId
+        val match = _state.value.channels.singleOrNull {
+            it.canPublish && it.id == context.classroomId && it.courseId == context.classroomId
+        }
+        if (match != null) {
+            selectChannel(match.id)
+            requestedClassroom = null
+        }
+        else {
+            transitionTo(null)
+            _state.update { it.copy(loading = false,
+                errorMessage = "No hay un canal autorizado para ${context.subjectName} · ${context.groupName.orEmpty()}.") }
+        }
+        return match?.id
+    }
 
     init { refreshChannels() }
 
     fun refreshChannels() {
+        if (_state.value.actionInProgress || _state.value.loading && _state.value.channels.isNotEmpty()) return
+        _state.update { it.copy(loading = true, errorMessage = null) }
         viewModelScope.launch {
-            _state.update { it.copy(loading = true, errorMessage = null) }
             when (val result = repository.channels()) {
                 is Outcome.Success -> {
                     val previous = _state.value.selectedChannelId
@@ -52,37 +77,49 @@ class ChannelViewModel @Inject constructor(
                         it.copy(
                             loading = false,
                             channels = result.value,
-                            selectedChannelId = selected?.id,
-                            posts = if (selected == null) emptyList() else it.posts,
                             errorMessage = null,
                         )
                     }
-                    selected?.let { loadPosts(it.id) }
+                    if (requestedClassroom != null) resolveRequestedChannel()?.let(::loadPosts)
+                    else {
+                        transitionTo(selected?.id)
+                        selected?.let { loadPosts(it.id) }
+                    }
                 }
-                is Outcome.Failure -> _state.update {
-                    it.copy(
+                is Outcome.Failure -> {
+                    transitionTo(null)
+                    _state.update { it.copy(
                         loading = false,
                         channels = emptyList(),
                         selectedChannelId = null,
                         posts = emptyList(),
                         errorMessage = result.error.userMessage,
-                    )
+                    ) }
                 }
             }
         }
     }
 
     fun selectChannel(channelId: String) {
+        if (_state.value.actionInProgress || _state.value.channels.none { it.id == channelId }) return
+        if (_state.value.selectedChannelId == channelId) return
+        transitionTo(channelId)
+        loadPosts(channelId)
+    }
+
+    private fun transitionTo(channelId: String?) {
         if (_state.value.selectedChannelId == channelId) return
         _state.update {
             it.copy(
                 selectedChannelId = channelId,
                 posts = emptyList(),
+                draftBody = "",
+                draftResourceLabel = "",
+                draftResourceUrl = "",
                 successMessage = null,
                 errorMessage = null,
             )
         }
-        loadPosts(channelId)
     }
 
     fun refreshPosts() {
@@ -105,7 +142,7 @@ class ChannelViewModel @Inject constructor(
         val snapshot = _state.value
         val channelId = snapshot.selectedChannelId ?: return
         val selected = snapshot.channels.firstOrNull { it.id == channelId } ?: return
-        if (!selected.canPublish || snapshot.actionInProgress) return
+        if (!selected.canPublish || snapshot.actionInProgress || snapshot.loading) return
 
         val body = snapshot.draftBody.trim()
         val resourceUrl = snapshot.draftResourceUrl.trim()
@@ -132,14 +169,8 @@ class ChannelViewModel @Inject constructor(
             )
         }
 
+        _state.update { it.copy(actionInProgress = true, errorMessage = null, successMessage = null) }
         viewModelScope.launch {
-            _state.update {
-                it.copy(
-                    actionInProgress = true,
-                    errorMessage = null,
-                    successMessage = null,
-                )
-            }
             when (
                 val result = repository.publish(
                     channelId = channelId,
@@ -150,7 +181,7 @@ class ChannelViewModel @Inject constructor(
                     ),
                 )
             ) {
-                is Outcome.Success -> _state.update {
+                is Outcome.Success -> if (_state.value.selectedChannelId == channelId) _state.update {
                     it.copy(
                         actionInProgress = false,
                         posts = listOf(result.value) + it.posts.filterNot { post ->
@@ -163,7 +194,7 @@ class ChannelViewModel @Inject constructor(
                         errorMessage = null,
                     )
                 }
-                is Outcome.Failure -> _state.update {
+                is Outcome.Failure -> if (_state.value.selectedChannelId == channelId) _state.update {
                     it.copy(
                         actionInProgress = false,
                         errorMessage = result.error.userMessage,
@@ -176,15 +207,10 @@ class ChannelViewModel @Inject constructor(
     fun acknowledge(post: ChannelPost, response: ChannelPresetResponse) {
         val channelId = _state.value.selectedChannelId ?: return
         if (response !in post.allowedResponses || _state.value.actionInProgress) return
+        if (_state.value.loading || post.channelId != channelId) return
 
+        _state.update { it.copy(actionInProgress = true, errorMessage = null, successMessage = null) }
         viewModelScope.launch {
-            _state.update {
-                it.copy(
-                    actionInProgress = true,
-                    errorMessage = null,
-                    successMessage = null,
-                )
-            }
             when (
                 val result = repository.acknowledge(
                     channelId = channelId,

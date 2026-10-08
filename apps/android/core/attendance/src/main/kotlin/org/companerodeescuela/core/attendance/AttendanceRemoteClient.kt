@@ -1,5 +1,7 @@
 package org.companerodeescuela.core.attendance
 
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import io.ktor.client.HttpClient
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
@@ -56,6 +58,7 @@ class AttendanceRemoteClient @Inject constructor(
         apiCall {
             client.post("presence/school-day/start") {
                 bearerAuth(accessToken)
+                contentType(ContentType.Application.Json)
                 setBody(request)
             }.requireBody<ApiResponse<SchoolPresenceResponse>>()
         }.map { it.data }
@@ -109,6 +112,7 @@ class AttendanceRemoteClient @Inject constructor(
         apiCall {
             client.post("attendance/sessions") {
                 bearerAuth(accessToken)
+                contentType(ContentType.Application.Json)
                 setBody(request)
             }.requireBody<ApiResponse<AttendanceSessionResponse>>()
         }.map { it.data }
@@ -132,6 +136,7 @@ class AttendanceRemoteClient @Inject constructor(
         apiCall {
             client.post("attendance/qr/inspect") {
                 bearerAuth(accessToken)
+                contentType(ContentType.Application.Json)
                 setBody(request)
             }.requireBody<ApiResponse<AttendanceQrInspectionResponse>>()
         }.map { it.data }
@@ -143,6 +148,7 @@ class AttendanceRemoteClient @Inject constructor(
         apiCall {
             client.post("attendance/sessions/$sessionId/confirm") {
                 bearerAuth(accessToken)
+                contentType(ContentType.Application.Json)
                 setBody(request)
             }.requireBody<ApiResponse<AttendanceRecordResponse>>()
         }.map { it.data }
@@ -198,6 +204,7 @@ class AttendanceRemoteClient @Inject constructor(
         apiCall {
             client.patch("attendance/records/$recordId/review") {
                 bearerAuth(accessToken)
+                contentType(ContentType.Application.Json)
                 setBody(request)
             }.requireBody<ApiResponse<AttendanceRecordResponse>>()
         }.map { it.data }
@@ -210,6 +217,7 @@ class AttendanceRemoteClient @Inject constructor(
         apiCall {
             client.post("attendance/sessions/" + operation.sessionId + "/attempts") {
                 bearerAuth(accessToken)
+                contentType(ContentType.Application.Json)
                 setBody(
                     AttendanceAttemptRequest(
                         operationId = operation.operationId,

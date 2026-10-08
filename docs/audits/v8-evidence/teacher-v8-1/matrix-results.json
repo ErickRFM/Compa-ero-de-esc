@@ -1,0 +1,44 @@
+[
+  {
+    "widthDp": 360,
+    "heightDp": 800,
+    "fontScale": 1.0,
+    "screens": 5,
+    "classChannelReturn": "passed"
+  },
+  {
+    "widthDp": 390,
+    "heightDp": 844,
+    "fontScale": 1.0,
+    "screens": 5,
+    "classChannelReturn": "passed"
+  },
+  {
+    "widthDp": 430,
+    "heightDp": 932,
+    "fontScale": 1.0,
+    "screens": 5,
+    "classChannelReturn": "passed"
+  },
+  {
+    "widthDp": 768,
+    "heightDp": 1024,
+    "fontScale": 1.0,
+    "screens": 5,
+    "classChannelReturn": "passed"
+  },
+  {
+    "widthDp": 1024,
+    "heightDp": 768,
+    "fontScale": 1.0,
+    "screens": 5,
+    "classChannelReturn": "passed"
+  },
+  {
+    "widthDp": 360,
+    "heightDp": 800,
+    "fontScale": 1.3,
+    "screens": 5,
+    "classChannelReturn": "passed"
+  }
+]

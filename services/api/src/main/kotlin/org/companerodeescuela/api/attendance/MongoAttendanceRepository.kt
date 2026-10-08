@@ -12,6 +12,9 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.bson.Document
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import org.companerodeescuela.shared.contracts.AttendanceReviewEntry
 import org.companerodeescuela.shared.contracts.AttendanceDisposition
 import org.companerodeescuela.shared.contracts.AttendanceReasonCode
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
@@ -212,6 +215,9 @@ class MongoAttendanceRepository(
         .append("reviewedBy", reviewedBy)
         .append("reviewedAtEpochSeconds", reviewedAtEpochSeconds)
         .append("disposition", disposition?.name)
+        .append("originalStatus", originalStatus?.name)
+        .append("originalReasonCode", originalReasonCode?.name)
+        .append("reviewHistory", Json.encodeToString(reviewHistory))
 
     private fun Document.toRecord(): AttendanceRecordResponse =
         AttendanceRecordResponse(
@@ -227,6 +233,9 @@ class MongoAttendanceRepository(
             reviewedBy = getString("reviewedBy"),
             reviewedAtEpochSeconds = numberAsLong("reviewedAtEpochSeconds"),
             disposition = getString("disposition")?.let(AttendanceDisposition::valueOf),
+            originalStatus = getString("originalStatus")?.let(AttendanceStatus::valueOf),
+            originalReasonCode = getString("originalReasonCode")?.let(AttendanceReasonCode::valueOf),
+            reviewHistory = getString("reviewHistory")?.let { Json.decodeFromString<List<AttendanceReviewEntry>>(it) }.orEmpty(),
         )
 
     private fun Document.requireLong(name: String): Long =

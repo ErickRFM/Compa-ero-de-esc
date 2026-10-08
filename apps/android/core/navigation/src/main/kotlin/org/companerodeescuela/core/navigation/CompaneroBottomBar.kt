@@ -6,9 +6,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -28,6 +30,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.CircleShape
+import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,14 +66,14 @@ fun CompaneroBottomBar(
             vertical = CompaneroSpacing.xxs,
         ),
         shape = MaterialTheme.shapes.extraLarge,
-        color = CompanionColors.graphite,
+        color = V8RedColors.Background,
         tonalElevation = CompaneroElevation.raised,
         shadowElevation = CompaneroElevation.immersive,
     ) {
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp)
+                .height(74.dp)
                 .padding(CompaneroSpacing.xxs),
         ) {
             val itemWidth = maxWidth / destinations.size
@@ -88,9 +92,9 @@ fun CompaneroBottomBar(
                 modifier = Modifier
                     .offset(x = pillOffset)
                     .width(itemWidth)
-                    .height(48.dp)
+                    .height(68.dp)
                     .clip(MaterialTheme.shapes.extraLarge)
-                    .background(CompanionColors.crimson),
+                    .background(V8RedColors.DeepCrimson.copy(alpha = 0.30f)),
             )
 
             Row(modifier = Modifier.fillMaxWidth()) {
@@ -118,45 +122,44 @@ fun CompaneroBottomBar(
                             },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .padding(horizontal = 8.dp)
-                                .graphicsLayer {
-                                    scaleX = scale
-                                    scaleY = scale
-                                },
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                            },
                         ) {
-                            Icon(
-                                imageVector = when (topLevel) {
-                                    TopLevelDestination.Home,
-                                    TopLevelDestination.TeacherHome,
-                                    TopLevelDestination.CoordinatorHome,
-                                    TopLevelDestination.AdminHome,
-                                    -> Icons.Filled.Home
-                                    TopLevelDestination.Schedule -> Icons.Filled.DateRange
-                                    TopLevelDestination.Classrooms -> Icons.Filled.School
-                                    TopLevelDestination.Channel -> Icons.Filled.Forum
-                                    TopLevelDestination.Attendance -> Icons.Filled.QrCodeScanner
-                                },
-                                contentDescription = topLevel.label,
-                                modifier = Modifier.size(20.dp),
-                                tint = if (selected) {
-                                    Color.White
-                                } else {
-                                    CompanionColors.onDarkSurfaceVariant
-                                },
-                            )
-                            if (selected) {
-                                Text(
-                                    text = topLevel.label,
-                                    modifier = Modifier.padding(start = 6.dp),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = Color.White,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
+                            val isQr = topLevel == TopLevelDestination.Attendance
+                            Box(
+                                modifier = Modifier
+                                    .size(if (isQr) 45.dp else 37.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isQr) V8RedColors.DeepCrimson else Color.Transparent),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = when (topLevel) {
+                                        TopLevelDestination.Home,
+                                        TopLevelDestination.TeacherHome,
+                                        TopLevelDestination.CoordinatorHome,
+                                        TopLevelDestination.AdminHome -> Icons.Filled.Home
+                                        TopLevelDestination.Schedule -> Icons.Filled.DateRange
+                                        TopLevelDestination.Classrooms -> Icons.Filled.School
+                                        TopLevelDestination.Channel -> Icons.Filled.Forum
+                                        TopLevelDestination.Attendance -> Icons.Filled.QrCodeScanner
+                                    },
+                                    contentDescription = topLevel.label,
+                                    modifier = Modifier.size(if (isQr) 26.dp else 22.dp),
+                                    tint = if (isQr) Color.White else if (selected) V8RedColors.Crimson else V8RedColors.TextSecondary,
                                 )
                             }
+                            Text(
+                                text = topLevel.label,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (selected) V8RedColors.Crimson else V8RedColors.TextSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
                     }
                 }

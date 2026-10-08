@@ -288,7 +288,11 @@ class MainActivity : ComponentActivity() {
                                         composable(Destination.Classrooms.route) {
                                             ClassroomScreen(
                                                 roles = session.roles,
+                                                teacherExperience = roleConfig.experience == AppExperience.TEACHER,
+                                                teacherUserId = session.userId,
+                                                onOpenAttendance = { navController.navigate(Destination.Attendance.route) { launchSingleTop = true } },
                                                 onOpenChannel = { navController.navigate(Destination.Channel.route) { launchSingleTop = true } },
+                                                onOpenGrading = { navController.navigate(Destination.Grading.route) { launchSingleTop = true } },
                                             )
                                         }
                                         composable(Destination.Grading.route) { GradebookScreen() }

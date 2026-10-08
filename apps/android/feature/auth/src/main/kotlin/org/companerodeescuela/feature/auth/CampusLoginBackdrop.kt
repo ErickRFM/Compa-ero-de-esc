@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import org.companerodeescuela.core.designsystem.R
 
 /**
  * The exact campus corridor image selected for Compañero de Clase.
@@ -24,7 +25,7 @@ import androidx.compose.ui.res.painterResource
 internal fun CampusLoginBackdrop(modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxSize()) {
         Image(
-            painter = painterResource(R.drawable.login_campus_red),
+            painter = painterResource(R.drawable.campus_red),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,

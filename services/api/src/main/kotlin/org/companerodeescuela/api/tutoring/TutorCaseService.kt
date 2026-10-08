@@ -33,7 +33,7 @@ class TutorCaseService(
             }
             else -> throw ApiException.Forbidden("Tutor permission is required")
         }
-        return records.map(TutorCaseRecord::toSummary)
+        return records.map { it.toSummary() }
     }
 
     suspend fun detail(actor: UserSummary, id: String): TutorCaseSummary {

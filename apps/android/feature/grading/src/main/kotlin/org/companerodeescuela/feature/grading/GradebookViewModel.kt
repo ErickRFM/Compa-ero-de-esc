@@ -53,19 +53,21 @@ class GradebookViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(loadingClassrooms = true, classroomLoadError = null) }
             when (val result = classroomRepository.classrooms()) {
-                is Outcome.Success -> _state.update { current ->
+                is Outcome.Success -> {
                     val currentUserId = SessionTokenInspector.inspect(tokenStore.readAccessToken().orEmpty())?.userId
-                    val allowed = result.value.filter {
-                        it.canManage && it.status == ClassroomStatus.ACTIVE && it.teacherId == currentUserId
+                    _state.update { current ->
+                        val allowed = result.value.filter {
+                            it.canManage && it.status == ClassroomStatus.ACTIVE && it.teacherId == currentUserId
+                        }
+                        val selection = current.classroomId.takeIf { id -> allowed.any { it.id == id } }
+                            ?: allowed.singleOrNull()?.id.orEmpty()
+                        current.copy(
+                            loadingClassrooms = false,
+                            assignedClassrooms = allowed,
+                            classroomId = selection,
+                            classroomLoadError = null,
+                        )
                     }
-                    val selection = current.classroomId.takeIf { id -> allowed.any { it.id == id } }
-                        ?: allowed.singleOrNull()?.id.orEmpty()
-                    current.copy(
-                        loadingClassrooms = false,
-                        assignedClassrooms = allowed,
-                        classroomId = selection,
-                        classroomLoadError = null,
-                    )
                 }
                 is Outcome.Failure -> _state.update {
                     it.copy(

@@ -16,11 +16,16 @@ import org.companerodeescuela.api.tutoring.InMemoryTutorAssignmentRepository
 import org.companerodeescuela.api.tutoring.MongoTutorAssignmentRepository
 import org.companerodeescuela.api.tutoring.TutorAssignmentRepository
 import org.companerodeescuela.api.tutoring.TutorAssignmentService
+import org.companerodeescuela.api.tutoring.TutorCaseService
+import org.companerodeescuela.api.tutoring.InMemoryTutorCaseRepository
+import org.companerodeescuela.api.tutoring.MongoTutorCaseRepository
+import org.companerodeescuela.api.tutoring.TutorCaseRepository
 
 data class AcademicFeatureGraph(
     val groupRepository: AcademicGroupRepository,
     val groupService: AcademicGroupService,
     val tutoringService: TutorAssignmentService,
+    val caseService: TutorCaseService,
     val scheduleOverrides: AcademicScheduleOverrideRepository,
     val scheduleManagement: AcademicScheduleManagementService,
 )
@@ -42,6 +47,12 @@ fun buildAcademicFeatureGraph(
         settings.environment == Environment.LOCAL -> InMemoryTutorAssignmentRepository()
         else -> error("Tutor assignments require MONGODB_URI outside local development")
     }
+    val caseRepository: TutorCaseRepository = when {
+        !settings.hasAuthentication -> InMemoryTutorCaseRepository()
+        settings.mongo.isConfigured -> MongoTutorCaseRepository(mongoConnection.database())
+        settings.environment == Environment.LOCAL -> InMemoryTutorCaseRepository()
+        else -> error("Tutoring cases require MONGODB_URI outside local development")
+    }
     val scheduleOverrides: AcademicScheduleOverrideRepository = when {
         !settings.hasAuthentication -> InMemoryAcademicScheduleOverrideRepository()
         settings.mongo.isConfigured ->
@@ -50,14 +61,16 @@ fun buildAcademicFeatureGraph(
         else -> error("Manual academic schedules require MONGODB_URI outside local development")
     }
 
+    val tutoringService = TutorAssignmentService(
+        repository = tutorRepository,
+        groupRepository = groupRepository,
+        accounts = accounts,
+    )
     return AcademicFeatureGraph(
         groupRepository = groupRepository,
         groupService = AcademicGroupService(groupRepository),
-        tutoringService = TutorAssignmentService(
-            repository = tutorRepository,
-            groupRepository = groupRepository,
-            accounts = accounts,
-        ),
+        tutoringService = tutoringService,
+        caseService = TutorCaseService(caseRepository, tutoringService, groupRepository),
         scheduleOverrides = scheduleOverrides,
         scheduleManagement = AcademicScheduleManagementService(scheduleOverrides),
     )

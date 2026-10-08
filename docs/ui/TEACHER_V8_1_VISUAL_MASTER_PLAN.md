@@ -1,7 +1,7 @@
 # Plan maestro de implementación visual — Docente V8.1
 
-**Fecha de auditoría:** 2026-10-08  
-**Línea base verificada:** `main@75b436daef3f7c6035e4d5bf380dc83051961c1c`  
+**Fecha de auditoría:** 2026-10-08
+**Línea base verificada:** `main@75b436daef3f7c6035e4d5bf380dc83051961c1c`
 **Estado:** PLAN DE EJECUCIÓN. No declarar imágenes generadas como capturas reales de la app ni funcionalidades completadas sin QA.
 
 ## 0. Objetivo

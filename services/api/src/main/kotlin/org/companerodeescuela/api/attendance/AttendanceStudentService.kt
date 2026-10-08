@@ -6,6 +6,8 @@ import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.presence.SchoolPresenceService
 import org.companerodeescuela.shared.contracts.ApiErrorCode
 import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
+import org.companerodeescuela.shared.contracts.ClassCallConfirmationRequest
+import org.companerodeescuela.shared.contracts.AttendanceDisposition
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionStatus
@@ -179,6 +181,67 @@ class AttendanceStudentService(
         }
     }
 
+
+    /**
+     * A one-tap class confirmation requires a campus entry plus CURRENT Wi-Fi evidence.
+     * No student device timestamp is used to decide whether the student is late.
+     */
+    suspend fun confirmClassCall(
+        studentId: String,
+        sessionId: String,
+        request: ClassCallConfirmationRequest,
+    ): AttendanceRecordResponse {
+        val operationId = request.operationId.trim()
+        if (operationId.isBlank() || operationId.length > MAX_OPERATION_ID_LENGTH) {
+            throw ApiException.Validation("operationId must be between 1 and 128 characters")
+        }
+        val presence = schoolPresenceService
+            ?: throw ApiException.DependencyUnavailable("School presence verification is not configured")
+        val session = repository.findSession(sessionId)
+            ?: throw ApiException.NotFound("Attendance session was not found")
+        val now = clock.instant().epochSecond
+        if (session.status != AttendanceSessionStatus.OPEN ||
+            now < session.openedAtEpochSeconds || now >= session.closesAtEpochSeconds
+        ) {
+            throw ApiException.Domain(
+                status = HttpStatusCode.Conflict,
+                code = ApiErrorCode.ATTENDANCE_SESSION_CLOSED,
+                message = "Attendance session is not currently open",
+            )
+        }
+        if (!enrollmentResolver.isEnrolled(studentId, session.courseId, session.groupName)) {
+            throw ApiException.Domain(
+                status = HttpStatusCode.Forbidden,
+                code = ApiErrorCode.ATTENDANCE_NOT_ENROLLED,
+                message = "You are not enrolled in this class",
+            )
+        }
+        presence.requireActive(studentId)
+        presence.verifyNetworkForAttendance(request.schoolNetwork)
+        val late = now > session.openedAtEpochSeconds + CLASS_CALL_GRACE_SECONDS
+        val candidate = AttendanceRecordResponse(
+            id = session.id + ":" + studentId,
+            operationId = operationId,
+            sessionId = session.id,
+            occurrenceId = session.occurrenceId,
+            studentId = studentId,
+            status = AttendanceStatus.VERIFIED,
+            reasonCode = AttendanceReasonCode.CLASS_CALL_CONFIRMED,
+            attemptedAtEpochSeconds = now,
+            receivedAtEpochSeconds = now,
+            disposition = if (late) AttendanceDisposition.LATE else AttendanceDisposition.PRESENT,
+        )
+        return when (val result = repository.writeAttempt(candidate)) {
+            is AttemptWriteResult.Created -> result.record
+            is AttemptWriteResult.Existing -> result.record
+            AttemptWriteResult.OperationConflict -> throw ApiException.Domain(
+                status = HttpStatusCode.Conflict,
+                code = ApiErrorCode.ATTENDANCE_OPERATION_CONFLICT,
+                message = "operationId was already used for another attendance",
+            )
+        }
+    }
+
     private fun classifyEvidence(
         request: AttendanceAttemptRequest,
         sessionId: String,
@@ -240,5 +303,6 @@ class AttendanceStudentService(
         const val MAX_OPERATION_ID_LENGTH = 128
         const val MAX_QR_TOKEN_LENGTH = 2_048
         const val LATE_SYNC_REVIEW_WINDOW_SECONDS = 24L * 60L * 60L
+        const val CLASS_CALL_GRACE_SECONDS = 5L * 60L
     }
 }

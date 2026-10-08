@@ -22,6 +22,7 @@ import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
+import org.companerodeescuela.shared.contracts.ClassCallConfirmationRequest
 import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
 import org.companerodeescuela.shared.contracts.UserRole
 
@@ -134,6 +135,23 @@ fun Route.attendanceRoutes(
                             studentId = principal.subjectId(),
                             sessionId = sessionId,
                             request = call.receive<AttendanceAttemptRequest>(),
+                        ),
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
+
+            post("/sessions/{sessionId}/confirm") {
+                val principal = call.requirePlatformPrincipal()
+                principal.requireRole(UserRole.STUDENT)
+                val sessionId = call.parameters["sessionId"]
+                    ?: throw ApiException.Validation("sessionId is required")
+                call.respond(
+                    ApiResponse(
+                        data = studentService.confirmClassCall(
+                            studentId = principal.subjectId(),
+                            sessionId = sessionId,
+                            request = call.receive<ClassCallConfirmationRequest>(),
                         ),
                         requestId = call.requestId(),
                     ),

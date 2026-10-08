@@ -73,6 +73,9 @@ enum class AttendanceReasonCode {
 
     @SerialName("qr_invalid")
     QR_INVALID,
+
+    @SerialName("class_call_confirmed")
+    CLASS_CALL_CONFIRMED,
 }
 
 @Serializable
@@ -175,4 +178,11 @@ data class ReviewAttendanceRequest(
     val status: AttendanceStatus,
     val reasonCode: AttendanceReasonCode = AttendanceReasonCode.TEACHER_REVIEW,
     val disposition: AttendanceDisposition? = null,
+)
+
+/** A class check-in must be verified server-side; receiving a notification does not count. */
+@Serializable
+data class ClassCallConfirmationRequest(
+    val operationId: String,
+    val schoolNetwork: SchoolNetworkEvidence,
 )

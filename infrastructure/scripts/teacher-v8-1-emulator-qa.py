@@ -22,8 +22,13 @@ def tap(label, index):
     if not matches:
         raise RuntimeError('Control not visible: ' + label)
     target = matches[index]
+    original = target
     while target.get('clickable') != 'true' and target in parents:
         target = parents[target]
+    # DocumentsUI list items can handle touch without declaring clickable.
+    # Fall back to the matching node's freshly observed bounds, never the root.
+    if target.get('clickable') != 'true':
+        target = original
     x1, y1, x2, y2 = map(int, re.findall(r'\d+', target.get('bounds')))
     if x2 <= x1 or y2 <= y1:
         raise RuntimeError('Control has no visible bounds')

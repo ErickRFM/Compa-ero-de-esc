@@ -98,20 +98,20 @@ class MongoTutorCaseRepository(database: MongoDatabase) : TutorCaseRepository {
     override suspend fun listForGroups(ids: Set<String>): List<TutorCaseRecord> {
         ensureIndexes()
         if (ids.isEmpty()) return emptyList()
-        return collection.find(com.mongodb.client.model.Filters.\`in\`("academicGroupId", ids)).toList()
-            .map(Document::toRecord).sortedByDescending(TutorCaseRecord::updatedAt)
+        return collection.find(com.mongodb.client.model.Filters.`in`("academicGroupId", ids)).toList()
+            .map { it.toRecord() }.sortedByDescending(TutorCaseRecord::updatedAt)
     }
 
     override suspend fun listForStudent(id: String): List<TutorCaseRecord> {
         ensureIndexes()
         return collection.find(eq("studentId", id)).toList()
-            .map(Document::toRecord).sortedByDescending(TutorCaseRecord::updatedAt)
+            .map { it.toRecord() }.sortedByDescending(TutorCaseRecord::updatedAt)
     }
 
     override suspend fun listAll(): List<TutorCaseRecord> {
         ensureIndexes()
         return collection.find().toList()
-            .map(Document::toRecord).sortedByDescending(TutorCaseRecord::updatedAt)
+            .map { it.toRecord() }.sortedByDescending(TutorCaseRecord::updatedAt)
     }
 
     override suspend fun compareAndUpdate(expected: TutorCaseRecord, updated: TutorCaseRecord): TutorCaseRecord? {

@@ -79,10 +79,12 @@ fun V8FrostedGlassPanel(
                 .height(1.dp)
                 .background(
                     Brush.horizontalGradient(
-                        Color.Transparent,
-                        Color(0xAAFFFFFF),
-                        V8RedColors.Crimson.copy(alpha = 0.48f),
-                        Color.Transparent,
+                        colors = listOf(
+                            Color.Transparent,
+                            Color(0xAAFFFFFF),
+                            V8RedColors.Crimson.copy(alpha = 0.48f),
+                            Color.Transparent,
+                        ),
                     ),
                 ),
         )

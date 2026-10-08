@@ -184,6 +184,18 @@ class ScheduleViewModel @Inject constructor(
     fun movePersonal(proposal: AgendaMoveProposal) {
         val entry = proposal.entry
         if (entry.source == ScheduleSource.INSTITUTIONAL) return
+        val currentEntries = _state.value.entries
+        val validated = AgendaEditingRules.proposeMove(
+            entry, proposal.targetDay, proposal.targetStart, currentEntries,
+        )
+        if (validated == null || validated.conflicts.isNotEmpty() ||
+            validated.targetEnd != proposal.targetEnd
+        ) {
+            _state.value = _state.value.copy(
+                errorMessage = "No se puede mover: el horario ya está ocupado o ha cambiado.",
+            )
+            return
+        }
         viewModelScope.launch {
             _state.value = _state.value.copy(actionInProgress = true, errorMessage = null)
             val draft = PersonalScheduleDraft(

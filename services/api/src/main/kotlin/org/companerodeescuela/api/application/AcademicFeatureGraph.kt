@@ -8,6 +8,7 @@ import org.companerodeescuela.api.academic.groups.AcademicGroupRepository
 import org.companerodeescuela.api.academic.groups.AcademicGroupService
 import org.companerodeescuela.api.academic.groups.InMemoryAcademicGroupRepository
 import org.companerodeescuela.api.academic.groups.MongoAcademicGroupRepository
+import org.companerodeescuela.api.auth.PlatformAccountRepository
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.database.MongoConnection
@@ -27,6 +28,7 @@ data class AcademicFeatureGraph(
 fun buildAcademicFeatureGraph(
     settings: ApiSettings,
     mongoConnection: MongoConnection,
+    accounts: PlatformAccountRepository? = null,
 ): AcademicFeatureGraph {
     val groupRepository = when {
         !settings.hasAuthentication -> InMemoryAcademicGroupRepository()
@@ -54,6 +56,7 @@ fun buildAcademicFeatureGraph(
         tutoringService = TutorAssignmentService(
             repository = tutorRepository,
             groupRepository = groupRepository,
+            accounts = accounts,
         ),
         scheduleOverrides = scheduleOverrides,
         scheduleManagement = AcademicScheduleManagementService(scheduleOverrides),

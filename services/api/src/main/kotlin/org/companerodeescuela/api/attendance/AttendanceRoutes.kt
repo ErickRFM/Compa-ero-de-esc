@@ -32,6 +32,7 @@ fun Route.attendanceRoutes(
     studentService: AttendanceStudentService,
     reviewService: AttendanceReviewService,
     qrService: AttendanceQrService? = null,
+    campusRoster: TeacherCampusRosterService? = null,
 ) {
     route("/attendance") {
         if (!settings.hasAuthentication) {
@@ -72,6 +73,27 @@ fun Route.attendanceRoutes(
                         data = studentService.inspectQr(
                             studentId = principal.subjectId(),
                             request = call.receive<AttendanceQrInspectionRequest>(),
+                        ),
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
+
+            get("/occurrences/{occurrenceId}/campus-roster") {
+                val principal = call.requirePlatformPrincipal()
+                principal.requireRole(UserRole.TEACHER)
+                val occurrenceId = call.parameters["occurrenceId"]
+                    ?: throw ApiException.Validation("occurrenceId is required")
+                val occurrenceDate = call.request.queryParameters["date"]
+                    ?: throw ApiException.Validation("date is required")
+                val rosterService = campusRoster
+                    ?: throw ApiException.DependencyUnavailable("School presence verification is not configured")
+                call.respond(
+                    ApiResponse(
+                        data = rosterService.forTeacher(
+                            teacherId = principal.subjectId(),
+                            occurrenceId = occurrenceId,
+                            date = occurrenceDate,
                         ),
                         requestId = call.requestId(),
                     ),

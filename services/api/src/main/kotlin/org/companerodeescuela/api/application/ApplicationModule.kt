@@ -67,6 +67,7 @@ fun Application.module(
         mongoConnection = mongoConnection,
         academicProvider = providerRegistry.academic,
         schoolPresenceService = presenceGraph?.service,
+        groupRepository = academicGraph.groupRepository,
     )
 
     val operationsGraph = buildOperationsFeatureGraph(
@@ -101,6 +102,7 @@ fun Application.module(
             studentService = attendanceGraph.studentService,
             reviewService = attendanceGraph.reviewService,
             qrService = attendanceGraph.qrService,
+            campusRoster = attendanceGraph.campusRoster,
         )
         presenceGraph?.let { graph ->
             schoolPresenceRoutes(

@@ -9,6 +9,8 @@ import org.companerodeescuela.api.attendance.AttendanceStudentService
 import org.companerodeescuela.api.attendance.InMemoryAttendanceRepository
 import org.companerodeescuela.api.attendance.MongoAttendanceRepository
 import org.companerodeescuela.api.attendance.ProviderAttendanceOccurrenceResolver
+import org.companerodeescuela.api.academic.groups.AcademicGroupRepository
+import org.companerodeescuela.api.attendance.TeacherCampusRosterService
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.database.MongoConnection
@@ -20,6 +22,7 @@ data class AttendanceFeatureGraph(
     val studentService: AttendanceStudentService,
     val reviewService: AttendanceReviewService,
     val qrService: AttendanceQrService?,
+    val campusRoster: TeacherCampusRosterService?,
 )
 
 fun buildAttendanceFeatureGraph(
@@ -27,6 +30,7 @@ fun buildAttendanceFeatureGraph(
     mongoConnection: MongoConnection,
     academicProvider: AcademicProvider,
     schoolPresenceService: SchoolPresenceService?,
+    groupRepository: AcademicGroupRepository,
 ): AttendanceFeatureGraph {
     val repository = when {
         !settings.hasAuthentication -> InMemoryAttendanceRepository()
@@ -41,10 +45,11 @@ fun buildAttendanceFeatureGraph(
         )
     }
     val accessPolicy = AttendanceAccessPolicy(repository)
+    val occurrenceResolver = ProviderAttendanceOccurrenceResolver(academicProvider)
     return AttendanceFeatureGraph(
         sessionService = AttendanceSessionService(
             repository = repository,
-            occurrenceResolver = ProviderAttendanceOccurrenceResolver(academicProvider),
+            occurrenceResolver = occurrenceResolver,
             accessPolicy = accessPolicy,
         ),
         studentService = AttendanceStudentService(
@@ -58,5 +63,8 @@ fun buildAttendanceFeatureGraph(
             accessPolicy = accessPolicy,
         ),
         qrService = qrService,
+        campusRoster = schoolPresenceService?.let { presence ->
+            TeacherCampusRosterService(occurrenceResolver, groupRepository, presence, repository)
+        },
     )
 }

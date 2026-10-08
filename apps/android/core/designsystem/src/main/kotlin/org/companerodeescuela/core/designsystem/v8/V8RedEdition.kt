@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.shadow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
@@ -47,7 +48,8 @@ fun V8GlassCard(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = V8RedDimensions.CardCorner,
     contentPadding: PaddingValues = PaddingValues(16.dp),
-    emphasized: Boolean = false,
+    highlighted: Boolean = false,
+    emphasized: Boolean = highlighted,
     content: @Composable BoxScope.() -> Unit,
 ) {
     V8FrostedGlassPanel(

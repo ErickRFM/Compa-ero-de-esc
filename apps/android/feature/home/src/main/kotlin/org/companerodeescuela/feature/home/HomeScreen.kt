@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -23,6 +24,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.sp
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
@@ -59,6 +63,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     onOpenSchedule: () -> Unit = {},
     onOpenClassrooms: () -> Unit = {},
+    onOpenChannel: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -80,21 +85,36 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
         ) {
             V8BrandHeader()
-            org.companerodeescuela.core.designsystem.v8.V8HeroTitle(
-                leading = "Hola,", accent = overview?.studentName?.substringBefore(" ") ?: "…",
-                modifier = Modifier.padding(end = 16.dp),
+            val firstName = overview?.studentName?.substringBefore(" ")?.takeIf { it.isNotBlank() }
+            Text(
+                text = buildAnnotatedString {
+                    append("Hola")
+                    if (firstName != null) {
+                        append(", ")
+                        withStyle(SpanStyle(color = V8RedColors.Crimson)) { append(firstName) }
+                    }
+                },
+                modifier = Modifier.padding(top = 8.dp, end = 42.dp),
+                fontSize = 37.sp,
+                lineHeight = 43.sp,
+                color = V8RedColors.TextPrimary,
+                fontWeight = FontWeight.Bold,
             )
             Text(
-                text = todayLabel(),
-                style = MaterialTheme.typography.bodyLarge,
+                text = "Un gran día para seguir construyendo tus metas. ✨",
+                fontSize = 16.sp,
+                lineHeight = 22.sp,
                 color = V8RedColors.TextSecondary,
             )
-
-            TextButton(
-                onClick = onOpenClassrooms,
-                modifier = Modifier.align(Alignment.End),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Mis clases")
+                Text(todayLabel(), color = V8RedColors.TextSecondary, style = MaterialTheme.typography.labelMedium)
+                TextButton(onClick = onOpenClassrooms) {
+                    Text("Mis clases  ›", color = V8RedColors.Crimson)
+                }
             }
 
             if (state.loading && overview == null) {
@@ -122,8 +142,24 @@ fun HomeScreen(
 
             overview?.let { day ->
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    V8DashboardStat(label = "Clases hoy", value = day.classes.size.toString(), onClick = onOpenSchedule, modifier = Modifier.weight(1f))
-                    V8DashboardStat(label = "Siguiente", value = day.next?.subjectName ?: "—", onClick = onOpenSchedule, modifier = Modifier.weight(1f))
+                    V8DashboardStat(
+                        label = "Clases hoy",
+                        value = day.classes.size.toString(),
+                        onClick = onOpenSchedule,
+                        modifier = Modifier.weight(1f),
+                    )
+                    V8DashboardStat(
+                        label = "Materias hoy",
+                        value = day.classes.distinctBy { entry -> entry.subjectCode.ifBlank { entry.subjectName } }.size.toString(),
+                        onClick = onOpenClassrooms,
+                        modifier = Modifier.weight(1f),
+                    )
+                    V8DashboardStat(
+                        label = "Próxima clase",
+                        value = day.next?.subjectName ?: "—",
+                        onClick = onOpenSchedule,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
                 when {
                     !day.hasSchedule -> {
@@ -172,12 +208,30 @@ fun HomeScreen(
                     }
                 }
 
+                Text("Avisos", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary, fontWeight = FontWeight.Bold)
+                V8GlassCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Canal de tus clases",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = V8RedColors.TextPrimary,
+                        )
+                        Text(
+                            text = "Consulta avisos y materiales publicados por tus docentes.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = V8RedColors.TextSecondary,
+                        )
+                        TextButton(onClick = onOpenChannel) {
+                            Text("Ver canales y avisos  ›", color = V8RedColors.Crimson)
+                        }
+                    }
+                }
                 TextButton(
                     onClick = viewModel::refresh,
                     enabled = !state.loading,
                     modifier = Modifier.align(Alignment.End),
                 ) {
-                    Text(if (state.loading) "Actualizando…" else "Actualizar")
+                    Text(if (state.loading) "Actualizando…" else "Actualizar", color = V8RedColors.TextSecondary)
                 }
             }
         }

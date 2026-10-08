@@ -1,9 +1,11 @@
 """Capture real emulator evidence. No session injection, synthetic UI or API writes."""
 import argparse
+import datetime
 import json
 import pathlib
 import re
 import runpy
+import subprocess
 import xml.etree.ElementTree as ET
 
 helper = runpy.run_path(str(pathlib.Path(__file__).with_name('v8-emulator-qa.py')))
@@ -44,6 +46,12 @@ def capture(name, expected):
         'size': ['wm', 'size'], 'density': ['wm', 'density'],
         'fontScale': ['settings', 'get', 'system', 'font_scale'],
     }.items()}
+    metadata.update({
+        'capturedAtUtc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        'sourceSha': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=root, text=True).strip(),
+        'expectedHeading': expected,
+        'environment': 'localhost QA; authenticated development account; real app UI',
+    })
     target.with_suffix('.json').write_text(json.dumps(metadata, indent=2), encoding='utf-8')
     print(target.with_suffix('.png'))
 

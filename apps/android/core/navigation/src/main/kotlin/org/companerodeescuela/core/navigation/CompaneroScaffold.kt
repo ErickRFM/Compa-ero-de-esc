@@ -17,6 +17,7 @@ import org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -65,7 +66,10 @@ fun CompaneroScaffold(
     ) else V8ColorScheme
     val studentGlass = startDestination == Destination.Home || startDestination == Destination.TeacherHome
     MaterialTheme(colorScheme = if (studentGlass) studentColors else MaterialTheme.colorScheme) {
-    CompositionLocalProvider(LocalV8GlassEnabled provides studentGlass) {
+    CompositionLocalProvider(
+        LocalV8GlassEnabled provides studentGlass,
+        LocalContentColor provides if (studentGlass) V8ColorScheme.onSurface else LocalContentColor.current,
+    ) {
     Box(Modifier.fillMaxSize()) {
     if (studentGlass) V8CampusBackdrop(Modifier.matchParentSize())
     Scaffold(

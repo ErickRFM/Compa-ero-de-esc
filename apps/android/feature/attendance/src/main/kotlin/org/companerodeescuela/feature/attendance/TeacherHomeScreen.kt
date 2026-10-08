@@ -184,12 +184,14 @@ fun TeacherHomeScreen(
                 ) {
                     V8DashboardStat(
                         label = "Clases hoy",
+                        compact = true,
                         value = if (state.occurrencesLoaded) sessions.count { it.date == today }.toString() else "—",
                         onClick = onOpenSchedule,
                         modifier = Modifier.weight(1f),
                     )
                     V8DashboardStat(
                         label = "Pases activos",
+                        compact = true,
                         value = if (state.sessionsLoaded) state.activeSessions.size.toString() else "—",
                         onClick = onOpenAttendance,
                         modifier = Modifier.weight(1f),
@@ -201,12 +203,14 @@ fun TeacherHomeScreen(
                 ) {
                     V8DashboardStat(
                         label = "Registros recibidos",
+                        compact = true,
                         value = if (active == null || state.roster == null) "—" else records.size.toString(),
                         onClick = onOpenAttendance,
                         modifier = Modifier.weight(1f),
                     )
                     V8DashboardStat(
                         label = "Por revisar",
+                        compact = true,
                         value = if (active == null || state.roster == null) "—" else review.toString(),
                         onClick = onOpenAttendance,
                         modifier = Modifier.weight(1f),

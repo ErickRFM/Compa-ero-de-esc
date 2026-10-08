@@ -48,6 +48,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import org.companerodeescuela.core.designsystem.v8.V8RedColors
+import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
+import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -60,14 +64,14 @@ import org.companerodeescuela.core.designsystem.brand.UptlaxBrand
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.motion.CompaneroMotionDuration
 
-private val UptlaxBackground = Color(0xFF090D13)
-private val UptlaxSurface = Color(0xFF111722)
-private val UptlaxAccent = Color(0xFFD20A3E)
-private val UptlaxAccentSoft = Color(0xFFF7DDE5)
-private val UptlaxPaper = Color(0xFFF7F6F2)
-private val UptlaxInk = Color(0xFF17191D)
-private val UptlaxMuted = Color(0xFF69707A)
-private val UptlaxBorder = Color(0xFFD5D8DE)
+private val UptlaxBackground = V8RedColors.Background
+private val UptlaxSurface = V8RedColors.Surface
+private val UptlaxAccent = V8RedColors.Crimson
+private val UptlaxAccentSoft = V8RedColors.TextSecondary
+private val UptlaxPaper = V8RedColors.Surface
+private val UptlaxInk = V8RedColors.TextPrimary
+private val UptlaxMuted = V8RedColors.TextSecondary
+private val UptlaxBorder = V8RedColors.Outline
 
 @Composable
 fun LoginScreen(
@@ -95,9 +99,10 @@ fun LoginScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(UptlaxBackground)
+            .background(Brush.verticalGradient(listOf(UptlaxBackground, Color(0xFF16070C), UptlaxBackground)))
             .imePadding(),
     ) {
+        V8CampusBackdrop(modifier = Modifier.matchParentSize(), login = true)
         Canvas(modifier = Modifier.fillMaxSize()) {
             val startX = size.width * 0.74f
             val endX = size.width * 0.98f
@@ -122,31 +127,33 @@ fun LoginScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 10.dp),
         ) {
-            UptlaxBrand(
-                modifier = Modifier
-                    .fillMaxWidth(0.44f)
-                    .height(46.dp),
-                tint = Color.White,
-            )
+            V8BrandHeader()
 
             Spacer(modifier = Modifier.height(20.dp))
 
             Text(
-                text = "Compañero de Clase",
+                text = "Tu vida universitaria,",
                 color = Color.White,
                 fontSize = 30.sp,
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                text = "Tu vida académica en contexto.",
+                text = "más simple.",
                 modifier = Modifier.padding(top = 3.dp),
-                color = Color(0xFFBBC2CC),
-                fontSize = 15.sp,
+                color = UptlaxAccent,
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Bold,
             )
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Text(
+                "Organiza tus clases, mantente al día y alcanza tus metas. Todo en un solo lugar.",
+                color = UptlaxMuted,
+                fontSize = 15.sp,
+                lineHeight = 21.sp,
+                modifier = Modifier.padding(top = 13.dp, bottom = 12.dp),
+            )
 
-            Card(
+            if (hasSessionNotice) Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = UptlaxSurface),
@@ -205,13 +212,13 @@ fun LoginScreen(
             ) {
                 Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp)) {
                     Text(
-                        text = "Acceso a Compañero",
+                        text = "Iniciar sesión",
                         color = UptlaxInk,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        text = "Tu cuenta funciona aunque la escuela no tenga una API conectada.",
+                        text = "Accede con tu cuenta escolar o matrícula.",
                         modifier = Modifier.padding(top = 3.dp, bottom = 14.dp),
                         color = UptlaxMuted,
                         fontSize = 13.sp,
@@ -290,7 +297,7 @@ fun LoginScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(top = 10.dp),
-                            color = Color(0xFFB42318),
+                            color = V8RedColors.Error,
                             fontSize = 13.sp,
                             lineHeight = 18.sp,
                         )
@@ -303,7 +310,7 @@ fun LoginScreen(
                             .padding(top = 14.dp)
                             .height(50.dp),
                         enabled = canSubmit,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(18.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = UptlaxAccent,
                             contentColor = Color.White,
@@ -335,7 +342,7 @@ fun LoginScreen(
                     }
 
                     Text(
-                        text = "¿Aún no tienes cuenta?",
+                        text = "¿Nuevo en Compañero de Clase?",
                         modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
                         color = UptlaxMuted,
                         fontSize = 12.sp,
@@ -359,7 +366,7 @@ fun LoginScreen(
             }
 
             Text(
-                text = "UPTLAX · Datos seguros · Uso académico",
+                text = "DISCIPLINA HOY, MEJORES MAÑANAS",
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 14.dp, bottom = 18.dp),

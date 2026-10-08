@@ -1,6 +1,7 @@
 package org.companerodeescuela.feature.channel
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,13 +28,21 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
+import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
+import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
+import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
@@ -48,7 +57,10 @@ fun ChannelScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val selected = state.channels.firstOrNull { it.id == state.selectedChannelId }
+    var selectedTab by remember(state.selectedChannelId) { mutableIntStateOf(0) }
 
+    Box(modifier = Modifier.fillMaxSize()) {
+        V8CampusBackdrop(modifier = Modifier.matchParentSize())
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -58,6 +70,7 @@ fun ChannelScreen(
             ),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
     ) {
+        V8BrandHeader()
         ChannelHeader(
             loading = state.loading,
             onRefresh = viewModel::refreshChannels,
@@ -120,9 +133,24 @@ fun ChannelScreen(
 
             else -> {
                 ChannelIdentity(selected)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    FilterChip(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        label = { Text("Avisos") },
+                        modifier = Modifier.weight(1f),
+                    )
+                    FilterChip(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        label = { Text("Chat · respuestas rápidas") },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
                 ChannelFeed(
                     posts = state.posts,
                     canPublish = selected.canPublish,
+                    allowQuickReplies = selectedTab == 1,
                     busy = state.actionInProgress,
                     loading = state.loading,
                     onAcknowledge = viewModel::acknowledge,
@@ -148,6 +176,7 @@ fun ChannelScreen(
                 }
             }
         }
+    }
     }
 }
 
@@ -209,25 +238,21 @@ private fun ChannelSelector(
 
 @Composable
 private fun ChannelIdentity(channel: ClassChannelSummary) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        tonalElevation = CompaneroElevation.subtle,
-        shadowElevation = CompaneroElevation.card,
-    ) {
+    V8GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(CompaneroSpacing.card),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
         ) {
             Text(
                 text = channel.subjectName,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.headlineSmall,
+                color = V8RedColors.TextPrimary,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
                 text = channel.groupName + " · " + channel.teacherDisplayName,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = V8RedColors.TextSecondary,
             )
         }
     }
@@ -237,6 +262,7 @@ private fun ChannelIdentity(channel: ClassChannelSummary) {
 private fun ChannelFeed(
     posts: List<ChannelPost>,
     canPublish: Boolean,
+    allowQuickReplies: Boolean,
     busy: Boolean,
     loading: Boolean,
     onAcknowledge: (ChannelPost, ChannelPresetResponse) -> Unit,
@@ -275,7 +301,7 @@ private fun ChannelFeed(
         items(posts, key = ChannelPost::id) { post ->
             ChannelPostCard(
                 post = post,
-                showStudentActions = !canPublish,
+                showStudentActions = !canPublish && allowQuickReplies,
                 busy = busy,
                 onAcknowledge = onAcknowledge,
             )
@@ -292,16 +318,7 @@ private fun ChannelPostCard(
 ) {
     val uriHandler = LocalUriHandler.current
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        tonalElevation = CompaneroElevation.subtle,
-        shadowElevation = if (post.pinned) {
-            CompaneroElevation.raised
-        } else {
-            CompaneroElevation.card
-        },
-    ) {
+    V8GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(CompaneroSpacing.card),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
@@ -320,7 +337,7 @@ private fun ChannelPostCard(
                     Text(
                         text = postTypeLabel(post.type),
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = V8RedColors.Crimson,
                     )
                 }
                 if (post.pinned) {

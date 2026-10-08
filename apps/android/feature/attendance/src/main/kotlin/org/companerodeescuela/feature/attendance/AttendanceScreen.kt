@@ -4,7 +4,9 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -57,6 +60,11 @@ import kotlinx.coroutines.launch
 import org.companerodeescuela.core.database.LocalAttendanceRecord
 import org.companerodeescuela.core.database.LocalAttendanceSyncState
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
+import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
+import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
+import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8AttendanceEvidence
+import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
@@ -165,16 +173,24 @@ private fun StudentAttendance(
     }
     var showPasteDialog by remember { mutableStateOf(false) }
 
+    Box(modifier = modifier.fillMaxSize()) {
+        V8CampusBackdrop(modifier = Modifier.matchParentSize())
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
             .widthIn(max = CompaneroSize.homeContentMaxWidth)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
+        V8BrandHeader()
+        V8AttendanceEvidence(
+            schoolNetworkVerified = if (state.schoolPresence == null) null else true,
+            locationVerified = null,
+            ready = state.schoolPresence != null && state.activeSessions.isNotEmpty(),
+        )
         AttendanceHeader(
-            title = "Asistencia",
+            title = "Pase de lista",
             subtitle = "Al escanear guardamos la evidencia primero. El servidor confirma después el estado final.",
             loading = state.loading,
             onRefresh = onRefresh,
@@ -248,6 +264,8 @@ private fun StudentAttendance(
                 LocalAttendanceRow(record)
             }
         }
+    }
+
     }
 
     if (showPasteDialog) {
@@ -401,27 +419,25 @@ private fun QrCenterCard(
     onImage: () -> Unit,
     onPaste: () -> Unit,
 ) {
-    CompaneroSurface(
-        modifier = Modifier.fillMaxWidth(),
-        role = CompaneroSurfaceRole.CARD,
-    ) {
+    V8GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(CompaneroSpacing.md),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
         ) {
-            Text("Comprobar otro QR", style = MaterialTheme.typography.titleMedium)
+            Icon(Icons.Filled.QrCodeScanner, contentDescription = null, tint = V8RedColors.Crimson, modifier = Modifier.size(78.dp).align(Alignment.CenterHorizontally))
+            Text("Escanea el código QR", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary, modifier = Modifier.align(Alignment.CenterHorizontally))
             Text(
                 text = "Escanéalo, elige una captura o pega el código. La evidencia se guarda primero y se verifica después.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = V8RedColors.TextSecondary,
             )
             Button(onClick = onScan, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Filled.QrCodeScanner, contentDescription = null)
-                Text(" Escanear con cámara")
+                Text(" Escanear código QR")
             }
             OutlinedButton(onClick = onImage, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Filled.Image, contentDescription = null)
-                Text(" Elegir imagen")
+                Text(" Desde galería")
             }
             OutlinedButton(onClick = onPaste, modifier = Modifier.fillMaxWidth()) {
                 Text("Pegar código")

@@ -147,7 +147,7 @@ class MongoAcademicGroupRepository(
     override suspend fun listMembers(groupId: String): List<AcademicGroupMembershipRecord> {
         ensureIndexes()
         return memberships.find(eq("groupId", groupId)).toList()
-            .map(Document::toMembership).sortedBy { it.userId }
+            .map { it.toMembership() }.sortedBy { it.userId }
     }
 
     private suspend fun ensureIndexes() {

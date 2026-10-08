@@ -46,7 +46,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
@@ -65,7 +64,7 @@ fun CompaneroBottomBar(
         currentDestination
             ?.hierarchy
             ?.any { it.route == topLevel.destination.route } == true
-    }.coerceAtLeast(0)
+    }
     val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
     val compactLabels = LocalDensity.current.fontScale > 1.3f
 
@@ -97,14 +96,16 @@ fun CompaneroBottomBar(
                 label = "navPillOffset",
             )
 
-            Box(
-                modifier = Modifier
-                    .offset(x = pillOffset)
-                    .width(itemWidth)
-                    .height(68.dp)
-                    .clip(MaterialTheme.shapes.extraLarge)
-                    .background(V8RedColors.DeepCrimson.copy(alpha = 0.30f)),
-            )
+            if (selectedIndex >= 0) {
+                Box(
+                    modifier = Modifier
+                        .offset(x = pillOffset)
+                        .width(itemWidth)
+                        .height(68.dp)
+                        .clip(MaterialTheme.shapes.extraLarge)
+                        .background(V8RedColors.DeepCrimson.copy(alpha = 0.30f)),
+                )
+            }
 
             Row(modifier = Modifier.fillMaxWidth()) {
                 destinations.forEachIndexed { index, topLevel ->
@@ -121,13 +122,7 @@ fun CompaneroBottomBar(
                             .heightIn(min = 74.dp)
                             .clip(MaterialTheme.shapes.extraLarge)
                             .clickable {
-                                navController.navigate(topLevel.destination.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
+                                navController.navigateToTopLevel(topLevel.destination)
                             },
                         contentAlignment = Alignment.Center,
                     ) {

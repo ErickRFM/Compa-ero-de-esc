@@ -15,6 +15,33 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class LoginV8SmokeTest {
     @Test
+    fun registrationAccountTypeCanBeSelectedByItsLabel() {
+        ActivityScenario.launch(MainActivity::class.java).use {
+            val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+            assertTrue(device.wait(Until.hasObject(By.textContains("universitaria,")), 10_000))
+            if (!device.hasObject(By.text("Crear cuenta"))) {
+                UiScrollable(UiSelector().scrollable(true)).scrollTextIntoView("Crear cuenta")
+            }
+            device.findObject(By.text("Crear cuenta")).click()
+            assertTrue(device.wait(Until.hasObject(By.text("Nombre")), 5_000))
+            if (!device.hasObject(By.text("Docente"))) {
+                UiScrollable(UiSelector().scrollable(true)).scrollTextIntoView("Docente")
+            }
+            device.findObject(By.text("Docente")).click()
+            assertTrue(
+                "The account label must select the teacher role",
+                device.wait(Until.hasObject(By.textContains("requieren verificación")), 3_000),
+            )
+            assertTrue(device.hasObject(By.text("Alumno")))
+            if (!device.hasObject(By.text("Ya tengo cuenta"))) {
+                UiScrollable(UiSelector().scrollable(true)).scrollTextIntoView("Ya tengo cuenta")
+            }
+            device.findObject(By.text("Ya tengo cuenta")).click()
+            assertTrue(device.wait(Until.hasObject(By.textContains("universitaria,")), 5_000))
+        }
+    }
+
+    @Test
     fun signedOutUserSeesInstitutionalLogin() {
         ActivityScenario.launch(MainActivity::class.java).use {
             val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())

@@ -1,5 +1,6 @@
 package org.companerodeescuela.feature.channel
 
+import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,10 +24,10 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material3.AssistChip
+import org.companerodeescuela.core.designsystem.v8.V8GlassAssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
+import org.companerodeescuela.core.designsystem.v8.V8GlassFilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -58,7 +59,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
 import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
-import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.v8GlassSurface
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
@@ -92,8 +92,7 @@ fun ChannelScreen(
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = CompaneroSpacing.sm),
         ) {
-            item { V8BrandHeader() }
-            item { ChannelHeader(state.loading || state.actionInProgress, viewModel::refreshChannels) }
+            item { V8ScreenHeader { ChannelHeader(state.loading || state.actionInProgress, viewModel::refreshChannels) } }
             if (state.channels.isNotEmpty()) item {
                 ChannelSelector(state.channels, state.selectedChannelId, viewModel::selectChannel)
             }
@@ -195,7 +194,7 @@ private fun ChannelSelector(
         horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
     ) {
         items(channels, key = ClassChannelSummary::id) { channel ->
-            FilterChip(
+            V8GlassFilterChip(
                 selected = channel.id == selectedId,
                 onClick = { onSelect(channel.id) },
                 label = {
@@ -321,7 +320,7 @@ private fun ChannelPostCard(
             }
 
             post.attachments.forEach { attachment ->
-                AssistChip(
+                V8GlassAssistChip(
                     onClick = { uriHandler.openUri(attachment.url) },
                     label = { Text(attachment.label) },
                     leadingIcon = {
@@ -344,7 +343,7 @@ private fun ChannelPostCard(
                     horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
                 ) {
                     items(post.allowedResponses.toList(), key = { it.name }) { response ->
-                        AssistChip(
+                        V8GlassAssistChip(
                             onClick = { onAcknowledge(post, response) },
                             enabled = !busy,
                             label = { Text(responseLabel(response)) },
@@ -417,10 +416,9 @@ private fun TeacherComposer(
 
 @Composable
 private fun StudentChannelFooter() {
-    Surface(
+    V8GlassCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
     ) {
         Row(
             modifier = Modifier.padding(CompaneroSpacing.sm),
@@ -430,7 +428,7 @@ private fun StudentChannelFooter() {
             Icon(
                 imageVector = Icons.Filled.Lock,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = V8RedColors.TextSecondary,
             )
             Column {
                 Text(
@@ -440,7 +438,7 @@ private fun StudentChannelFooter() {
                 Text(
                     text = "Puedes leer y usar respuestas rápidas, pero no enviar mensajes.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = V8RedColors.TextSecondary,
                 )
             }
         }

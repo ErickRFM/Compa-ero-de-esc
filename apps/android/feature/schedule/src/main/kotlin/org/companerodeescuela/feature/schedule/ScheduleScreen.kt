@@ -1,5 +1,6 @@
 package org.companerodeescuela.feature.schedule
 
+import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,7 +18,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
-import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
 import org.companerodeescuela.core.designsystem.v8.V8DaySelector
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,7 +38,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
+import org.companerodeescuela.core.designsystem.v8.V8GlassFilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -156,8 +156,9 @@ fun ScheduleScreen(
             .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
-        V8BrandHeader()
-        V8HeroTitle(leading = "Mi", accent = "horario")
+        V8ScreenHeader {
+            V8HeroTitle(leading = "Mi", accent = "horario")
+        }
         Text(
             text = "Organiza tu semana, consulta tus clases incluso sin conexión.",
             style = MaterialTheme.typography.bodyMedium,
@@ -231,9 +232,9 @@ fun ScheduleScreen(
             )
         } else {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                item { FilterChip(selected = subjectFilter == null, onClick = { subjectFilter = null }, label = { Text("Todas") }) }
+                item { V8GlassFilterChip(selected = subjectFilter == null, onClick = { subjectFilter = null }, label = { Text("Todas") }) }
                 items(state.entries.map { it.subjectName }.distinct().sorted()) { name ->
-                    FilterChip(selected = subjectFilter == name, onClick = { subjectFilter = name }, label = { Text(name) })
+                    V8GlassFilterChip(selected = subjectFilter == name, onClick = { subjectFilter = name }, label = { Text(name) })
                 }
             }
             val visibleEntries = state.entries.filter { subjectFilter == null || it.subjectName == subjectFilter }
@@ -511,7 +512,7 @@ private fun DayAgenda(
                     verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
                 ) {
                     days.forEach { day ->
-                        FilterChip(
+                        V8GlassFilterChip(
                             selected = selectedDay == day,
                             onClick = { onSelectedDay(day) },
                             label = { Text(dayLabel(day)) },
@@ -541,7 +542,7 @@ private fun DayAgenda(
                             horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
                         ) {
                             rowDays.forEach { day ->
-                                FilterChip(
+                                V8GlassFilterChip(
                                     selected = selectedDay == day,
                                     onClick = { onSelectedDay(day) },
                                     label = { Text(dayShortLabel(day)) },
@@ -970,7 +971,7 @@ private fun ScheduleEditorDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
                     ) {
-                        FilterChip(
+                        V8GlassFilterChip(
                             selected = !applyToSeries,
                             onClick = {
                                 applyToSeries = false
@@ -979,7 +980,7 @@ private fun ScheduleEditorDialog(
                             label = { Text("Solo este día") },
                             modifier = Modifier.weight(1f),
                         )
-                        FilterChip(
+                        V8GlassFilterChip(
                             selected = applyToSeries,
                             onClick = {
                                 applyToSeries = true
@@ -1002,7 +1003,7 @@ private fun ScheduleEditorDialog(
                             horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
                         ) {
                             rowDays.forEach { value ->
-                                FilterChip(
+                                V8GlassFilterChip(
                                     selected = value in selectedDays,
                                     onClick = {
                                         selectedDays = if (value in selectedDays) {

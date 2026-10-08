@@ -1,5 +1,6 @@
 package org.companerodeescuela.feature.tutoring
 
+import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -43,7 +44,9 @@ fun TutorHomeScreen(
             .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
-        Text("Tutorías", style = MaterialTheme.typography.headlineSmall)
+        V8ScreenHeader {
+            Text("Tutorías", style = MaterialTheme.typography.headlineSmall)
+        }
         Text(
             "Acompañamiento académico de tus grupos asignados.",
             style = MaterialTheme.typography.bodyMedium,

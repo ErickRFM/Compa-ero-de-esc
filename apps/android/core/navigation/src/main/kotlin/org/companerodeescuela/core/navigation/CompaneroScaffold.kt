@@ -13,6 +13,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.MaterialTheme
 import org.companerodeescuela.core.designsystem.v8.V8ColorScheme
 import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
+import org.companerodeescuela.core.designsystem.v8.LocalV8HeaderAction
 import org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -21,10 +22,8 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -65,9 +64,20 @@ fun CompaneroScaffold(
         outlineVariant = V8ColorScheme.onSurface.copy(alpha = 0.65f),
     ) else V8ColorScheme
     val studentGlass = startDestination == Destination.Home || startDestination == Destination.TeacherHome
+    val headerAction: (@Composable () -> Unit)? =
+        if (!onSecondaryScreen && topLevelDestinations.none { it.destination == Destination.Profile }) {
+            {
+                IconButton(onClick = {
+                    navController.navigate(Destination.Profile.route) { launchSingleTop = true }
+                }) {
+                    Icon(Icons.Filled.Person, contentDescription = "Abrir perfil")
+                }
+            }
+        } else null
     MaterialTheme(colorScheme = if (studentGlass) studentColors else MaterialTheme.colorScheme) {
     CompositionLocalProvider(
         LocalV8GlassEnabled provides studentGlass,
+        LocalV8HeaderAction provides headerAction,
         LocalContentColor provides if (studentGlass) V8ColorScheme.onSurface else LocalContentColor.current,
     ) {
     Box(Modifier.fillMaxSize()) {
@@ -116,23 +126,7 @@ fun CompaneroScaffold(
                 destinations()
             }
 
-            if (!onSecondaryScreen && topLevelDestinations.none { it.destination == Destination.Profile }) {
-                IconButton(
-                    onClick = {
-                        navController.navigate(Destination.Profile.route) {
-                            launchSingleTop = true
-                        }
-                    },
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 2.dp, end = 6.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Person,
-                        contentDescription = "Abrir perfil",
-                    )
-                }
-            }
+
         }
     }
     }

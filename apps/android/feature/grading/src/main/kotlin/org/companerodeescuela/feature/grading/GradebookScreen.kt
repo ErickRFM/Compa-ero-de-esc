@@ -42,7 +42,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
-import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
 import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
@@ -86,7 +85,9 @@ fun GradebookScreen(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        V8CampusBackdrop(modifier = Modifier.matchParentSize())
+        if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current) {
+            V8CampusBackdrop(modifier = Modifier.matchParentSize())
+        }
         Column(
             modifier = Modifier.align(Alignment.TopCenter)
                 .widthIn(max = CompaneroSize.homeContentMaxWidth).fillMaxSize()
@@ -94,7 +95,6 @@ fun GradebookScreen(
                 .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
         ) {
-            V8BrandHeader()
             Text(
                 "Evaluación",
                 style = MaterialTheme.typography.headlineLarge,

@@ -1,5 +1,6 @@
 package org.companerodeescuela.feature.attendance
 
+import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,7 +36,6 @@ import java.time.LocalDate
 import java.time.LocalTime
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
-import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
 import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8ClassSummary
 import org.companerodeescuela.core.designsystem.v8.V8DailyClassRow
@@ -73,7 +73,9 @@ fun TeacherHomeScreen(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        V8CampusBackdrop(modifier = Modifier.matchParentSize())
+        if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current) {
+            V8CampusBackdrop(modifier = Modifier.matchParentSize())
+        }
         Column(
             modifier = Modifier.align(Alignment.TopCenter)
                 .widthIn(max = CompaneroSize.homeContentMaxWidth).fillMaxSize()
@@ -81,21 +83,22 @@ fun TeacherHomeScreen(
                 .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
         ) {
-            V8BrandHeader()
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = "Inicio docente",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = V8RedColors.TextPrimary,
-                    fontWeight = FontWeight.Bold,
-                )
-                val greeting = displayName?.trim()?.takeIf { it.isNotEmpty() }
-                Text(
-                    text = greeting?.let { "Hola, $it · Tus clases asignadas" }
-                        ?: "Consulta tus clases asignadas y organiza la jornada.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = V8RedColors.TextSecondary,
-                )
+            V8ScreenHeader {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "Inicio docente",
+                        style = MaterialTheme.typography.headlineLarge,
+                        color = V8RedColors.TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    val greeting = displayName?.trim()?.takeIf { it.isNotEmpty() }
+                    Text(
+                        text = greeting?.let { "Hola, $it · Tus clases asignadas" }
+                            ?: "Consulta tus clases asignadas y organiza la jornada.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = V8RedColors.TextSecondary,
+                    )
+                }
             }
 
             if (state.mode == AttendanceMode.LOADING || state.loading && state.occurrences.isEmpty()) {

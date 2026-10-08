@@ -415,10 +415,12 @@ private fun RoleUnavailableScreen(experience: AppExperience) {
             .padding(horizontal = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.page),
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineMedium,
-        )
+        org.companerodeescuela.core.designsystem.v8.V8ScreenHeader {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineMedium,
+            )
+        }
         Text(
             text = if (experience == AppExperience.UNSUPPORTED) {
                 "Tu cuenta está creada, pero todavía no tiene un rol operativo habilitado."

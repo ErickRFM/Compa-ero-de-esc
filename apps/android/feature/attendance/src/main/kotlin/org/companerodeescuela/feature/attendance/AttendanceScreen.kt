@@ -1,5 +1,6 @@
 package org.companerodeescuela.feature.attendance
 
+import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -73,7 +74,6 @@ import org.companerodeescuela.core.database.LocalAttendanceRecord
 import org.companerodeescuela.core.database.LocalAttendanceSyncState
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
-import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8AttendanceEvidence
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
@@ -213,8 +213,9 @@ private fun StudentAttendance(
             .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
-        V8BrandHeader()
-        org.companerodeescuela.core.designsystem.v8.V8HeroTitle("Pase de", "lista")
+        V8ScreenHeader {
+            org.companerodeescuela.core.designsystem.v8.V8HeroTitle("Pase de", "lista")
+        }
         V8AttendanceEvidence(
             schoolNetworkVerified = schoolVerified,
             locationVerified = null,
@@ -671,19 +672,22 @@ private fun TeacherAttendance(
     val records = state.roster?.takeIf { it.session.id == active?.id }?.records.orEmpty()
     val review = records.filter { it.status == AttendanceStatus.REVIEW_REQUIRED }
     Box(modifier = modifier.fillMaxSize()) {
-        V8CampusBackdrop(Modifier.matchParentSize())
+        if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current) {
+            V8CampusBackdrop(Modifier.matchParentSize())
+        }
         LazyColumn(
             modifier = Modifier.fillMaxSize().widthIn(max = CompaneroSize.homeContentMaxWidth)
                 .align(Alignment.TopCenter),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(CompaneroSpacing.page),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
         ) {
-            item { V8BrandHeader() }
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Asistencia", style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold, color = V8RedColors.TextPrimary)
-                    Text("Pase de lista · " + (active?.groupName ?: campus?.groupName ?: "Tus grupos"), color = V8RedColors.TextSecondary)
+                V8ScreenHeader {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Asistencia", style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Bold, color = V8RedColors.TextPrimary)
+                        Text("Pase de lista · " + (active?.groupName ?: campus?.groupName ?: "Tus grupos"), color = V8RedColors.TextSecondary)
+                    }
                 }
             }
             state.errorMessage?.let { item { StatusNotice("No pudimos actualizar", it, tone = NoticeTone.ERROR) } }
@@ -1030,6 +1034,7 @@ private fun LoadingAttendance(modifier: Modifier) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        V8ScreenHeader { Text("Asistencia", style = MaterialTheme.typography.headlineSmall) }
         CircularProgressIndicator()
         Text(
             text = "Preparando asistencia…",
@@ -1050,6 +1055,7 @@ private fun UnsupportedAttendance(
             .padding(CompaneroSpacing.lg),
         verticalArrangement = Arrangement.Center,
     ) {
+        V8ScreenHeader { Text("Asistencia", style = MaterialTheme.typography.headlineSmall) }
         StatusNotice(
             title = "Asistencia no disponible",
             message = message ?: "Tu rol actual no tiene un flujo de asistencia en esta versión.",

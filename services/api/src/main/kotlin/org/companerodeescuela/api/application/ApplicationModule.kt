@@ -22,6 +22,7 @@ import org.companerodeescuela.api.integrations.ProviderRegistry
 import org.companerodeescuela.api.plugins.configurePlugins
 import org.companerodeescuela.api.presence.schoolPresenceRoutes
 import org.companerodeescuela.api.tutoring.tutoringRoutes
+import org.companerodeescuela.api.tutoring.tutorCaseRoutes
 
 /**
  * Composes the application graph.
@@ -113,6 +114,7 @@ fun Application.module(
         }
         academicGroupRoutes(settings = settings, service = academicGraph.groupService)
         tutoringRoutes(settings = settings, service = academicGraph.tutoringService)
+        tutorCaseRoutes(settings = settings, service = academicGraph.caseService)
         classroomRoutes(settings = settings, service = classroomGraph.classroomService)
         channelRoutes(settings = settings, service = classroomGraph.channelService)
         academicEventRoutes(settings = settings, service = operationsGraph.eventService)

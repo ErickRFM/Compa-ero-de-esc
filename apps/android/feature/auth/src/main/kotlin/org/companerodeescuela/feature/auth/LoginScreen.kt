@@ -5,7 +5,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -46,11 +45,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
-import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -65,10 +62,10 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.motion.CompaneroMotionDuration
 
 private val UptlaxBackground = V8RedColors.Background
-private val UptlaxSurface = V8RedColors.Surface
+private val UptlaxSurface = V8RedColors.Surface.copy(alpha = 0.94f)
 private val UptlaxAccent = V8RedColors.Crimson
 private val UptlaxAccentSoft = V8RedColors.TextSecondary
-private val UptlaxPaper = V8RedColors.Surface
+private val UptlaxPaper = V8RedColors.Surface.copy(alpha = 0.91f)
 private val UptlaxInk = V8RedColors.TextPrimary
 private val UptlaxMuted = V8RedColors.TextSecondary
 private val UptlaxBorder = V8RedColors.Outline
@@ -102,21 +99,7 @@ fun LoginScreen(
             .background(Brush.verticalGradient(listOf(UptlaxBackground, Color(0xFF16070C), UptlaxBackground)))
             .imePadding(),
     ) {
-        V8CampusBackdrop(modifier = Modifier.matchParentSize(), login = true)
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val startX = size.width * 0.74f
-            val endX = size.width * 0.98f
-            val topY = size.height * 0.035f
-            repeat(5) { index ->
-                val offset = index * 16f
-                drawLine(
-                    color = UptlaxAccent.copy(alpha = 0.62f),
-                    start = Offset(startX + offset, topY),
-                    end = Offset(endX, topY + 126f + offset),
-                    strokeWidth = 2f,
-                )
-            }
-        }
+        CampusLoginBackdrop()
 
         Column(
             modifier = Modifier
@@ -370,7 +353,7 @@ fun LoginScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 14.dp, bottom = 18.dp),
-                color = Color(0xFF7F8792),
+                color = Color(0xFFCDC4CA),
                 fontSize = 11.sp,
             )
         }
@@ -381,14 +364,14 @@ fun LoginScreen(
 private fun institutionalFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedTextColor = UptlaxInk,
     unfocusedTextColor = UptlaxInk,
-    focusedContainerColor = Color.White,
-    unfocusedContainerColor = Color.White,
-    disabledContainerColor = Color(0xFFF0F0EE),
+    focusedContainerColor = Color(0xE01C151B),
+    unfocusedContainerColor = Color(0xD71C151B),
+    disabledContainerColor = Color(0xD71C151B),
     focusedBorderColor = UptlaxAccent,
     unfocusedBorderColor = UptlaxBorder,
     focusedLabelColor = UptlaxAccent,
     unfocusedLabelColor = UptlaxMuted,
     cursorColor = UptlaxAccent,
-    errorBorderColor = Color(0xFFB42318),
-    errorLabelColor = Color(0xFFB42318),
+    errorBorderColor = V8RedColors.Error,
+    errorLabelColor = V8RedColors.Error,
 )

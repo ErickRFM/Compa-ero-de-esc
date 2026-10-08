@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -24,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.LocalDate
+import java.time.LocalTime
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
@@ -76,7 +78,7 @@ fun TeacherHomeScreen(
             V8BrandHeader()
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = "Panel docente",
+                    text = "Inicio docente",
                     style = MaterialTheme.typography.headlineLarge,
                     color = V8RedColors.TextPrimary,
                     fontWeight = FontWeight.Bold,
@@ -104,11 +106,68 @@ fun TeacherHomeScreen(
 
                 val today = LocalDate.now().toString()
                 val sessions = state.occurrences.sortedWith(compareBy({ it.date }, { it.startsAt }))
-                val upcoming = sessions.filter { it.date >= today }
+                val localClock = LocalTime.now().toString().take(5)
+                val upcoming = sessions.filter { it.date > today || (it.date == today && it.endsAt.take(5) >= localClock) }
                 val records = state.roster?.records.orEmpty()
                 val review = records.count { it.status == AttendanceStatus.REVIEW_REQUIRED }
                 val active = state.teacherSession
                 val campus = state.campusRoster
+
+                Text("Pase de lista", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary)
+                V8GlassCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            text = if (active != null) "EN VIVO · ${active.groupName}" else "Sin pase abierto",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (active != null) V8RedColors.Success else V8RedColors.TextSecondary,
+                        )
+                        Text(
+                            text = if (active != null) {
+                                sessions.firstOrNull { it.id == active.occurrenceId }?.subjectName
+                                    ?: "Sesión de ${active.groupName}"
+                            } else "Inicia el pase de una clase asignada",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = V8RedColors.TextPrimary,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = if (active != null) {
+                                "${active.scheduledStartsAt} – ${active.scheduledEndsAt} · " +
+                                    (if (state.roster == null) "Actualizando registros…" else "${records.size} registros recibidos")
+                            } else "El QR se genera desde el servidor y se renueva automáticamente.",
+                            color = V8RedColors.TextSecondary,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        V8RedPrimaryButton(
+                            text = if (active == null) "Iniciar pase de lista" else "Gestionar pase activo",
+                            onClick = onOpenAttendance,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+
+                val nextClass = upcoming.firstOrNull()
+                if (nextClass != null) {
+                    V8GlassCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenSchedule)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
+                            Text("SIGUIENTE CLASE", color = V8RedColors.Crimson,
+                                style = MaterialTheme.typography.labelLarge)
+                            Text(nextClass.subjectName, color = V8RedColors.TextPrimary,
+                                style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            Text(
+                                listOfNotNull(
+                                    nextClass.date,
+                                    nextClass.startsAt + " – " + nextClass.endsAt,
+                                    nextClass.classroomName?.takeIf(String::isNotBlank),
+                                ).joinToString(" · "),
+                                color = V8RedColors.TextSecondary,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Text("Ver detalles en Mi horario", color = V8RedColors.TextSecondary,
+                                style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -152,11 +211,16 @@ fun TeacherHomeScreen(
                                 style = MaterialTheme.typography.titleMedium, color = V8RedColors.TextPrimary)
                             Text("${campus.students.count { it.campusEntryAtEpochSeconds != null }} de ${campus.students.size} integrantes con entrada validada",
                                 style = MaterialTheme.typography.bodyMedium, color = V8RedColors.TextSecondary)
-                            campus.students.take(3).forEach { student ->
-                                Text("${student.studentId} · " +
-                                    (if (student.campusEntryAtEpochSeconds != null) "Registró entrada" else "Sin registro activo"),
-                                    style = MaterialTheme.typography.bodySmall, color = V8RedColors.TextSecondary)
-                            }
+                            Text(
+                                "Consulta el padrón completo y los retardos en Asistencia.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = V8RedColors.TextSecondary,
+                            )
+                            V8RedPrimaryButton(
+                                text = "Abrir padrón",
+                                onClick = onOpenAttendance,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
                         }
                     }
                 } else if (state.campusRosterError != null) {
@@ -164,40 +228,7 @@ fun TeacherHomeScreen(
                         message = state.campusRosterError!!)
                 }
 
-                Text("Pase de lista", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary)
-                V8GlassCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            text = if (active != null) "EN VIVO · ${active.groupName}" else "Sin pase abierto",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = if (active != null) V8RedColors.Success else V8RedColors.TextSecondary,
-                        )
-                        Text(
-                            text = if (active != null) {
-                                sessions.firstOrNull { it.id == active.occurrenceId }?.subjectName
-                                    ?: "Sesión de ${active.groupName}"
-                            } else "Inicia el pase de una clase asignada",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = V8RedColors.TextPrimary,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            text = if (active != null) {
-                                "${active.scheduledStartsAt} – ${active.scheduledEndsAt} · " +
-                                    (if (state.roster == null) "Actualizando registros…" else "${records.size} registros recibidos")
-                            } else "El QR se genera desde el servidor y se renueva automáticamente.",
-                            color = V8RedColors.TextSecondary,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        V8RedPrimaryButton(
-                            text = if (active == null) "Iniciar pase de lista" else "Gestionar pase activo",
-                            onClick = onOpenAttendance,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
-
-                Text("Herramientas docentes", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary)
+                Text("Accesos rápidos", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TeacherToolCard("Mis clases", "Grupos asignados", onOpenClassrooms, Modifier.weight(1f))
                     TeacherToolCard("Mi horario", "Agenda semanal", onOpenSchedule, Modifier.weight(1f))
@@ -207,14 +238,14 @@ fun TeacherHomeScreen(
                     TeacherToolCard("Evaluación", "Excel y calificaciones", onOpenGrading, Modifier.weight(1f))
                 }
 
-                Text("Próximas clases", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary)
+                Text("Tu agenda", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary)
                 if (upcoming.isEmpty()) {
                     StatusNotice(
                         title = "Sin próximas clases asignadas",
                         message = "Control escolar asigna las clases. Cuando estén disponibles, aparecerán aquí.",
                     )
                 } else {
-                    upcoming.take(4).forEach { occurrence ->
+                    upcoming.take(3).forEach { occurrence ->
                         V8DailyClassRow(
                             classInfo = V8ClassSummary(
                                 id = occurrence.id,
@@ -245,7 +276,7 @@ private fun TeacherToolCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    V8GlassCard(modifier = modifier.clickable(onClick = onClick)) {
+    V8GlassCard(modifier = modifier.heightIn(min = 76.dp).clickable(onClick = onClick)) {
         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(title, color = V8RedColors.TextPrimary, style = MaterialTheme.typography.titleMedium)
             Text(subtitle, color = V8RedColors.TextSecondary, style = MaterialTheme.typography.bodySmall)

@@ -51,12 +51,14 @@ object FeatureBindingsModule {
         scheduler: AttendanceSyncScheduler,
         remoteClient: AttendanceRemoteClient,
         offlineQrStore: AndroidAttendanceQrPackStore,
+        tokenStore: SessionTokenStore,
         networkEvidenceProvider: SchoolNetworkEvidenceProvider,
     ): AttendanceRepository = AttendanceRepository(
         localStore = localStore,
         scheduler = scheduler,
         remoteClient = remoteClient,
         offlineQrStore = offlineQrStore,
+        sessionTokenStore = tokenStore,
         networkEvidenceProvider = networkEvidenceProvider,
     )
 

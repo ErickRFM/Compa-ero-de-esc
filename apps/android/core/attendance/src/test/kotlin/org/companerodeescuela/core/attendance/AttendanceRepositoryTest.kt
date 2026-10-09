@@ -121,6 +121,32 @@ class AttendanceRepositoryTest {
     }
 
     @Test
+    fun `expired local identity may queue signed QR offline but cannot confirm presence`() = runTest {
+        val store = FakeStore()
+        val scheduler = FakeScheduler()
+        val tokenStore = FakeTokenStore(token("student-1", 1L))
+        val repository = AttendanceRepository(
+            localStore = store,
+            scheduler = scheduler,
+            remoteClient = unusedRemoteClient(tokenStore),
+            sessionTokenStore = tokenStore,
+            networkEvidenceProvider = SchoolNetworkEvidenceProvider { null },
+            clock = clock,
+            newOperationId = { "offline-jwt-expired" },
+        )
+
+        val claims = assertIs<Outcome.Success<org.companerodeescuela.core.security.PlatformSessionClaims>>(
+            repository.localSessionClaims(),
+        ).value
+        assertEquals("student-1", claims.userId)
+        val saved = repository.enqueueAttempt("session-1", "preissued-server-signed")
+        assertIs<Outcome.Success<LocalAttendanceRecord>>(saved)
+        assertEquals("preissued-server-signed", store.lastQrToken)
+        assertEquals("offline-jwt-expired", store.lastOperationId)
+        assertEquals(1, scheduler.calls)
+    }
+
+    @Test
     fun `expired session does not create an outbox row`() = runTest {
         val store = FakeStore()
         val scheduler = FakeScheduler()

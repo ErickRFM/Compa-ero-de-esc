@@ -9,6 +9,7 @@ import org.companerodeescuela.core.database.AttendanceLocalStore
 import org.companerodeescuela.core.database.LocalAttendanceRecord
 import org.companerodeescuela.core.security.PlatformSessionClaims
 import org.companerodeescuela.core.security.SessionTokenInspector
+import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.shared.contracts.AcademicWeekResponse
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse
@@ -34,12 +35,18 @@ class AttendanceRepository(
     private val scheduler: AttendanceSyncEnqueuer,
     private val remoteClient: AttendanceRemoteClient,
     private val offlineQrStore: AttendanceQrPackStore = NoopAttendanceQrPackStore,
+    private val sessionTokenStore: SessionTokenStore? = null,
     private val networkEvidenceProvider: SchoolNetworkEvidenceProvider =
         SchoolNetworkEvidenceProvider { null },
     private val clock: Clock = Clock.systemUTC(),
     private val newOperationId: () -> String = { UUID.randomUUID().toString() },
 ) {
     suspend fun localSessionClaims(): Outcome<PlatformSessionClaims> {
+        // Identity stored in the encrypted local session can still label an
+        // offline *pending* capture. The API authenticates the sync later.
+        val localClaims = sessionTokenStore?.readAccessToken()
+            ?.let(SessionTokenInspector::inspect)
+        if (localClaims != null) return Outcome.Success(localClaims)
         val token = currentToken().valueOrNull()
             ?: return Outcome.Failure(AppError.Http(status = 401))
         val claims = SessionTokenInspector.inspect(token)
@@ -203,9 +210,16 @@ class AttendanceRepository(
             )
         }
 
-        val token = currentToken().valueOrNull()
-            ?: return Outcome.Failure(AppError.Http(status = 401))
-        val claims = SessionTokenInspector.inspect(token)
+        // If the access token expired during an outage, local signed-QR
+        // evidence can still be queued under the previously logged-in owner.
+        // It is NOT a server-authorized attendance; sync requires fresh auth.
+        val liveToken = currentToken().valueOrNull()
+        val token = liveToken ?: if (normalizedQrToken != null &&
+            networkEvidenceProvider.current() == null
+        ) {
+            sessionTokenStore?.readAccessToken()
+        } else null
+        val claims = token?.let(SessionTokenInspector::inspect)
             ?: return Outcome.Failure(AppError.Http(status = 401))
 
         return try {

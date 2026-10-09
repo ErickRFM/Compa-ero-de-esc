@@ -6,11 +6,18 @@ import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.patch
 import io.ktor.client.request.setBody
+import io.ktor.http.contentType
+import io.ktor.http.ContentType
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.network.SessionRefreshCoordinator
 import org.companerodeescuela.core.network.apiCall
 import org.companerodeescuela.core.network.requireBody
 import org.companerodeescuela.core.security.SessionTokenStore
+import org.companerodeescuela.core.security.SessionTokenInspector
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.ExcuseRequestSummary
 import org.companerodeescuela.shared.contracts.ExcuseStatus
@@ -20,6 +27,7 @@ import org.companerodeescuela.shared.contracts.TutorStudentSummary
 import org.companerodeescuela.shared.contracts.TutorCaseSummary
 import org.companerodeescuela.shared.contracts.CreateTutorCaseRequest
 import org.companerodeescuela.shared.contracts.AddTutorCaseNoteRequest
+import org.companerodeescuela.shared.contracts.UserRole
 
 class TutorRepository(
     private val client: HttpClient,
@@ -27,6 +35,15 @@ class TutorRepository(
     private val refreshCoordinator: SessionRefreshCoordinator =
         SessionRefreshCoordinator(client, tokenStore),
 ) {
+    /** Local ownership signal for clearing UI data, never server authorization. */
+    fun observeScopeIdentity(): Flow<String?> = tokenStore.observeAccessToken()
+        .map { token ->
+            token?.let(SessionTokenInspector::inspect)?.takeIf { UserRole.TUTOR in it.roles }
+                ?.let { claims -> claims.sessionId?.let { "${claims.userId}:$it:${claims.roles.sortedBy { role -> role.name }}" } }
+        }
+        .catch { emit(null) }
+        .distinctUntilChanged()
+
     suspend fun scope(): Outcome<TutorScopeSummary> = authorized { token ->
         apiCall {
             client.get("tutoring/me") { bearerAuth(token) }
@@ -46,6 +63,7 @@ class TutorRepository(
             apiCall {
                 client.patch("excuses/$id/review") {
                     bearerAuth(token)
+                    contentType(ContentType.Application.Json)
                     setBody(
                         ReviewExcuseRequest(
                             status = if (approved) ExcuseStatus.APPROVED else ExcuseStatus.REJECTED,
@@ -74,6 +92,7 @@ class TutorRepository(
         apiCall {
             client.post("tutoring/cases") {
                 bearerAuth(token)
+                contentType(ContentType.Application.Json)
                 setBody(request)
             }.requireBody<ApiResponse<TutorCaseSummary>>()
         }.map { it.data }
@@ -84,6 +103,7 @@ class TutorRepository(
             apiCall {
                 client.post("tutoring/cases/$caseId/notes") {
                     bearerAuth(token)
+                    contentType(ContentType.Application.Json)
                     setBody(request)
                 }.requireBody<ApiResponse<TutorCaseSummary>>()
             }.map { it.data }

@@ -115,12 +115,17 @@ class TutorAssignmentService(
 
     suspend fun requireCanAccessGroup(actor: UserSummary, academicGroupId: String) {
         if (isAdmin(actor)) return
+        requireTutorAssignmentForGroup(actor, academicGroupId)
+    }
+
+    /** Private cases require an actual tutor assignment even for administrative accounts. */
+    suspend fun requireTutorAssignmentForGroup(actor: UserSummary, academicGroupId: String) {
         requireTutor(actor)
         val group = groupRepository.find(academicGroupId.trim().uppercase())
         val assignment = group?.takeIf { it.active }?.let {
             repository.findActive(actor.id, it.id)
         }
-        if (assignment == null || assignment.revokedAt != null) {
+        if (assignment?.active != true || assignment.revokedAt != null) {
             throw ApiException.Forbidden("Tutor is not assigned to this active academic group")
         }
     }
@@ -138,7 +143,7 @@ class TutorAssignmentService(
     )
 
     private fun requireTutor(actor: UserSummary) {
-        if (UserRole.TUTOR !in actor.roles) throw ApiException.Forbidden("Tutor role is required")
+        if (!actor.active || UserRole.TUTOR !in actor.roles) throw ApiException.Forbidden("An active tutor identity is required")
     }
 
     private fun requireAdmin(actor: UserSummary) {

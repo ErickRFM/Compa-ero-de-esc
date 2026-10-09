@@ -46,7 +46,7 @@ xcodebuild build \
 app=build/ios/DerivedData/Build/Products/Debug-iphonesimulator/iosApp.app
 test -d "$app"
 test -f "$app/iosApp"
-lipo -verify_arch "$sim_arch" "$app/iosApp"
+lipo "$app/iosApp" -verify_arch "$sim_arch"
 # Select an available iPhone from the selected Xcode, without assuming its name.
 xcrun simctl list devices available --json > build/ios/simulators.json
 sim_udid="$(python3 - <<'PY'

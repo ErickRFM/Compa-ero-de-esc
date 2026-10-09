@@ -67,8 +67,8 @@ fun AdminHomeScreen(
                     color = CompanionColors.onDarkSurface,
                 )
                 Text(
-                    text = "Métricas de servicios, sesiones y auditoría todavía no conectadas. " +
-                        "No se muestra un estado ficticio como si fuera información del servidor.",
+                    text = "El monitoreo de servicios, sesiones y auditoría estará disponible " +
+                        "cuando se conecte el panel institucional.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = CompanionColors.onDarkSurfaceVariant,
                 )

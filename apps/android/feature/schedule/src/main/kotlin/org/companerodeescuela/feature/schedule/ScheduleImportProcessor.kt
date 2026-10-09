@@ -22,9 +22,9 @@ class ScheduleImportProcessor(
         if (isPdf) {
             // The native path is deterministic for digital PDFs. The image
             // recognition path is reserved for scanned or unsupported pages.
-            val direct = runCatching {
+            val direct = readNativePdfOrNull {
                 DigitalPdfTimetableReader(context).extract(uri)
-            }.getOrNull()
+            }
             if (!direct.isNullOrEmpty()) return direct
         }
         return ScheduleOcrParser.parse(extractText(uri))

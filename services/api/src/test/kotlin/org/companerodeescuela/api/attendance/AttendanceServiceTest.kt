@@ -460,6 +460,79 @@ class AttendanceServiceTest {
         assertEquals(AttendanceDisposition.LATE, confirmed.disposition)
     }
 
+    @Test
+    fun `signed classroom QR without WiFi is review only even without a school day`() = runTest {
+        val repository = InMemoryAttendanceRepository()
+        val clock = MutableClock(initialInstant)
+        val presence = SchoolPresenceService(
+            repository = InMemorySchoolPresenceRepository(),
+            policy = SchoolPresencePolicy(
+                entryQrSha256 = sha256("school-entry"),
+                allowedSsids = setOf("UD4-Alumno"),
+                allowedBssids = emptySet(),
+            ),
+            clock = clock,
+        )
+        val qr = AttendanceQrService("q".repeat(48).toCharArray(), repository, clock)
+        val services = service(repository = repository, clock = clock,
+            schoolPresenceService = presence, qrService = qr)
+        val session = services.openSession("T-0001", requestFor(teacherOccurrence()))
+        val token = qr.issuePack("T-0001", session.id)[1]
+        clock.advance(Duration.ofSeconds(40))
+        val record = services.register(
+            "2020-10455", session.id,
+            AttendanceAttemptRequest(
+                operationId = "qr-outage-1",
+                deviceTimestampEpochSeconds = token.issuedAtEpochSeconds + 1,
+                qrToken = token.token,
+                schoolNetwork = null,
+            ),
+        )
+        assertEquals(AttendanceStatus.REVIEW_REQUIRED, record.status)
+        assertEquals(AttendanceReasonCode.OFFLINE_NETWORK_QR_REVIEW, record.reasonCode)
+        assertEquals(null, record.disposition)
+        assertEquals(record, services.register(
+            "2020-10455", session.id,
+            AttendanceAttemptRequest(
+                "qr-outage-1", token.issuedAtEpochSeconds + 1, token.token, null,
+            ),
+        ))
+    }
+
+    @Test
+    fun `offline bypass rejects missing or forged classroom QR`() = runTest {
+        val repository = InMemoryAttendanceRepository()
+        val clock = MutableClock(initialInstant)
+        val presence = SchoolPresenceService(
+            repository = InMemorySchoolPresenceRepository(),
+            policy = SchoolPresencePolicy(
+                entryQrSha256 = sha256("school-entry"),
+                allowedSsids = setOf("UD4-Alumno"),
+                allowedBssids = emptySet(),
+            ),
+            clock = clock,
+        )
+        val qr = AttendanceQrService("q".repeat(48).toCharArray(), repository, clock)
+        val services = service(repository = repository, clock = clock,
+            schoolPresenceService = presence, qrService = qr)
+        val session = services.openSession("T-0001", requestFor(teacherOccurrence()))
+        assertFailsWith<ApiException.Forbidden> {
+            services.register("2020-10455", session.id,
+                AttendanceAttemptRequest("empty-offline", clock.instant().epochSecond))
+        }
+        assertFailsWith<ApiException.Forbidden> {
+            services.register("2020-10455", session.id,
+                AttendanceAttemptRequest("fake-offline", clock.instant().epochSecond, "not-signed"))
+        }
+        assertFailsWith<ApiException.Forbidden> {
+            services.register("2020-10455", session.id,
+                AttendanceAttemptRequest("fake-wifi", clock.instant().epochSecond,
+                    qr.issue("T-0001", session.id).token,
+                    SchoolNetworkEvidence(ssid = "UD4-Alumno")))
+        }
+        assertEquals(0, repository.recordsForSession(session.id).size)
+    }
+
     private suspend fun teacherOccurrence(): ClassOccurrence {
         val courses = provider.listCourses().associateBy { it.externalId }
         val schedule = AcademicMappers.toSchedule(

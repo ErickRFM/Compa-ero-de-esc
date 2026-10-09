@@ -1,5 +1,12 @@
 package org.companerodeescuela
 
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import org.junit.Rule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -14,6 +21,7 @@ import java.io.File
 /** Captures the actual signed-out Activity, not a mocked composition or flattened image. */
 @RunWith(AndroidJUnit4::class)
 class LoginVisualEvidenceTest {
+    @get:Rule val compose = createEmptyComposeRule()
     @Test fun actualLoginFitsPhoneAndTabletViewports() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val device = UiDevice.getInstance(instrumentation)
@@ -30,12 +38,12 @@ class LoginVisualEvidenceTest {
                         it.appearancePreferences.setThemeMode(AppThemeMode.DARK)
                         it.appearancePreferences.setHighContrast(false)
                     }
-                    assertTrue(device.wait(Until.hasObject(By.textContains("universitaria,")), 10_000))
+                    waitForHero("universitaria,")
                     device.waitForIdle()
                     assertTrue(device.takeScreenshot(File(directory, "dark-" + width + "-top.png")))
-                    UiScrollable(UiSelector().packageName("org.companerodeescuela").scrollable(true)).setAsVerticalList().scrollToEnd(8)
+                    showForm()
                     device.waitForIdle()
-                    assertTrue(device.hasObject(By.text("Correo electrónico o matrícula")))
+                    compose.onNodeWithTag("login_username").assertIsDisplayed()
                     assertTrue(device.takeScreenshot(File(directory, "dark-" + width + "-form.png")))
                 }
             }
@@ -46,10 +54,10 @@ class LoginVisualEvidenceTest {
                     it.appearancePreferences.setHighContrast(true)
                     it.appearancePreferences.setLanguage(AppLanguage.ENGLISH)
                 }
-                assertTrue(device.wait(Until.hasObject(By.textContains("university life,")), 10_000))
+                waitForHero("university life,")
                 device.waitForIdle()
                 assertTrue(device.takeScreenshot(File(directory, "light-contrast-390-top.png")))
-                UiScrollable(UiSelector().packageName("org.companerodeescuela").scrollable(true)).setAsVerticalList().scrollToEnd(8)
+                showForm()
                 device.waitForIdle()
                 assertTrue(device.takeScreenshot(File(directory, "light-contrast-390-form.png")))
                 scenario.onActivity {
@@ -62,7 +70,7 @@ class LoginVisualEvidenceTest {
                 scenario.recreate()
                 device.waitForIdle()
                 assertTrue(device.takeScreenshot(File(directory, "dark-contrast-large-text-390.png")))
-                UiScrollable(UiSelector().packageName("org.companerodeescuela").scrollable(true)).setAsVerticalList().scrollToEnd(12)
+                showForm()
                 device.waitForIdle()
                 assertTrue(device.takeScreenshot(File(directory, "dark-contrast-large-text-390-form.png")))
                 scenario.onActivity {
@@ -77,4 +85,24 @@ class LoginVisualEvidenceTest {
             device.executeShellCommand("wm density reset")
         }
     }
+    private fun waitForHero(text: String) {
+        // Drive the Compose test clock, including MainActivity startup state,
+        // before querying the native surface for a screenshot.
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onAllNodesWithText(text, substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText(text, substring = true).assertIsDisplayed()
+        compose.waitForIdle()
+    }
+
+    private fun showForm() {
+        // Scroll the real Compose parent through semantics; stale display bounds can
+        // make UiScrollable swipe once and incorrectly report the end after wm resize.
+        compose.onNodeWithTag("login_registration").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("login_username").assertIsDisplayed()
+        compose.onNodeWithTag("login_password").assertIsDisplayed()
+        compose.onNodeWithTag("login_submit").assertIsDisplayed()
+        compose.waitForIdle()
+    }
+
 }

@@ -204,6 +204,9 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm-nodes.rules
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
 
+      - name: Build instrumentation APKs before starting the emulator
+        run: ./gradlew :apps:android:app:assembleDebug :apps:android:app:assembleDebugAndroidTest --max-workers=2 --no-daemon --console=plain
+
       - name: Run Instrumentation Tests
         timeout-minutes: 20
         uses: reactivecircus/android-emulator-runner@v2
@@ -211,18 +214,12 @@ jobs:
           api-level: ${{ matrix.api-level }}
           target: google_apis
           arch: x86_64
+          profile: pixel_2
+          ram-size: 2048M
+          emulator-options: -no-window -gpu swiftshader -feature -Vulkan -no-snapshot -noaudio -no-boot-anim
           # App contains the smoke tests. Root task also launches empty library
           # suites concurrently against the same emulator and can stall ADB.
-          script: |
-            set +e
-            ./gradlew :apps:android:app:connectedDebugAndroidTest --max-workers=2 --console=plain
-            instrumentation_status=$?
-            set -e
-            mkdir -p build/v10-device-evidence
-            adb exec-out run-as org.companerodeescuela tar -C files -cf - v10-evidence > build/v10-evidence.tar
-            tar -xf build/v10-evidence.tar -C build/v10-device-evidence
-            test "$(find build/v10-device-evidence -name '*.png' | wc -l)" -ge 19
-            exit "$instrumentation_status"
+          script: bash infrastructure/scripts/run-v10-instrumentation.sh
 
       - name: Verify instrumentation tests actually executed
         run: |
@@ -233,9 +230,10 @@ jobs:
           suites = [ET.parse(path).getroot() for path in reports]
           tests = sum(int(suite.get('tests', 0)) for suite in suites)
           failures = sum(int(suite.get('failures', 0)) + int(suite.get('errors', 0)) for suite in suites)
-          print(f'instrumentation tests={tests} failures={failures}')
-          if tests == 0 or failures != 0:
-              raise SystemExit('Instrumentation must execute tests without failures')
+          skipped = sum(int(suite.get('skipped', 0)) for suite in suites)
+          print(f'instrumentation tests={tests} failures={failures} skipped={skipped}')
+          if tests < 17 or failures != 0 or skipped != 0:
+              raise SystemExit('Instrumentation must execute all 17+ tests without failures or skips')
           PY
 
       - name: Upload Android UI evidence

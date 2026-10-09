@@ -34,3 +34,9 @@ Una captura blanca inicial no demostró causa de producto: se corrigió la detec
 ## Pendientes reales
 
 MFA y proveedor institucional productivo pendientes. No existen fixtures locales Tutor/Super Admin/multirrol: sus decisiones de autorización y navegación tienen pruebas automatizadas, sin afirmar sesiones reales ejecutadas. TalkBack manual y aprovisionamiento productivo pendientes. Conexión, expiración, renovación y revocación tienen cobertura automatizada, que no equivale a QA manual en red productiva. PR iOS #127 permanece separado, draft y sin merge. Este cambio no certifica iOS ni producción.
+
+## Integración del runner de nube
+
+CI compila los APK antes de arrancar el AVD y ejecuta un único helper Bash. Se retienen los APK durante la ejecución (`android.injected.androidTest.leaveApksInstalledAfterRun=true`) para exportar filesDir antes de que el runner efímero se descarte. El helper conserva el estado de salida y exige 19 PNG; el job exige 17 o más casos, sin fallos ni omitidos. La prueba visual desplaza la Activity real mediante semántica Compose y comprueba formulario, contraseña y envío visibles tras cada cambio de tamaño, evitando coordenadas antiguas del gesto UiScrollable. La opción del runner gráfico se ajusta al modo [swiftshader vigente](https://developer.android.com/studio/run/emulator-acceleration); esto no cambia el renderizado de la aplicación en dispositivos reales. Los primeros fallos de CI y su diagnóstico quedan en logs locales `v10-ci-*-failure.log`; no se cuentan como aprobados.
+
+Helper completo verificado localmente: `v10-instrumentation-ci-helper-final.log`, BUILD SUCCESSFUL en 2m45s, 17 casos sin fallos/omitidos, estado de salida 0 y 19 PNG exportados. Prueba visual focalizada: `v10-visual-clock-targeted.log`, OK (1 test). La regla Compose sincroniza su reloj antes de consultar o capturar la superficie nativa. Código productivo y APK Debug permanecen iguales a la verificación completa anterior.

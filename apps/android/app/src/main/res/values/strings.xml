@@ -4,10 +4,33 @@
 
     <!-- Home -->
     <string name="home_title">Compañero de Escuela</string>
-    <string name="home_subtitle">Tu base diaria, lista sin conexion</string>
-    <string name="home_foundation_notice">Fase de cimientos: la interfaz real llega en el siguiente bloque.</string>
+    <string name="home_subtitle">Tu base diaria, lista sin conexión</string>
 
-    <!-- Profile -->
-    <string name="profile_title">Perfil</string>
-    <string name="profile_notice">Aqui vive la sesion y los datos de la institucion.</string>
+    <!-- Navigation -->
+    <string name="nav_home">Hoy</string>
+    <string name="nav_schedule">Agenda</string>
+    <string name="nav_channel">Canal</string>
+    <string name="nav_attendance">Asistencia</string>
+    <string name="nav_profile">Perfil</string>
+    <string name="nav_qr">Pase de lista QR</string>
+
+    <!-- Appearance -->
+    <string name="appearance_title">Apariencia</string>
+    <string name="appearance_subtitle">Ajusta el producto sin perder la identidad visual de UPTlax.</string>
+    <string name="theme_and_language">Tema e idioma</string>
+    <string name="theme_label">Tema</string>
+    <string name="theme_system">Sistema</string>
+    <string name="theme_light">Claro</string>
+    <string name="theme_dark">Oscuro</string>
+    <string name="language_label">Idioma</string>
+    <string name="language_system">Sistema</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_english">English</string>
+    <string name="text_scale_label">Tamaño de texto</string>
+    <string name="text_scale_compact">Compacto</string>
+    <string name="text_scale_normal">Normal</string>
+    <string name="text_scale_large">Grande</string>
+    <string name="accessibility_title">Accesibilidad</string>
+    <string name="reduced_motion_label">Reducir animaciones</string>
+    <string name="high_contrast_label">Mayor contraste</string>
 </resources>

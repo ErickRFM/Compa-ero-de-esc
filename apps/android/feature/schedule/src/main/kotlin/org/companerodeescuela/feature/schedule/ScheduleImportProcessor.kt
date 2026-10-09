@@ -108,7 +108,7 @@ internal object TimetableOcrReconstructor {
     )
 
     private val timeRange = Regex(
-        """\\b([01]?\\d|2[0-3])[:.]([0-5]\\d)\\s*(?:-|–|—|a)\\s*([01]?\\d|2[0-3])[:.]([0-5]\\d)\\b""",
+        """\b([01]?\d|2[0-3])[:.]([0-5]\d)\s*(?:-|–|—|a)\s*([01]?\d|2[0-3])[:.]([0-5]\d)\b""",
         RegexOption.IGNORE_CASE,
     )
 
@@ -191,14 +191,14 @@ internal object TimetableOcrReconstructor {
                     // line into its own class.
                     val subject = cell.filter { it.centerY < row.second }
                         .joinToString(" ") { it.text.trim() }
-                        .replace(Regex("""\\s+"""), " ").trim()
+                        .replace(Regex("""\s+"""), " ").trim()
                     if (subject.isNotBlank()) {
                         append(row.first)
                         append(' ')
                         appendLine(subject)
                         val teacher = cell.filter { it.centerY >= row.second }
                             .joinToString(" ") { it.text.trim() }
-                            .replace(Regex("""\\s+"""), " ").trim()
+                            .replace(Regex("""\s+"""), " ").trim()
                         if (teacher.isNotBlank()) appendLine(teacher)
                     }
                 }

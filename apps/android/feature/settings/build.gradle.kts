@@ -31,6 +31,7 @@ dependencies {
     implementation(project(":apps:android:feature:schedule"))
 
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.compose.ui)
@@ -38,4 +39,8 @@ dependencies {
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+
+    testImplementation(libs.junit.jupiter)
+    testImplementation(libs.kotlin.test)
+    testImplementation(libs.androidx.test.ext.junit)
 }

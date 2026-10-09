@@ -27,6 +27,7 @@ import org.companerodeescuela.core.ui.component.CompaneroGroupedList
 fun AppearanceSettingsScreen(
     settings: AppearanceSettings,
     onThemeMode: (AppThemeMode) -> Unit,
+    onLanguage: (AppLanguage) -> Unit = {},
     onTextScale: (Float) -> Unit,
     onReducedMotion: (Boolean) -> Unit,
     onHighContrast: (Boolean) -> Unit,
@@ -51,7 +52,7 @@ fun AppearanceSettingsScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        SettingsGroup(title = "Tema y texto") {
+        SettingsGroup(title = "Tema e idioma") {
             SettingsContentRow(
                 title = "Tema",
                 supporting = "Crimson institucional en claro, oscuro o según el sistema.",
@@ -68,6 +69,30 @@ fun AppearanceSettingsScreen(
                         FilterChip(
                             selected = settings.themeMode == mode,
                             onClick = { onThemeMode(mode) },
+                            label = { Text(label) },
+                        )
+                    }
+                }
+            }
+
+            GroupDivider()
+
+            SettingsContentRow(
+                title = "Idioma",
+                supporting = "Selecciona el idioma preferido de la aplicación.",
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                ) {
+                    listOf(
+                        AppLanguage.SYSTEM to "Sistema",
+                        AppLanguage.SPANISH to "Español",
+                        AppLanguage.ENGLISH to "English",
+                    ).forEach { (lang, label) ->
+                        FilterChip(
+                            selected = settings.language == lang,
+                            onClick = { onLanguage(lang) },
                             label = { Text(label) },
                         )
                     }

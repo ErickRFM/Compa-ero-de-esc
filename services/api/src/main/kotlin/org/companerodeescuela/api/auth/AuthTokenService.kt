@@ -84,13 +84,16 @@ class AuthTokenService(
             displayName = displayName,
             email = jwt.getClaim(CLAIM_EMAIL).asString(),
             roles = roles,
-            active = jwt.getClaim(CLAIM_ACTIVE).asBoolean() ?: true,
+            active = jwt.getClaim(CLAIM_ACTIVE).asBoolean() ?: false,
         )
     }
 
     fun sessionIdFrom(jwt: Payload): String? = jwt.getClaim(CLAIM_SESSION_ID)
         .asString()
         ?.takeIf(String::isNotBlank)
+
+    fun sessionGenerationFrom(jwt: Payload): Long? =
+        runCatching { jwt.getClaim(CLAIM_SESSION_GENERATION).asLong() }.getOrNull()
 
     companion object {
         const val PROVIDER_NAME = "auth-jwt"

@@ -31,7 +31,8 @@ class AuthRoutesTest {
         val sessions = InMemoryRefreshSessionRepository()
         val settings = authenticatedSettings()
         application {
-            configurePlugins(settings, refreshSessions = sessions)
+            configurePlugins(settings, refreshSessions = sessions,
+                sessionAuthority = PlatformSessionAuthority(InMemoryPlatformAccountRepository(), MockIdentityProvider()))
             routing {
                 authRoutes(settings, MockIdentityProvider(), sessions = sessions)
             }
@@ -81,7 +82,8 @@ class AuthRoutesTest {
         val settings = authenticatedSettings()
         val sessions = InMemoryRefreshSessionRepository()
         application {
-            configurePlugins(settings, refreshSessions = sessions)
+            configurePlugins(settings, refreshSessions = sessions,
+                sessionAuthority = PlatformSessionAuthority(InMemoryPlatformAccountRepository(), MockIdentityProvider()))
             routing {
                 authRoutes(settings, MockIdentityProvider(), sessions = sessions)
             }

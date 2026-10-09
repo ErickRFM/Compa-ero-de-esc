@@ -5,6 +5,7 @@ import org.companerodeescuela.api.integrations.MockIntegrationProvider
 import org.companerodeescuela.api.integrations.identity.AuthenticatedAccount
 import org.companerodeescuela.api.integrations.identity.IdentityProvider
 import org.companerodeescuela.api.integrations.identity.InstitutionalCredentials
+import org.companerodeescuela.api.integrations.identity.InstitutionalIdentityState
 import org.companerodeescuela.api.integrations.lms.ExternalAssignment
 import org.companerodeescuela.api.integrations.lms.ExternalLearningModule
 import org.companerodeescuela.api.integrations.lms.LearningProvider
@@ -23,6 +24,11 @@ class MockIdentityProvider : IdentityProvider, MockIntegrationProvider {
 
     override suspend fun authenticate(credentials: InstitutionalCredentials): AuthenticatedAccount? =
         accountFor(credentials.username, credentials.password)
+
+    override suspend fun currentState(externalId: String): InstitutionalIdentityState? =
+        ALL_ACCOUNTS.firstOrNull { it.externalId == externalId }?.let {
+            InstitutionalIdentityState(it.externalId, active = true, roles = it.roles)
+        }
 
     override suspend fun refreshRoles(externalId: String): Set<UserRole> =
         ALL_ACCOUNTS.firstOrNull { it.externalId == externalId }?.roles

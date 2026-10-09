@@ -244,5 +244,6 @@ jobs:
           name: v10-login-ui-evidence-api-${{ matrix.api-level }}
           path: |
             build/v10-device-evidence/**
+            build/v10-runner-diagnostics/**
             apps/android/app/build/outputs/androidTest-results/connected/**
           retention-days: 7

@@ -64,9 +64,14 @@ object ScheduleOcrParser {
                 .take(4)
 
             val room = context.firstOrNull(::looksLikeRoom)
-            val teacher = embedded.second
-                ?: context.firstOrNull(::looksLikeTeacher)
-                ?: context.firstOrNull(::looksLikePersonName)
+            val teacher = if (embedded.second != null) {
+                // Some PDF cells wrap the last teacher surname onto its own line.
+                val continuation = context.firstOrNull()?.takeIf(::looksLikeNameContinuation)
+                listOfNotNull(embedded.second, continuation).joinToString(" ")
+            } else {
+                context.firstOrNull(::looksLikeTeacher)
+                    ?: context.firstOrNull(::looksLikePersonName)
+            }
 
             result += PersonalScheduleDraft(
                 subjectName = subject,
@@ -88,7 +93,15 @@ object ScheduleOcrParser {
                 it.teacherName.trim().lowercase(),
             ).joinToString("|")
         }
-        return mergeContiguous(canonicalizeRepeatedLabels(unique))
+        val canonical = canonicalizeRepeatedLabels(unique)
+        // OCR sometimes reads a teacher's name as the only "subject" in a cell.
+        // If the same label is already known as a teacher, do not invent a class.
+        val knownTeachers = canonical.map { it.teacherName.foldForComparison() }
+            .filter(String::isNotBlank).toSet()
+        val academicEntries = canonical.filterNot {
+            it.teacherName.isBlank() && it.subjectName.foldForComparison() in knownTeachers
+        }
+        return mergeContiguous(academicEntries)
     }
 
     private fun canonicalizeRepeatedLabels(
@@ -212,6 +225,16 @@ object ScheduleOcrParser {
 
     private fun looksLikeTeacher(value: String): Boolean =
         teacherTitle.containsMatchIn(value)
+
+    private fun looksLikeNameContinuation(value: String): Boolean {
+        if (looksLikeRoom(value) || timeRange.containsMatchIn(value) || dayFrom(value) != null) return false
+        val words = value.trim().split(Regex("""\\s+"""))
+        if (words.size !in 1..2) return false
+        return words.all { word ->
+            word.length >= 3 && word.all { it.isLetter() || it == '-' } &&
+                word.first().isUpperCase()
+        }
+    }
 
     private fun looksLikePersonName(value: String): Boolean {
         if (looksLikeRoom(value) || timeRange.containsMatchIn(value) || dayFrom(value) != null) return false

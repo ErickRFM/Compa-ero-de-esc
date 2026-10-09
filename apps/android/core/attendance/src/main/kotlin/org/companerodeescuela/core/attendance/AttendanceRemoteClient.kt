@@ -129,6 +129,17 @@ class AttendanceRemoteClient @Inject constructor(
         }.map { it.data }
     }
 
+    suspend fun issueQrPack(
+        token: String,
+        sessionId: String,
+    ): Outcome<List<AttendanceQrResponse>> = authorized(token) { accessToken ->
+        apiCall {
+            client.post("attendance/sessions/$"+"sessionId/qr-pack") {
+                bearerAuth(accessToken)
+            }.requireBody<ApiResponse<List<AttendanceQrResponse>>>()
+        }.map { it.data }
+    }
+
     suspend fun inspectQr(
         token: String,
         request: AttendanceQrInspectionRequest,

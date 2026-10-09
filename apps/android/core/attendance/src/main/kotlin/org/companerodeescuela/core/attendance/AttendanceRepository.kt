@@ -33,6 +33,7 @@ class AttendanceRepository(
     private val localStore: AttendanceLocalStore,
     private val scheduler: AttendanceSyncEnqueuer,
     private val remoteClient: AttendanceRemoteClient,
+    private val offlineQrStore: AttendanceQrPackStore = NoopAttendanceQrPackStore,
     private val networkEvidenceProvider: SchoolNetworkEvidenceProvider =
         SchoolNetworkEvidenceProvider { null },
     private val clock: Clock = Clock.systemUTC(),
@@ -99,8 +100,41 @@ class AttendanceRepository(
     suspend fun myClassRecord(sessionId: String): Outcome<AttendanceRecordResponse?> =
         withToken { token -> remoteClient.myClassRecord(token, sessionId) }
 
-    suspend fun issueQr(sessionId: String): Outcome<AttendanceQrResponse> =
-        withToken { token -> remoteClient.issueQr(token, sessionId) }
+    /**
+     * Cache all remaining signed QR rotations while online. Safe to display
+     * later without Wi-Fi, but student evidence stays pending until review.
+     */
+    suspend fun prepareOfflineQrPack(sessionId: String, ownerId: String): Outcome<Boolean> {
+        val now = clock.instant().epochSecond
+        if (offlineQrStore.read(ownerId, sessionId).any { it.expiresAtEpochSeconds > now }) {
+            return Outcome.Success(true)
+        }
+        return when (val pack = withToken { token -> remoteClient.issueQrPack(token, sessionId) }) {
+            is Outcome.Success -> {
+                offlineQrStore.save(ownerId, sessionId, pack.value)
+                Outcome.Success(pack.value.any { it.expiresAtEpochSeconds > now })
+            }
+            is Outcome.Failure -> pack
+        }
+    }
+
+    fun rememberTeacherSession(ownerId: String, session: AttendanceSessionResponse) =
+        offlineQrStore.rememberSession(ownerId, session)
+
+    fun restoreTeacherSession(ownerId: String): AttendanceSessionResponse? =
+        offlineQrStore.restoreSession(ownerId)?.takeIf {
+            it.closedAtEpochSeconds == null && it.closesAtEpochSeconds > clock.instant().epochSecond
+        }
+
+    fun forgetTeacherSession(ownerId: String) = offlineQrStore.clearSession(ownerId)
+
+    suspend fun issueQr(sessionId: String, ownerId: String = ""): Outcome<AttendanceQrResponse> {
+        val now = clock.instant().epochSecond
+        val cached = offlineQrStore.read(ownerId, sessionId)
+            .lastOrNull { now >= it.issuedAtEpochSeconds && now < it.expiresAtEpochSeconds }
+        return if (cached != null) Outcome.Success(cached)
+        else withToken { token -> remoteClient.issueQr(token, sessionId) }
+    }
 
     suspend fun inspectQr(
         request: AttendanceQrInspectionRequest,

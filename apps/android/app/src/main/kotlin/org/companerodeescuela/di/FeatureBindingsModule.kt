@@ -9,6 +9,7 @@ import javax.inject.Singleton
 import org.companerodeescuela.core.academic.AcademicRepository
 import org.companerodeescuela.core.academic.PersonalScheduleRepository
 import org.companerodeescuela.core.attendance.AndroidSchoolNetworkEvidenceProvider
+import org.companerodeescuela.core.attendance.AndroidAttendanceQrPackStore
 import org.companerodeescuela.core.attendance.AttendanceRemoteClient
 import org.companerodeescuela.core.attendance.AttendanceRepository
 import org.companerodeescuela.core.attendance.AttendanceSyncScheduler
@@ -49,11 +50,13 @@ object FeatureBindingsModule {
         localStore: AttendanceLocalStore,
         scheduler: AttendanceSyncScheduler,
         remoteClient: AttendanceRemoteClient,
+        offlineQrStore: AndroidAttendanceQrPackStore,
         networkEvidenceProvider: SchoolNetworkEvidenceProvider,
     ): AttendanceRepository = AttendanceRepository(
         localStore = localStore,
         scheduler = scheduler,
         remoteClient = remoteClient,
+        offlineQrStore = offlineQrStore,
         networkEvidenceProvider = networkEvidenceProvider,
     )
 

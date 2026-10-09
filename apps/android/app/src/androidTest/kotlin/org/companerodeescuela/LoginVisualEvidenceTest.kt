@@ -17,7 +17,7 @@ class LoginVisualEvidenceTest {
     @Test fun actualLoginFitsPhoneAndTabletViewports() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val device = UiDevice.getInstance(instrumentation)
-        val directory = instrumentation.targetContext.getExternalFilesDir("v10-evidence")!!
+        val directory = File(instrumentation.targetContext.filesDir, "v10-evidence")
         directory.mkdirs()
         val originalScale = device.executeShellCommand("settings get system font_scale").trim()
         try {
@@ -62,6 +62,9 @@ class LoginVisualEvidenceTest {
                 scenario.recreate()
                 device.waitForIdle()
                 assertTrue(device.takeScreenshot(File(directory, "dark-contrast-large-text-390.png")))
+                UiScrollable(UiSelector().packageName("org.companerodeescuela").scrollable(true)).setAsVerticalList().scrollToEnd(12)
+                device.waitForIdle()
+                assertTrue(device.takeScreenshot(File(directory, "dark-contrast-large-text-390-form.png")))
                 scenario.onActivity {
                     it.appearancePreferences.setTextScale(1f)
                     it.appearancePreferences.setReducedMotion(false)

@@ -1,6 +1,10 @@
 package org.companerodeescuela
 
 import android.content.res.Configuration
+import android.graphics.Bitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.test.platform.app.InstrumentationRegistry
+import java.io.File
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
@@ -43,7 +47,8 @@ class SmartRoleLoginUiTest {
         compose.onNodeWithTag("login_username").performScrollTo().performTextInput("qa.docente")
         compose.onNodeWithTag("login_password").performScrollTo().performTextInput("test-password")
         compose.onNodeWithTag("role_TUTOR").performScrollTo().performClick()
-        compose.onNodeWithTag("role_title_TUTOR", useUnmergedTree = true).assertIsDisplayed()
+        // The keyboard may obscure the card; assert selected access and the retained shared form.
+        compose.onNodeWithTag("role_TUTOR").assertIsSelected()
         compose.onNodeWithTag("login_registration").assertDoesNotExist()
         compose.onNodeWithTag("login_submit").performScrollTo().performClick()
         assertEquals(Triple("qa.docente", "test-password", AppExperience.TUTOR), submitted)
@@ -53,18 +58,31 @@ class SmartRoleLoginUiTest {
         compose.setContent { LoginTestContent() }
         compose.onNodeWithTag("role_pager").performScrollTo().performTouchInput { swipeLeft() }
         compose.onNodeWithTag("role_title_TEACHER", useUnmergedTree = true).assertIsDisplayed()
+        captureAccess("teacher")
         compose.onNodeWithTag("access_next").performScrollTo().performClick()
+        compose.onNodeWithTag("role_pager").performScrollTo()
         compose.onNodeWithTag("role_title_TUTOR", useUnmergedTree = true).assertIsDisplayed()
+        captureAccess("tutor")
         compose.onNodeWithTag("role_ADMIN").performScrollTo().performClick()
         compose.onNodeWithTag("role_title_ADMIN", useUnmergedTree = true).assertIsDisplayed()
+        captureAccess("admin")
         compose.onNodeWithTag("role_SUPER_ADMIN").performClick()
         compose.onNodeWithTag("role_title_SUPER_ADMIN", useUnmergedTree = true).assertIsDisplayed()
+        captureAccess("super_admin")
         compose.onNodeWithTag("access_next").assertIsNotEnabled()
         compose.onNodeWithTag("role_STUDENT").performClick()
         compose.onNodeWithTag("role_title_STUDENT", useUnmergedTree = true).assertIsDisplayed()
+        captureAccess("student")
         compose.onNodeWithTag("access_previous").assertIsNotEnabled()
     }
 
+    private fun captureAccess(name: String) {
+        val directory = File(InstrumentationRegistry.getInstrumentation().targetContext.filesDir, "v10-evidence")
+        directory.mkdirs()
+        File(directory, "access-" + name + ".png").outputStream().use {
+            org.junit.Assert.assertTrue(compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it))
+        }
+    }
     @Test fun rotationRestoresIdentifierAndAccessWithoutSavingPassword() {
         val restoration = StateRestorationTester(compose)
         restoration.setContent { LoginTestContent() }

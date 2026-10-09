@@ -179,7 +179,11 @@ jobs:
           retention-days: 7
 
   instrumentation:
-    name: Android instrumentation smoke test
+    name: Android instrumentation API ${{ matrix.api-level }}
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [31, 35]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -204,7 +208,7 @@ jobs:
         timeout-minutes: 20
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 31
+          api-level: ${{ matrix.api-level }}
           target: google_apis
           arch: x86_64
           # App contains the smoke tests. Root task also launches empty library
@@ -213,8 +217,11 @@ jobs:
             set +e
             ./gradlew :apps:android:app:connectedDebugAndroidTest --max-workers=2 --console=plain
             instrumentation_status=$?
+            set -e
             mkdir -p build/v10-device-evidence
-            adb pull /sdcard/Android/data/org.companerodeescuela/files/v10-evidence build/v10-device-evidence
+            adb exec-out run-as org.companerodeescuela tar -C files -cf - v10-evidence > build/v10-evidence.tar
+            tar -xf build/v10-evidence.tar -C build/v10-device-evidence
+            test "$(find build/v10-device-evidence -name '*.png' | wc -l)" -ge 19
             exit "$instrumentation_status"
 
       - name: Verify instrumentation tests actually executed
@@ -236,7 +243,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: v10-login-ui-evidence
+          name: v10-login-ui-evidence-api-${{ matrix.api-level }}
           path: |
             build/v10-device-evidence/**
             apps/android/app/build/outputs/androidTest-results/connected/**

@@ -81,6 +81,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        appearancePreferences.applySavedLanguage()
 
         setContent {
             val appearance by appearancePreferences.state.collectAsStateWithLifecycle()

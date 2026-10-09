@@ -44,7 +44,8 @@ class AppearancePreferences @Inject constructor(
     private val _state = MutableStateFlow(read())
     val state: StateFlow<AppearanceSettings> = _state.asStateFlow()
 
-    init { applyLocale(_state.value.language) }
+    /** Apply after the host has completed Activity.onCreate; constructors must not recreate it. */
+    fun applySavedLanguage() { applyLocale(_state.value.language) }
 
     fun setThemeMode(mode: AppThemeMode) {
         preferences.edit { putString(KEY_THEME, mode.name) }

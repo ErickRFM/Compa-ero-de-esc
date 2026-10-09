@@ -133,6 +133,7 @@ internal object RefreshSessionDocumentCodec {
         .append("createdAt", Date.from(session.createdAt))
         .append("expiresAt", Date.from(session.expiresAt))
         .append("generation", session.generation)
+        .append("identitySource", session.identitySource.name)
         .append("previousTokenHashes", session.previousTokenHashes.toList())
         .append("revokedAt", session.revokedAt?.let(Date::from))
 
@@ -145,6 +146,8 @@ internal object RefreshSessionDocumentCodec {
             createdAt = document.getDate("createdAt").toInstant(),
             expiresAt = document.getDate("expiresAt").toInstant(),
             generation = (document.get("generation") as? Number)?.toLong() ?: 0L,
+            identitySource = runCatching { SessionIdentitySource.valueOf(document.getString("identitySource")) }
+                .getOrDefault(SessionIdentitySource.LEGACY),
             previousTokenHashes = document.getList("previousTokenHashes", String::class.java)
                 .orEmpty()
                 .toSet(),

@@ -25,6 +25,7 @@ class RefreshSessionDocumentCodecTest {
             createdAt = Instant.parse("2026-10-02T12:00:00Z"),
             expiresAt = Instant.parse("2026-11-01T12:00:00Z"),
             generation = 2,
+            identitySource = SessionIdentitySource.NATIVE,
             previousTokenHashes = setOf("old-hash-1", "old-hash-2"),
         )
 

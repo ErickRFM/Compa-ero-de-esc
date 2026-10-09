@@ -30,7 +30,8 @@ class PlatformRegistrationTest {
         val accounts = InMemoryPlatformAccountRepository()
         val settings = authenticatedSettings()
         application {
-            configurePlugins(settings, refreshSessions = sessions)
+            configurePlugins(settings, refreshSessions = sessions,
+                sessionAuthority = PlatformSessionAuthority(accounts, MockIdentityProvider()))
             routing {
                 authRoutes(
                     settings = settings,
@@ -66,7 +67,8 @@ class PlatformRegistrationTest {
         val accounts = InMemoryPlatformAccountRepository()
         val settings = authenticatedSettings()
         application {
-            configurePlugins(settings, refreshSessions = sessions)
+            configurePlugins(settings, refreshSessions = sessions,
+                sessionAuthority = PlatformSessionAuthority(accounts, MockIdentityProvider()))
             routing {
                 authRoutes(
                     settings = settings,

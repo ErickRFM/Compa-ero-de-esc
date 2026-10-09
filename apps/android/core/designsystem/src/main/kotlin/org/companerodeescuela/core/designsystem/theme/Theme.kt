@@ -98,10 +98,29 @@ fun CompaneroTheme(
         else -> LightColors
     }
     val colorScheme = if (highContrast) {
-        baseScheme.copy(
-            outline = baseScheme.onSurfaceVariant,
-            outlineVariant = baseScheme.onSurface.copy(alpha = 0.35f),
-        )
+        if (darkTheme) {
+            baseScheme.copy(
+                background = Color(0xFF000000),
+                surface = Color(0xFF0F0E13),
+                surfaceVariant = Color(0xFF18171E),
+                onBackground = Color(0xFFFFFFFF),
+                onSurface = Color(0xFFFFFFFF),
+                onSurfaceVariant = Color(0xFFEEEEEE),
+                outline = Color(0xFFFFFFFF),
+                outlineVariant = Color(0xCCFFFFFF),
+            )
+        } else {
+            baseScheme.copy(
+                background = Color(0xFFFFFFFF),
+                surface = Color(0xFFFAFAFA),
+                surfaceVariant = Color(0xFFF0F0F0),
+                onBackground = Color(0xFF000000),
+                onSurface = Color(0xFF000000),
+                onSurfaceVariant = Color(0xFF111111),
+                outline = Color(0xFF000000),
+                outlineVariant = Color(0xCC000000),
+            )
+        }
     } else {
         baseScheme
     }
@@ -112,7 +131,10 @@ fun CompaneroTheme(
         fontScale = density.fontScale * fontScaleMultiplier.coerceIn(0.9f, 1.2f),
     )
 
-    CompositionLocalProvider(LocalDensity provides adjustedDensity, LocalCompaneroHighContrast provides highContrast) {
+    CompositionLocalProvider(
+        LocalDensity provides adjustedDensity,
+        LocalCompaneroHighContrast provides highContrast,
+    ) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography = CompanionTypography,

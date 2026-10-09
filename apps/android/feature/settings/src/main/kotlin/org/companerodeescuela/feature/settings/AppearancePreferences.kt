@@ -1,7 +1,9 @@
 package org.companerodeescuela.feature.settings
 
 import android.content.Context
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.edit
+import androidx.core.os.LocaleListCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -16,8 +18,15 @@ enum class AppThemeMode {
     DARK,
 }
 
+enum class AppLanguage(val languageTag: String) {
+    SYSTEM(""),
+    SPANISH("es"),
+    ENGLISH("en"),
+}
+
 data class AppearanceSettings(
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+    val language: AppLanguage = AppLanguage.SYSTEM,
     val textScale: Float = 1f,
     val reducedMotion: Boolean = false,
     val highContrast: Boolean = false,
@@ -40,6 +49,12 @@ class AppearancePreferences @Inject constructor(
         _state.update { it.copy(themeMode = mode) }
     }
 
+    fun setLanguage(language: AppLanguage) {
+        preferences.edit { putString(KEY_LANGUAGE, language.name) }
+        _state.update { it.copy(language = language) }
+        applyLocale(language)
+    }
+
     fun setTextScale(scale: Float) {
         val normalized = scale.coerceIn(MIN_TEXT_SCALE, MAX_TEXT_SCALE)
         preferences.edit { putFloat(KEY_TEXT_SCALE, normalized) }
@@ -56,6 +71,15 @@ class AppearancePreferences @Inject constructor(
         _state.update { it.copy(highContrast = enabled) }
     }
 
+    private fun applyLocale(language: AppLanguage) {
+        val localeList = if (language.languageTag.isEmpty()) {
+            LocaleListCompat.getEmptyLocaleList()
+        } else {
+            LocaleListCompat.forLanguageTags(language.languageTag)
+        }
+        AppCompatDelegate.setApplicationLocales(localeList)
+    }
+
     private fun read(): AppearanceSettings =
         AppearanceSettings(
             themeMode = runCatching {
@@ -64,6 +88,12 @@ class AppearancePreferences @Inject constructor(
                         ?: AppThemeMode.SYSTEM.name,
                 )
             }.getOrDefault(AppThemeMode.SYSTEM),
+            language = runCatching {
+                AppLanguage.valueOf(
+                    preferences.getString(KEY_LANGUAGE, AppLanguage.SYSTEM.name)
+                        ?: AppLanguage.SYSTEM.name,
+                )
+            }.getOrDefault(AppLanguage.SYSTEM),
             textScale = preferences.getFloat(KEY_TEXT_SCALE, 1f)
                 .coerceIn(MIN_TEXT_SCALE, MAX_TEXT_SCALE),
             reducedMotion = preferences.getBoolean(KEY_REDUCED_MOTION, false),
@@ -73,6 +103,7 @@ class AppearancePreferences @Inject constructor(
     private companion object {
         const val PREFS_NAME = "appearance_preferences"
         const val KEY_THEME = "theme"
+        const val KEY_LANGUAGE = "language"
         const val KEY_TEXT_SCALE = "text_scale"
         const val KEY_REDUCED_MOTION = "reduced_motion"
         const val KEY_HIGH_CONTRAST = "high_contrast"

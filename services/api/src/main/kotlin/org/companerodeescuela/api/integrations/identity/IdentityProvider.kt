@@ -23,6 +23,13 @@ data class AuthenticatedAccount(
     val mustChangePassword: Boolean = false,
 )
 
+/** Current upstream authorization state, independent of a previous login snapshot. */
+data class InstitutionalIdentityState(
+    val externalId: String,
+    val active: Boolean,
+    val roles: Set<UserRole>,
+)
+
 /**
  * Adapter for the institution's identity source (LDAP, Active Directory, an
  * SSO gateway, or a campus ID service).
@@ -44,4 +51,7 @@ interface IdentityProvider : IntegrationProvider {
 
     /** Resolves roles for an already-authenticated user, used on token refresh. */
     suspend fun refreshRoles(externalId: String): Set<UserRole>
+
+    /** Null means that current active identity cannot be verified; access must fail closed. */
+    suspend fun currentState(externalId: String): InstitutionalIdentityState? = null
 }

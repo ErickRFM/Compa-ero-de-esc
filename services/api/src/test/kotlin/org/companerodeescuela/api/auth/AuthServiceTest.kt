@@ -220,5 +220,11 @@ class AuthServiceTest {
         org.companerodeescuela.api.integrations.identity.IdentityProvider by MockIdentityProvider() {
         override suspend fun refreshRoles(externalId: String): Set<UserRole> =
             setOf(UserRole.TEACHER)
+        private var firstState = true
+        override suspend fun currentState(externalId: String): org.companerodeescuela.api.integrations.identity.InstitutionalIdentityState {
+            val roles = if (firstState) setOf(UserRole.STUDENT) else setOf(UserRole.TEACHER)
+            firstState = false
+            return org.companerodeescuela.api.integrations.identity.InstitutionalIdentityState(externalId, true, roles)
+        }
     }
 }

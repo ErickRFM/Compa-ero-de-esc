@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Campus Companion</string>
+
+    <!-- Home -->
+    <string name="home_title">Campus Companion</string>
+    <string name="home_subtitle">Your daily hub, ready offline</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Today</string>
+    <string name="nav_schedule">Schedule</string>
+    <string name="nav_channel">Channel</string>
+    <string name="nav_attendance">Attendance</string>
+    <string name="nav_profile">Profile</string>
+    <string name="nav_qr">QR Attendance Check-in</string>
+
+    <!-- Appearance -->
+    <string name="appearance_title">Appearance</string>
+    <string name="appearance_subtitle">Adjust the product while preserving the institutional UPTlax identity.</string>
+    <string name="theme_and_language">Theme and language</string>
+    <string name="theme_label">Theme</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="language_label">Language</string>
+    <string name="language_system">System</string>
+    <string name="language_spanish">Spanish</string>
+    <string name="language_english">English</string>
+    <string name="text_scale_label">Text size</string>
+    <string name="text_scale_compact">Compact</string>
+    <string name="text_scale_normal">Normal</string>
+    <string name="text_scale_large">Large</string>
+    <string name="accessibility_title">Accessibility</string>
+    <string name="reduced_motion_label">Reduce motion</string>
+    <string name="high_contrast_label">High contrast</string>
+</resources>

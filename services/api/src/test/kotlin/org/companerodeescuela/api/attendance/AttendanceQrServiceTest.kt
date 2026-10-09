@@ -83,6 +83,27 @@ class AttendanceQrServiceTest {
         assertEquals(initial.plusSeconds(10).epochSecond, issued.expiresAtEpochSeconds)
     }
 
+    @Test
+    fun `preissued pack stays inside session and cannot be issued by another teacher`() = runTest {
+        val repository = InMemoryAttendanceRepository()
+        val clock = MutableClock(initial)
+        repository.createSession(session("session-1", initial))
+        val service = AttendanceQrService("q".repeat(48).toCharArray(), repository, clock)
+
+        val pack = service.issuePack("teacher-1", "session-1")
+        assertEquals(40, pack.size)
+        assertEquals(initial.epochSecond, pack.first().issuedAtEpochSeconds)
+        assertEquals(initial.plusSeconds(585).epochSecond, pack.last().issuedAtEpochSeconds)
+        assertEquals(initial.plusSeconds(600).epochSecond, pack.last().expiresAtEpochSeconds)
+        clock.advance(Duration.ofSeconds(45))
+        assertIs<QrEvidenceResult.Valid>(
+            service.verify(pack[3].token, "session-1", clock.instant().epochSecond),
+        )
+        kotlin.test.assertFailsWith<org.companerodeescuela.api.errors.ApiException.Forbidden> {
+            service.issuePack("other-teacher", "session-1")
+        }
+    }
+
     private fun session(id: String, openedAt: Instant) = AttendanceSessionResponse(
         id = id,
         occurrenceId = "occ-1",

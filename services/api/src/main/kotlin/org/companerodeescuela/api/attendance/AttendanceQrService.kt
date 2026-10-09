@@ -44,38 +44,65 @@ class AttendanceQrService(
         sessionId: String,
         allowCrossOwner: Boolean = false,
     ): AttendanceQrResponse {
+        val session = requireIssuableSession(actorId, sessionId, allowCrossOwner)
+        return issueAt(sessionId, clock.instant().epochSecond, session.closesAtEpochSeconds)
+    }
+
+    /**
+     * Pre-sign the remaining 15-second QR slots while the teacher is online.
+     * The signing secret stays on the API; a teacher can display the pack
+     * during a short connectivity outage without issuing new tokens locally.
+     */
+    suspend fun issuePack(
+        actorId: String,
+        sessionId: String,
+        allowCrossOwner: Boolean = false,
+    ): List<AttendanceQrResponse> {
+        val session = requireIssuableSession(actorId, sessionId, allowCrossOwner)
+        val now = clock.instant().epochSecond
+        return generateSequence(now) { it + ROTATE_AFTER.seconds }
+            .takeWhile { it < session.closesAtEpochSeconds }
+            .take(MAX_PACK_SLOTS)
+            .map { issueAt(sessionId, it, session.closesAtEpochSeconds) }
+            .toList()
+    }
+
+    private suspend fun requireIssuableSession(
+        actorId: String,
+        sessionId: String,
+        allowCrossOwner: Boolean,
+    ): org.companerodeescuela.shared.contracts.AttendanceSessionResponse {
         val session = repository.findSession(sessionId)
             ?: throw ApiException.NotFound("Attendance session was not found")
         if (!allowCrossOwner && session.openedBy != actorId) {
             throw ApiException.Forbidden("This attendance session belongs to another teacher")
         }
-
         val now = clock.instant().epochSecond
-        if (
-            session.status != AttendanceSessionStatus.OPEN ||
+        if (session.status != AttendanceSessionStatus.OPEN ||
             session.closesAtEpochSeconds <= now
         ) {
             throw ApiException.Conflict("Attendance session is closed")
         }
+        return session
+    }
 
-        val expiresAt = minOf(
-            now + TOKEN_TTL.seconds,
-            session.closesAtEpochSeconds,
-        )
-        val nonceBytes = ByteArray(NONCE_BYTES).also(secureRandom::nextBytes)
-        val nonce = encoder.encodeToString(nonceBytes)
+    private fun issueAt(
+        sessionId: String,
+        issuedAt: Long,
+        sessionClose: Long,
+    ): AttendanceQrResponse {
+        val expiresAt = minOf(issuedAt + TOKEN_TTL.seconds, sessionClose)
+        val nonce = encoder.encodeToString(ByteArray(NONCE_BYTES).also(secureRandom::nextBytes))
         val prefix = listOf(
             TOKEN_VERSION,
             encodeText(sessionId),
             nonce,
-            now.toString(),
+            issuedAt.toString(),
             expiresAt.toString(),
         ).joinToString(".")
-        val signature = encoder.encodeToString(sign(prefix))
-
         return AttendanceQrResponse(
-            token = "$prefix.$signature",
-            issuedAtEpochSeconds = now,
+            token = "$"+"prefix."+"$"+"{encoder.encodeToString(sign(prefix))}",
+            issuedAtEpochSeconds = issuedAt,
             expiresAtEpochSeconds = expiresAt,
             rotateAfterSeconds = ROTATE_AFTER.seconds,
         )
@@ -144,6 +171,7 @@ class AttendanceQrService(
         private const val HMAC_ALGORITHM = "HmacSHA256"
         private const val NONCE_BYTES = 16
         private const val TOKEN_PARTS = 6
+        private const val MAX_PACK_SLOTS = 61
         private const val MAX_CLOCK_SKEW_SECONDS = 5L
         private val TOKEN_TTL: Duration = Duration.ofSeconds(25)
         private val ROTATE_AFTER: Duration = Duration.ofSeconds(15)

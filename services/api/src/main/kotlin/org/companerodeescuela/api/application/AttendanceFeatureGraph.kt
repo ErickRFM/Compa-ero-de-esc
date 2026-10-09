@@ -38,14 +38,15 @@ fun buildAttendanceFeatureGraph(
         settings.environment == Environment.LOCAL -> InMemoryAttendanceRepository()
         else -> error("Attendance requires MONGODB_URI outside local development")
     }
+    val occurrenceResolver = ProviderAttendanceOccurrenceResolver(academicProvider)
+    val accessPolicy = AttendanceAccessPolicy(repository, occurrenceResolver)
     val qrService = settings.attendanceQrSecret?.let { secret ->
         AttendanceQrService(
             secret = secret,
             repository = repository,
+            accessPolicy = accessPolicy,
         )
     }
-    val accessPolicy = AttendanceAccessPolicy(repository)
-    val occurrenceResolver = ProviderAttendanceOccurrenceResolver(academicProvider)
     return AttendanceFeatureGraph(
         sessionService = AttendanceSessionService(
             repository = repository,

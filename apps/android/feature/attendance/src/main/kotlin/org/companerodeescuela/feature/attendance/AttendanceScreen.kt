@@ -50,6 +50,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.key
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -156,7 +157,7 @@ fun AttendanceScreen(
             onDismissInspection = viewModel::clearQrInspection,
             modifier = modifier,
         )
-        AttendanceMode.TEACHER -> TeacherAttendance(
+        AttendanceMode.TEACHER -> TeacherAttendanceContent(
             state = state,
             onRefresh = viewModel::refresh,
             onOpen = viewModel::openAttendance,
@@ -652,7 +653,23 @@ private fun LocalAttendanceRow(record: LocalAttendanceRecord) {
 }
 
 @Composable
-private fun TeacherAttendance(
+fun TeacherAttendanceContent(
+    state: AttendanceUiState,
+    onRefresh: () -> Unit,
+    onOpen: (ClassOccurrenceContract) -> Unit,
+    onClose: () -> Unit,
+    onRefreshRoster: () -> Unit,
+    onReview: (AttendanceRecordResponse, AttendanceStatus, String) -> Unit,
+    onMark: (AttendanceRecordResponse, AttendanceDisposition, String) -> Unit,
+    modifier: Modifier,
+) {
+    key(state.teacherScopeGeneration) {
+        TeacherAttendanceBody(state, onRefresh, onOpen, onClose, onRefreshRoster, onReview, onMark, modifier)
+    }
+}
+
+@Composable
+private fun TeacherAttendanceBody(
     state: AttendanceUiState,
     onRefresh: () -> Unit,
     onOpen: (ClassOccurrenceContract) -> Unit,
@@ -740,7 +757,7 @@ private fun TeacherAttendance(
                 item { Text("Lista de estudiantes · ${shown.size}", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary) }
                 if (shown.isEmpty()) item { StatusNotice("Sin registros en este filtro", "El servidor aún no reporta registros para este filtro.") }
                 items(shown, key = AttendanceRecordResponse::id) { record ->
-                    RosterRecord(record, state.actionInProgress, onReview, onMark)
+                    RosterRecord(record, state.actionInProgress, state.teacherReviewCompletion, state.errorMessage, onReview, onMark)
                 }
                 if (filter == "Recibidos" && campus?.sessionId == active.id) {
                     items(campus.students.filter { student -> records.none { it.studentId == student.studentId } }, key = { "missing:" + it.studentId }) { student ->
@@ -876,6 +893,8 @@ private fun TeacherSessionCard(
 private fun RosterRecord(
     record: AttendanceRecordResponse,
     busy: Boolean,
+    completion: TeacherReviewCompletion?,
+    errorMessage: String?,
     onReview: (AttendanceRecordResponse, AttendanceStatus, String) -> Unit,
     onMark: (AttendanceRecordResponse, AttendanceDisposition, String) -> Unit,
 ) {
@@ -883,6 +902,15 @@ private fun RosterRecord(
     var decision by remember(record.id) { mutableStateOf<AttendanceDisposition?>(null) }
     var verify by remember(record.id) { mutableStateOf(false) }
     var reason by remember(record.id) { mutableStateOf("") }
+    var submittedVersion by remember(record.id) { mutableStateOf<Long?>(null) }
+    // The parent scope key disposes this editor on invalidation. Only its matching
+    // successful submission may dismiss it within the same authorized generation.
+    LaunchedEffect(completion) {
+        val submitted = submittedVersion
+        if (submitted != null && completion?.recordId == record.id && completion.version > submitted) {
+            decision = null; verify = false; reason = ""; submittedVersion = null
+        }
+    }
     V8GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -908,18 +936,21 @@ private fun RosterRecord(
         }
     }
     if (decision != null || verify) AlertDialog(
-        onDismissRequest = { decision = null; verify = false; reason = "" },
+        onDismissRequest = { if (!busy) { decision = null; verify = false; reason = ""; submittedVersion = null } },
         title = { Text("Motivo del ajuste") },
         text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("El servidor registrará tu identidad, fecha y motivo. La evidencia original se conserva.")
-            OutlinedTextField(value = reason, onValueChange = { reason = it.take(500) }, label = { Text("Motivo") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = reason, onValueChange = { reason = it.take(500) }, enabled = !busy, label = { Text("Motivo") }, modifier = Modifier.fillMaxWidth())
+            if (submittedVersion != null && !busy && errorMessage != null) {
+                Text(errorMessage, color = V8RedColors.Error)
+            }
         } },
         confirmButton = { Button(onClick = {
+            submittedVersion = completion?.version ?: 0
             if (verify) onReview(record, AttendanceStatus.VERIFIED, reason.trim())
             else decision?.let { onMark(record, it, reason.trim()) }
-            decision = null; verify = false; reason = ""
         }, enabled = !busy && reason.trim().length >= 3) { Text("Confirmar ajuste") } },
-        dismissButton = { TextButton(onClick = { decision = null; verify = false; reason = "" }) { Text("Cancelar") } },
+        dismissButton = { TextButton(onClick = { decision = null; verify = false; reason = ""; submittedVersion = null }, enabled = !busy) { Text("Cancelar") } },
     )
 }
 

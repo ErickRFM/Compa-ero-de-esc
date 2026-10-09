@@ -32,6 +32,7 @@ class AttendanceQrService(
     private val repository: AttendanceRepository,
     private val clock: Clock = Clock.systemUTC(),
     private val secureRandom: SecureRandom = SecureRandom(),
+    private val accessPolicy: AttendanceAccessPolicy = AttendanceAccessPolicy(repository),
 ) {
     private val keyBytes = secret.concatToString().toByteArray(StandardCharsets.UTF_8)
 
@@ -46,9 +47,7 @@ class AttendanceQrService(
     ): AttendanceQrResponse {
         val session = repository.findSession(sessionId)
             ?: throw ApiException.NotFound("Attendance session was not found")
-        if (!allowCrossOwner && session.openedBy != actorId) {
-            throw ApiException.Forbidden("This attendance session belongs to another teacher")
-        }
+        accessPolicy.requireOwnerOrAdministrative(actorId, session, allowCrossOwner)
 
         val now = clock.instant().epochSecond
         if (

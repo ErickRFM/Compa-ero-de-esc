@@ -101,7 +101,7 @@ class AttendanceQrService(
             expiresAt.toString(),
         ).joinToString(".")
         return AttendanceQrResponse(
-            token = "$"+"prefix."+"$"+"{encoder.encodeToString(sign(prefix))}",
+            token = "$prefix.${encoder.encodeToString(sign(prefix))}",
             issuedAtEpochSeconds = issuedAt,
             expiresAtEpochSeconds = expiresAt,
             rotateAfterSeconds = ROTATE_AFTER.seconds,

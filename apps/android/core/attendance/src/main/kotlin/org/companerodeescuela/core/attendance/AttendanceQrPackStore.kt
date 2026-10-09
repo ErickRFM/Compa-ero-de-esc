@@ -71,6 +71,6 @@ class AndroidAttendanceQrPackStore @Inject constructor(
         }.apply()
     }
 
-    private fun sessionKey(ownerId: String) = "session:$"+"ownerId"
-    private fun packKey(ownerId: String, sessionId: String) = "pack:$"+"ownerId:$"+"sessionId"
+    private fun sessionKey(ownerId: String) = "session:$ownerId"
+    private fun packKey(ownerId: String, sessionId: String) = "pack:$ownerId:$sessionId"
 }

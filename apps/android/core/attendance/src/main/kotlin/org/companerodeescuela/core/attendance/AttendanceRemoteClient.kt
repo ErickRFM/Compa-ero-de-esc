@@ -134,7 +134,7 @@ class AttendanceRemoteClient @Inject constructor(
         sessionId: String,
     ): Outcome<List<AttendanceQrResponse>> = authorized(token) { accessToken ->
         apiCall {
-            client.post("attendance/sessions/$"+"sessionId/qr-pack") {
+            client.post("attendance/sessions/$sessionId/qr-pack") {
                 bearerAuth(accessToken)
             }.requireBody<ApiResponse<List<AttendanceQrResponse>>>()
         }.map { it.data }

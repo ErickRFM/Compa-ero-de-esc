@@ -144,7 +144,7 @@ fun AttendanceScreen(
 
     when (state.mode) {
         AttendanceMode.LOADING -> LoadingAttendance(modifier)
-        AttendanceMode.STUDENT -> StudentAttendance(
+        AttendanceMode.STUDENT -> StudentAttendanceContent(
             state = state,
             onRefresh = viewModel::refresh,
             onScan = viewModel::openScanner,
@@ -175,7 +175,7 @@ fun AttendanceScreen(
 }
 
 @Composable
-private fun StudentAttendance(
+fun StudentAttendanceContent(
     state: AttendanceUiState,
     onRefresh: () -> Unit,
     onScan: (String?) -> Unit,
@@ -199,8 +199,8 @@ private fun StudentAttendance(
             monotonicNow = android.os.SystemClock.elapsedRealtime()
         }
     }
-    val schoolVerified = state.schoolPresenceReceivedRealtime?.let {
-        schoolDayVerifiedAtServerTime(state.schoolPresence, (monotonicNow - it) / 1_000)
+    val schoolRecorded = state.schoolPresenceReceivedRealtime?.let {
+        schoolDayRecordedAtServerTime(state.schoolPresence, (monotonicNow - it) / 1_000)
     } ?: false
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -219,9 +219,10 @@ private fun StudentAttendance(
             org.companerodeescuela.core.designsystem.v8.V8HeroTitle("Pase de", "lista")
         }
         V8AttendanceEvidence(
-            schoolNetworkVerified = schoolVerified,
+            // No independently authenticated campus witness is available.
+            schoolNetworkVerified = null,
             locationVerified = null,
-            ready = schoolVerified && state.activeSessions.isNotEmpty(),
+            ready = schoolRecorded && state.activeSessions.isNotEmpty(),
         )
         TextButton(onClick = onRefresh, enabled = !state.loading, modifier = Modifier.align(Alignment.End)) {
             Text(if (state.loading) "Actualizando…" else "Actualizar")
@@ -249,7 +250,7 @@ private fun StudentAttendance(
         )
 
         SchoolDayPresenceCard(
-            active = schoolVerified,
+            recorded = schoolRecorded,
             ssid = state.schoolNetworkSsid,
             expiresAtEpochSeconds = state.schoolPresence?.expiresAtEpochSeconds,
             busy = state.actionInProgress,
@@ -286,7 +287,7 @@ private fun StudentAttendance(
                 onConfirm = { onConfirmClassCall(session.id) },
                 confirmed = state.confirmedClassCalls[session.id],
                 busy = state.actionInProgress,
-                schoolPresenceActive = schoolVerified,
+                schoolPresenceActive = schoolRecorded,
             )
         }
 
@@ -369,8 +370,7 @@ private fun StudentSessionCard(
                     enabled = !busy && confirmed == null && local == null && schoolPresenceActive,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(if (confirmed == null) "Confirmar pase desde la app" else
-                        if (confirmed.disposition == AttendanceDisposition.LATE) "Retardo confirmado" else "Asistencia confirmada")
+                    Text(if (confirmed == null) "Enviar pase para revisión" else classCallRecordMessage(confirmed))
                 }
                 if (!schoolPresenceActive) {
                     Text("Primero registra tu entrada escolar con el QR institucional.",
@@ -403,7 +403,7 @@ private fun StudentSessionCard(
 
 @Composable
 private fun SchoolDayPresenceCard(
-    active: Boolean,
+    recorded: Boolean,
     ssid: String?,
     expiresAtEpochSeconds: Long?,
     busy: Boolean,
@@ -422,22 +422,17 @@ private fun SchoolDayPresenceCard(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
-            if (active) {
+            if (recorded) {
                 StatusNotice(
-                    title = "Jornada iniciada",
+                    title = "Ingreso registrado · presencia sin verificar",
                     message = buildString {
-                        append("QR institucional validado")
-                        ssid?.let { append(" · Wi-Fi: ").append(it) }
+                        append("El QR fue reconocido. La red declarada no acredita presencia física; el pase de clase requiere revisión docente.")
                         expiresAtEpochSeconds?.let {
-                            append(" · válida hasta ")
-                            append(
-                                DateTimeFormatter.ofPattern("HH:mm")
-                                    .withZone(java.time.ZoneId.systemDefault())
-                                    .format(Instant.ofEpochSecond(it)),
-                            )
+                            append(" Registro vigente hasta ")
+                            append(DateTimeFormatter.ofPattern("HH:mm").withZone(java.time.ZoneId.systemDefault()).format(Instant.ofEpochSecond(it)))
                         }
                     },
-                    tone = NoticeTone.SUCCESS,
+                    tone = NoticeTone.WARNING,
                 )
             } else {
                 Text(
@@ -672,7 +667,7 @@ private fun TeacherAttendance(
     val active = state.teacherSession
     val campus = state.campusRoster
     val records = state.roster?.takeIf { it.session.id == active?.id }?.records.orEmpty()
-    val review = records.filter { it.status == AttendanceStatus.REVIEW_REQUIRED }
+    val review = records.filter(::attendanceRecordRequiresReview)
     Box(modifier = modifier.fillMaxSize()) {
         if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current) {
             V8CampusBackdrop(Modifier.matchParentSize())
@@ -908,7 +903,7 @@ private fun RosterRecord(
                     OutlinedButton(onClick = { decision = AttendanceDisposition.LATE }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Retardo") }
                     OutlinedButton(onClick = { decision = AttendanceDisposition.ABSENT }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Ausente") }
                 }
-                if (record.status == AttendanceStatus.REVIEW_REQUIRED) OutlinedButton(onClick = { verify = true }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Validar por excepción docente") }
+                if (attendanceRecordRequiresReview(record)) OutlinedButton(onClick = { verify = true }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Validar por excepción docente") }
             }
         }
     }
@@ -1114,8 +1109,6 @@ private fun localStatusLabel(
         "Guardado · requiere sesión" to NoticeTone.WARNING
     AttendanceClientVerdict.SERVER_RECEIVED ->
         "Recibida por el servidor" to NoticeTone.SUCCESS
-    AttendanceClientVerdict.SERVER_VERIFIED ->
-        "Verificada por el servidor" to NoticeTone.SUCCESS
     AttendanceClientVerdict.REVIEW_REQUIRED ->
         "En revisión por el docente" to NoticeTone.WARNING
     AttendanceClientVerdict.SERVER_REJECTED ->
@@ -1123,7 +1116,7 @@ private fun localStatusLabel(
 }
 
 private fun attendanceDisplayLabel(record: AttendanceRecordResponse): String =
-    when (record.disposition) {
+    if (attendanceRecordRequiresReview(record)) "En revisión" else when (record.disposition) {
         AttendanceDisposition.PRESENT -> "Presente"
         AttendanceDisposition.LATE -> "Retardo"
         AttendanceDisposition.ABSENT -> "Ausente"
@@ -1132,7 +1125,7 @@ private fun attendanceDisplayLabel(record: AttendanceRecordResponse): String =
 
 @Composable
 private fun attendanceDisplayColor(record: AttendanceRecordResponse) =
-    when (record.disposition) {
+    if (attendanceRecordRequiresReview(record)) MaterialTheme.colorScheme.tertiary else when (record.disposition) {
         AttendanceDisposition.PRESENT -> if (
             MaterialTheme.colorScheme.surface.luminance() < 0.5f
         ) {

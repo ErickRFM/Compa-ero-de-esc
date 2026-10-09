@@ -316,7 +316,7 @@ class AttendanceViewModel @Inject constructor(
                         schoolPresence = result.value,
                         schoolPresenceReceivedRealtime = android.os.SystemClock.elapsedRealtime(),
                         schoolNetworkSsid = repository.currentSchoolNetwork()?.ssid,
-                        successMessage = "Jornada escolar iniciada. Tu red y el QR institucional fueron verificados.",
+                        successMessage = "Ingreso registrado. El QR fue reconocido; la presencia física aún no está verificada.",
                     )
                 }
                 is Outcome.Failure -> _state.update {
@@ -399,11 +399,7 @@ class AttendanceViewModel @Inject constructor(
                     it.copy(
                         actionInProgress = false,
                         confirmedClassCalls = it.confirmedClassCalls + (sessionId to result.value),
-                        successMessage = when (result.value.disposition) {
-                            AttendanceDisposition.LATE -> "Confirmación recibida con retardo."
-                            AttendanceDisposition.PRESENT -> "Asistencia confirmada por el servidor."
-                            else -> "Registro recibido por el servidor."
-                        },
+                        successMessage = classCallRecordMessage(result.value),
                     )
                 }
                 is Outcome.Failure -> _state.update {

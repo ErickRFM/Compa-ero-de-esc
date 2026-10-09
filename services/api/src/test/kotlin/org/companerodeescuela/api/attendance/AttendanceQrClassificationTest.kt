@@ -25,7 +25,7 @@ class AttendanceQrClassificationTest {
     private val occurrenceDate = LocalDate.parse("2026-10-05")
 
     @Test
-    fun `current signed QR verifies attendance`() = runTest {
+    fun `current signed QR is valid evidence but requires physical presence review`() = runTest {
         val setup = setup()
         val qr = setup.qr.issue("T-0001", setup.sessionId)
 
@@ -39,7 +39,7 @@ class AttendanceQrClassificationTest {
             ),
         )
 
-        assertEquals(AttendanceStatus.VERIFIED, record.status)
+        assertEquals(AttendanceStatus.REVIEW_REQUIRED, record.status)
         assertEquals(AttendanceReasonCode.QR_VALID, record.reasonCode)
     }
 

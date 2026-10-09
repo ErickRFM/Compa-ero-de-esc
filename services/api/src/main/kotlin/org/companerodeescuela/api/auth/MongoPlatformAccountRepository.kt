@@ -80,7 +80,7 @@ class MongoPlatformAccountRepository(
             .orEmpty()
             .mapNotNull { encoded -> runCatching { UserRole.valueOf(encoded) }.getOrNull() }
             .toSet(),
-        active = getBoolean("active", true),
+        active = get("active") == true,
         createdAt = getDate("createdAt").toInstant(),
     )
 

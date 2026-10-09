@@ -22,11 +22,15 @@ La indisponibilidad del repositorio o proveedor rechaza el acceso con `503 DEPEN
 
 Pruebas HTTP reales con Ktor y repositorios locales cubren rotación, desactivación nativa/institucional, retirada de roles, eliminación de identidad nativa, fuente legacy, claims de rol/propietario/generación/actividad, JWT sin caducidad e indisponibilidad durante petición y refresh. Se observaron fallos antes de corregir generación, actividad, fallback, caducidad y clasificación de indisponibilidad.
 
-La primera suite completa API/contratos/validación e `installDist` pasó. La última ejecución también terminó con código 0, pero coincidió con modificaciones de otro chat en el checkout y no se usa como evidencia final aislada. Falta repetir después de coordinar, revisión final y CI del SHA publicado.
+La revisión independiente encontró dos problemas adicionales: actividad Mongo ausente interpretada como activa y revocación por replay perdida ante una rotación concurrente. Se reprodujeron ambos (2 fallos de 4 pruebas) y se corrigieron en una pasada. La cuenta Mongo ahora exige booleano explícito `true`; el replay revoca con una actualización atómica por sesión activa y hash anterior reconocido, sin depender del token actual leído previamente. Véase [atomicidad Mongo](https://www.mongodb.com/docs/manual/core/write-operations-atomicity/).
+
+Tras las correcciones, API (181), contratos (16) y validación (7): **204 pruebas, cero fallos**, además de `installDist`, en `auth-review-full-green.log`. Las regresiones Mongo ejercitan los repositorios y el driver coroutine con una frontera reactiva determinista; no equivalen a una base Mongo real. El checkout contiene cambios de apariencia de otro chat; CI deberá validar el árbol de seguridad aislado del SHA publicado antes del merge.
 
 | Escenario | Estado |
 | --- | --- |
-| Autoridad actual de generación/actividad/roles en HTTP local | PASS en suite local; pendiente repetir en rama aislada |
+| Autoridad actual de generación/actividad/roles en HTTP local | PASS; suite completa tras correcciones |
+| Cuenta Mongo con actividad ausente/null/falsa o tipo incorrecto | PASS; acceso, refresh y login denegados |
+| Replay concurrente, hash desconocido, sesión distinta y revocación previa | PASS en frontera reactiva determinista |
 | MongoDB real, migración de sesiones y caída del proveedor externo | NOT_RUN |
 | MFA, recuperación de contraseña, dispositivos y abuso distribuido | NOT_RUN; alcance posterior de F2 |
 | Permisos por institución/recurso/grant y privacidad Tutor | NOT_RUN; no quedan resueltos por comparar roles |
@@ -34,3 +38,5 @@ La primera suite completa API/contratos/validación e `installDist` pasó. La ú
 | CI del SHA final de este cambio | NOT_RUN |
 
 Este documento no declara terminada F2 ni V10.1. El PR #123 continúa en borrador: su prueba física con dos teléfonos permanece BLOCKED. En su SHA `bab1665`, los checks de compilación/API pasaron; instrumentación pasó en la ejecución de rama, mientras la ejecución de PR agotó el tiempo descargando el SDK/emulador antes de lanzar pruebas.
+
+La numeración F2 corresponde a la misión del usuario; el plan versionado V10.1 enumera seguridad como F1. La igualdad de roles no certifica permisos por recurso/institución. La revisión dejó para una tarea posterior el rechazo completo de roles desconocidos en un JWT firmado (no se observó elevación), y no certificó Mongo real, proveedor productivo, MFA/reset/dispositivos, privacidad Tutor, cancelación extremo a extremo en Ktor, operaciones ya autorizadas en vuelo ni Android/QR/CI. Estos límites permanecen abiertos y no justifican una declaración de V10.1 completa.

@@ -500,6 +500,38 @@ class AttendanceServiceTest {
     }
 
     @Test
+    fun `school WiFi without Internet but no campus check-in permits signed QR only for review`() = runTest {
+        val repository = InMemoryAttendanceRepository()
+        val clock = MutableClock(initialInstant)
+        val presence = SchoolPresenceService(
+            repository = InMemorySchoolPresenceRepository(),
+            policy = SchoolPresencePolicy(
+                entryQrSha256 = sha256("school-entry"),
+                allowedSsids = setOf("UD4-Alumno"),
+                allowedBssids = emptySet(),
+            ),
+            clock = clock,
+        )
+        val qr = AttendanceQrService("q".repeat(48).toCharArray(), repository, clock)
+        val services = service(repository = repository, clock = clock,
+            schoolPresenceService = presence, qrService = qr)
+        val session = services.openSession("T-0001", requestFor(teacherOccurrence()))
+        val signed = qr.issue("T-0001", session.id)
+        val result = services.register(
+            "2020-10455", session.id,
+            AttendanceAttemptRequest(
+                "school-wifi-no-internet",
+                clock.instant().epochSecond,
+                signed.token,
+                SchoolNetworkEvidence(ssid = "UD4-Alumno"),
+            ),
+        )
+        assertEquals(AttendanceStatus.REVIEW_REQUIRED, result.status)
+        assertEquals(AttendanceReasonCode.OFFLINE_NETWORK_QR_REVIEW, result.reasonCode)
+        assertEquals(null, result.disposition)
+    }
+
+    @Test
     fun `offline bypass rejects missing or forged classroom QR`() = runTest {
         val repository = InMemoryAttendanceRepository()
         val clock = MutableClock(initialInstant)

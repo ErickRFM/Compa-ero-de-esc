@@ -142,39 +142,41 @@ class AttendanceStudentService(
             )
         }
 
-        // A signed classroom QR may be captured during a campus network outage.
-        // It is evidence for teacher review, NEVER an automatic verified presence.
-        val offlineQrFallback = schoolPresenceService != null && request.schoolNetwork == null
-        schoolPresenceService?.let { presence ->
-            if (offlineQrFallback) {
-                val rawToken = request.qrToken?.trim().orEmpty()
-                val signed = qrService?.verify(
-                    token = rawToken,
-                    expectedSessionId = session.id,
-                    receivedAtEpochSeconds = now.epochSecond,
-                )
-                val capturedWithinQrWindow = when (signed) {
-                    is QrEvidenceResult.Valid ->
-                        request.deviceTimestampEpochSeconds in
-                            signed.issuedAtEpochSeconds..signed.expiresAtEpochSeconds
-                    is QrEvidenceResult.Expired ->
-                        request.deviceTimestampEpochSeconds in
-                            signed.issuedAtEpochSeconds..signed.expiresAtEpochSeconds
-                    else -> false
-                }
-                if (!capturedWithinQrWindow ||
-                    !attemptWasInsideWindow ||
-                    now.epochSecond > effectiveClose + LATE_SYNC_REVIEW_WINDOW_SECONDS
-                ) {
-                    throw ApiException.Forbidden(
-                        "Offline attendance requires a valid signed classroom QR captured during the session",
-                    )
-                }
-            } else {
-                presence.requireActive(studentId)
-                presence.verifyNetworkForAttendance(
-                    request.schoolNetwork
-                        ?: throw ApiException.Forbidden("School Wi-Fi evidence is required"),
+        // Wi-Fi connected does not imply Internet connectivity. During an
+        // outage the student may still supply a real school SSID while the API
+        // has no campus check-in. Accept a server-signed classroom QR *only*
+        // as teacher-review evidence, never as VERIFIED attendance.
+        val presence = schoolPresenceService
+        val hasLiveCampusEvidence = if (presence == null) {
+            true
+        } else {
+            val campusActive = presence.activeFor(studentId) != null
+            campusActive && request.schoolNetwork?.let { network ->
+                runCatching { presence.verifyNetworkForAttendance(network) }.isSuccess
+            } == true
+        }
+        val offlineQrFallback = presence != null && !hasLiveCampusEvidence
+        if (offlineQrFallback) {
+            val signed = qrService?.verify(
+                token = request.qrToken?.trim().orEmpty(),
+                expectedSessionId = session.id,
+                receivedAtEpochSeconds = now.epochSecond,
+            )
+            val capturedWithinQrWindow = when (signed) {
+                is QrEvidenceResult.Valid ->
+                    request.deviceTimestampEpochSeconds in
+                        signed.issuedAtEpochSeconds..signed.expiresAtEpochSeconds
+                is QrEvidenceResult.Expired ->
+                    request.deviceTimestampEpochSeconds in
+                        signed.issuedAtEpochSeconds..signed.expiresAtEpochSeconds
+                else -> false
+            }
+            if (!capturedWithinQrWindow ||
+                !attemptWasInsideWindow ||
+                now.epochSecond > effectiveClose + LATE_SYNC_REVIEW_WINDOW_SECONDS
+            ) {
+                throw ApiException.Forbidden(
+                    "Offline attendance requires a valid signed classroom QR captured during the session",
                 )
             }
         }

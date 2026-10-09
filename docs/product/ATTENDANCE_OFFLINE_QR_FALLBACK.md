@@ -6,7 +6,7 @@
 - Los QR se guardan de forma privada en Android, asociados al usuario docente y a la sesión. El teléfono elige el QR de la franja de 15 segundos actual sin necesitar conexión.
 - Un estudiante autenticado escanea el QR con la cámara incluso sin Wi-Fi. Se guarda en Room con ID de operación, marca temporal y token QR, y WorkManager reenvía al recuperar conectividad.
 - La API sigue validando inscripción, sesión, firma HMAC, ventana de captura y un límite de sincronización de 24 horas tras el cierre.
-- Cuando la captura **no tiene evidencia Wi-Fi**, la API registra `REVIEW_REQUIRED / OFFLINE_NETWORK_QR_REVIEW`. Nunca declara presente automáticamente ni inventa jornada escolar verificada.
+- Cuando la captura **no tiene validación completa de jornada+Wi-Fi** (incluido Wi-Fi conectado pero sin internet al iniciar jornada), la API registra `REVIEW_REQUIRED / OFFLINE_NETWORK_QR_REVIEW`. Nunca declara presente automáticamente ni inventa jornada escolar verificada.
 - El profesor consulta los registros pendientes al recuperar conexión y decide PRESENCIA / RETARDO / AUSENCIA mediante la revisión auditada existente.
 
 ## Límites reales

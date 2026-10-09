@@ -182,6 +182,24 @@ class AuthRepositoryTest {
         assertNull(tokenStore.refreshSession)
     }
 
+    @Test
+    fun `cancelledSecureStorageDoesNotBecomeAStorageFailure`() = runTest {
+        val store = object : SessionTokenStore by FakeTokenStore() {
+            override suspend fun writeSession(accessToken: String, sessionId: String, refreshToken: String) {
+                throw kotlinx.coroutines.CancellationException("cancelled")
+            }
+        }
+        val client = createApiClient(ApiEnvironment("https://example.test/", "test"), MockEngine {
+            respond(loginResponse(platformToken("student-1", 4_102_444_800), "fixture-refresh"),
+                HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()))
+        })
+        client.use {
+            kotlin.test.assertFailsWith<kotlinx.coroutines.CancellationException> {
+                AuthRepository(client, store).login("student", "fixture")
+            }
+        }
+    }
+
     private fun platformToken(
         userId: String,
         expiresAt: Long,

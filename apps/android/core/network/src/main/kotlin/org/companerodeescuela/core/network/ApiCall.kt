@@ -19,6 +19,8 @@ import org.companerodeescuela.core.common.result.Outcome
  */
 suspend fun <T> apiCall(block: suspend () -> Outcome<T>): Outcome<T> = try {
     block()
+} catch (e: kotlinx.coroutines.CancellationException) {
+    throw e
 } catch (e: ResponseException) {
     Outcome.Failure(e.toAppError())
 } catch (e: java.io.IOException) {

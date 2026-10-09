@@ -77,9 +77,11 @@ class SessionViewModelTest {
         val repository = AuthRepository(
             client = createApiClient(
                 ApiEnvironment("https://example.test/", "test"),
-                MockEngine {
+                MockEngine { request ->
                     respond(
-                        content = refreshResponse(refreshedToken, currentEpoch + 3600),
+                        content = if (request.url.encodedPath == "/auth/me") {
+                            """{"data":{"id":"teacher-1","displayName":"Elena Ríos","email":"elena@example.edu","roles":["teacher"],"active":true}}"""
+                        } else refreshResponse(refreshedToken, currentEpoch + 3600),
                         status = HttpStatusCode.OK,
                         headers = headersOf(
                             HttpHeaders.ContentType,

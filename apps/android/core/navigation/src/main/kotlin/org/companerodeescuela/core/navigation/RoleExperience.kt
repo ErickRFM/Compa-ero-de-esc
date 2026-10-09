@@ -36,6 +36,17 @@ object RoleExperienceResolver {
         if (UserRole.SUPER_ADMIN in roles) add(AppExperience.SUPER_ADMIN)
     }
 
+    /** A login card is an intention, never a role grant. Null asks the user to choose. */
+    fun preferredAfterLogin(
+        roles: Set<UserRole>,
+        requested: AppExperience?,
+        saved: AppExperience?,
+    ): AppExperience? {
+        val granted = available(roles)
+        if (requested != null) return requested.takeIf(granted::contains)
+        return saved?.takeIf(granted::contains) ?: granted.singleOrNull()
+    }
+
     fun resolve(
         roles: Set<UserRole>,
         preferredExperience: AppExperience? = null,

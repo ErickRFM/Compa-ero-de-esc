@@ -45,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -66,6 +67,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.delay
@@ -690,7 +692,7 @@ private fun TeacherAttendance(
                     }
                 }
             }
-            state.errorMessage?.let { item { StatusNotice("No pudimos actualizar", it, tone = NoticeTone.ERROR) } }
+            state.errorMessage?.let { item { StatusNotice("No pudimos completar la operación", it, tone = NoticeTone.ERROR) } }
             state.successMessage?.let { item { StatusNotice("Listo", it, tone = NoticeTone.SUCCESS) } }
             if (active != null) item {
                 TeacherSessionCard(active, state.occurrences.firstOrNull { it.id == active.occurrenceId },
@@ -724,14 +726,28 @@ private fun TeacherAttendance(
                         }
                     }
                 }
+            } else if (active == null) {
+                item {
+                    StatusNotice(
+                        "Sin pase activo",
+                        "Abre un pase vigente para consultar registros de clase. La entrada escolar es independiente.",
+                    )
+                }
+            } else if (state.roster == null) {
+                item {
+                    StatusNotice(
+                        "Registros pendientes",
+                        "Todavía no recibimos el padrón de este pase. Actualiza para consultarlo.",
+                    )
+                }
             } else {
                 val shown = if (filter == "Por revisar") review else records
                 item { Text("Lista de estudiantes · ${shown.size}", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary) }
-                if (shown.isEmpty()) item { StatusNotice("Sin registros en este filtro", "Los registros aparecen al recibirse del servidor. Actualiza para volver a consultar.") }
+                if (shown.isEmpty()) item { StatusNotice("Sin registros en este filtro", "El servidor aún no reporta registros para este filtro.") }
                 items(shown, key = AttendanceRecordResponse::id) { record ->
                     RosterRecord(record, state.actionInProgress, onReview, onMark)
                 }
-                if (filter == "Recibidos" && active != null && campus?.sessionId == active.id) {
+                if (filter == "Recibidos" && campus?.sessionId == active.id) {
                     items(campus.students.filter { student -> records.none { it.studentId == student.studentId } }, key = { "missing:" + it.studentId }) { student ->
                         V8GlassCard(Modifier.fillMaxWidth()) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -921,6 +937,12 @@ private fun TeacherOccurrenceList(
     val today = LocalDate.now().toString()
     val todayOccurrences = occurrences.filter { it.date == today }
     val visible = if (todayOccurrences.isNotEmpty()) todayOccurrences else occurrences
+    val now by produceState(initialValue = LocalDateTime.now()) {
+        while (true) {
+            delay(60_000L)
+            value = LocalDateTime.now()
+        }
+    }
 
     Text(
         text = if (todayOccurrences.isNotEmpty()) "Clases de hoy" else "Clases de la semana",
@@ -937,6 +959,7 @@ private fun TeacherOccurrenceList(
     }
 
     visible.forEach { occurrence ->
+        val availability = teacherPassOpenStatus(occurrence, now)
         V8GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier.padding(CompaneroSpacing.md),
@@ -961,10 +984,22 @@ private fun TeacherOccurrenceList(
                 )
                 Button(
                     onClick = { onOpen(occurrence) },
-                    enabled = !busy,
+                    enabled = !busy && availability == TeacherPassOpenStatus.AVAILABLE,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Abrir pase")
+                    Text(when (availability) {
+                        TeacherPassOpenStatus.AVAILABLE -> "Abrir pase"
+                        TeacherPassOpenStatus.ENDED -> "Clase finalizada"
+                        TeacherPassOpenStatus.CANCELLED -> "Clase cancelada"
+                        TeacherPassOpenStatus.INVALID_SCHEDULE -> "Revisar horario"
+                    })
+                }
+                if (availability != TeacherPassOpenStatus.AVAILABLE) {
+                    Text(
+                        teacherPassUnavailableMessage(availability),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = V8RedColors.TextSecondary,
+                    )
                 }
             }
         }

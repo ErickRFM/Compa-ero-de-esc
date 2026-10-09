@@ -18,12 +18,12 @@ internal interface AttendanceOutboxDao {
     @Query(
         """
         SELECT * FROM attendance_outbox
-        WHERE state = 'PENDING' AND nextAttemptAtEpochSeconds <= :nowEpochSeconds
-        ORDER BY createdAtEpochSeconds ASC
+        WHERE ownerId = :ownerId AND state = 'PENDING' AND nextAttemptAtEpochSeconds <= :nowEpochSeconds
+        ORDER BY createdAtEpochSeconds ASC, operationId ASC
         LIMIT 1
         """,
     )
-    suspend fun nextReady(nowEpochSeconds: Long): AttendanceOutboxEntity?
+    suspend fun nextReady(nowEpochSeconds: Long, ownerId: String): AttendanceOutboxEntity?
 
     @Query("SELECT * FROM attendance_outbox WHERE operationId = :operationId LIMIT 1")
     suspend fun findOutbox(operationId: String): AttendanceOutboxEntity?

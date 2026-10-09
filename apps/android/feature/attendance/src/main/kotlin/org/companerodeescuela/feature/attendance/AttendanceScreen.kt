@@ -373,7 +373,7 @@ private fun StudentSessionCard(
                         if (confirmed.disposition == AttendanceDisposition.LATE) "Retardo confirmado" else "Asistencia confirmada")
                 }
                 if (!schoolPresenceActive) {
-                    Text("Primero registra tu entrada escolar con el QR institucional.",
+                    Text("Si no hay Wi-Fi, escanea el QR del docente; el registro quedará pendiente de revisión.",
                         style = MaterialTheme.typography.bodySmall)
                 }
 
@@ -697,7 +697,7 @@ private fun TeacherAttendance(
             if (active != null) item {
                 TeacherSessionCard(active, state.occurrences.firstOrNull { it.id == active.occurrenceId },
                     state.qr?.token, state.qr?.expiresAtEpochSeconds, state.qrVisualState,
-                    state.actionInProgress, onRefreshRoster, { confirmClose = true })
+                    state.offlineQrPrepared, state.actionInProgress, onRefreshRoster, { confirmClose = true })
             } else item {
                 TeacherOccurrenceList(state.occurrences, state.actionInProgress, onOpen)
             }
@@ -787,6 +787,7 @@ private fun TeacherSessionCard(
     qrToken: String?,
     qrExpiresAt: Long?,
     qrState: QrVisualState,
+    offlineQrPrepared: Boolean,
     busy: Boolean,
     onRefreshRoster: () -> Unit,
     onRequestClose: () -> Unit,
@@ -824,7 +825,11 @@ private fun TeacherSessionCard(
                     )
                     QrCountdown(qrExpiresAt)
                     Text(
-                        text = "El QR cambia automáticamente. No contiene datos del alumno.",
+                        text = if (offlineQrPrepared) {
+                            "QR de contingencia preparado: seguirá rotando durante este pase aunque se caiga el Wi-Fi."
+                        } else {
+                            "El QR cambia automáticamente. Se requiere conexión para preparar la contingencia."
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = V8RedColors.TextSecondary,
                     )
@@ -836,7 +841,7 @@ private fun TeacherSessionCard(
                     color = V8RedColors.TextPrimary,
                     )
                     Text(
-                        text = "Reconectando automáticamente. No uses un código anterior.",
+                        text = "Reconectando. Abre el pase con red para preparar QR de contingencia.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = V8RedColors.TextSecondary,
                     )

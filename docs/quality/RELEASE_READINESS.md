@@ -1,5 +1,7 @@
 # Release readiness
 
+> El contenido histórico de este documento conserva su corte original. Para el corte V10.1 sobre main `97e68e1` y el PR #123 todavía abierto, consultar [la ejecución F0](../audits/V10_1_F0_QR_EXECUTION_20261008.md). Los contratos V10 no equivalen a funcionalidad implementada.
+
 ## Verdict
 
 **Internal V5 candidate is integrated. Physical-device acceptance is required. Real-student pilot remains blocked by real institutional providers and release configuration.**

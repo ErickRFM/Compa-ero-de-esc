@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.companerodeescuela.core.attendance.AttendanceRepository
 import org.companerodeescuela.core.common.result.Outcome
+import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.database.LocalAttendanceRecord
 import org.companerodeescuela.shared.contracts.AttendanceDisposition
 import org.companerodeescuela.shared.contracts.TeacherCampusRosterResponse
@@ -68,6 +69,7 @@ data class AttendanceUiState(
     val teacherSession: AttendanceSessionResponse? = null,
     val qr: AttendanceQrResponse? = null,
     val qrVisualState: QrVisualState = QrVisualState.IDLE,
+    val offlineQrPrepared: Boolean = false,
     val roster: AttendanceRosterResponse? = null,
     val campusRoster: TeacherCampusRosterResponse? = null,
     val campusRosterError: String? = null,
@@ -113,7 +115,7 @@ class AttendanceViewModel @Inject constructor(
         _state.update { it.copy(teacherSession = null, roster = null, campusRoster = null, qr = null,
             activeSessions = emptyList(), occurrences = emptyList(), occurrencesLoaded = false,
             sessionsLoaded = false, actionInProgress = false, campusRosterError = null,
-            qrVisualState = QrVisualState.IDLE, successMessage = null, errorMessage = null) }
+            qrVisualState = QrVisualState.IDLE, offlineQrPrepared = false, successMessage = null, errorMessage = null) }
     }
 
     init {
@@ -211,7 +213,7 @@ class AttendanceViewModel @Inject constructor(
             _state.update {
                 it.copy(
                     schoolNetworkSsid = null,
-                    errorMessage = "Conéctate al Wi-Fi de la escuela antes de iniciar tu jornada.",
+                    errorMessage = "Sin Wi-Fi escolar no se verifica la jornada. Para tu clase escanea el QR de contingencia del docente.",
                 )
             }
             return
@@ -367,10 +369,14 @@ class AttendanceViewModel @Inject constructor(
             ensureActive()
             when (result) {
                 is Outcome.Success -> {
+                    _state.value.userId?.let { teacherId ->
+                        repository.rememberTeacherSession(teacherId, result.value, occurrence)
+                    }
                     _state.update {
                         it.copy(
                             actionInProgress = false,
                             teacherSession = result.value,
+                            offlineQrPrepared = false,
                             successMessage = "Pase abierto. El QR se renueva automáticamente.",
                         )
                     }
@@ -436,6 +442,7 @@ class AttendanceViewModel @Inject constructor(
             ensureActive()
             when (result) {
                 is Outcome.Success -> {
+                    _state.value.userId?.let(repository::forgetTeacherSession)
                     qrRotationJob?.cancel()
                     rosterPollingJob?.cancel()
                     _state.update {
@@ -443,6 +450,7 @@ class AttendanceViewModel @Inject constructor(
                             actionInProgress = false,
                             teacherSession = null,
                             qr = null,
+                            offlineQrPrepared = false,
                             qrVisualState = QrVisualState.IDLE,
                             roster = null,
                             successMessage = "Pase cerrado.",
@@ -670,11 +678,24 @@ class AttendanceViewModel @Inject constructor(
             }
             val ambiguous = context != null && matching.map { it.courseId }.distinct().size > 1
             val occurrences = if (ambiguous) emptyList() else matching
-            val activeSessions = active.valueOrNull().orEmpty().filter {
+            val activeSessions = if (active is Outcome.Failure) {
+                val error = active.error
+                val transient = error is AppError.Network || error is AppError.Http &&
+                    (error.status in setOf(408, 425, 429) || error.status in 500..599)
+                if (transient) listOfNotNull(_state.value.userId?.let { repository.restoreTeacherSession(it, context) })
+                else {
+                    _state.value.userId?.let(repository::forgetTeacherSession)
+                    emptyList()
+                }
+            } else active.valueOrNull().orEmpty().filter {
                 it.closedAtEpochSeconds == null && it.closesAtEpochSeconds > System.currentTimeMillis() / 1000 &&
                     (context == null || occurrences.any { occurrence -> occurrence.id == it.occurrenceId })
             }
             val activeSession = activeSessions.firstOrNull()
+            if (active is Outcome.Success && activeSession != null) {
+                _state.value.userId?.let { repository.rememberTeacherSession(it, activeSession,
+                    occurrences.firstOrNull { occurrence -> occurrence.id == activeSession.occurrenceId }) }
+            }
 
             _state.update {
                 it.copy(
@@ -684,7 +705,9 @@ class AttendanceViewModel @Inject constructor(
                     sessionsLoaded = active is Outcome.Success,
                     activeSessions = activeSessions,
                     teacherSession = activeSession,
+                    offlineQrPrepared = if (it.teacherSession?.id == activeSession?.id) it.offlineQrPrepared else false,
                     errorMessage = when {
+                        active is Outcome.Failure && activeSession != null -> null
                         week is Outcome.Failure -> week.error.userMessage
                         active is Outcome.Failure -> active.error.userMessage
                         ambiguous -> "No hay una vinculación inequívoca entre esta clase y el horario institucional."
@@ -743,7 +766,14 @@ class AttendanceViewModel @Inject constructor(
     private fun startQrRotation(sessionId: String) {
         qrRotationJob?.cancel()
         qrRotationJob = launchTeacherRequest {
+            val ownerId = _state.value.userId.orEmpty()
             while (_state.value.teacherSession?.id == sessionId) {
+                if (!_state.value.offlineQrPrepared && ownerId.isNotBlank()) {
+                    when (val prepared = repository.prepareOfflineQrPack(sessionId, ownerId)) {
+                        is Outcome.Success -> _state.update { it.copy(offlineQrPrepared = prepared.value) }
+                        is Outcome.Failure -> Unit // Live QR keeps working; retry pack preparation.
+                    }
+                }
                 _state.update {
                     it.copy(
                         qrVisualState = if (it.qr == null) {
@@ -753,7 +783,7 @@ class AttendanceViewModel @Inject constructor(
                         },
                     )
                 }
-                val result = repository.issueQr(sessionId)
+                val result = repository.issueQr(sessionId, ownerId)
                 ensureActive()
                 when (result) {
                     is Outcome.Success -> {

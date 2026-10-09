@@ -89,6 +89,38 @@ class AttendanceRepositoryTest {
     }
 
     @Test
+    fun `signed QR pack is readable without a network call and stays scoped to teacher`() = runTest {
+        val now = clock.instant().epochSecond
+        val signed = org.companerodeescuela.shared.contracts.AttendanceQrResponse(
+            token = "server-signed-test-token",
+            issuedAtEpochSeconds = now,
+            expiresAtEpochSeconds = now + 25,
+            rotateAfterSeconds = 15,
+        )
+        val offlineCache = object : AttendanceQrPackStore {
+            override fun read(ownerId: String, sessionId: String) =
+                if (ownerId == "teacher-1" && sessionId == "session-1") listOf(signed)
+                else emptyList()
+            override fun save(ownerId: String, sessionId: String, slots: List<org.companerodeescuela.shared.contracts.AttendanceQrResponse>) = Unit
+            override fun rememberSession(ownerId: String, session: org.companerodeescuela.shared.contracts.AttendanceSessionResponse) = Unit
+            override fun restoreSession(ownerId: String): org.companerodeescuela.shared.contracts.AttendanceSessionResponse? = null
+            override fun clearSession(ownerId: String) = Unit
+        }
+        val tokenStore = FakeTokenStore(token("teacher-1", 2_000_000_000L))
+        val repository = AttendanceRepository(
+            localStore = FakeStore(),
+            scheduler = FakeScheduler(),
+            remoteClient = unusedRemoteClient(tokenStore),
+            offlineQrStore = offlineCache,
+            clock = clock,
+        )
+
+        val cached = repository.issueQr("session-1", "teacher-1")
+        assertEquals(signed, assertIs<Outcome.Success<org.companerodeescuela.shared.contracts.AttendanceQrResponse>>(cached).value)
+        assertIs<Outcome.Failure>(repository.issueQr("session-1", "another-teacher"))
+    }
+
+    @Test
     fun `expired session does not create an outbox row`() = runTest {
         val store = FakeStore()
         val scheduler = FakeScheduler()

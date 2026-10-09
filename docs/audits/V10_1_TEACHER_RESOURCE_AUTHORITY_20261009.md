@@ -58,6 +58,13 @@ generación del alcance, incluso si la respuesta revalidada conserva los mismos 
   52 advertencias en 22 informes; APK debug y release R8 sin firma generados.
   El comando completo terminó con `BUILD SUCCESSFUL` en 4m 45s. Formato y
   escaneo de secretos pasan. El CI del SHA final es obligatorio antes del merge.
+- CI inicial: ambas instrumentaciones ejecutaron 13 pruebas y fallaron las dos
+  nuevas al buscar una fila todavía no compuesta fuera del viewport. Reproducción
+  local a 360×640dp: 2/2 fallos. Se corrigió exclusivamente el recorrido del test:
+  desplaza la lista vertical hasta la fila, identificando su eje de scroll estable.
+  Pasan las dos regresiones y la batería completa en ese tamaño: 392 unitarias,
+  13 instrumentadas, lint sin errores y APK debug/release generados; `BUILD
+  SUCCESSFUL` en 1m 42s. El runtime conserva la corrección ya revisada.
 
 ## Compatibilidad y pendientes
 

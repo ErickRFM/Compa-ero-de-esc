@@ -1,9 +1,14 @@
 package org.companerodeescuela
 
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.lifecycle.viewModelScope
 import io.ktor.client.engine.mock.MockEngine
@@ -67,7 +72,10 @@ class TeacherAttendanceReviewUiTest {
     private fun openEditor() {
         fixture = Fixture()
         compose.setContent { CompaneroTheme { AttendanceScreen(requestedMode = AttendanceMode.TEACHER, viewModel = fixture.model) } }
+        compose.waitForIdle()
         compose.waitUntil(10_000) { fixture.model.state.value.roster != null }
+        compose.onNode(hasScrollToNodeAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange))
+            .performScrollToNode(hasText("Revisar registro"))
         compose.onNodeWithText("Revisar registro").performScrollTo().performClick()
         compose.onNodeWithText("Marcar presente").performScrollTo().performClick()
         compose.onNodeWithText("Motivo").performTextInput("QA correction reason")

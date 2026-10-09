@@ -59,3 +59,14 @@ desktop.ini
 .kotlin/
 __pycache__/
 dist/v8-audit/
+
+# iOS and standalone Kotlin Multiplatform local artifacts
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcresult/
+*.mobileprovision
+*.p8
+*.p12
+*.cer
+.superpowers/

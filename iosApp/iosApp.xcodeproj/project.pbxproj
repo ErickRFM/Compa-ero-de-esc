@@ -1,0 +1,121 @@
+// !$*UTF8*$!
+{
+    archiveVersion = 1;
+    classes = {};
+    objectVersion = 56;
+    objects = {
+        A00000000000000000000064 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompaneroApp.swift; sourceTree = "<group>"; };
+        A000000000000000000000C8 = {isa = PBXBuildFile; fileRef = A00000000000000000000064; };
+        A00000000000000000000065 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationGate.swift; sourceTree = "<group>"; };
+        A000000000000000000000C9 = {isa = PBXBuildFile; fileRef = A00000000000000000000065; };
+        A00000000000000000000066 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+        A000000000000000000000CA = {isa = PBXBuildFile; fileRef = A00000000000000000000066; };
+        A00000000000000000000067 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = V8Theme.swift; sourceTree = "<group>"; };
+        A000000000000000000000CB = {isa = PBXBuildFile; fileRef = A00000000000000000000067; };
+        A00000000000000000000068 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+        A000000000000000000000CC = {isa = PBXBuildFile; fileRef = A00000000000000000000068; };
+        A00000000000000000000069 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionView.swift; sourceTree = "<group>"; };
+        A000000000000000000000CD = {isa = PBXBuildFile; fileRef = A00000000000000000000069; };
+
+        A00000000000000000000018 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OperationGateTests.swift; sourceTree = "<group>"; };
+        A00000000000000000000019 = {isa = PBXBuildFile; fileRef = A00000000000000000000018; };
+        A00000000000000000000012 = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+        A00000000000000000000013 = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+        A00000000000000000000006 = {isa = PBXFileReference; explicitFileType = wrapper.application; path = iosApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+        A00000000000000000000015 = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = iosAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+        A00000000000000000000002 = {isa = PBXGroup; children = (A00000000000000000000003, A00000000000000000000011, A00000000000000000000017, A00000000000000000000004); sourceTree = "<group>"; };
+        A00000000000000000000003 = {isa = PBXGroup; children = (A00000000000000000000064, A00000000000000000000065, A00000000000000000000066, A00000000000000000000067, A00000000000000000000068, A00000000000000000000069); path = iosApp; sourceTree = "<group>"; };
+        A00000000000000000000011 = {isa = PBXGroup; children = (A00000000000000000000012, A00000000000000000000013); path = Configuration; sourceTree = "<group>"; };
+        A00000000000000000000017 = {isa = PBXGroup; children = (A00000000000000000000018); path = iosAppTests; sourceTree = "<group>"; };
+        A00000000000000000000004 = {isa = PBXGroup; children = (A00000000000000000000006, A00000000000000000000015); name = Products; sourceTree = "<group>"; };
+        A00000000000000000000007 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A000000000000000000000C8, A000000000000000000000C9, A000000000000000000000CA, A000000000000000000000CB, A000000000000000000000CC, A000000000000000000000CD); runOnlyForDeploymentPostprocessing = 0; };
+        A00000000000000000000016 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000019); runOnlyForDeploymentPostprocessing = 0; };
+        A00000000000000000000008 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+        A00000000000000000000009 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+        A0000000000000000000000A = {
+            isa = PBXShellScriptBuildPhase;
+            alwaysOutOfDate = 1;
+            buildActionMask = 2147483647;
+            files = (); inputPaths = (); outputPaths = ();
+            name = "Build Kotlin framework";
+            runOnlyForDeploymentPostprocessing = 0;
+            shellPath = /bin/sh;
+            shellScript = "set -eu\ncd \"$SRCROOT/..\"\n./gradlew -p multiplatform :shared:embedAndSignAppleFrameworkForXcode --console=plain\n";
+        };
+        A00000000000000000000005 = {
+            isa = PBXNativeTarget; buildConfigurationList = A0000000000000000000000E;
+            buildPhases = (A0000000000000000000000A, A00000000000000000000007, A00000000000000000000008, A00000000000000000000009);
+            buildRules = (); dependencies = (); name = iosApp; productName = iosApp;
+            productReference = A00000000000000000000006; productType = "com.apple.product-type.application";
+        };
+        A0000000000000000000001E = {isa = PBXContainerItemProxy; containerPortal = A00000000000000000000001; proxyType = 1; remoteGlobalIDString = A00000000000000000000005; remoteInfo = iosApp; };
+        A0000000000000000000001D = {isa = PBXTargetDependency; target = A00000000000000000000005; targetProxy = A0000000000000000000001E; };
+        A00000000000000000000014 = {
+            isa = PBXNativeTarget; buildConfigurationList = A0000000000000000000001A;
+            buildPhases = (A00000000000000000000016); buildRules = (); dependencies = (A0000000000000000000001D);
+            name = iosAppTests; productName = iosAppTests; productReference = A00000000000000000000015;
+            productType = "com.apple.product-type.bundle.unit-test";
+        };
+        A00000000000000000000001 = {
+            isa = PBXProject;
+            attributes = {BuildIndependentTargetsInParallel = YES; LastUpgradeCheck = 2600; TargetAttributes = {A00000000000000000000005 = {CreatedOnToolsVersion = 26.0; }; A00000000000000000000014 = {CreatedOnToolsVersion = 26.0; TestTargetID = A00000000000000000000005; }; }; };
+            buildConfigurationList = A0000000000000000000000B; compatibilityVersion = "Xcode 14.0";
+            developmentRegion = es; hasScannedForEncodings = 0; knownRegions = (es, en, Base);
+            mainGroup = A00000000000000000000002; productRefGroup = A00000000000000000000004; projectDirPath = ""; projectRoot = "";
+            targets = (A00000000000000000000005, A00000000000000000000014);
+        };
+        A0000000000000000000000C = {isa = XCBuildConfiguration; name = Debug; buildSettings = {
+            SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+            SWIFT_VERSION = 5.0; CLANG_ENABLE_MODULES = YES; SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+            ENABLE_TESTABILITY = YES; DEBUG_INFORMATION_FORMAT = dwarf;
+        }; };
+        A0000000000000000000000D = {isa = XCBuildConfiguration; name = Release; buildSettings = {
+            SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+            SWIFT_VERSION = 5.0; CLANG_ENABLE_MODULES = YES; SWIFT_COMPILATION_MODE = wholemodule;
+            DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+        }; };
+        A0000000000000000000000F = {isa = XCBuildConfiguration; name = Debug; baseConfigurationReference = A00000000000000000000012; buildSettings = {
+            CODE_SIGN_STYLE = Automatic;
+            PRODUCT_BUNDLE_IDENTIFIER = org.companerodeescuela.ios;
+            PRODUCT_NAME = "$(TARGET_NAME)";
+            INFOPLIST_FILE = "iosApp/Info-Debug.plist";
+            GENERATE_INFOPLIST_FILE = NO;
+            TARGETED_DEVICE_FAMILY = "1,2";
+            SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+            ENABLE_USER_SCRIPT_SANDBOXING = NO;
+            FRAMEWORK_SEARCH_PATHS = ("$(inherited)", "$(SRCROOT)/../multiplatform/shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)");
+            OTHER_LDFLAGS = ("$(inherited)", "-framework", CompaneroShared);
+            LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks"); }; };
+        A00000000000000000000010 = {isa = XCBuildConfiguration; name = Release; baseConfigurationReference = A00000000000000000000013; buildSettings = {
+            CODE_SIGN_STYLE = Automatic;
+            PRODUCT_BUNDLE_IDENTIFIER = org.companerodeescuela.ios;
+            PRODUCT_NAME = "$(TARGET_NAME)";
+            INFOPLIST_FILE = "iosApp/Info.plist";
+            GENERATE_INFOPLIST_FILE = NO;
+            TARGETED_DEVICE_FAMILY = "1,2";
+            SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+            ENABLE_USER_SCRIPT_SANDBOXING = NO;
+            FRAMEWORK_SEARCH_PATHS = ("$(inherited)", "$(SRCROOT)/../multiplatform/shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)");
+            OTHER_LDFLAGS = ("$(inherited)", "-framework", CompaneroShared);
+            LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks"); }; };
+        A0000000000000000000001B = {isa = XCBuildConfiguration; name = Debug; buildSettings = {
+            PRODUCT_BUNDLE_IDENTIFIER = org.companerodeescuela.ios.tests; PRODUCT_NAME = "$(TARGET_NAME)";
+            GENERATE_INFOPLIST_FILE = YES; TARGETED_DEVICE_FAMILY = "1,2";
+            TEST_HOST = "$(BUILT_PRODUCTS_DIR)/iosApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/iosApp";
+            BUNDLE_LOADER = "$(TEST_HOST)";
+            FRAMEWORK_SEARCH_PATHS = ("$(inherited)", "$(SRCROOT)/../multiplatform/shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)");
+        }; };
+        A0000000000000000000001C = {isa = XCBuildConfiguration; name = Release; buildSettings = {
+            PRODUCT_BUNDLE_IDENTIFIER = org.companerodeescuela.ios.tests; PRODUCT_NAME = "$(TARGET_NAME)";
+            GENERATE_INFOPLIST_FILE = YES; TARGETED_DEVICE_FAMILY = "1,2";
+            TEST_HOST = "$(BUILT_PRODUCTS_DIR)/iosApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/iosApp";
+            BUNDLE_LOADER = "$(TEST_HOST)";
+            FRAMEWORK_SEARCH_PATHS = ("$(inherited)", "$(SRCROOT)/../multiplatform/shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)");
+        }; };
+
+        A0000000000000000000000B = {isa = XCConfigurationList; buildConfigurations = (A0000000000000000000000C, A0000000000000000000000D); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+        A0000000000000000000000E = {isa = XCConfigurationList; buildConfigurations = (A0000000000000000000000F, A00000000000000000000010); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+        A0000000000000000000001A = {isa = XCConfigurationList; buildConfigurations = (A0000000000000000000001B, A0000000000000000000001C); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+    };
+    rootObject = A00000000000000000000001;
+}

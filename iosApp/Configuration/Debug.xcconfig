@@ -1,0 +1,4 @@
+// Override COMPANERO_API_BASE_URL in Xcode or with an xcodebuild setting.
+// An empty value opens Conexión without contacting an invented endpoint.
+COMPANERO_API_BASE_URL =
+COMPANERO_ALLOW_LOCAL_HTTP = YES

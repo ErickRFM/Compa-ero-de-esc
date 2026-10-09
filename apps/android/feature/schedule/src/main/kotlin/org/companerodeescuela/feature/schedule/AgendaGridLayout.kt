@@ -4,7 +4,9 @@ import java.time.LocalTime
 import org.companerodeescuela.shared.contracts.ScheduleEntry
 
 internal fun weeklyAgendaDays(entries: List<org.companerodeescuela.shared.contracts.ScheduleEntry>): List<String> =
-    academicDaysV8.take(5) + listOf("SATURDAY", "SUNDAY").filter { day -> entries.any { it.dayOfWeek == day } }
+    // Saturday is part of the normal school week even when an imperfect
+    // import has temporarily missed its entries. Sunday remains optional.
+    academicDaysV8.take(6) + listOf("SUNDAY").filter { day -> entries.any { it.dayOfWeek == day } }
 
 internal fun weeklyDragTargetDay(days: List<String>, widthsPx: List<Float>, dayIndex: Int, lane: Int, laneCount: Int, offsetX: Float): String {
     require(days.size == widthsPx.size && widthsPx.all { it > 0 } && dayIndex in days.indices && laneCount > 0)

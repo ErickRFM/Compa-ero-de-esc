@@ -387,7 +387,7 @@ class AttendanceServiceTest {
 
 
     @Test
-    fun `class call requires verified campus entry and fresh school WiFi`() = runTest {
+    fun `class call with declared campus entry requires review and remains idempotent`() = runTest {
         val repository = InMemoryAttendanceRepository()
         val presence = SchoolPresenceService(
             repository = InMemorySchoolPresenceRepository(),
@@ -419,15 +419,15 @@ class AttendanceServiceTest {
             )
         }
         val confirmed = services.student.confirmClassCall("2020-10455", session.id, request)
-        assertEquals(AttendanceStatus.VERIFIED, confirmed.status)
-        assertEquals(AttendanceDisposition.PRESENT, confirmed.disposition)
+        assertEquals(AttendanceStatus.REVIEW_REQUIRED, confirmed.status)
+        assertEquals(null, confirmed.disposition)
         assertEquals(AttendanceReasonCode.CLASS_CALL_CONFIRMED, confirmed.reasonCode)
         assertEquals(confirmed, services.student.confirmClassCall("2020-10455", session.id, request))
         assertEquals(1, repository.recordsForSession(session.id).size)
     }
 
     @Test
-    fun `class call beyond grace period is late according to server clock`() = runTest {
+    fun `unattested late class call retains server time without declaring presence`() = runTest {
         val repository = InMemoryAttendanceRepository()
         val presence = SchoolPresenceService(
             repository = InMemorySchoolPresenceRepository(),
@@ -457,7 +457,37 @@ class AttendanceServiceTest {
             "2020-10455", session.id,
             ClassCallConfirmationRequest("confirm-late", SchoolNetworkEvidence(ssid = "UD4-Alumno")),
         )
-        assertEquals(AttendanceDisposition.LATE, confirmed.disposition)
+        assertEquals(AttendanceStatus.REVIEW_REQUIRED, confirmed.status)
+        assertEquals(null, confirmed.disposition)
+        assertEquals(initialInstant.plusSeconds(360).epochSecond, confirmed.receivedAtEpochSeconds)
+    }
+
+    @Test
+    fun `legacy automatic verification is quarantined in every service view and duplicate`() = runTest {
+        val repository = InMemoryAttendanceRepository()
+        val services = service(repository = repository)
+        val session = services.openSession("T-0001", requestFor(teacherOccurrence()))
+        val legacy = org.companerodeescuela.shared.contracts.AttendanceRecordResponse(
+            session.id + ":2020-10455", "legacy-op", session.id, session.occurrenceId, "2020-10455",
+            AttendanceStatus.VERIFIED, AttendanceReasonCode.QR_VALID, initialInstant.epochSecond, initialInstant.epochSecond,
+            disposition = AttendanceDisposition.PRESENT,
+        )
+        repository.writeAttempt(legacy)
+        val viewed = services.student.myClassRecord("2020-10455", session.id)!!
+        assertEquals(AttendanceStatus.REVIEW_REQUIRED, viewed.status)
+        assertEquals(null, viewed.disposition)
+        assertEquals(AttendanceStatus.VERIFIED, viewed.originalStatus)
+        assertEquals(AttendanceStatus.REVIEW_REQUIRED, services.roster("T-0001", session.id).records.single().status)
+        val duplicate = services.register("2020-10455", session.id, AttendanceAttemptRequest("legacy-op", initialInstant.epochSecond))
+        assertEquals(AttendanceStatus.REVIEW_REQUIRED, duplicate.status)
+        assertEquals(legacy, repository.findRecord(legacy.id), "Read policy must preserve raw evidence")
+        val reviewed = services.review("T-0001", legacy.id,
+            ReviewAttendanceRequest(AttendanceStatus.VERIFIED, disposition = AttendanceDisposition.PRESENT, note = "Presencia comprobada personalmente"))
+        assertEquals(AttendanceDisposition.PRESENT, reviewed.disposition)
+        assertEquals("T-0001", reviewed.reviewedBy)
+        assertEquals(AttendanceStatus.VERIFIED, reviewed.originalStatus)
+        assertEquals(1, reviewed.reviewHistory.size)
+        assertEquals(reviewed, services.student.myClassRecord("2020-10455", session.id))
     }
 
     private suspend fun teacherOccurrence(): ClassOccurrence {

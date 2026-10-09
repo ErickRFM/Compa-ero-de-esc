@@ -53,7 +53,7 @@ class SchoolPresenceService(
         val now = clock.instant()
 
         repository.findActiveForStudent(studentId, now.epochSecond)?.let {
-            return it.copy(serverTimeEpochSeconds = now.epochSecond)
+            return it.copy(networkVerified = false, serverTimeEpochSeconds = now.epochSecond)
         }
 
         return repository.save(
@@ -64,7 +64,9 @@ class SchoolPresenceService(
                 expiresAtEpochSeconds = now.plus(Duration.ofHours(policy.sessionHours)).epochSecond,
                 status = SchoolPresenceStatus.ACTIVE,
                 qrVerified = true,
-                networkVerified = true,
+                // Matching client-declared SSID/BSSID is not an authenticated
+                // network witness. No independent verifier is configured.
+                networkVerified = false,
                 networkVerificationMethod = method,
             ),
         ).copy(serverTimeEpochSeconds = now.epochSecond)
@@ -72,7 +74,7 @@ class SchoolPresenceService(
 
     suspend fun activeFor(studentId: String): SchoolPresenceResponse? {
         val now = clock.instant().epochSecond
-        return repository.findActiveForStudent(studentId, now)?.copy(serverTimeEpochSeconds = now)
+        return repository.findActiveForStudent(studentId, now)?.copy(networkVerified = false, serverTimeEpochSeconds = now)
     }
 
     suspend fun requireActive(studentId: String): SchoolPresenceResponse =
@@ -82,16 +84,21 @@ class SchoolPresenceService(
             )
 
     suspend fun close(studentId: String): SchoolPresenceResponse {
-        val current = requireActive(studentId)
+        val now = clock.instant().epochSecond
+        // Write from raw storage; read projections must not overwrite evidence.
+        val current = repository.findActiveForStudent(studentId, now)
+            ?: throw ApiException.Forbidden(
+                "Start your school day by scanning the institutional QR while connected to the school network",
+            )
         val closed = current.copy(
             status = SchoolPresenceStatus.CLOSED,
-            closedAtEpochSeconds = clock.instant().epochSecond,
-            serverTimeEpochSeconds = clock.instant().epochSecond,
+            closedAtEpochSeconds = now,
         )
         repository.replace(closed)
-        return closed
+        return closed.copy(networkVerified = false, serverTimeEpochSeconds = now)
     }
 
+    /** Declaration policy match only; never proof of physical presence. */
     fun verifyNetworkForAttendance(network: SchoolNetworkEvidence) =
         networkVerifier.verify(network)
 }

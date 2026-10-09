@@ -35,7 +35,7 @@ class TeacherCampusRosterService(
         }
         val ids = groups.memberIdsForGroup(matching.single().id)
         val session = attendance.findSessionByOccurrence(occurrenceId)
-        val records = session?.let { attendance.recordsForSession(it.id).associateBy { record -> record.studentId } }
+        val records = session?.let { attendance.recordsForSession(it.id).map { record -> record.withCurrentPresencePolicy() }.associateBy { record -> record.studentId } }
             .orEmpty()
         return TeacherCampusRosterResponse(
             occurrenceId = occurrenceId,

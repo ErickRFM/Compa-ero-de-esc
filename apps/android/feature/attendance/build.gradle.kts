@@ -35,6 +35,7 @@ dependencies {
     implementation(composeBom)
 
     implementation(project(":shared:contracts"))
+    implementation(project(":shared:validation"))
     implementation(project(":apps:android:core:attendance"))
     implementation(project(":apps:android:core:common"))
     implementation(project(":apps:android:core:database"))

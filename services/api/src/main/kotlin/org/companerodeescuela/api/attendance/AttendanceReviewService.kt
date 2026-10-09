@@ -21,6 +21,7 @@ class AttendanceReviewService(
         allowCrossOwner: Boolean = false,
     ): AttendanceRecordResponse = reviewMutex.withLock {
         val record = repository.findRecord(recordId)
+            ?.withCurrentPresencePolicy()
             ?: throw ApiException.NotFound("Attendance record was not found")
         val session = accessPolicy.requireSession(record.sessionId)
         accessPolicy.requireOwnerOrAdministrative(reviewerId, session, allowCrossOwner)

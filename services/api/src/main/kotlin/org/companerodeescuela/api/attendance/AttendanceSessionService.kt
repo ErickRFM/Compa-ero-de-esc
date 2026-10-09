@@ -114,7 +114,7 @@ class AttendanceSessionService(
         accessPolicy.requireOwnerOrAdministrative(actorId, session, allowCrossOwner)
         return AttendanceRosterResponse(
             session = session,
-            records = repository.recordsForSession(sessionId).sortedBy { it.studentId },
+            records = repository.recordsForSession(sessionId).map { it.withCurrentPresencePolicy() }.sortedBy { it.studentId },
         )
     }
 

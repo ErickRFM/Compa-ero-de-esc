@@ -21,7 +21,7 @@ class SchoolPresenceServiceTest {
     private val qrHash = sha256(qrToken)
 
     @Test
-    fun `starts school day only with valid QR and school WiFi`() = runTest {
+    fun `records QR and declared network without claiming independent verification`() = runTest {
         val service = service()
 
         val result = service.start(
@@ -32,7 +32,7 @@ class SchoolPresenceServiceTest {
         assertEquals("2020-10455", result.studentId)
         assertEquals(SchoolPresenceStatus.ACTIVE, result.status)
         assertEquals(true, result.qrVerified)
-        assertEquals(true, result.networkVerified)
+        assertEquals(false, result.networkVerified)
         assertEquals(NetworkVerificationMethod.SSID_BSSID, result.networkVerificationMethod)
         assertEquals(instant.epochSecond, result.serverTimeEpochSeconds)
         assertEquals(instant.epochSecond, service.activeFor("2020-10455")?.serverTimeEpochSeconds)
@@ -130,6 +130,39 @@ class SchoolPresenceServiceTest {
 
         assertEquals(SchoolPresenceStatus.CLOSED, closed.status)
         assertEquals(null, service.activeFor("2020-10455"))
+    }
+
+    @Test
+    fun `legacy active entry network flags are not effective verification`() = runTest {
+        val repository = InMemorySchoolPresenceRepository()
+        val service = SchoolPresenceService(repository, SchoolPresencePolicy(qrHash, setOf("Escuela-Alumnos"), emptySet()), clock = Clock.fixed(instant, ZoneOffset.UTC))
+        val legacy = org.companerodeescuela.shared.contracts.SchoolPresenceResponse(
+            "legacy", "student-1", instant.epochSecond, instant.plusSeconds(3600).epochSecond,
+            status = SchoolPresenceStatus.ACTIVE, qrVerified = true, networkVerified = true,
+            networkVerificationMethod = NetworkVerificationMethod.SSID,
+        )
+        repository.save(legacy)
+        assertEquals(false, service.activeFor("student-1")!!.networkVerified)
+        assertEquals(true, repository.findById("legacy")!!.networkVerified, "Do not erase original captured evidence")
+    }
+
+    @Test
+    fun `closing legacy entry preserves raw evidence and returns honest closed projection`() = runTest {
+        val repository = InMemorySchoolPresenceRepository()
+        val service = SchoolPresenceService(repository, SchoolPresencePolicy(qrHash, setOf("Escuela-Alumnos"), emptySet()), clock = Clock.fixed(instant, ZoneOffset.UTC))
+        val legacy = org.companerodeescuela.shared.contracts.SchoolPresenceResponse(
+            "legacy", "student-1", instant.epochSecond, instant.plusSeconds(3600).epochSecond,
+            status = SchoolPresenceStatus.ACTIVE, qrVerified = true, networkVerified = true,
+            networkVerificationMethod = NetworkVerificationMethod.SSID,
+        )
+        repository.save(legacy)
+        val response = service.close("student-1")
+        assertEquals(SchoolPresenceStatus.CLOSED, response.status)
+        assertEquals(false, response.networkVerified)
+        val stored = repository.findById("legacy")!!
+        assertEquals(true, stored.networkVerified, "Closing must not rewrite captured evidence")
+        assertEquals(legacy.copy(status = SchoolPresenceStatus.CLOSED, closedAtEpochSeconds = instant.epochSecond), stored)
+        assertEquals(null, service.activeFor("student-1"))
     }
 
     private fun service(

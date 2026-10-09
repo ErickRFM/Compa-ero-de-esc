@@ -7,7 +7,6 @@ import org.companerodeescuela.api.presence.SchoolPresenceService
 import org.companerodeescuela.shared.contracts.ApiErrorCode
 import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
 import org.companerodeescuela.shared.contracts.ClassCallConfirmationRequest
-import org.companerodeescuela.shared.contracts.AttendanceDisposition
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionStatus
@@ -23,7 +22,6 @@ class AttendanceStudentService(
     private val qrService: AttendanceQrService? = null,
     private val schoolPresenceService: SchoolPresenceService? = null,
     private val clock: Clock = Clock.systemUTC(),
-    private val classCallGraceSeconds: Long = 300L,
 ) {
     suspend fun activeFor(studentId: String): List<AttendanceSessionResponse> {
         schoolPresenceService?.requireActive(studentId)
@@ -171,8 +169,8 @@ class AttendanceStudentService(
         )
 
         return when (val result = repository.writeAttempt(candidate)) {
-            is AttemptWriteResult.Created -> result.record
-            is AttemptWriteResult.Existing -> result.record
+            is AttemptWriteResult.Created -> result.record.withCurrentPresencePolicy()
+            is AttemptWriteResult.Existing -> result.record.withCurrentPresencePolicy()
             AttemptWriteResult.OperationConflict ->
                 throw ApiException.Domain(
                     status = HttpStatusCode.Conflict,
@@ -184,8 +182,9 @@ class AttendanceStudentService(
 
 
     /**
-     * A one-tap class confirmation requires a campus entry plus CURRENT Wi-Fi evidence.
-     * No student device timestamp is used to decide whether the student is late.
+     * Records a class call with a campus QR capture and current network declaration.
+     * Neither declaration nor QR alone authenticates physical presence; an assigned
+     * teacher must review. The server capture time is retained for that decision.
      */
     suspend fun confirmClassCall(
         studentId: String,
@@ -219,22 +218,20 @@ class AttendanceStudentService(
         }
         presence.requireActive(studentId)
         presence.verifyNetworkForAttendance(request.schoolNetwork)
-        val late = now > session.openedAtEpochSeconds + classCallGraceSeconds
         val candidate = AttendanceRecordResponse(
             id = session.id + ":" + studentId,
             operationId = operationId,
             sessionId = session.id,
             occurrenceId = session.occurrenceId,
             studentId = studentId,
-            status = AttendanceStatus.VERIFIED,
+            status = AttendanceStatus.REVIEW_REQUIRED,
             reasonCode = AttendanceReasonCode.CLASS_CALL_CONFIRMED,
             attemptedAtEpochSeconds = now,
             receivedAtEpochSeconds = now,
-            disposition = if (late) AttendanceDisposition.LATE else AttendanceDisposition.PRESENT,
         )
         return when (val result = repository.writeAttempt(candidate)) {
-            is AttemptWriteResult.Created -> result.record
-            is AttemptWriteResult.Existing -> result.record
+            is AttemptWriteResult.Created -> result.record.withCurrentPresencePolicy()
+            is AttemptWriteResult.Existing -> result.record.withCurrentPresencePolicy()
             AttemptWriteResult.OperationConflict -> throw ApiException.Domain(
                 status = HttpStatusCode.Conflict,
                 code = ApiErrorCode.ATTENDANCE_OPERATION_CONFLICT,
@@ -250,7 +247,7 @@ class AttendanceStudentService(
         if (!enrollmentResolver.isEnrolled(studentId, session.courseId, session.groupName)) {
             throw ApiException.Forbidden("You are not enrolled in this class")
         }
-        return repository.findRecord("$sessionId:$studentId")
+        return repository.findRecord("$sessionId:$studentId")?.withCurrentPresencePolicy()
     }
 
     private fun classifyEvidence(
@@ -287,7 +284,7 @@ class AttendanceStudentService(
                     if (lateSyncEligible) {
                         AttendanceStatus.REVIEW_REQUIRED to AttendanceReasonCode.OFFLINE_LATE_SYNC
                     } else {
-                        AttendanceStatus.VERIFIED to AttendanceReasonCode.QR_VALID
+                        AttendanceStatus.REVIEW_REQUIRED to AttendanceReasonCode.QR_VALID
                     }
                 } else {
                     AttendanceStatus.REJECTED to AttendanceReasonCode.QR_EXPIRED

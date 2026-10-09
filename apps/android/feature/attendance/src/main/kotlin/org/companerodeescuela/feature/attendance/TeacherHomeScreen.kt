@@ -45,7 +45,6 @@ import org.companerodeescuela.core.designsystem.v8.V8HeroTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.ui.component.StatusNotice
-import org.companerodeescuela.shared.contracts.AttendanceStatus
 
 /**
  * Teacher dashboard backed by the authorized teacher's occurrences/active roster.
@@ -117,7 +116,7 @@ fun TeacherHomeScreen(
                 val sessions = state.occurrences.sortedWith(compareBy({ it.date }, { it.startsAt }))
                 val upcoming = upcomingTeacherClasses(sessions, java.time.LocalDateTime.now())
                 val records = state.roster?.records.orEmpty()
-                val review = records.count { it.status == AttendanceStatus.REVIEW_REQUIRED }
+                val review = attendanceRecordsRequiringReviewCount(records)
                 val active = state.teacherSession?.takeIf {
                     it.closedAtEpochSeconds == null && it.closesAtEpochSeconds > System.currentTimeMillis() / 1000
                 }
@@ -225,7 +224,7 @@ fun TeacherHomeScreen(
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("Entrada escolar · ${campus.groupName}",
                                 style = MaterialTheme.typography.titleMedium, color = V8RedColors.TextPrimary)
-                            Text("${campus.students.count { it.campusEntryAtEpochSeconds != null }} de ${campus.students.size} integrantes con entrada validada",
+                            Text("${campus.students.count { it.campusEntryAtEpochSeconds != null }} de ${campus.students.size} integrantes con ingreso registrado",
                                 style = MaterialTheme.typography.bodyMedium, color = V8RedColors.TextSecondary)
                             Text(
                                 "Consulta el padrón completo y los retardos en Asistencia.",

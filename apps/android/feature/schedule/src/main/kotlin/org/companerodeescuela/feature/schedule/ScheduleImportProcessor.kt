@@ -17,6 +17,19 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 class ScheduleImportProcessor(
     private val context: Context,
 ) {
+    suspend fun extractCandidates(uri: Uri): List<org.companerodeescuela.core.academic.PersonalScheduleDraft> {
+        val isPdf = context.contentResolver.getType(uri) == "application/pdf"
+        if (isPdf) {
+            // The native path is deterministic for digital PDFs. The image
+            // recognition path is reserved for scanned or unsupported pages.
+            val direct = runCatching {
+                DigitalPdfTimetableReader(context).extract(uri)
+            }.getOrNull()
+            if (!direct.isNullOrEmpty()) return direct
+        }
+        return ScheduleOcrParser.parse(extractText(uri))
+    }
+
     suspend fun extractText(uri: Uri): String {
         val mime = context.contentResolver.getType(uri).orEmpty()
         return if (mime == "application/pdf") {

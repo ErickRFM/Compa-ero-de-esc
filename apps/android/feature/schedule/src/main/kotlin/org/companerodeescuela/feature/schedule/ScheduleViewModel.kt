@@ -307,7 +307,10 @@ class ScheduleViewModel @Inject constructor(
     }
 
     fun stageImport(recognizedText: String) {
-        val candidates = ScheduleOcrParser.parse(recognizedText)
+        stageImportCandidates(ScheduleOcrParser.parse(recognizedText))
+    }
+
+    fun stageImportCandidates(candidates: List<PersonalScheduleDraft>) {
         _state.value = _state.value.copy(
             importCandidates = candidates,
             errorMessage = if (candidates.isEmpty()) {

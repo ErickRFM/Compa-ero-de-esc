@@ -24,3 +24,8 @@
 
 # Keep the shared contracts the API serialises.
 -keep class org.companerodeescuela.shared.contracts.** { *; }
+
+# PDFBox-Android optionally decodes JPEG-2000 via a JP2 library that is not
+# bundled. Timetable text extraction never invokes this image-only decoder.
+# Suppress only this optional missing class, not all PDFBox warnings.
+-dontwarn com.gemalto.jp2.JP2Decoder

@@ -89,7 +89,6 @@ object RoleExperienceResolver {
                 topLevelDestinations = listOf(
                     TopLevelDestination.CoordinatorHome,
                     TopLevelDestination.Schedule,
-                    TopLevelDestination.Attendance,
                     TopLevelDestination.Channel,
                 ),
             )
@@ -101,7 +100,7 @@ object RoleExperienceResolver {
                 topLevelDestinations = listOf(
                     TopLevelDestination.AdminHome,
                     TopLevelDestination.Schedule,
-                    TopLevelDestination.Attendance,
+                    TopLevelDestination.Classrooms,
                     TopLevelDestination.Channel,
                 ),
             )

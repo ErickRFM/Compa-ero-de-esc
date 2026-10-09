@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.LocalDate
+import java.time.LocalDateTime
 import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CoroutineScope
@@ -342,6 +343,16 @@ class AttendanceViewModel @Inject constructor(
         if (_state.value.actionInProgress || _state.value.mode != AttendanceMode.TEACHER ||
             _state.value.occurrences.none { it.id == occurrence.id }) return
         launchTeacherRequest {
+            val availability = teacherPassOpenStatus(occurrence, LocalDateTime.now())
+            if (availability != TeacherPassOpenStatus.AVAILABLE) {
+                _state.update {
+                    it.copy(
+                        actionInProgress = false,
+                        errorMessage = teacherPassUnavailableMessage(availability),
+                    )
+                }
+                return@launchTeacherRequest
+            }
             _state.update {
                 it.copy(
                     actionInProgress = true,
@@ -376,7 +387,7 @@ class AttendanceViewModel @Inject constructor(
                     _state.update {
                         it.copy(
                             actionInProgress = false,
-                            errorMessage = result.error.userMessage,
+                            errorMessage = teacherPassOpenError(result.error),
                         )
                     }
                 }

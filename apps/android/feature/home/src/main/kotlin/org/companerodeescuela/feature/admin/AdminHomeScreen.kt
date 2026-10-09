@@ -3,7 +3,6 @@ package org.companerodeescuela.feature.admin
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,7 +13,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
@@ -26,7 +24,6 @@ import org.companerodeescuela.core.ui.component.CompaneroSurfaceRole
 @Composable
 fun AdminHomeScreen(
     onOpenSchedule: () -> Unit,
-    onOpenAttendance: () -> Unit,
     onOpenChannel: () -> Unit,
     onOpenClassrooms: () -> Unit,
     modifier: Modifier = Modifier,
@@ -69,14 +66,12 @@ fun AdminHomeScreen(
                     style = MaterialTheme.typography.titleLarge,
                     color = CompanionColors.onDarkSurface,
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
-                ) {
-                    Metric("Servicios", "OK", Modifier.weight(1f))
-                    Metric("Sesiones", "Activas", Modifier.weight(1f))
-                    Metric("Auditoría", "0 alertas", Modifier.weight(1f))
-                }
+                Text(
+                    text = "El monitoreo de servicios, sesiones y auditoría estará disponible " +
+                        "cuando se conecte el panel institucional.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = CompanionColors.onDarkSurfaceVariant,
+                )
             }
         }
 
@@ -132,13 +127,12 @@ fun AdminHomeScreen(
             ) {
                 Text("Asistencia Global", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "Monitorea el flujo completo de asistencias e incidencias registradas.",
+                    "El tablero global de asistencia está pendiente de integración. " +
+                        "La consulta de sesiones y sus métricas requerirá un panel autorizado " +
+                        "con datos verificados de la API.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Button(onClick = onOpenAttendance, modifier = Modifier.fillMaxWidth()) {
-                    Text("Ver métricas de asistencia")
-                }
             }
         }
 
@@ -161,29 +155,5 @@ fun AdminHomeScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun Metric(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.Start,
-        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
-    ) {
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleLarge,
-            color = CompanionColors.onDarkSurface,
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = CompanionColors.onDarkSurfaceVariant,
-        )
     }
 }

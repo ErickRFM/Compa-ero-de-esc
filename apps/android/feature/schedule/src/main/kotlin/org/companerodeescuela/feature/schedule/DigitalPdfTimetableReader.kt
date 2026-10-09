@@ -9,6 +9,8 @@ import com.tom_roush.pdfbox.text.TextPosition
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
+import kotlin.coroutines.coroutineContext
 import org.companerodeescuela.core.academic.PersonalScheduleDraft
 
 /**
@@ -21,14 +23,14 @@ import org.companerodeescuela.core.academic.PersonalScheduleDraft
 internal class DigitalPdfTimetableReader(private val context: Context) {
     suspend fun extract(uri: Uri): List<PersonalScheduleDraft>? = withContext(Dispatchers.IO) {
         PDFBoxResourceLoader.init(context.applicationContext)
-        val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
-            input.readBytes()
-        } ?: throw IOException("No se pudo abrir el PDF")
-        if (bytes.size > MAX_PDF_BYTES) return@withContext null
+        val input = context.contentResolver.openInputStream(uri) ?: throw IOException("No se pudo abrir el PDF")
+        val readContext = coroutineContext
+        val bytes = input.use { readPdfBytes(it, MAX_PDF_BYTES) { readContext.ensureActive() } } ?: return@withContext null
 
         PDDocument.load(bytes).use { document ->
             val entries = mutableListOf<PersonalScheduleDraft>()
             for (pageIndex in 0 until minOf(document.numberOfPages, MAX_PAGES)) {
+                coroutineContext.ensureActive()
                 val glyphs = mutableListOf<DigitalPdfGlyph>()
                 val extractor = object : PDFTextStripper() {
                     override fun processTextPosition(position: TextPosition) {

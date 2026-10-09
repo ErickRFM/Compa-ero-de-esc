@@ -17,6 +17,8 @@ Este informe documenta comprobaciones de código; **no autoriza todavía el merg
 | Limpieza sin sesión recordada | Quedaban paquetes huérfanos | Se borran todos los paquetes y sesiones del propietario |
 | Cola con cuentas A/B | A podía bloquear la entrega pendiente de B | Room selecciona únicamente filas de la cuenta autenticada; A se conserva |
 | Caducidad QR en la frontera exacta | `expiresAt` todavía se consideraba válido | En ese instante ya se clasifica como expirado |
+| Cambio A → B durante caída de red | Restauraba el pase A dentro de B | Se conserva la ocurrencia y se valida materia, grupo, curso, fecha e ID de sesión antes de restaurar |
+| JWT vencido con Wi-Fi conectado sin internet | Descartaba la captura por tener SSID/BSSID | Una renovación transitoriamente fallida permite guardar evidencia PENDIENTE bajo el mismo login; un rechazo definitivo impide guardarla |
 
 No se cambió el secreto HMAC ni se incorporó a Android. No se mezclaron las evidencias de entrada escolar, clase o eventos. Un QR firmado sin la validación escolar completa continúa produciendo `REVIEW_REQUIRED / OFFLINE_NETWORK_QR_REVIEW`, sin disposición PRESENTE automática.
 
@@ -27,7 +29,10 @@ Todas las correcciones anteriores se reprodujeron antes de corregirlas. Los logs
 - `AttendanceRepositoryTest`: 12 pruebas, sin fallos tras corregir propietario, login y retroceso de reloj.
 - API y contratos/validaciones compartidos: 196 pruebas, sin fallos.
 - Almacén Android real y worker real con Room: 6 pruebas en AVD API 30, sin fallos. Incluyen restauración válida, cuenta distinta, expiración, reloj, arranque y aislamiento de cola.
-- Verificación completa Android, lint, APKs y smoke de autenticación: pendiente de registrar resultado final.
+- Corte `83aecf2`: 149 pruebas Android y 196 API/shared, 9 instrumentadas API 30; lint sin errores, 32 advertencias en 22 informes; APK debug y release R8 sin firma construidos. CI remoto de ese SHA completo en verde.
+- Correcciones de revisión posteriores: 30 pruebas de los módulos core/feature attendance pasan, incluidos cambio A → B y restauración positiva de A tras recrear el ViewModel. Regresión completa del árbol: 152 Android, 196 API/contracts/validation y 10 instrumentadas API 30, sin fallos. Lint sin errores (33 advertencias); APK debug y release R8 sin firma construidos; escaneo de secretos PASS. Este corte todavía no sustituye la aceptación física.
+
+La revisión independiente del rango `97e68e1..83aecf2` no encontró defectos críticos y encontró los dos fallos de clase/conectividad de la tabla. Ambos se reprodujeron con pruebas funcionales antes de corregirse. Cachés antiguas sin ocurrencia conocida necesitan reconectar para restaurar un pase dentro de una clase seleccionada.
 
 El test del worker usa el patrón oficial de [TestListenableWorkerBuilder](https://developer.android.com/develop/background-work/background-tasks/testing/persistent/worker-impl), con el worker y Room reales; solo sustituye la frontera HTTP por respuestas sintéticas.
 

@@ -4,6 +4,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.companerodeescuela.core.attendance.AndroidAttendanceQrPackStore
 import org.companerodeescuela.shared.contracts.AttendanceQrResponse
+import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
+import org.companerodeescuela.shared.contracts.ClassOccurrenceStatusContract
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -12,6 +14,22 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class AttendanceQrPackStoreTest {
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
+
+    @Test
+    fun selectedClassContextSurvivesProcessRecreationAndClearsWithOwner() {
+        val owner = "qa-class-context:login"
+        val store = AndroidAttendanceQrPackStore(context)
+        val occurrence = ClassOccurrenceContract("occurrence-A", null, "course-A", "9A", "math", "Matemáticas", "QA Docente",
+            "2026-10-08", "09:00", "10:00", ClassOccurrenceStatusContract.SCHEDULED)
+        try {
+            store.rememberOccurrence(owner, occurrence)
+            val restored = AndroidAttendanceQrPackStore(context)
+            assertEquals(occurrence, restored.restoreOccurrence(owner))
+            assertEquals(null, restored.restoreOccurrence("qa-another-owner:login"))
+            restored.clearSession("qa-class-context")
+            assertEquals(null, AndroidAttendanceQrPackStore(context).restoreOccurrence(owner))
+        } finally { store.clearSession("qa-class-context") }
+    }
 
     @Test
     fun validPackSurvivesProcessRecreationOnSameBootAndIsOwnerScoped() {

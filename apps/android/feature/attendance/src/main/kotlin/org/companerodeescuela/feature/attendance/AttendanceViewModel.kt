@@ -370,7 +370,7 @@ class AttendanceViewModel @Inject constructor(
             when (result) {
                 is Outcome.Success -> {
                     _state.value.userId?.let { teacherId ->
-                        repository.rememberTeacherSession(teacherId, result.value)
+                        repository.rememberTeacherSession(teacherId, result.value, occurrence)
                     }
                     _state.update {
                         it.copy(
@@ -682,7 +682,7 @@ class AttendanceViewModel @Inject constructor(
                 val error = active.error
                 val transient = error is AppError.Network || error is AppError.Http &&
                     (error.status in setOf(408, 425, 429) || error.status in 500..599)
-                if (transient) listOfNotNull(_state.value.userId?.let { repository.restoreTeacherSession(it) })
+                if (transient) listOfNotNull(_state.value.userId?.let { repository.restoreTeacherSession(it, context) })
                 else {
                     _state.value.userId?.let(repository::forgetTeacherSession)
                     emptyList()
@@ -693,7 +693,8 @@ class AttendanceViewModel @Inject constructor(
             }
             val activeSession = activeSessions.firstOrNull()
             if (active is Outcome.Success && activeSession != null) {
-                _state.value.userId?.let { repository.rememberTeacherSession(it, activeSession) }
+                _state.value.userId?.let { repository.rememberTeacherSession(it, activeSession,
+                    occurrences.firstOrNull { occurrence -> occurrence.id == activeSession.occurrenceId }) }
             }
 
             _state.update {

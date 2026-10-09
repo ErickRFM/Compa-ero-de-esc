@@ -28,6 +28,7 @@ import org.companerodeescuela.core.database.LocalAttendanceSyncState
 import org.companerodeescuela.core.database.PendingAttendanceOperation
 import org.companerodeescuela.core.network.SessionRefreshCoordinator
 import org.companerodeescuela.core.security.SessionTokenStore
+import org.companerodeescuela.core.security.RefreshSessionCredentials
 import org.companerodeescuela.shared.contracts.AttendanceReasonCode
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
 import org.companerodeescuela.shared.contracts.SchoolNetworkEvidence
@@ -222,10 +223,46 @@ class AttendanceRepositoryTest {
     }
 
     @Test
+    fun `expired identity queues signed capture when school Wi-Fi has no internet`() = runTest {
+        val store = FakeStore()
+        val tokens = FakeTokenStore(token("student-1", 1L), RefreshSessionCredentials("login-student-1", "refresh"))
+        val client = org.companerodeescuela.core.network.createApiClient(
+            org.companerodeescuela.core.network.ApiEnvironment("https://example.test/", "test"),
+            MockEngine { throw java.io.IOException("offline") })
+        try {
+            val repository = AttendanceRepository(store, FakeScheduler(),
+                AttendanceRemoteClient(client, SessionRefreshCoordinator(client, tokens)),
+                sessionTokenStore = tokens,
+                networkEvidenceProvider = SchoolNetworkEvidenceProvider { SchoolNetworkEvidence("school", "aa:bb:cc:dd:ee:ff") },
+                clock = clock)
+            val result = assertIs<Outcome.Success<LocalAttendanceRecord>>(repository.enqueueAttempt("session-1", "signed"))
+            assertEquals("student-1", result.value.ownerId)
+            assertEquals(LocalAttendanceSyncState.PENDING, result.value.syncState)
+            assertEquals("school", store.lastSchoolNetwork?.ssid)
+        } finally { client.close() }
+    }
+
+    @Test
+    fun `definitive refresh rejection never queues expired signed capture`() = runTest {
+        val store = FakeStore()
+        val tokens = FakeTokenStore(token("student-1", 1L), RefreshSessionCredentials("login-student-1", "refresh"))
+        val client = org.companerodeescuela.core.network.createApiClient(
+            org.companerodeescuela.core.network.ApiEnvironment("https://example.test/", "test"),
+            MockEngine { respondError(HttpStatusCode.Unauthorized) })
+        try {
+            val repository = AttendanceRepository(store, FakeScheduler(),
+                AttendanceRemoteClient(client, SessionRefreshCoordinator(client, tokens)),
+                sessionTokenStore = tokens, clock = clock)
+            assertIs<Outcome.Failure>(repository.enqueueAttempt("session-1", "signed"))
+            assertNull(store.lastOperationId)
+        } finally { client.close() }
+    }
+
+    @Test
     fun `expired local identity may queue signed QR offline but cannot confirm presence`() = runTest {
         val store = FakeStore()
         val scheduler = FakeScheduler()
-        val tokenStore = FakeTokenStore(token("student-1", 1L))
+        val tokenStore = FakeTokenStore(token("student-1", 1L), RefreshSessionCredentials("login-student-1", "refresh"))
         val repository = AttendanceRepository(
             localStore = store,
             scheduler = scheduler,
@@ -286,7 +323,8 @@ class AttendanceRepositoryTest {
     }
 
     private fun unusedRemoteClient(tokenStore: FakeTokenStore): AttendanceRemoteClient {
-        val client = HttpClient(
+        val client = org.companerodeescuela.core.network.createApiClient(
+            org.companerodeescuela.core.network.ApiEnvironment("https://example.test/", "test"),
             MockEngine {
                 respondError(HttpStatusCode.InternalServerError)
             },
@@ -314,7 +352,9 @@ class AttendanceRepositoryTest {
 
     private class FakeTokenStore(
         private var token: String?,
+        private val refresh: RefreshSessionCredentials? = null,
     ) : SessionTokenStore {
+        override suspend fun readRefreshSession() = refresh
         override suspend fun readAccessToken(): String? = token
         override suspend fun writeAccessToken(token: String) {
             this.token = token

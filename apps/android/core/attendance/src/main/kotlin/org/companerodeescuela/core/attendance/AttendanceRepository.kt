@@ -26,6 +26,8 @@ import org.companerodeescuela.shared.contracts.SchoolPresenceResponse
 import org.companerodeescuela.shared.contracts.StartSchoolPresenceRequest
 import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
+import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
+import org.companerodeescuela.shared.contracts.TeacherClassContext
 
 data class QrEvidenceCapture(
     val localRecord: LocalAttendanceRecord,
@@ -132,19 +134,29 @@ class AttendanceRepository(
         }
     }
 
-    suspend fun rememberTeacherSession(ownerId: String, session: AttendanceSessionResponse) {
+    suspend fun rememberTeacherSession(ownerId: String, session: AttendanceSessionResponse, occurrence: ClassOccurrenceContract? = null) {
         if (session.openedBy != ownerId) return
-        localCacheOwner(ownerId)?.let { offlineQrStore.rememberSession(it, session) }
+        localCacheOwner(ownerId)?.let { scope ->
+            offlineQrStore.rememberSession(scope, session)
+            occurrence?.takeIf { matchesSession(it, session) }?.let { offlineQrStore.rememberOccurrence(scope, it) }
+        }
     }
 
-    suspend fun restoreTeacherSession(ownerId: String): AttendanceSessionResponse? {
+    suspend fun restoreTeacherSession(ownerId: String, requestedClassroom: TeacherClassContext? = null): AttendanceSessionResponse? {
         val scope = localCacheOwner(ownerId) ?: return null
         return offlineQrStore.restoreSession(scope)?.takeIf {
             it.openedBy == ownerId && it.status == AttendanceSessionStatus.OPEN &&
                 it.closedAtEpochSeconds == null && it.closesAtEpochSeconds > clock.instant().epochSecond &&
-                offlineQrStore.read(scope, it.id).isNotEmpty()
+                offlineQrStore.read(scope, it.id).isNotEmpty() &&
+                (requestedClassroom == null || offlineQrStore.restoreOccurrence(scope)?.let { occurrence ->
+                    matchesSession(occurrence, it) && requestedClassroom.matches(occurrence.subjectName, occurrence.groupName)
+                } == true)
         }
     }
+
+    private fun matchesSession(occurrence: ClassOccurrenceContract, session: AttendanceSessionResponse): Boolean =
+        occurrence.id == session.occurrenceId && occurrence.courseId == session.courseId &&
+            occurrence.groupName == session.groupName && occurrence.date == session.occurrenceDate
 
     fun forgetTeacherSession(ownerId: String) = offlineQrStore.clearSession(ownerId)
 
@@ -263,12 +275,16 @@ class AttendanceRepository(
         // If the access token expired during an outage, local signed-QR
         // evidence can still be queued under the previously logged-in owner.
         // It is NOT a server-authorized attendance; sync requires fresh auth.
-        val liveToken = currentToken().valueOrNull()
-        val token = liveToken ?: if (normalizedQrToken != null &&
-            networkEvidenceProvider.current() == null
-        ) {
-            sessionTokenStore?.readAccessToken()
-        } else null
+        val retainedToken = sessionTokenStore?.readAccessToken()
+        val retainedClaims = retainedToken?.let(SessionTokenInspector::inspect)
+        val authentication = currentToken()
+        val token = when (authentication) {
+            is Outcome.Success -> authentication.value
+            is Outcome.Failure -> if (normalizedQrToken != null && permitsOfflineFallback(authentication.error) &&
+                retainedClaims?.sessionId != null &&
+                sessionTokenStore?.readAccessToken() == retainedToken
+            ) retainedToken else null
+        }
         val claims = token?.let(SessionTokenInspector::inspect)
             ?: return Outcome.Failure(AppError.Http(status = 401))
 

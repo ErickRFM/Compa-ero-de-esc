@@ -13,6 +13,7 @@ import kotlinx.serialization.Serializable
 import kotlin.math.abs
 import org.companerodeescuela.shared.contracts.AttendanceQrResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
+import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
 
 /**
  * Device-private cache of server-signed QR slots. No signing key exists on Android.
@@ -23,6 +24,8 @@ interface AttendanceQrPackStore {
     fun save(ownerId: String, sessionId: String, slots: List<AttendanceQrResponse>)
     fun rememberSession(ownerId: String, session: AttendanceSessionResponse)
     fun restoreSession(ownerId: String): AttendanceSessionResponse?
+    fun rememberOccurrence(ownerId: String, occurrence: ClassOccurrenceContract) = Unit
+    fun restoreOccurrence(ownerId: String): ClassOccurrenceContract? = null
     fun clearSession(ownerId: String)
 }
 
@@ -85,15 +88,28 @@ class AndroidAttendanceQrPackStore(
         return runCatching { json.decodeFromString<AttendanceSessionResponse>(data) }.getOrNull()
     }
 
+    override fun rememberOccurrence(ownerId: String, occurrence: ClassOccurrenceContract) {
+        if (ownerId.isBlank()) return
+        preferences.edit().putString(occurrenceKey(ownerId), json.encodeToString(occurrence)).apply()
+    }
+
+    override fun restoreOccurrence(ownerId: String): ClassOccurrenceContract? {
+        if (ownerId.isBlank()) return null
+        val data = preferences.getString(occurrenceKey(ownerId), null) ?: return null
+        return runCatching { json.decodeFromString<ClassOccurrenceContract>(data) }.getOrNull()
+    }
+
     override fun clearSession(ownerId: String) {
         if (ownerId.isBlank()) return
         preferences.edit().also { editor ->
-            preferences.all.keys.filter { it.startsWith("pack:$ownerId:") || it.startsWith("session:$ownerId:") }.forEach(editor::remove)
+            preferences.all.keys.filter { it.startsWith("pack:$ownerId:") || it.startsWith("session:$ownerId:") || it.startsWith("occurrence:$ownerId:") }.forEach(editor::remove)
             editor.remove(sessionKey(ownerId))
+            editor.remove(occurrenceKey(ownerId))
         }.apply()
     }
 
     private fun sessionKey(ownerId: String) = "session:$ownerId"
+    private fun occurrenceKey(ownerId: String) = "occurrence:$ownerId"
     private fun packKey(ownerId: String, sessionId: String) = "pack:$ownerId:$sessionId"
 }
 

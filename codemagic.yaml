@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=https://codemagic.io/codemagic-schema.json
+# Simulator only. No Apple credentials, provisioning or App Store publishing.
+workflows:
+  ios-simulator:
+    name: Compañero de Clase - iOS simulator
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      xcode: "26.0"
+      java: "17"
+    cache:
+      cache_paths:
+        - ~/.gradle/caches
+        - ~/.gradle/wrapper
+        - ~/.konan
+    triggering:
+      events:
+        - push
+        - pull_request
+      branch_patterns:
+        - pattern: "codex/ios-*"
+          include: true
+          source: true
+      cancel_previous_builds: true
+    scripts:
+      - name: Verify, build and launch unsigned iOS simulator app
+        script: bash infrastructure/scripts/build-ios-simulator.sh
+    artifacts:
+      - build/ios/*.zip
+      - build/ios/*.log
+      - build/ios/*.txt
+      - build/ios/*.json
+      - build/ios/*.png
+      - build/ios/TestResults.xcresult
+      - multiplatform/shared/build/test-results/**/*.xml

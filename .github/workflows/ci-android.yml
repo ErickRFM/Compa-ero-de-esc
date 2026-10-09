@@ -216,7 +216,9 @@ jobs:
           arch: x86_64
           profile: pixel_2
           ram-size: 2048M
-          emulator-options: -no-window -gpu swiftshader -feature -Vulkan -no-snapshot -noaudio -no-boot-anim
+          # Keep the emulator's default Vulkan capabilities. Disabling Vulkan
+          # made API 35 lose QEMU at the first real login Activity on 37.2.12.
+          emulator-options: -no-window -gpu swiftshader -no-snapshot -noaudio -no-boot-anim
           # App contains the smoke tests. Root task also launches empty library
           # suites concurrently against the same emulator and can stall ADB.
           script: bash infrastructure/scripts/run-v10-instrumentation.sh

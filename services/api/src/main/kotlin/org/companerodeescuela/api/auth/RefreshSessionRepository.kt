@@ -5,6 +5,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.companerodeescuela.shared.contracts.UserSummary
 
+enum class SessionIdentitySource { NATIVE, INSTITUTIONAL, LEGACY }
+
 data class RefreshSession(
     val id: String,
     val tokenHash: String,
@@ -14,6 +16,7 @@ data class RefreshSession(
     val generation: Long = 0,
     val previousTokenHashes: Set<String> = emptySet(),
     val revokedAt: Instant? = null,
+    val identitySource: SessionIdentitySource = SessionIdentitySource.LEGACY,
 )
 
 interface RefreshSessionRepository {

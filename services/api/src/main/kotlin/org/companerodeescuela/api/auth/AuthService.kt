@@ -33,6 +33,7 @@ class AuthService(
     private val clock: Clock = Clock.systemUTC(),
     private val random: SecureRandom = SecureRandom(),
 ) {
+    private val authority = PlatformSessionAuthority(accounts, identityProvider, clock)
     suspend fun register(request: RegisterRequest): LoginResponse {
         val displayName = request.displayName.trim()
         val email = request.email.trim().lowercase()
@@ -59,10 +60,10 @@ class AuthService(
             roles = roles,
             createdAt = clock.instant(),
         )
-        if (!accounts.create(account)) {
+        if (!authenticationDependency { accounts.create(account) }) {
             throw ApiException.Conflict("An account with that email already exists")
         }
-        return createSession(account.toUserSummary())
+        return createSession(account.toUserSummary(), SessionIdentitySource.NATIVE)
     }
 
     suspend fun login(request: LoginRequest): LoginResponse {
@@ -74,20 +75,20 @@ class AuthService(
             throw ApiException.Validation("Password is required")
         }
 
-        val localAccount = accounts.findByIdentifier(username)
+        val localAccount = authenticationDependency { accounts.findByIdentifier(username) }
         if (localAccount != null) {
             if (!localAccount.active || !passwordHasher.verify(request.password, localAccount.passwordHash)) {
                 throw ApiException.Unauthorized("Invalid username or password")
             }
-            return createSession(localAccount.toUserSummary())
+            return createSession(localAccount.toUserSummary(), SessionIdentitySource.NATIVE)
         }
 
-        val institutional = identityProvider.authenticate(
+        val institutional = authenticationDependency { identityProvider.authenticate(
             InstitutionalCredentials(
                 username = username,
                 password = request.password,
             ),
-        ) ?: throw ApiException.Unauthorized("Invalid username or password")
+        ) } ?: throw ApiException.Unauthorized("Invalid username or password")
 
         return createSession(
             UserSummary(
@@ -97,6 +98,7 @@ class AuthService(
                 roles = institutional.roles,
                 active = true,
             ),
+            SessionIdentitySource.INSTITUTIONAL,
         )
     }
 
@@ -105,53 +107,49 @@ class AuthService(
             throw ApiException.Unauthorized()
         }
         val now = clock.instant()
-        val session = sessions.find(request.sessionId)
+        val session = authenticationDependency { sessions.find(request.sessionId) }
             ?.takeIf { it.revokedAt == null && it.expiresAt > now }
             ?: throw ApiException.Unauthorized()
 
-        val local = accounts.findById(session.user.id)
-        val updatedUser = if (local != null) {
-            local.toUserSummary()
-        } else {
-            session.user.copy(
-                roles = identityProvider.refreshRoles(session.user.id),
-            )
-        }
+        val updatedUser = authority.currentUser(session) ?: throw ApiException.Unauthorized()
 
         val nextRefreshToken = newRefreshToken()
-        val rotated = sessions.rotate(
+        val rotated = authenticationDependency { sessions.rotate(
             sessionId = session.id,
             currentTokenHash = hashRefreshToken(request.refreshToken),
             nextTokenHash = hashRefreshToken(nextRefreshToken),
             user = updatedUser,
             now = now,
             expiresAt = now.plus(REFRESH_TOKEN_TTL),
-        ) ?: throw ApiException.Unauthorized()
+        ) } ?: throw ApiException.Unauthorized()
 
         return response(rotated, nextRefreshToken)
     }
 
     suspend fun logout(request: RefreshSessionRequest) {
         if (request.sessionId.isBlank() || request.refreshToken.isBlank()) return
-        sessions.revoke(
+        authenticationDependency { sessions.revoke(
             sessionId = request.sessionId,
             presentedTokenHash = hashRefreshToken(request.refreshToken),
             now = clock.instant(),
-        )
+        ) }
     }
 
-    private suspend fun createSession(user: UserSummary): LoginResponse {
+    private suspend fun createSession(user: UserSummary, source: SessionIdentitySource): LoginResponse {
         val now = clock.instant()
         val sessionId = UUID.randomUUID().toString()
         val refreshToken = newRefreshToken()
-        val session = RefreshSession(
+        val pending = RefreshSession(
             id = sessionId,
             tokenHash = hashRefreshToken(refreshToken),
             user = user,
             createdAt = now,
             expiresAt = now.plus(REFRESH_TOKEN_TTL),
+            identitySource = source,
         )
-        sessions.create(session)
+        val currentUser = authority.currentUser(pending) ?: throw ApiException.Unauthorized()
+        val session = pending.copy(user = currentUser)
+        authenticationDependency { sessions.create(session) }
         return response(session, refreshToken)
     }
 

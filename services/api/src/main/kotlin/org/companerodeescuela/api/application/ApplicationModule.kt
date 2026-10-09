@@ -7,6 +7,7 @@ import org.companerodeescuela.api.academic.groups.academicGroupRoutes
 import org.companerodeescuela.api.academic.academicRoutes
 import org.companerodeescuela.api.attendance.attendanceRoutes
 import org.companerodeescuela.api.auth.authRoutes
+import org.companerodeescuela.api.auth.PlatformSessionAuthority
 import org.companerodeescuela.api.channel.channelRoutes
 import org.companerodeescuela.api.classroom.classroomRoutes
 import org.companerodeescuela.api.config.ApiSettings
@@ -47,7 +48,8 @@ fun Application.module(
         settings = settings,
         mongoConnection = mongoConnection,
     )
-    configurePlugins(settings, refreshSessions = identityGraph.refreshSessions)
+    configurePlugins(settings, refreshSessions = identityGraph.refreshSessions,
+        sessionAuthority = PlatformSessionAuthority(identityGraph.accounts, providerRegistry.identity))
 
     val academicGraph = buildAcademicFeatureGraph(
         settings = settings,

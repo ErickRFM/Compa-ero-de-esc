@@ -532,7 +532,7 @@ class AttendanceServiceTest {
     }
 
     @Test
-    fun `offline bypass rejects missing or forged classroom QR`() = runTest {
+    fun `offline bypass rejects forged QR and never verifies claimed WiFi`() = runTest {
         val repository = InMemoryAttendanceRepository()
         val clock = MutableClock(initialInstant)
         val presence = SchoolPresenceService(
@@ -556,13 +556,21 @@ class AttendanceServiceTest {
             services.register("2020-10455", session.id,
                 AttendanceAttemptRequest("fake-offline", clock.instant().epochSecond, "not-signed"))
         }
-        assertFailsWith<ApiException.Forbidden> {
-            services.register("2020-10455", session.id,
-                AttendanceAttemptRequest("fake-wifi", clock.instant().epochSecond,
-                    qr.issue("T-0001", session.id).token,
-                    SchoolNetworkEvidence(ssid = "UD4-Alumno")))
-        }
-        assertEquals(0, repository.recordsForSession(session.id).size)
+        // A claimed SSID is untrusted. A server-signed classroom QR may
+        // produce REVIEW_REQUIRED evidence but never verified presence.
+        val claimedWifi = services.register(
+            "2020-10455", session.id,
+            AttendanceAttemptRequest(
+                "fake-wifi",
+                clock.instant().epochSecond,
+                qr.issue("T-0001", session.id).token,
+                SchoolNetworkEvidence(ssid = "UD4-Alumno"),
+            ),
+        )
+        assertEquals(AttendanceStatus.REVIEW_REQUIRED, claimedWifi.status)
+        assertEquals(AttendanceReasonCode.OFFLINE_NETWORK_QR_REVIEW, claimedWifi.reasonCode)
+        assertEquals(null, claimedWifi.disposition)
+        assertEquals(1, repository.recordsForSession(session.id).size)
     }
 
     private suspend fun teacherOccurrence(): ClassOccurrence {

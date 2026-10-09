@@ -36,6 +36,13 @@ fun Route.tutoringRoutes(
                 call.respond(ApiResponse(data = service.listFor(actor), requestId = call.requestId()))
             }
 
+            get("/groups/{groupId}/students") {
+                val actor = call.requireActor(tokenService)
+                val groupId = call.parameters["groupId"]
+                    ?: throw ApiException.Validation("groupId is required")
+                call.respond(ApiResponse(data = service.studentsForGroup(actor, groupId), requestId = call.requestId()))
+            }
+
             get("/me") {
                 val actor = call.requireActor(tokenService)
                 call.respond(ApiResponse(data = service.scopeFor(actor), requestId = call.requestId()))

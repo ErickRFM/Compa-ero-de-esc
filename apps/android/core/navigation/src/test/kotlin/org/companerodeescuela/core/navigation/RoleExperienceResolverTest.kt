@@ -56,7 +56,7 @@ class RoleExperienceResolverTest {
         assertEquals(AppExperience.TUTOR, result.experience)
         assertEquals(Destination.TutorHome, result.startDestination)
         assertEquals(
-            listOf(TopLevelDestination.TutorHome, TopLevelDestination.TutorRequests),
+            listOf(TopLevelDestination.TutorHome, TopLevelDestination.TutorGroups, TopLevelDestination.TutorRequests),
             result.topLevelDestinations,
         )
     }

@@ -129,6 +129,7 @@ internal fun WeeklyAgendaGrid(entries: List<ScheduleEntry>, onEdit: (ScheduleEnt
         }
         }
     }
+    }
     // Keep a compact grid. The full readable list is opt-in, not 25
     // duplicated rows that push the rest of the screen below the bottom bar.
     Text("Toca un bloque para sus detalles o desliza para ver los demás días.", fontSize = 11.sp, color = V8RedColors.TextSecondary)

@@ -3,6 +3,7 @@ package org.companerodeescuela.feature.tutoring
 import io.ktor.client.HttpClient
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
+import io.ktor.client.request.post
 import io.ktor.client.request.patch
 import io.ktor.client.request.setBody
 import org.companerodeescuela.core.common.result.Outcome
@@ -15,6 +16,10 @@ import org.companerodeescuela.shared.contracts.ExcuseRequestSummary
 import org.companerodeescuela.shared.contracts.ExcuseStatus
 import org.companerodeescuela.shared.contracts.ReviewExcuseRequest
 import org.companerodeescuela.shared.contracts.TutorScopeSummary
+import org.companerodeescuela.shared.contracts.TutorStudentSummary
+import org.companerodeescuela.shared.contracts.TutorCaseSummary
+import org.companerodeescuela.shared.contracts.CreateTutorCaseRequest
+import org.companerodeescuela.shared.contracts.AddTutorCaseNoteRequest
 
 class TutorRepository(
     private val client: HttpClient,
@@ -48,6 +53,39 @@ class TutorRepository(
                         ),
                     )
                 }.requireBody<ApiResponse<ExcuseRequestSummary>>()
+            }.map { it.data }
+        }
+
+    suspend fun students(groupId: String): Outcome<List<TutorStudentSummary>> = authorized { token ->
+        apiCall {
+            client.get("tutoring/groups/$groupId/students") { bearerAuth(token) }
+                .requireBody<ApiResponse<List<TutorStudentSummary>>>()
+        }.map { it.data }
+    }
+
+    suspend fun cases(): Outcome<List<TutorCaseSummary>> = authorized { token ->
+        apiCall {
+            client.get("tutoring/cases") { bearerAuth(token) }
+                .requireBody<ApiResponse<List<TutorCaseSummary>>>()
+        }.map { it.data }
+    }
+
+    suspend fun createCase(request: CreateTutorCaseRequest): Outcome<TutorCaseSummary> = authorized { token ->
+        apiCall {
+            client.post("tutoring/cases") {
+                bearerAuth(token)
+                setBody(request)
+            }.requireBody<ApiResponse<TutorCaseSummary>>()
+        }.map { it.data }
+    }
+
+    suspend fun addNote(caseId: String, request: AddTutorCaseNoteRequest): Outcome<TutorCaseSummary> =
+        authorized { token ->
+            apiCall {
+                client.post("tutoring/cases/$caseId/notes") {
+                    bearerAuth(token)
+                    setBody(request)
+                }.requireBody<ApiResponse<TutorCaseSummary>>()
             }.map { it.data }
         }
 

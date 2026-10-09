@@ -22,6 +22,14 @@ data class CreateTutorAssignmentRequest(
 )
 
 @Serializable
+data class TutorStudentSummary(
+    val userId: String,
+    val academicGroupId: String,
+    val displayName: String? = null,
+    val verifiedPlatformStudent: Boolean = false,
+)
+
+@Serializable
 data class TutorScopeSummary(
     val tutorUserId: String,
     val groups: List<AcademicGroupSummary>,

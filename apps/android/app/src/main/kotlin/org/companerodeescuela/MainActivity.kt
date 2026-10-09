@@ -56,6 +56,7 @@ import org.companerodeescuela.feature.profile.ActiveExperiencePreferences
 import org.companerodeescuela.feature.profile.ProfileScreen
 import org.companerodeescuela.feature.schedule.ScheduleScreen
 import org.companerodeescuela.feature.tutoring.TutorHomeScreen
+import org.companerodeescuela.feature.tutoring.TutorGroupsScreen
 import org.companerodeescuela.feature.tutoring.TutorRequestsScreen
 import org.companerodeescuela.feature.settings.AppThemeMode
 import org.companerodeescuela.feature.settings.AppearancePreferences
@@ -243,6 +244,9 @@ class MainActivity : ComponentActivity() {
                                                     }
                                                 },
                                             )
+                                        }
+                                        composable(Destination.TutorGroups.route) {
+                                            TutorGroupsScreen()
                                         }
                                         composable(Destination.TutorRequests.route) {
                                             TutorRequestsScreen()

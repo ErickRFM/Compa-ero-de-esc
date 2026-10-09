@@ -13,6 +13,14 @@ class AgendaGridLayoutTest {
     }
 
     @Test
+    fun `Saturday stays visible even if a partially recognized import has no Saturday class`() {
+        val days = weeklyAgendaDays(listOf(entry("monday", "08:00", "09:00")))
+        assertEquals(listOf(
+            "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY",
+        ), days)
+    }
+
+    @Test
     fun `drag uses full column boundaries rather than lane width and supports multiple days`() {
         val days = listOf("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY")
         val widths = listOf(192f, 96f, 96f, 96f)

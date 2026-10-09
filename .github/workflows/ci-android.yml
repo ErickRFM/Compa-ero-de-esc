@@ -58,7 +58,7 @@ jobs:
       # suite and then reports zero tests without failing. useJUnitPlatform()
       # is set in every Android module; this step proves it took effect.
       - name: Run Android unit tests
-        run: ./gradlew :apps:android:core:common:testDebugUnitTest :apps:android:core:designsystem:testDebugUnitTest :apps:android:core:motion:testDebugUnitTest :apps:android:core:ui:testDebugUnitTest :apps:android:core:network:testDebugUnitTest :apps:android:core:security:testDebugUnitTest :apps:android:core:database:testDebugUnitTest :apps:android:core:academic:testDebugUnitTest :apps:android:core:attendance:testDebugUnitTest :apps:android:core:navigation:testDebugUnitTest :apps:android:feature:auth:testDebugUnitTest :apps:android:feature:home:testDebugUnitTest :apps:android:feature:schedule:testDebugUnitTest :apps:android:feature:attendance:testDebugUnitTest :apps:android:feature:channel:testDebugUnitTest :apps:android:feature:grading:testDebugUnitTest --console=plain
+        run: ./gradlew testDebugUnitTest --console=plain
 
       - name: Verify Android tests actually executed
         run: |
@@ -181,7 +181,7 @@ jobs:
   instrumentation:
     name: Android instrumentation smoke test
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -201,7 +201,7 @@ jobs:
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
 
       - name: Run Instrumentation Tests
-        timeout-minutes: 10
+        timeout-minutes: 20
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 31
@@ -209,7 +209,13 @@ jobs:
           arch: x86_64
           # App contains the smoke tests. Root task also launches empty library
           # suites concurrently against the same emulator and can stall ADB.
-          script: ./gradlew :apps:android:app:connectedDebugAndroidTest --max-workers=2 --console=plain
+          script: |
+            set +e
+            ./gradlew :apps:android:app:connectedDebugAndroidTest --max-workers=2 --console=plain
+            instrumentation_status=$?
+            mkdir -p build/v10-device-evidence
+            adb pull /sdcard/Android/data/org.companerodeescuela/files/v10-evidence build/v10-device-evidence
+            exit "$instrumentation_status"
 
       - name: Verify instrumentation tests actually executed
         run: |
@@ -224,3 +230,14 @@ jobs:
           if tests == 0 or failures != 0:
               raise SystemExit('Instrumentation must execute tests without failures')
           PY
+
+      - name: Upload Android UI evidence
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: v10-login-ui-evidence
+          path: |
+            build/v10-device-evidence/**
+            apps/android/app/build/outputs/androidTest-results/connected/**
+          retention-days: 7

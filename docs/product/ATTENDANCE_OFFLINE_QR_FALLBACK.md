@@ -3,7 +3,7 @@
 ## Implementado en esta rama
 
 - El docente **abre el pase en línea** (duración 1–15 minutos) y la app descarga una secuencia de QR HMAC-SHA256 firmados por la API para la sesión vigente.
-- Los QR se guardan de forma privada en Android, asociados al usuario docente y a la sesión. El teléfono elige el QR de la franja de 15 segundos actual sin necesitar conexión.
+- Los QR se guardan de forma privada en Android, asociados al usuario docente, al login autenticado y a la sesión del pase. Ante un fallo transitorio de conexión, el teléfono elige el QR de la franja de 15 segundos actual. Un rechazo de autorización o cierre de pase invalida la caché.
 - Un estudiante autenticado escanea el QR con la cámara incluso sin Wi-Fi. Se guarda en Room con ID de operación, marca temporal y token QR, y WorkManager reenvía al recuperar conectividad.
 - La API sigue validando inscripción, sesión, firma HMAC, ventana de captura y un límite de sincronización de 24 horas tras el cierre.
 - Cuando la captura **no tiene validación completa de jornada+Wi-Fi** (incluido Wi-Fi conectado pero sin internet al iniciar jornada), la API registra `REVIEW_REQUIRED / OFFLINE_NETWORK_QR_REVIEW`. Nunca declara presente automáticamente ni inventa jornada escolar verificada.
@@ -15,7 +15,7 @@
 2. **El QR pegado en la pared es para la entrada institucional normal**, que sigue exigiendo SSID/BSSID y la API. Aún falta un outbox independiente para escanear y auditar la entrada de pared durante la caída. No se debe prometer que un QR estático demuestre presencia offline por sí solo.
 3. **No se confirma automáticamente la presencialidad offline**: hora de teléfono, SSID declarado, pantallazos o QR compartidos pueden manipularse. El QR firmado más inscripción permite solo una solicitud para revisión humana.
 4. Los QR precargados solo son válidos hasta el cierre de su sesión. No se permite al docente generar extensiones offline ni usar el secreto HMAC en Android.
-5. El paquete guardado es exclusivo de la cuenta activa. No es una credencial para autorizar acceso a la API. Ante revocación remota, el servidor rechazará intentos fuera de ventana.
+5. El paquete guardado es exclusivo de la cuenta y del login activos. Un nuevo login no puede reutilizar el paquete anterior. No es una credencial para autorizar acceso a la API. Ante revocación remota, el servidor rechazará intentos fuera de ventana.
 6. La app debe conservar la sesión autenticada para atribuir el registro local; al expirar el JWT y no poder refrescar, la UI podría pedir autenticación al recuperar red.
 
 ## QA / aceptación
@@ -28,4 +28,4 @@
 - Probar Wi-Fi escolar autorizado y QR online para asegurar que su ruta VERIFIED habitual no regresa.
 - Para jornada offline con QR de pared, programar módulo específico de evidencia pendiente y reconciliación administrativa; no confundir con la prueba de clase.
 
-La construcción y los ensayos físicos requieren entorno Android/Gradle/API conectado; este cambio no implica que ya se probaron en teléfonos.
+Hay pruebas automatizadas API, JVM Android y de almacenamiento/worker reales en un AVD API 30; ver [ejecución F0](../audits/V10_1_F0_QR_EXECUTION_20261008.md). La aceptación obligatoria con dos teléfonos sigue pendiente. El proceso puede restaurarse dentro del mismo arranque; después de reiniciar el teléfono o alterar el reloj hay que descargar otro paquete online.

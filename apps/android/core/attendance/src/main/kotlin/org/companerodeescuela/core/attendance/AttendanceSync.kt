@@ -73,29 +73,22 @@ class AttendanceSyncWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result {
         repeat(MAX_BATCH_SIZE) {
-            val operation = localStore.nextReady(clock.instant().epochSecond)
-                ?: return Result.success()
-
             val token = when (val access = remoteClient.currentAccessToken()) {
                 is Outcome.Success -> access.value
                 is Outcome.Failure -> {
                     val error = access.error
-                    if (error is AppError.Http && error.status == 401) {
-                        localStore.markAuthRequired(operation.operationId)
-                        return Result.success()
-                    }
-                    val delay = AttendanceRetryPolicy.nextDelaySeconds(operation.attemptCount)
-                    localStore.recordRetry(
-                        operationId = operation.operationId,
-                        nextAttemptAtEpochSeconds = clock.instant().epochSecond + delay,
-                        errorCode = AttendanceRemoteClient.errorCode(error),
-                    )
-                    return Result.retry()
+                    // No authenticated owner: do not select or modify another
+                    // account's pending evidence. Login schedules delivery again.
+                    if (error is AppError.Http && error.status == 401) return Result.success()
+                    return if (error is AppError.Network || error is AppError.Http &&
+                        AttendanceRetryPolicy.isRetryableHttp(error.status)
+                    ) Result.retry() else Result.failure()
                 }
             }
-            val claims = token?.let(SessionTokenInspector::inspect)
+            val claims = SessionTokenInspector.inspect(token) ?: return Result.failure()
+            val operation = localStore.nextReady(clock.instant().epochSecond, claims.userId)
+                ?: return Result.success()
             if (
-                claims == null ||
                 claims.userId != operation.ownerId
             ) {
                 localStore.markAuthRequired(operation.operationId)

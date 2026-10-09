@@ -24,6 +24,8 @@ import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
 import org.companerodeescuela.shared.contracts.SchoolNetworkEvidence
 import org.companerodeescuela.shared.contracts.SchoolPresenceResponse
 import org.companerodeescuela.shared.contracts.StartSchoolPresenceRequest
+import org.companerodeescuela.shared.contracts.UserRole
+import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
 
 data class QrEvidenceCapture(
     val localRecord: LocalAttendanceRecord,
@@ -41,6 +43,8 @@ class AttendanceRepository(
     private val clock: Clock = Clock.systemUTC(),
     private val newOperationId: () -> String = { UUID.randomUUID().toString() },
 ) {
+    private var latestQrTime = clock.instant().epochSecond
+
     suspend fun localSessionClaims(): Outcome<PlatformSessionClaims> {
         // Identity stored in the encrypted local session can still label an
         // offline *pending* capture. The API authenticates the sync later.
@@ -112,35 +116,81 @@ class AttendanceRepository(
      * later without Wi-Fi, but student evidence stays pending until review.
      */
     suspend fun prepareOfflineQrPack(sessionId: String, ownerId: String): Outcome<Boolean> {
+        val scopedOwner = localCacheOwner(ownerId)
+            ?: return Outcome.Failure(AppError.Http(status = 401))
         val now = clock.instant().epochSecond
-        if (offlineQrStore.read(ownerId, sessionId).any { it.expiresAtEpochSeconds > now }) {
+        if (offlineQrStore.read(scopedOwner, sessionId).any { it.expiresAtEpochSeconds > now }) {
             return Outcome.Success(true)
         }
         return when (val pack = withToken { token -> remoteClient.issueQrPack(token, sessionId) }) {
             is Outcome.Success -> {
-                offlineQrStore.save(ownerId, sessionId, pack.value)
+                if (localCacheOwner(ownerId) != scopedOwner) return Outcome.Failure(AppError.Http(status = 401))
+                offlineQrStore.save(scopedOwner, sessionId, pack.value)
                 Outcome.Success(pack.value.any { it.expiresAtEpochSeconds > now })
             }
             is Outcome.Failure -> pack
         }
     }
 
-    fun rememberTeacherSession(ownerId: String, session: AttendanceSessionResponse) =
-        offlineQrStore.rememberSession(ownerId, session)
+    suspend fun rememberTeacherSession(ownerId: String, session: AttendanceSessionResponse) {
+        if (session.openedBy != ownerId) return
+        localCacheOwner(ownerId)?.let { offlineQrStore.rememberSession(it, session) }
+    }
 
-    fun restoreTeacherSession(ownerId: String): AttendanceSessionResponse? =
-        offlineQrStore.restoreSession(ownerId)?.takeIf {
-            it.closedAtEpochSeconds == null && it.closesAtEpochSeconds > clock.instant().epochSecond
+    suspend fun restoreTeacherSession(ownerId: String): AttendanceSessionResponse? {
+        val scope = localCacheOwner(ownerId) ?: return null
+        return offlineQrStore.restoreSession(scope)?.takeIf {
+            it.openedBy == ownerId && it.status == AttendanceSessionStatus.OPEN &&
+                it.closedAtEpochSeconds == null && it.closesAtEpochSeconds > clock.instant().epochSecond &&
+                offlineQrStore.read(scope, it.id).isNotEmpty()
         }
+    }
 
     fun forgetTeacherSession(ownerId: String) = offlineQrStore.clearSession(ownerId)
 
     suspend fun issueQr(sessionId: String, ownerId: String = ""): Outcome<AttendanceQrResponse> {
+        // A cached signature is evidence, not an authenticated teacher session.
+        // Consult the API first so a close/revocation is not masked by the pack.
+        val scopedOwner = if (ownerId.isNotBlank()) localCacheOwner(ownerId) else null
+        if (ownerId.isNotBlank() && scopedOwner == null) {
+            offlineQrStore.clearSession(ownerId)
+            return Outcome.Failure(AppError.Http(status = 401))
+        }
+        val online = withToken { token -> remoteClient.issueQr(token, sessionId) }
+        if (ownerId.isNotBlank() && localCacheOwner(ownerId) != scopedOwner) {
+            offlineQrStore.clearSession(ownerId)
+            return Outcome.Failure(AppError.Http(status = 401))
+        }
+        if (online is Outcome.Success) return online
+        val error = (online as Outcome.Failure).error
+        if (!permitsOfflineFallback(error)) {
+            if (ownerId.isNotBlank()) offlineQrStore.clearSession(ownerId)
+            return online
+        }
         val now = clock.instant().epochSecond
-        val cached = offlineQrStore.read(ownerId, sessionId)
+        if (now < latestQrTime - 5) {
+            offlineQrStore.clearSession(ownerId)
+            return Outcome.Failure(AppError.Storage("Device clock moved backwards; reconnect to prepare a new QR pack"))
+        }
+        latestQrTime = maxOf(latestQrTime, now)
+        val cached = offlineQrStore.read(scopedOwner.orEmpty(), sessionId)
             .lastOrNull { now >= it.issuedAtEpochSeconds && now < it.expiresAtEpochSeconds }
-        return if (cached != null) Outcome.Success(cached)
-        else withToken { token -> remoteClient.issueQr(token, sessionId) }
+        return cached?.let { Outcome.Success(it) } ?: online
+    }
+
+    private suspend fun localCacheOwner(ownerId: String): String? {
+        val token = if (sessionTokenStore != null) sessionTokenStore.readAccessToken()
+            else currentToken().valueOrNull()
+        val claims = token?.let(SessionTokenInspector::inspect) ?: return null
+        if (claims.userId != ownerId || UserRole.TEACHER !in claims.roles) return null
+        val loginSession = claims.sessionId ?: return null
+        return "$ownerId:$loginSession"
+    }
+
+    private fun permitsOfflineFallback(error: AppError): Boolean = when (error) {
+        is AppError.Network -> true
+        is AppError.Http -> error.status in setOf(408, 425, 429) || error.status in 500..599
+        else -> false
     }
 
     suspend fun inspectQr(

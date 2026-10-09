@@ -1,5 +1,7 @@
 # Security model
 
+> El contenido histórico de este documento conserva su corte original. Para el corte V10.1 sobre main `97e68e1` y el PR #123 todavía abierto, consultar [la ejecución F0](../audits/V10_1_F0_QR_EXECUTION_20261008.md). Los contratos V10 no equivalen a funcionalidad implementada.
+
 Status: foundation controls are in place. Authentication is **not** built.
 This document describes what is enforced now and what must exist before any
 real user data exists.

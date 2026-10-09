@@ -1,12 +1,16 @@
 package org.companerodeescuela.core.attendance
 
 import android.content.Context
+import android.os.SystemClock
+import android.provider.Settings
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.Serializable
+import kotlin.math.abs
 import org.companerodeescuela.shared.contracts.AttendanceQrResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 
@@ -31,22 +35,41 @@ object NoopAttendanceQrPackStore : AttendanceQrPackStore {
 }
 
 @Singleton
-class AndroidAttendanceQrPackStore @Inject constructor(
-    @ApplicationContext context: Context,
+class AndroidAttendanceQrPackStore(
+    context: Context,
+    private val wallTimeSeconds: () -> Long,
+    private val elapsedRealtimeMillis: () -> Long,
+    private val bootCount: () -> Int,
 ) : AttendanceQrPackStore {
+    @Inject constructor(@ApplicationContext context: Context) : this(
+        context,
+        { System.currentTimeMillis() / 1000 },
+        SystemClock::elapsedRealtime,
+        { Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT, -1) },
+    )
     private val preferences = context.getSharedPreferences("signed_teacher_attendance_qrs", Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true }
 
     override fun read(ownerId: String, sessionId: String): List<AttendanceQrResponse> {
         if (ownerId.isBlank() || sessionId.isBlank()) return emptyList()
         val data = preferences.getString(packKey(ownerId, sessionId), null) ?: return emptyList()
-        return runCatching { json.decodeFromString<List<AttendanceQrResponse>>(data) }
-            .getOrDefault(emptyList())
+        val pack = runCatching { json.decodeFromString<SavedQrPack>(data) }.getOrNull()
+            ?: return emptyList()
+        val elapsed = elapsedRealtimeMillis() - pack.savedAtElapsedMillis
+        val wallDelta = wallTimeSeconds() - pack.savedAtWallSeconds
+        if (pack.bootCount < 0 || bootCount() != pack.bootCount || elapsed < 0 ||
+            abs(wallDelta - elapsed / 1000) > 5
+        ) {
+            clearSession(ownerId)
+            return emptyList()
+        }
+        return pack.slots.filter { it.expiresAtEpochSeconds > wallTimeSeconds() }
     }
 
     override fun save(ownerId: String, sessionId: String, slots: List<AttendanceQrResponse>) {
         if (ownerId.isBlank() || sessionId.isBlank()) return
-        preferences.edit().putString(packKey(ownerId, sessionId), json.encodeToString(slots)).apply()
+        val pack = SavedQrPack(slots, wallTimeSeconds(), elapsedRealtimeMillis(), bootCount())
+        preferences.edit().putString(packKey(ownerId, sessionId), json.encodeToString(pack)).apply()
     }
 
     override fun rememberSession(ownerId: String, session: AttendanceSessionResponse) {
@@ -64,9 +87,8 @@ class AndroidAttendanceQrPackStore @Inject constructor(
 
     override fun clearSession(ownerId: String) {
         if (ownerId.isBlank()) return
-        val session = restoreSession(ownerId)
         preferences.edit().also { editor ->
-            session?.let { editor.remove(packKey(ownerId, it.id)) }
+            preferences.all.keys.filter { it.startsWith("pack:$ownerId:") || it.startsWith("session:$ownerId:") }.forEach(editor::remove)
             editor.remove(sessionKey(ownerId))
         }.apply()
     }
@@ -74,3 +96,11 @@ class AndroidAttendanceQrPackStore @Inject constructor(
     private fun sessionKey(ownerId: String) = "session:$ownerId"
     private fun packKey(ownerId: String, sessionId: String) = "pack:$ownerId:$sessionId"
 }
+
+@Serializable
+private data class SavedQrPack(
+    val slots: List<AttendanceQrResponse>,
+    val savedAtWallSeconds: Long,
+    val savedAtElapsedMillis: Long,
+    val bootCount: Int,
+)

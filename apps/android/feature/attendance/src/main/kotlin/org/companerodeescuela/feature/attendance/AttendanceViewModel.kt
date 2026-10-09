@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.companerodeescuela.core.attendance.AttendanceRepository
 import org.companerodeescuela.core.common.result.Outcome
+import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.database.LocalAttendanceRecord
 import org.companerodeescuela.shared.contracts.AttendanceDisposition
 import org.companerodeescuela.shared.contracts.TeacherCampusRosterResponse
@@ -678,7 +679,14 @@ class AttendanceViewModel @Inject constructor(
             val ambiguous = context != null && matching.map { it.courseId }.distinct().size > 1
             val occurrences = if (ambiguous) emptyList() else matching
             val activeSessions = if (active is Outcome.Failure) {
-                listOfNotNull(_state.value.userId?.let(repository::restoreTeacherSession))
+                val error = active.error
+                val transient = error is AppError.Network || error is AppError.Http &&
+                    (error.status in setOf(408, 425, 429) || error.status in 500..599)
+                if (transient) listOfNotNull(_state.value.userId?.let { repository.restoreTeacherSession(it) })
+                else {
+                    _state.value.userId?.let(repository::forgetTeacherSession)
+                    emptyList()
+                }
             } else active.valueOrNull().orEmpty().filter {
                 it.closedAtEpochSeconds == null && it.closesAtEpochSeconds > System.currentTimeMillis() / 1000 &&
                     (context == null || occurrences.any { occurrence -> occurrence.id == it.occurrenceId })

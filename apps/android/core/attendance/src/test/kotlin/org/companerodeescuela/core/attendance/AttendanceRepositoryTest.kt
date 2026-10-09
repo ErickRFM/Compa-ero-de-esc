@@ -3,15 +3,20 @@ package org.companerodeescuela.core.attendance
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import java.time.ZoneId
+import java.time.Duration
 import java.util.Base64
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respondError
+import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpStatusCode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import org.companerodeescuela.shared.contracts.AttendanceQrResponse
+import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -99,7 +104,7 @@ class AttendanceRepositoryTest {
         )
         val offlineCache = object : AttendanceQrPackStore {
             override fun read(ownerId: String, sessionId: String) =
-                if (ownerId == "teacher-1" && sessionId == "session-1") listOf(signed)
+                if (ownerId == "teacher-1:login-teacher-1" && sessionId == "session-1") listOf(signed)
                 else emptyList()
             override fun save(ownerId: String, sessionId: String, slots: List<org.companerodeescuela.shared.contracts.AttendanceQrResponse>) = Unit
             override fun rememberSession(ownerId: String, session: org.companerodeescuela.shared.contracts.AttendanceSessionResponse) = Unit
@@ -118,6 +123,102 @@ class AttendanceRepositoryTest {
         val cached = repository.issueQr("session-1", "teacher-1")
         assertEquals(signed, assertIs<Outcome.Success<org.companerodeescuela.shared.contracts.AttendanceQrResponse>>(cached).value)
         assertIs<Outcome.Failure>(repository.issueQr("session-1", "another-teacher"))
+    }
+
+    @Test
+    fun `server authorization rejection invalidates prepared teacher QR`() = runTest {
+        for (status in listOf(HttpStatusCode.Forbidden, HttpStatusCode.Conflict, HttpStatusCode.Unauthorized)) {
+            val cache = MemoryQrStore(clock.instant().epochSecond)
+            val tokens = FakeTokenStore(token("teacher-1", 2_000_000_000L))
+            val client = HttpClient(MockEngine { respondError(status) })
+            val repository = AttendanceRepository(FakeStore(), FakeScheduler(),
+                AttendanceRemoteClient(client, SessionRefreshCoordinator(client, tokens)),
+                offlineQrStore = cache, sessionTokenStore = tokens, clock = clock)
+
+            assertIs<Outcome.Failure>(repository.issueQr("session-1", "teacher-1"))
+            assertEquals(emptyList(), cache.read("teacher-1", "session-1"))
+            client.close()
+        }
+    }
+
+    @Test
+    fun `logged out teacher cannot display prepared QR`() = runTest {
+        val cache = MemoryQrStore(clock.instant().epochSecond)
+        val tokens = FakeTokenStore(null)
+        val repository = AttendanceRepository(FakeStore(), FakeScheduler(), unusedRemoteClient(tokens),
+            offlineQrStore = cache, sessionTokenStore = tokens, clock = clock)
+        assertIs<Outcome.Failure>(repository.issueQr("session-1", "teacher-1"))
+        assertEquals(emptyList(), cache.read("teacher-1", "session-1"))
+    }
+
+    @Test
+    fun `active account cannot display another teacher prepared QR`() = runTest {
+        val cache = MemoryQrStore(clock.instant().epochSecond)
+        val tokens = FakeTokenStore(token("teacher-2", 2_000_000_000L))
+        val repository = AttendanceRepository(FakeStore(), FakeScheduler(), unusedRemoteClient(tokens),
+            offlineQrStore = cache, sessionTokenStore = tokens, clock = clock)
+        assertIs<Outcome.Failure>(repository.issueQr("session-1", "teacher-1"))
+    }
+
+    @Test
+    fun `new login for same teacher cannot reuse prior login QR`() = runTest {
+        val now = clock.instant().epochSecond
+        val signed = AttendanceQrResponse("signed", now, now + 25, 15)
+        val cache = object : AttendanceQrPackStore {
+            private val packs = mutableMapOf<Pair<String, String>, List<AttendanceQrResponse>>()
+            override fun read(ownerId: String, sessionId: String) = packs[ownerId to sessionId].orEmpty()
+            override fun save(ownerId: String, sessionId: String, slots: List<AttendanceQrResponse>) { packs[ownerId to sessionId] = slots }
+            override fun rememberSession(ownerId: String, session: AttendanceSessionResponse) = Unit
+            override fun restoreSession(ownerId: String): AttendanceSessionResponse? = null
+            override fun clearSession(ownerId: String) { packs.keys.removeAll { it.first.startsWith(ownerId) } }
+        }
+        val tokens = FakeTokenStore(token("teacher-1", 2_000_000_000L, "login-one"))
+        val client = org.companerodeescuela.core.network.createApiClient(
+            org.companerodeescuela.core.network.ApiEnvironment("https://example.test/", "test"),
+            MockEngine { request ->
+                if (request.url.encodedPath.endsWith("/qr-pack")) {
+                    respond("""{"data":[{"token":"signed","issuedAtEpochSeconds":$now,"expiresAtEpochSeconds":${now + 25},"rotateAfterSeconds":15}]}""",
+                        headers = io.ktor.http.headersOf("Content-Type", "application/json"))
+                } else respondError(HttpStatusCode.ServiceUnavailable)
+            },
+        )
+        try {
+            val repository = AttendanceRepository(FakeStore(), FakeScheduler(),
+                AttendanceRemoteClient(client, SessionRefreshCoordinator(client, tokens)),
+                offlineQrStore = cache, sessionTokenStore = tokens, clock = clock)
+            assertIs<Outcome.Success<Boolean>>(repository.prepareOfflineQrPack("session-1", "teacher-1"))
+            assertEquals(signed, assertIs<Outcome.Success<AttendanceQrResponse>>(repository.issueQr("session-1", "teacher-1")).value)
+            tokens.writeAccessToken(token("teacher-1", 2_000_000_000L, "login-two"))
+            assertIs<Outcome.Failure>(repository.issueQr("session-1", "teacher-1"))
+        } finally { client.close() }
+    }
+
+    @Test
+    fun `expired QR cannot be resurrected by moving clock backwards`() = runTest {
+        val movingClock = object : Clock() {
+            var instant = clock.instant()
+            override fun getZone(): ZoneId = ZoneOffset.UTC
+            override fun withZone(zone: ZoneId): Clock = this
+            override fun instant(): Instant = instant
+        }
+        val cache = MemoryQrStore(clock.instant().epochSecond)
+        val tokens = FakeTokenStore(token("teacher-1", 2_000_000_000L))
+        val repository = AttendanceRepository(FakeStore(), FakeScheduler(), unusedRemoteClient(tokens),
+            offlineQrStore = cache, sessionTokenStore = tokens, clock = movingClock)
+        assertIs<Outcome.Success<AttendanceQrResponse>>(repository.issueQr("session-1", "teacher-1"))
+        movingClock.instant += Duration.ofSeconds(30)
+        assertIs<Outcome.Failure>(repository.issueQr("session-1", "teacher-1"))
+        movingClock.instant -= Duration.ofSeconds(30)
+        assertIs<Outcome.Failure>(repository.issueQr("session-1", "teacher-1"))
+    }
+
+    private class MemoryQrStore(now: Long) : AttendanceQrPackStore {
+        private var slots = listOf(AttendanceQrResponse("signed", now, now + 25, 15))
+        override fun read(ownerId: String, sessionId: String) = slots
+        override fun save(ownerId: String, sessionId: String, slots: List<AttendanceQrResponse>) { this.slots = slots }
+        override fun rememberSession(ownerId: String, session: AttendanceSessionResponse) = Unit
+        override fun restoreSession(ownerId: String): AttendanceSessionResponse? = null
+        override fun clearSession(ownerId: String) { slots = emptyList() }
     }
 
     @Test
@@ -196,8 +297,9 @@ class AttendanceRepositoryTest {
         )
     }
 
-    private fun token(subject: String, expiresAt: Long): String {
-        val payload = """{"sub":"$subject","exp":$expiresAt}"""
+    private fun token(subject: String, expiresAt: Long, sessionId: String = "login-$subject"): String {
+        val role = if (subject.startsWith("teacher")) "TEACHER" else "STUDENT"
+        val payload = """{"sub":"$subject","exp":$expiresAt,"session_id":"$sessionId","roles":["$role"]}"""
         val encoded = Base64.getUrlEncoder().withoutPadding()
             .encodeToString(payload.toByteArray())
         return "e30.$encoded.signature"
@@ -249,7 +351,7 @@ class AttendanceRepositoryTest {
             )
         }
 
-        override suspend fun nextReady(nowEpochSeconds: Long): PendingAttendanceOperation? = null
+        override suspend fun nextReady(nowEpochSeconds: Long, ownerId: String): PendingAttendanceOperation? = null
 
         override suspend fun recordRetry(
             operationId: String,

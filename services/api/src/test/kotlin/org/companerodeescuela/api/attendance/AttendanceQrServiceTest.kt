@@ -17,6 +17,17 @@ class AttendanceQrServiceTest {
     private val initial = Instant.parse("2026-10-05T08:02:00Z")
 
     @Test
+    fun `QR is expired exactly at its expiration boundary`() = runTest {
+        val repository = InMemoryAttendanceRepository()
+        repository.createSession(session("session-1", initial))
+        val service = AttendanceQrService("q".repeat(48).toCharArray(), repository, MutableClock(initial))
+        val issued = service.issue("teacher-1", "session-1")
+        assertIs<QrEvidenceResult.Expired>(
+            service.verify(issued.token, "session-1", issued.expiresAtEpochSeconds),
+        )
+    }
+
+    @Test
     fun `issued token verifies only for its attendance session`() = runTest {
         val repository = InMemoryAttendanceRepository()
         val clock = MutableClock(initial)

@@ -135,6 +135,10 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.uiautomator)
+    androidTestImplementation(libs.androidx.work.testing)
+    androidTestImplementation(libs.androidx.room.runtime)
+    androidTestImplementation(platform(libs.ktor.bom))
+    androidTestImplementation(libs.ktor.client.mock)
 }
 
 tasks.withType<Test>().configureEach {

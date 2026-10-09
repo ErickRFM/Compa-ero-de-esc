@@ -144,7 +144,7 @@ class AttendanceQrService(
             return QrEvidenceResult.WrongSession
         }
 
-        return if (receivedAtEpochSeconds > expiresAt) {
+        return if (receivedAtEpochSeconds >= expiresAt) {
             QrEvidenceResult.Expired(issuedAt, expiresAt)
         } else {
             QrEvidenceResult.Valid(issuedAt, expiresAt)

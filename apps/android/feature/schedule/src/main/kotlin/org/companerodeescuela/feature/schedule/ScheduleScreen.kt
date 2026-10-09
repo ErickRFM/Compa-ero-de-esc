@@ -119,8 +119,8 @@ fun ScheduleScreen(
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
             importBusy = true
-            runCatching { importProcessor.extractText(uri) }
-                .onSuccess(viewModel::stageImport)
+            runCatching { importProcessor.extractCandidates(uri) }
+                .onSuccess(viewModel::stageImportCandidates)
                 .onFailure { viewModel.reportImportFailure() }
             importBusy = false
         }

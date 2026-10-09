@@ -36,6 +36,8 @@ dependencies {
     implementation(project(":apps:android:core:common"))
     implementation(project(":apps:android:core:designsystem"))
     implementation(project(":apps:android:core:motion"))
+    implementation(project(":apps:android:core:navigation"))
+    implementation("androidx.compose.foundation:foundation")
     implementation(project(":apps:android:core:network"))
     implementation(project(":apps:android:core:security"))
 

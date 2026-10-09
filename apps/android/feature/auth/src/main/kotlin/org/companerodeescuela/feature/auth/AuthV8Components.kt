@@ -7,67 +7,61 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
-import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
-import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
-import org.companerodeescuela.core.designsystem.v8.V8RedColors
-import org.companerodeescuela.core.motion.CompaneroMotionDuration
+import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
+import org.companerodeescuela.core.designsystem.v8.*
+import org.companerodeescuela.core.motion.*
 
-/** Login and registration share the existing V8 assets and accessible scroll frame. */
+@Composable internal fun authDark() = MaterialTheme.colorScheme.background.luminance() < 0.5f
+@Composable internal fun authInk() = if (authDark()) {
+    if (LocalCompaneroHighContrast.current) Color.White else V8RedColors.TextPrimary
+} else MaterialTheme.colorScheme.onSurface
+@Composable internal fun authMuted() = if (authDark()) {
+    if (LocalCompaneroHighContrast.current) Color(0xFFEEEEEE) else V8RedColors.TextSecondary
+} else MaterialTheme.colorScheme.onSurfaceVariant
+@Composable internal fun authAccent() = if (authDark()) V8RedColors.Crimson else V8RedColors.DeepCrimson
+
+/** Same campus, geometry and tokens; colors come from the existing CompaneroTheme. */
 @Composable
 internal fun AuthV8Layout(
     modifier: Modifier = Modifier,
+    themeAware: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Box(modifier.fillMaxSize().background(V8RedColors.Background)) {
-        V8CampusBackdrop(Modifier.matchParentSize(), login = true)
-        CompositionLocalProvider(LocalContentColor provides V8RedColors.TextPrimary) {
-            Column(
-                modifier = Modifier
-                    .widthIn(max = CompaneroSize.loginContentMaxWidth)
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .navigationBarsPadding()
-                    .imePadding()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 10.dp),
-            ) {
-                V8BrandHeader()
+    if (themeAware) {
+        AuthV8Frame(modifier, content)
+    } else {
+        // Registration keeps its existing fixed V8 palette and inherits font/motion preferences.
+        MaterialTheme(colorScheme = V8ColorScheme) { AuthV8Frame(modifier, content) }
+    }
+}
+
+@Composable
+private fun AuthV8Frame(modifier: Modifier, content: @Composable ColumnScope.() -> Unit) {
+    val background = if (authDark()) {
+        if (LocalCompaneroHighContrast.current) Color.Black else V8RedColors.Background
+    } else MaterialTheme.colorScheme.background
+    Box(modifier.fillMaxSize().background(background)) {
+        V8CampusBackdrop(Modifier.matchParentSize(), login = true, backgroundColor = background)
+        CompositionLocalProvider(LocalContentColor provides authInk()) {
+            Column(Modifier.widthIn(max = CompaneroSize.loginContentMaxWidth).fillMaxWidth().align(Alignment.TopCenter)
+                .statusBarsPadding().navigationBarsPadding().imePadding()
+                .verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 10.dp)) {
+                V8BrandHeader(contentColor = authInk(), secondaryColor = authMuted(), tagline = stringResource(R.string.auth_tagline))
                 Spacer(Modifier.height(20.dp))
                 content()
             }
@@ -75,96 +69,54 @@ internal fun AuthV8Layout(
     }
 }
 
-/** Extracted from Login so registration uses the same fields and error contrast. */
 @Composable
-internal fun institutionalFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedTextColor = V8RedColors.TextPrimary,
-    unfocusedTextColor = V8RedColors.TextPrimary,
-    disabledTextColor = V8RedColors.TextSecondary,
-    errorTextColor = V8RedColors.TextPrimary,
-    focusedContainerColor = Color(0xF31A1118),
-    unfocusedContainerColor = Color(0xED171419),
-    disabledContainerColor = Color(0xED171419),
-    errorContainerColor = Color(0xED171419),
-    focusedBorderColor = V8RedColors.Crimson,
-    unfocusedBorderColor = Color(0xFF71616C),
-    focusedLabelColor = V8RedColors.Crimson,
-    unfocusedLabelColor = V8RedColors.TextSecondary,
-    disabledLabelColor = V8RedColors.TextSecondary,
-    cursorColor = V8RedColors.Crimson,
-    errorCursorColor = V8RedColors.Error,
-    errorBorderColor = V8RedColors.Error,
-    errorLabelColor = V8RedColors.Error,
-    errorSupportingTextColor = V8RedColors.Error,
-)
+internal fun institutionalFieldColors(): TextFieldColors {
+    val ink = authInk()
+    val muted = authMuted()
+    val accent = authAccent()
+    val container = if (authDark()) Color(0xF31A1118) else MaterialTheme.colorScheme.surface
+    val outline = if (LocalCompaneroHighContrast.current) ink else if (authDark()) Color(0xFF71616C) else MaterialTheme.colorScheme.outline
+    return OutlinedTextFieldDefaults.colors(
+        focusedTextColor = ink, unfocusedTextColor = ink, disabledTextColor = muted, errorTextColor = ink,
+        focusedContainerColor = container, unfocusedContainerColor = container, disabledContainerColor = container, errorContainerColor = container,
+        focusedBorderColor = accent, unfocusedBorderColor = outline,
+        focusedLabelColor = accent, unfocusedLabelColor = muted, disabledLabelColor = muted,
+        cursorColor = accent, errorCursorColor = MaterialTheme.colorScheme.error,
+        errorBorderColor = MaterialTheme.colorScheme.error, errorLabelColor = MaterialTheme.colorScheme.error,
+        errorSupportingTextColor = MaterialTheme.colorScheme.error,
+    )
+}
 
-/** The existing Login action, shared without imposing a fixed text height. */
 @Composable
 internal fun AuthV8PrimaryAction(
-    text: String,
-    onClick: () -> Unit,
-    enabled: Boolean,
-    submitting: Boolean,
-    modifier: Modifier = Modifier,
-    submittingText: String? = null,
+    text: String, onClick: () -> Unit, enabled: Boolean, submitting: Boolean,
+    modifier: Modifier = Modifier, submittingText: String? = null,
 ) {
-    val shape = RoundedCornerShape(18.dp)
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.fillMaxWidth().heightIn(min = 56.dp).shadow(
-            elevation = if (enabled) 11.dp else 0.dp,
-            shape = shape,
-            ambientColor = V8RedColors.Crimson.copy(alpha = 0.48f),
-            spotColor = V8RedColors.Crimson.copy(alpha = 0.40f),
-        ),
-        shape = shape,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = V8RedColors.Crimson,
-            contentColor = Color.White,
-            disabledContainerColor = V8RedColors.Crimson.copy(alpha = 0.30f),
-            disabledContentColor = Color.White.copy(alpha = 0.82f),
-        ),
-    ) {
-        AnimatedContent(
-            targetState = submitting,
-            transitionSpec = {
-                fadeIn(tween(CompaneroMotionDuration.FAST))
-                    .togetherWith(fadeOut(tween(CompaneroMotionDuration.FAST)))
-            },
-            label = "authSubmitState",
-        ) { busy ->
+    val duration = CompaneroMotionPolicy.resolve(MotionRole.STATE_CHANGE, LocalCompaneroMotionPreferences.current.reducedMotion).durationMillis
+    Button(onClick, enabled = enabled, modifier = modifier.fillMaxWidth().heightIn(min = 56.dp),
+        shape = RoundedCornerShape(18.dp), colors = ButtonDefaults.buttonColors(
+            containerColor = V8RedColors.DeepCrimson, contentColor = Color.White,
+            disabledContainerColor = V8RedColors.DeepCrimson.copy(alpha = 0.3f), disabledContentColor = authMuted())) {
+        AnimatedContent(submitting, transitionSpec = {
+            fadeIn(tween(duration)).togetherWith(fadeOut(tween(duration)))
+        }, label = "authSubmitState") { busy ->
             if (busy) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
                     submittingText?.let { Text(it, fontWeight = FontWeight.SemiBold) }
                 }
-            } else {
-                Text(text, fontWeight = FontWeight.Bold)
-            }
+            } else Text(text, fontWeight = FontWeight.SemiBold)
         }
     }
 }
 
 @Composable
-internal fun AuthV8SecondaryAction(
-    text: String,
-    onClick: () -> Unit,
-    enabled: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    OutlinedButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.fillMaxWidth().heightIn(min = 54.dp),
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, V8RedColors.Crimson.copy(alpha = 0.53f)),
+internal fun AuthV8SecondaryAction(text: String, onClick: () -> Unit, enabled: Boolean, modifier: Modifier = Modifier) {
+    OutlinedButton(onClick, enabled = enabled, modifier = modifier.fillMaxWidth().heightIn(min = 54.dp),
+        shape = RoundedCornerShape(18.dp), border = BorderStroke(1.dp, authAccent().copy(alpha = 0.53f)),
         colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = Color(0xEF1A121A),
-            contentColor = V8RedColors.TextPrimary,
-            disabledContentColor = V8RedColors.TextSecondary,
-        ),
-    ) {
+            containerColor = if (authDark()) Color(0xEF1A121A) else MaterialTheme.colorScheme.surface,
+            contentColor = authInk(), disabledContentColor = authMuted())) {
         Text(text, fontWeight = FontWeight.SemiBold)
     }
 }

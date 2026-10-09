@@ -44,6 +44,8 @@ class AppearancePreferences @Inject constructor(
     private val _state = MutableStateFlow(read())
     val state: StateFlow<AppearanceSettings> = _state.asStateFlow()
 
+    init { applyLocale(_state.value.language) }
+
     fun setThemeMode(mode: AppThemeMode) {
         preferences.edit { putString(KEY_THEME, mode.name) }
         _state.update { it.copy(themeMode = mode) }

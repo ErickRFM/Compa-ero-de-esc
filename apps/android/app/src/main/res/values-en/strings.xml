@@ -33,4 +33,14 @@
     <string name="accessibility_title">Accessibility</string>
     <string name="reduced_motion_label">Reduce motion</string>
     <string name="high_contrast_label">High contrast</string>
+    <string name="login_experience_picker_title">How do you want to use Compañero?</string>
+    <string name="login_experience_picker_description">You can switch experience later from Profile.</string>
+    <string name="login_experience_unavailable">Your account is not authorized for the selected access. Choose one of your available experiences.</string>
+    <string name="login_continue_student">Continue as student</string>
+    <string name="login_continue_teacher">Continue as teacher</string>
+    <string name="login_continue_tutor">Continue as tutor</string>
+    <string name="login_continue_coordinator">Continue as coordinator</string>
+    <string name="login_continue_admin">Continue as administrator</string>
+    <string name="login_continue_super_admin">Continue as superadministrator</string>
+    <string name="login_continue">Continue</string>
 </resources>

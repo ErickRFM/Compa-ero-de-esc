@@ -21,6 +21,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.companerodeescuela.core.designsystem.v8.*
@@ -43,16 +45,29 @@ internal fun WeeklyAgendaGrid(entries: List<ScheduleEntry>, onEdit: (ScheduleEnt
     val density = LocalDensity.current
     val haptics = LocalHapticFeedback.current
     val quarterHourPx = with(density) { hourHeight.toPx() / 4 }
+    val gridScroll = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
+    var showAllDetails by remember { mutableStateOf(false) }
+    LaunchedEffect(entries) { gridScroll.scrollTo(0) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text("Lunes a sábado · desplaza a los lados", fontSize = 11.sp, color = V8RedColors.TextSecondary)
+        TextButton(onClick = {
+            coroutineScope.launch { gridScroll.animateScrollTo(gridScroll.maxValue) }
+        }) { Text("Ver sábado →") }
+    }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val normalWidth = ((maxWidth - rail) / days.size).coerceAtLeast(64.dp)
+        val normalWidth = ((maxWidth - rail) / days.size).coerceAtLeast(116.dp)
         val widths = layouts.map { layout ->
             val lanes = layout.maxOfOrNull { it.laneCount } ?: 1
             if (lanes > 1) (normalWidth * lanes).coerceAtLeast(96.dp * lanes) else normalWidth
         }
         val gridWidth = widths.fold(rail) { total, width -> total + width }
         val widthsPx = widths.map { with(density) { it.toPx() } }
-        Column(Modifier.horizontalScroll(rememberScrollState()).width(gridWidth)
+        // The viewport must scroll, not the oversized child itself; otherwise
+        // Compose can clip the final Saturday column on a narrow device.
+        Box(Modifier.fillMaxWidth().horizontalScroll(gridScroll)) {
+        Column(Modifier.width(gridWidth)
             .v8GlassSurface(cornerRadius = 14.dp, elevation = 0.dp)) {
             Row(Modifier.padding(vertical = 12.dp)) {
                 Text("Hora", Modifier.width(rail).padding(start = 4.dp), fontSize = 10.sp, color = V8RedColors.TextSecondary)
@@ -98,8 +113,10 @@ internal fun WeeklyAgendaGrid(entries: List<ScheduleEntry>, onEdit: (ScheduleEnt
                                 .v8GlassSurface(cornerRadius = 8.dp, emphasized = accent, elevation = 0.dp)
                                 .clickable { detail = entry }.padding(5.dp)) {
                                 Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                    Text(entry.subjectName, fontSize = 10.sp, lineHeight = 12.sp, fontWeight = FontWeight.Bold)
-                                    if (placement.durationMinutes >= 60) {
+                                    Text(entry.subjectName, fontSize = 10.sp, lineHeight = 12.sp,
+                                        maxLines = if (placement.durationMinutes >= 120) 3 else 2,
+                                        overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
+                                    if (placement.durationMinutes >= 90) {
                                         Text(entry.startsAt + "–" + entry.endsAt, fontSize = 9.sp, lineHeight = 11.sp, color = V8RedColors.TextSecondary)
                                         entry.classroomName?.let { Text(it, fontSize = 9.sp, lineHeight = 11.sp, color = V8RedColors.TextSecondary) }
                                     }
@@ -110,10 +127,15 @@ internal fun WeeklyAgendaGrid(entries: List<ScheduleEntry>, onEdit: (ScheduleEnt
                 }
             }
         }
+        }
     }
-    // Full names and details remain accessible even for a fifteen-minute grid slot.
-    Text("Toca un bloque para consultar sus detalles. Desliza la cuadrícula si hay clases simultáneas.", fontSize = 11.sp, color = V8RedColors.TextSecondary)
-    entries.forEach { entry ->
+    // Keep a compact grid. The full readable list is opt-in, not 25
+    // duplicated rows that push the rest of the screen below the bottom bar.
+    Text("Toca un bloque para sus detalles o desliza para ver los demás días.", fontSize = 11.sp, color = V8RedColors.TextSecondary)
+    TextButton(onClick = { showAllDetails = !showAllDetails }) {
+        Text(if (showAllDetails) "Ocultar lista accesible" else "Ver horario como lista")
+    }
+    if (showAllDetails) entries.forEach { entry ->
         TextButton(onClick = { detail = entry }, modifier = Modifier.fillMaxWidth()) {
             Text(dayLabelGrid(entry.dayOfWeek) + " · " + entry.startsAt + "–" + entry.endsAt + " · " + entry.subjectName, modifier = Modifier.fillMaxWidth())
         }

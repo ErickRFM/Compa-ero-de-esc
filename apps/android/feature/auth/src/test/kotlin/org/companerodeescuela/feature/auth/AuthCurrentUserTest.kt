@@ -105,6 +105,52 @@ class AuthCurrentUserTest {
         }
     }
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test fun aDelayedCredentialCompletionCannotOverwriteNewerServerAuthority() = runTest {
+        val dispatcher = kotlinx.coroutines.test.UnconfinedTestDispatcher(testScheduler)
+        kotlinx.coroutines.Dispatchers.setMain(dispatcher)
+        val writeGate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val fixtureToken = MeSessionStore().readAccessToken()!!
+        val access = MutableStateFlow<String?>(null)
+        val store = object : SessionTokenStore by MeSessionStore() {
+            override fun observeAccessToken(): Flow<String?> = access
+            override suspend fun readAccessToken(): String? = access.value
+            override suspend fun clear() { access.value = null }
+            override suspend fun writeSession(accessToken: String, sessionId: String, refreshToken: String) {
+                access.value = accessToken
+                writeGate.await()
+            }
+        }
+        val engine = MockEngine.create {
+            this.dispatcher = dispatcher
+            addHandler { request ->
+                val response = if (request.url.encodedPath == "/auth/login") {
+                    """{"data":{"accessToken":"$fixtureToken","expiresAtEpochSeconds":4102444800,"sessionId":"session-1","refreshToken":"fixture-refresh","user":{"id":"user-1","displayName":"Elena","email":"e@example.edu","roles":["student"],"active":true}}}"""
+                } else {
+                    """{"data":{"id":"user-1","displayName":"Elena","email":"e@example.edu","roles":["teacher","tutor"],"active":true}}"""
+                }
+                respond(response, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()))
+            }
+        }
+        val client = createApiClient(ApiEnvironment("https://example.test/", "test"), engine)
+        val vm = SessionViewModel(AuthRepository(client, store), store)
+        try {
+            vm.login("qa.alumno", "fixture-password")
+            runCurrent()
+            kotlin.test.assertTrue(vm.state.value.authenticated, "Valid login must reach live authority")
+            val live = vm.state.value
+            assertEquals(setOf(UserRole.TEACHER, UserRole.TUTOR), live.roles)
+            writeGate.complete(Unit)
+            runCurrent()
+            assertEquals(setOf(UserRole.TEACHER, UserRole.TUTOR), vm.state.value.roles)
+        } finally {
+            writeGate.complete(Unit)
+            vm.viewModelScope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin()
+            client.close()
+            kotlinx.coroutines.Dispatchers.resetMain()
+        }
+    }
+
     @Test fun currentRolesAreReadFromTheProtectedBackendContract() = runTest {
         val store = MeSessionStore()
         val client = createApiClient(ApiEnvironment("https://example.test/", "test"), MockEngine { request ->

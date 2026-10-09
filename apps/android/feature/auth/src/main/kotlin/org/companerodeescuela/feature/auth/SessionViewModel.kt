@@ -129,7 +129,7 @@ class SessionViewModel @Inject constructor(
 
     private fun publishCredentialResult(result: Outcome<UserSummary>, login: Boolean) {
         when (result) {
-            is Outcome.Success -> publishAuthenticated(result.value)
+            is Outcome.Success -> Unit // Token observation publishes the newer /auth/me authority.
             is Outcome.Failure -> _state.update {
                 it.copy(checking = false, authenticated = false, submitting = signingOut, userId = null,
                     displayName = null, roles = emptySet(),

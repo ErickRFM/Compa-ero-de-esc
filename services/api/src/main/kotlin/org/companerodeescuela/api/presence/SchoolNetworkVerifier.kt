@@ -4,6 +4,7 @@ import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.shared.contracts.NetworkVerificationMethod
 import org.companerodeescuela.shared.contracts.SchoolNetworkEvidence
 
+/** Validates declarations against policy, not independently authenticated location. */
 class SchoolNetworkVerifier(
     private val allowedSsids: Set<String>,
     private val allowedBssids: Set<String>,

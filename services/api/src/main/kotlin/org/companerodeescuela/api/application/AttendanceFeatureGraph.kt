@@ -57,7 +57,6 @@ fun buildAttendanceFeatureGraph(
             enrollmentResolver = AttendanceEnrollmentResolver(academicProvider),
             qrService = qrService,
             schoolPresenceService = schoolPresenceService,
-            classCallGraceSeconds = settings.attendanceGraceMinutes * 60L,
         ),
         reviewService = AttendanceReviewService(
             repository = repository,

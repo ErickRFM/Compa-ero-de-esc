@@ -19,6 +19,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +41,13 @@ fun TutorRequestsScreen(
     viewModel: TutorViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    key(state.scopeGeneration) {
+        TutorRequestsContent(state, viewModel, modifier)
+    }
+}
+
+@Composable
+private fun TutorRequestsContent(state: TutorUiState, viewModel: TutorViewModel, modifier: Modifier) {
     var selected by remember { mutableStateOf<Pair<ExcuseRequestSummary, Boolean>?>(null) }
     var comment by remember { mutableStateOf("") }
 
@@ -108,8 +116,8 @@ fun TutorRequestsScreen(
                 }
             },
             confirmButton = {
-                Button(enabled = !state.submitting,
-                    onClick = { viewModel.review(request.id, approved, comment); selected = null }) {
+                Button(enabled = !state.submitting && !state.loading,
+                    onClick = { viewModel.review(request.id, approved, comment, state.scopeGeneration); selected = null }) {
                     Text("Confirmar")
                 }
             },

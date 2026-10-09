@@ -17,6 +17,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +38,13 @@ fun TutorGroupsScreen(
     viewModel: TutorViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    key(state.scopeGeneration) {
+        TutorGroupsContent(state, viewModel, modifier)
+    }
+}
+
+@Composable
+private fun TutorGroupsContent(state: TutorUiState, viewModel: TutorViewModel, modifier: Modifier) {
     var groupId by remember { mutableStateOf<String?>(null) }
     var studentId by remember { mutableStateOf<String?>(null) }
     var caseSummary by remember { mutableStateOf("") }
@@ -51,6 +59,12 @@ fun TutorGroupsScreen(
         studentId = null
         editingCase = null
         groupId?.let(viewModel::loadRoster)
+    }
+    LaunchedEffect(groupId, studentId) {
+        caseSummary = ""
+        editingCase = null
+        noteText = ""
+        publishNote = false
     }
 
     Column(
@@ -119,7 +133,7 @@ fun TutorGroupsScreen(
             Button(
                 onClick = {
                     val activeGroup = groupId ?: return@Button
-                    viewModel.createCase(activeGroup, selected.userId, caseSummary)
+                    viewModel.createCase(activeGroup, selected.userId, caseSummary, state.scopeGeneration)
                     caseSummary = ""
                 },
                 enabled = !state.submitting && caseSummary.trim().length in 8..500,
@@ -154,7 +168,7 @@ fun TutorGroupsScreen(
                                 Button(
                                     enabled = !state.submitting && noteText.trim().length in 5..2000,
                                     onClick = {
-                                        viewModel.addNote(case.id, noteText, publishNote)
+                                        viewModel.addNote(case.id, noteText, publishNote, state.scopeGeneration)
                                         noteText = ""
                                         editingCase = null
                                     },

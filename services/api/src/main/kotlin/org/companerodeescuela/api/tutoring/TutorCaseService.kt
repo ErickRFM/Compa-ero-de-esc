@@ -25,14 +25,8 @@ class TutorCaseService(
     private val clock: Clock = Clock.systemUTC(),
 ) {
     suspend fun list(actor: UserSummary): List<TutorCaseSummary> {
-        val records = when {
-            isAdmin(actor) -> repository.listAll()
-            UserRole.TUTOR in actor.roles -> {
-                val groupIds = assignments.scopeFor(actor).groups.map { it.id }.toSet()
-                repository.listForGroups(groupIds)
-            }
-            else -> throw ApiException.Forbidden("Tutor permission is required")
-        }
+        val groupIds = assignments.scopeFor(actor).groups.map { it.id }.toSet()
+        val records = repository.listForGroups(groupIds)
         return records.map { it.toSummary() }
     }
 
@@ -116,15 +110,8 @@ class TutorCaseService(
     }
 
     private suspend fun requireScope(actor: UserSummary, groupId: String) {
-        if (isAdmin(actor)) return
-        if (UserRole.TUTOR !in actor.roles) {
-            throw ApiException.Forbidden("Tutor role is required")
-        }
-        assignments.requireCanAccessGroup(actor, groupId)
+        assignments.requireTutorAssignmentForGroup(actor, groupId)
     }
-
-    private fun isAdmin(actor: UserSummary): Boolean =
-        UserRole.ADMIN in actor.roles || UserRole.SUPER_ADMIN in actor.roles
 
     private fun TutorCaseRecord.toSummary(): TutorCaseSummary = TutorCaseSummary(
         id = id,

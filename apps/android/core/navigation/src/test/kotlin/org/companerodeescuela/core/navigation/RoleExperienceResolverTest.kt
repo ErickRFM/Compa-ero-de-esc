@@ -83,7 +83,6 @@ class RoleExperienceResolverTest {
             listOf(
                 TopLevelDestination.CoordinatorHome,
                 TopLevelDestination.Schedule,
-                TopLevelDestination.Attendance,
                 TopLevelDestination.Channel,
             ),
             config.topLevelDestinations,
@@ -100,6 +99,14 @@ class RoleExperienceResolverTest {
 
         assertEquals(AppExperience.SUPER_ADMIN, superAdmin.experience)
         assertEquals(Destination.AdminHome, superAdmin.startDestination)
+        val expected = listOf(
+            TopLevelDestination.AdminHome,
+            TopLevelDestination.Schedule,
+            TopLevelDestination.Classrooms,
+            TopLevelDestination.Channel,
+        )
+        assertEquals(expected, admin.topLevelDestinations)
+        assertEquals(expected, superAdmin.topLevelDestinations)
     }
 
     @Test

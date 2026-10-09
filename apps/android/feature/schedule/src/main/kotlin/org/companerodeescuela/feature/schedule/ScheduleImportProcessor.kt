@@ -3,6 +3,7 @@ package org.companerodeescuela.feature.schedule
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import com.google.mlkit.vision.common.InputImage
@@ -34,16 +35,19 @@ class ScheduleImportProcessor(
                 return buildList {
                     repeat(pages) { index ->
                         renderer.openPage(index).use { page ->
+                            // A timetable fits seven narrow columns on one PDF page.
+                            // Rendering at native 72 DPI leaves glyphs too small for ML Kit.
+                            val scale = minOf(3f, MAX_RENDER_DIMENSION / maxOf(page.width, page.height).toFloat())
                             val bitmap = Bitmap.createBitmap(
-                                page.width.coerceAtLeast(1),
-                                page.height.coerceAtLeast(1),
+                                (page.width * scale).toInt().coerceAtLeast(1),
+                                (page.height * scale).toInt().coerceAtLeast(1),
                                 Bitmap.Config.ARGB_8888,
                             )
                             bitmap.eraseColor(Color.WHITE)
                             page.render(
                                 bitmap,
                                 null,
-                                null,
+                                Matrix().apply { postScale(scale, scale) },
                                 PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY,
                             )
                             try {
@@ -81,10 +85,18 @@ class ScheduleImportProcessor(
 
     private companion object {
         const val MAX_PAGES = 4
+        const val MAX_RENDER_DIMENSION = 3072f
     }
 }
 
-private object TimetableOcrReconstructor {
+/**
+ * Layout-aware timetable reader. ML Kit's full-page reading order does not
+ * preserve PDF table columns; positions are essential.
+ *
+ * This algorithm deliberately reconstructs missing header columns instead of
+ * assigning Wednesday/Thursday cells to Friday when OCR misses their labels.
+ */
+internal object TimetableOcrReconstructor {
     private val dayNames = linkedMapOf(
         "Lunes" to listOf("lunes"),
         "Martes" to listOf("martes"),
@@ -100,98 +112,104 @@ private object TimetableOcrReconstructor {
         RegexOption.IGNORE_CASE,
     )
 
-    private data class PositionedLine(
+    internal data class PositionedLine(
         val text: String,
         val centerX: Float,
         val centerY: Float,
         val left: Int,
     )
 
-    fun reconstruct(result: Text): String? {
-        val lines = result.textBlocks
-            .flatMap { it.lines }
-            .mapNotNull { line ->
-                val box = line.boundingBox ?: return@mapNotNull null
-                val value = line.text.trim().takeIf(String::isNotBlank) ?: return@mapNotNull null
-                PositionedLine(
-                    text = value,
-                    centerX = box.exactCenterX(),
-                    centerY = box.exactCenterY(),
-                    left = box.left,
-                )
-            }
+    fun reconstruct(result: Text): String? = reconstructLines(
+        result.textBlocks.flatMap { it.lines }.mapNotNull { line ->
+            val box = line.boundingBox ?: return@mapNotNull null
+            val value = line.text.trim().takeIf(String::isNotBlank) ?: return@mapNotNull null
+            PositionedLine(value, box.exactCenterX(), box.exactCenterY(), box.left)
+        },
+    )
 
-        val dayHeaders = dayNames.mapNotNull { (canonical, aliases) ->
+    internal fun reconstructLines(lines: List<PositionedLine>): String? {
+        val observed = dayNames.entries.mapIndexedNotNull { index, (name, aliases) ->
             lines.firstOrNull { line ->
                 val normalized = line.text.lowercase()
-                aliases.any { alias ->
-                    normalized == alias || normalized.startsWith("$alias ")
-                }
-            }?.let { canonical to it }
-        }.sortedBy { it.second.centerX }
+                aliases.any { alias -> normalized == alias || normalized.startsWith("$alias ") }
+            }?.let { Triple(index, name, it) }
+        }.sortedBy { it.first }
 
-        val rowAnchors = lines
-            .mapNotNull { line ->
-                val match = timeRange.find(line.text) ?: return@mapNotNull null
-                val normalized = normalizeRange(match)
-                Triple(normalized, line.centerY, line.centerX)
-            }
-            .distinctBy { it.first + "@" + it.second.toInt() }
-            .sortedBy { it.second }
+        val anchors = lines.mapNotNull { line ->
+            val match = timeRange.find(line.text) ?: return@mapNotNull null
+            Triple(normalizeRange(match), line.centerY, line.centerX)
+        }.distinctBy { it.first + "@" + it.second.toInt() }.sortedBy { it.second }
 
-        if (dayHeaders.size < MIN_DAY_HEADERS || rowAnchors.size < MIN_TIME_ROWS) return null
-        if (!timetableHeadersShareRow(dayHeaders.map { it.second.centerX to it.second.centerY }, rowBand(rowAnchors) * 2)) return null
+        if (observed.size < MIN_DAY_HEADERS || anchors.size < MIN_TIME_ROWS) return null
+        if (!timetableHeadersShareRow(
+                observed.map { it.third.centerX to it.third.centerY },
+                rowBand(anchors) * 2,
+            )
+        ) return null
 
-        val leftMostDay = dayHeaders.minOf { it.second.centerX }
-        val timeRows = rowAnchors
-            .filter { it.third < leftMostDay }
-            .ifEmpty { rowAnchors }
-            .sortedBy { it.second }
+        // A missed header must not collapse an entire column. Recover its center
+        // from the spacing between headers whose day-of-week is known.
+        val spacing = observed.zipWithNext { a, b ->
+            (b.third.centerX - a.third.centerX) / (b.first - a.first)
+        }.filter { it > 0f }.sorted()
+        val step = spacing.getOrNull(spacing.size / 2) ?: return null
+        val origin = observed.map { it.third.centerX - it.first * step }.average().toFloat()
+        val columns = dayNames.keys.mapIndexed { i, name -> name to (origin + i * step) }
 
+        val timeRows = anchors.filter { it.third < columns.first().second }
+            .ifEmpty { anchors }.sortedBy { it.second }
         if (timeRows.size < MIN_TIME_ROWS) return null
 
-        val excluded = lines.filter { line ->
-            dayHeaders.any { it.second === line } || timeRange.containsMatchIn(line.text)
-        }.toSet()
+        val observedHeaders = observed.map { it.third }.toSet()
+        val excluded = lines.filter { it in observedHeaders || timeRange.containsMatchIn(it.text) }.toSet()
 
         return buildString {
-            dayHeaders.forEachIndexed { dayIndex, (dayName, header) ->
+            columns.forEachIndexed { dayIndex, (day, _) ->
                 if (dayIndex > 0) appendLine()
-                appendLine(dayName)
+                appendLine(day)
 
                 timeRows.forEachIndexed { rowIndex, row ->
                     val previousY = timeRows.getOrNull(rowIndex - 1)?.second
                     val nextY = timeRows.getOrNull(rowIndex + 1)?.second
-                    val top = previousY?.let { (it + row.second) / 2f } ?: row.second - rowBand(timeRows)
-                    val bottom = nextY?.let { (it + row.second) / 2f } ?: row.second + rowBand(timeRows)
+                    val top = previousY?.let { (it + row.second) / 2f }
+                        ?: row.second - rowBand(timeRows)
+                    val bottom = nextY?.let { (it + row.second) / 2f }
+                        ?: row.second + rowBand(timeRows)
 
-                    val cellLines = lines
-                        .asSequence()
+                    val cell = lines.asSequence()
                         .filterNot(excluded::contains)
                         .filter { it.centerY >= top && it.centerY < bottom }
-                        .filter { nearestDay(it.centerX, dayHeaders) == header }
+                        // Use the LEFT edge rather than the bounding-box center:
+                        // long subject names extend beyond their narrow column.
+                        .filter { nearestColumn(it.left.toFloat(), columns) == dayIndex }
                         .sortedWith(compareBy<PositionedLine>({ it.centerY }, { it.left }))
-                        .map { it.text.replace(Regex("""\s+"""), " ").trim() }
-                        .filter(String::isNotBlank)
                         .toList()
 
-                    if (cellLines.isNotEmpty()) {
+                    // Timetable subjects sit above the printed time label's
+                    // center; teacher names sit below it. Keep multi-line
+                    // subjects together, and never turn an orphaned teacher
+                    // line into its own class.
+                    val subject = cell.filter { it.centerY < row.second }
+                        .joinToString(" ") { it.text.trim() }
+                        .replace(Regex("""\s+"""), " ").trim()
+                    if (subject.isNotBlank()) {
                         append(row.first)
                         append(' ')
-                        appendLine(cellLines.first())
-                        cellLines.drop(1).forEach(::appendLine)
+                        appendLine(subject)
+                        val teacher = cell.filter { it.centerY >= row.second }
+                            .joinToString(" ") { it.text.trim() }
+                            .replace(Regex("""\s+"""), " ").trim()
+                        if (teacher.isNotBlank()) appendLine(teacher)
                     }
                 }
             }
         }.trim()
     }
 
-    private fun nearestDay(
-        x: Float,
-        headers: List<Pair<String, PositionedLine>>,
-    ): PositionedLine? = headers.minByOrNull { (_, header) ->
-        kotlin.math.abs(header.centerX - x)
-    }?.second
+    private fun nearestColumn(x: Float, columns: List<Pair<String, Float>>): Int =
+        columns.indices.minByOrNull { index ->
+            kotlin.math.abs(columns[index].second - x)
+        } ?: 0
 
     private fun rowBand(rows: List<Triple<String, Float, Float>>): Float {
         val deltas = rows.zipWithNext { a, b -> kotlin.math.abs(b.second - a.second) }

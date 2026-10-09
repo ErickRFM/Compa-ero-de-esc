@@ -128,4 +128,32 @@ class ScheduleOcrParserTest {
 
         assertTrue(result.isEmpty())
     }
+    @Test
+    fun `preserves teacher surname wrapped under an embedded title`() {
+        val entries = ScheduleOcrParser.parse(
+            """
+            Jueves
+            16:00-17:00 Inteligencia de NegociosMa. Guadalupe
+            Tecuapacho
+            """.trimIndent(),
+        )
+        assertEquals(1, entries.size)
+        assertEquals("Inteligencia de Negocios", entries.single().subjectName)
+        assertEquals("Ma. Guadalupe Tecuapacho", entries.single().teacherName)
+    }
+
+    @Test
+    fun `teacher names are not imported as extra subject blocks`() {
+        val entries = ScheduleOcrParser.parse(
+            """
+            Lunes
+            13:00-14:00 Seguridad Informática
+            Osvaldo Moreno
+            14:00-15:00 Osvaldo Moreno
+            """.trimIndent(),
+        )
+        assertEquals(1, entries.size)
+        assertEquals("Seguridad Informática", entries.single().subjectName)
+        assertEquals("Osvaldo Moreno", entries.single().teacherName)
+    }
 }

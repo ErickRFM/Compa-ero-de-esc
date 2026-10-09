@@ -364,6 +364,7 @@ class AttendanceViewModel @Inject constructor(
                         it.copy(
                             actionInProgress = false,
                             teacherSession = result.value,
+                            offlineQrPrepared = false,
                             successMessage = "Pase abierto. El QR se renueva automáticamente.",
                         )
                     }
@@ -437,6 +438,7 @@ class AttendanceViewModel @Inject constructor(
                             actionInProgress = false,
                             teacherSession = null,
                             qr = null,
+                            offlineQrPrepared = false,
                             qrVisualState = QrVisualState.IDLE,
                             roster = null,
                             successMessage = "Pase cerrado.",
@@ -683,6 +685,7 @@ class AttendanceViewModel @Inject constructor(
                     sessionsLoaded = active is Outcome.Success,
                     activeSessions = activeSessions,
                     teacherSession = activeSession,
+                    offlineQrPrepared = if (it.teacherSession?.id == activeSession?.id) it.offlineQrPrepared else false,
                     errorMessage = when {
                         active is Outcome.Failure && activeSession != null -> null
                         week is Outcome.Failure -> week.error.userMessage

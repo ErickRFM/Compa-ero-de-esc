@@ -128,7 +128,8 @@ class InMemoryGroupRepresentativeRepository : GroupRepresentativeRepository {
     private fun ensurePositionAvailable(candidate:GroupRepresentativeAssignment) {
         if(candidate.status !in setOf(RepresentativeStatus.ACTIVE,RepresentativeStatus.PENDING)) return
         if(storage.values.any { it.id!=candidate.id && it.academicGroupId==candidate.academicGroupId &&
-                it.position==candidate.position && it.status in setOf(RepresentativeStatus.ACTIVE,RepresentativeStatus.PENDING) })
+                (it.position==candidate.position || it.studentUserId==candidate.studentUserId) &&
+                it.status in setOf(RepresentativeStatus.ACTIVE,RepresentativeStatus.PENDING) })
             throw ApiException.Conflict("A current representative appointment already occupies this position")
     }
 }
@@ -142,6 +143,13 @@ class MongoGroupRepresentativeRepository(
         collection.createIndex(
             Indexes.compoundIndex(Indexes.ascending("academicGroupId"),Indexes.ascending("position")),
             IndexOptions().unique(true).name("uq_pending_active_representative_position").partialFilterExpression(
+                Filters.or(Filters.eq("status",RepresentativeStatus.PENDING.name),
+                    Filters.eq("status",RepresentativeStatus.ACTIVE.name))
+            ),
+        )
+        collection.createIndex(
+            Indexes.compoundIndex(Indexes.ascending("academicGroupId"),Indexes.ascending("studentUserId")),
+            IndexOptions().unique(true).name("uq_pending_active_representative_student").partialFilterExpression(
                 Filters.or(Filters.eq("status",RepresentativeStatus.PENDING.name),
                     Filters.eq("status",RepresentativeStatus.ACTIVE.name))
             ),

@@ -214,8 +214,9 @@ jobs:
           api-level: ${{ matrix.api-level }}
           target: google_apis
           arch: x86_64
-          profile: pixel_2
           ram-size: 2048M
+          # Use the runner default hardware profile, as in the prior complete run.
+          # The real visual suite explicitly checks 360 through 1024 dp.
           # Compatibility renderer used by the earlier complete API 35 run.
           # Direct swiftshader lost QEMU with and without the Vulkan override.
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
@@ -234,8 +235,8 @@ jobs:
           failures = sum(int(suite.get('failures', 0)) + int(suite.get('errors', 0)) for suite in suites)
           skipped = sum(int(suite.get('skipped', 0)) for suite in suites)
           print(f'instrumentation tests={tests} failures={failures} skipped={skipped}')
-          if tests < 17 or failures != 0 or skipped != 0:
-              raise SystemExit('Instrumentation must execute all 17+ tests without failures or skips')
+          if tests < 21 or failures != 0 or skipped != 0:
+              raise SystemExit('Instrumentation must execute all 21+ tests without failures or skips')
           PY
 
       - name: Upload Android UI evidence

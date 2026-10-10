@@ -5,6 +5,8 @@ import org.companerodeescuela.api.test.ScopedAcademicFixtures
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
+import org.companerodeescuela.api.academic.groups.AcademicGroupScopeChange
 import kotlinx.coroutines.test.runTest
 import org.companerodeescuela.api.academic.groups.AcademicGroupMembershipRecord
 import org.companerodeescuela.api.academic.groups.AcademicGroupRecord
@@ -45,6 +47,26 @@ class TutorCaseServiceTest {
         assertFailsWith<ApiException.Forbidden> {
             service.addNote(tutor, record.id, AddTutorCaseNoteRequest("Sensitive comment", TutorNoteVisibility.SENSITIVE_RESTRICTED))
         }
+    }
+
+    @Test
+    fun `published tutor notes cease to be visible after the student group is migrated`() = runTest {
+        val groups=InMemoryAcademicGroupRepository()
+        groups.create(ScopedAcademicFixtures.group("9A"))
+        groups.assign(AcademicGroupMembershipRecord("9A",student.id,Instant.EPOCH))
+        val tutors=InMemoryTutorAssignmentRepository()
+        tutors.create(ScopedAcademicFixtures.assignment("case-scope",tutor.id,"9A"))
+        val accounts=ScopedAcademicFixtures.accounts(tutor,student)
+        val service=TutorCaseService(InMemoryTutorCaseRepository(),
+            TutorAssignmentService(tutors,groups,accounts=accounts),groups)
+        val record=service.create(tutor,CreateTutorCaseRequest("9A",student.id,"Academic support"))
+        service.addNote(tutor,record.id,AddTutorCaseNoteRequest("Please attend tutorial",TutorNoteVisibility.STUDENT_VISIBLE))
+        assertEquals(1,service.myPublishedNotes(student).size)
+        val change=AcademicGroupScopeChange("period-change","admin",
+            ScopedAcademicFixtures.INSTITUTION,"next-period",Instant.EPOCH,ScopedAcademicFixtures.END,
+            Instant.now(),"a".repeat(64))
+        assertEquals(1,groups.changeScope("9A",0,change)?.scopeRevision)
+        assertTrue(service.myPublishedNotes(student).isEmpty())
     }
 
     private suspend fun setup(): Pair<TutorCaseService, InMemoryTutorCaseRepository> {

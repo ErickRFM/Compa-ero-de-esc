@@ -43,6 +43,24 @@ class MongoAcademicGroupScopeIntegrationTest {
         assertEquals(-1,assertNotNull(repo.find("6A")).scopeRevision)
         assertNull(repo.changeScope("6A",1,change().copy(operationId="tampered")))
     }
+    @Test fun `Mongo denies inherited enrollment after scope change and accepts a new explicit operation`()=database { db ->
+        val repo=MongoAcademicGroupRepository(db)
+        repo.create(AcademicGroupRecord("6A","6A",true,now))
+        repo.assign(AcademicGroupMembershipRecord("6A","student",now))
+        assertTrue(repo.isUserInGroup("student","6A"))
+        val migrated=assertNotNull(repo.changeScope("6A",0,change()))
+        assertFalse(repo.isUserInGroup("student","6A"))
+        assertTrue(repo.memberIdsForGroup("6A").isEmpty())
+        assertTrue(repo.listGroupsForUser("student").isEmpty())
+        val enrolled=AcademicGroupMembershipRecord("6A","student",now,"owner","enroll-1","b".repeat(64),migrated.scopeRevision)
+        assertEquals(enrolled,repo.assign(enrolled))
+        assertTrue(repo.isUserInGroup("student","6A"))
+        val changed=assertNotNull(repo.changeScope("6A",1,change().copy(operationId="next",periodId="next",payloadDigest="c".repeat(64))))
+        assertFalse(repo.isUserInGroup("student","6A"))
+        val newEnrollment=enrolled.copy(operationId="enroll-2",groupScopeRevision=changed.scopeRevision)
+        assertEquals(newEnrollment,repo.assign(newEnrollment))
+        assertTrue(repo.isUserInGroup("student","6A"))
+    }
     private fun database(block:suspend(MongoDatabase)->Unit)=runBlocking<Unit> {
         val uri=System.getenv("V12_TEST_MONGODB_URI");require(uri=="mongodb://127.0.0.1:27017")
         MongoClient.create(uri).use { client -> val db=client.getDatabase("v12_test_"+UUID.randomUUID().toString().replace("-",""));try { block(db) } finally { db.drop() } }

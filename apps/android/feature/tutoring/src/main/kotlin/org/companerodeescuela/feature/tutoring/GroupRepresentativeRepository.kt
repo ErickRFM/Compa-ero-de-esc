@@ -14,7 +14,6 @@ import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.network.SessionRefreshCoordinator
 import org.companerodeescuela.core.network.apiCall
 import org.companerodeescuela.core.network.requireBody
-import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.AppointRepresentativeRequest
 import org.companerodeescuela.shared.contracts.GroupRepresentativeAssignment
@@ -29,7 +28,6 @@ import org.companerodeescuela.shared.contracts.RepresentativePosition
 @Singleton
 class GroupRepresentativeRepository @Inject constructor(
     private val client: HttpClient,
-    private val tokens: SessionTokenStore,
     private val refresh: SessionRefreshCoordinator,
 ) {
     suspend fun getOverview(groupId: String): Outcome<GroupRepresentativesOverview> =

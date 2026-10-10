@@ -90,15 +90,14 @@ class InMemoryAcademicGroupRepository : AcademicGroupRepository {
     override suspend fun listGroupsForUser(userId: String): List<AcademicGroupRecord> =
         memberships.values
             .filter { it.userId == userId }
-            .mapNotNull { groups[it.groupId] }
-            .filter(AcademicGroupRecord::active)
+            .mapNotNull { member -> groups[member.groupId]?.takeIf { it.currentMember(member) } }
             .sortedBy(AcademicGroupRecord::name)
 
     override suspend fun isUserInGroup(userId: String, groupId: String): Boolean =
-        memberships.containsKey(key(groupId, userId))
+        memberships[key(groupId, userId)]?.let { member -> groups[groupId]?.currentMember(member) } ?: false
 
     override suspend fun memberIdsForGroup(groupId: String): List<String> =
-        memberships.values.filter { it.groupId == groupId }.map { it.userId }.distinct().sorted()
+        memberships.values.filter { it.groupId == groupId && groups[groupId]?.currentMember(it) == true }.map { it.userId }.distinct().sorted()
 
     private fun key(groupId: String, userId: String): String = "$groupId::$userId"
 }
@@ -181,26 +180,28 @@ class MongoAcademicGroupRepository(
 
     override suspend fun listGroupsForUser(userId: String): List<AcademicGroupRecord> {
         ensureIndexes()
-        val ids = memberships.find(eq("userId", userId)).toList()
-            .mapNotNull { it.getString("groupId") }
-            .toSet()
-        if (ids.isEmpty()) return emptyList()
+        val memberByGroup = memberships.find(eq("userId", userId)).toList()
+            .map { it.toMembership() }.associateBy { it.groupId }
+        if (memberByGroup.isEmpty()) return emptyList()
         return groups.find().toList()
             .map { it.toGroup() }
-            .filter { it.active && it.id in ids }
+            .filter { group -> memberByGroup[group.id]?.let { group.currentMember(it) } == true }
             .sortedBy(AcademicGroupRecord::name)
     }
 
     override suspend fun isUserInGroup(userId: String, groupId: String): Boolean {
         ensureIndexes()
+        val group = find(groupId) ?: return false
         return memberships.find(and(eq("groupId", groupId), eq("userId", userId)))
-            .firstOrNull() != null
+            .firstOrNull()?.toMembership()?.let { group.currentMember(it) } == true
     }
 
     override suspend fun memberIdsForGroup(groupId: String): List<String> {
         ensureIndexes()
+        val group = find(groupId) ?: return emptyList()
         return memberships.find(eq("groupId", groupId)).toList()
-            .mapNotNull { it.getString("userId") }.distinct().sorted()
+            .map { it.toMembership() }.filter { group.currentMember(it) }
+            .map { it.userId }.distinct().sorted()
     }
 
     private suspend fun ensureIndexes() {
@@ -266,3 +267,9 @@ private fun AcademicGroupRecord.requireExactCreation(request:AcademicGroupRecord
         scopeAudit.map { it.copy(occurredAt=Instant.EPOCH) }!=request.scopeAudit.map { it.copy(occurredAt=Instant.EPOCH) })
         throw org.companerodeescuela.api.errors.ApiException.Conflict("Academic group already belongs to a different creation or scope")
 }
+
+/** Scope changes invalidate prior membership; only unmigrated revision-zero records retain compatibility. */
+private fun AcademicGroupRecord.currentMember(member: AcademicGroupMembershipRecord): Boolean =
+    active && scopeRevision>=0 && member.groupId==id &&
+    (member.groupScopeRevision==scopeRevision ||
+        (scopeRevision==0L && scopeAudit.isEmpty() && member.groupScopeRevision==-1L))

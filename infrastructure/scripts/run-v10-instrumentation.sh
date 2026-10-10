@@ -6,11 +6,21 @@ set -uo pipefail
 mkdir -p build/v10-runner-diagnostics
 monitor_pid=""
 trace_launcher_pid=""
+core_file=""
+emulator_executable=""
 if [[ "$OSTYPE" == linux* ]]; then
   # Only signal/exit metadata from the native main process; no syscall data,
   # process arguments, environment, raw memory or app network payloads.
   emulator_pid=$(pgrep -x qemu-system-x86 | head -n 1 || true)
   if [[ "$emulator_pid" =~ ^[0-9]+$ ]] && command -v strace >/dev/null; then
+    if [[ "${GITHUB_ACTIONS:-false}" == true ]]; then
+      # Private ephemeral core; only sanitized backtrace metadata is uploaded.
+      mkdir -p build/v10-native-cores
+      core_file="$PWD/build/v10-native-cores/core.$emulator_pid"
+      emulator_executable=$(readlink -f "/proc/$emulator_pid/exe")
+      sudo -n sysctl -w "kernel.core_pattern=$PWD/build/v10-native-cores/core.%p" >/dev/null || true
+      sudo -n prlimit --pid "$emulator_pid" --core=unlimited || true
+    fi
     sudo -n bash -c '
       echo "$$" > build/v10-runner-diagnostics/tracer.pid
       exec strace -tt -e trace=none -e signal=all -p "$1" \
@@ -39,6 +49,12 @@ finish_diagnostics() {
     fi
     wait "$trace_launcher_pid" 2>/dev/null || true
     cat build/v10-runner-diagnostics/emulator-signals.log 2>/dev/null || true
+    if [[ -n "$core_file" && -n "$emulator_executable" ]]; then
+      python3 infrastructure/scripts/read-emulator-crash.py \
+        --core "$core_file" --executable "$emulator_executable" \
+        > build/v10-runner-diagnostics/native-backtrace.log 2>&1 || true
+      cat build/v10-runner-diagnostics/native-backtrace.log
+    fi
   fi
   if [[ -n "$monitor_pid" ]]; then
     kill "$monitor_pid" 2>/dev/null || true

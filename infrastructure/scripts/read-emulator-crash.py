@@ -2,6 +2,9 @@
 """Emit only native exception metadata; never publish raw minidump memory."""
 from pathlib import Path
 import struct
+import argparse
+import re
+import subprocess
 
 
 def describe_dump(path: Path) -> None:
@@ -43,7 +46,44 @@ def describe_dump(path: Path) -> None:
         print(f"fault_module={name} offset=0x{address - base:x}")
 
 
+def describe_core(core: Path, executable: Path) -> None:
+    # Only the exact QEMU core in our ephemeral CI directory is inspected.
+    root = Path("build/v10-native-cores").resolve()
+    core = core.resolve()
+    if not core.is_relative_to(root) or not re.fullmatch(r"core\.[0-9]+", core.name):
+        raise ValueError("Unexpected native core path")
+    if not core.is_file():
+        print("No native ELF core found")
+        return
+    try:
+        result = subprocess.run([
+            "gdb", "-nx", "-nh", "-batch",
+            "-iex", "set auto-load off",
+            "-iex", "set debuginfod enabled off",
+            "-iex", "set print frame-arguments none",
+            "-ex", "bt 32", str(executable), str(core),
+        ], capture_output=True, text=True, timeout=45)
+        # Never echo GDB startup, arguments, locals, registers or raw output.
+        for line in result.stdout.splitlines():
+            match = re.match(r"^#([0-9]+)\s+(?:(0x[0-9a-f]+)\s+in\s+)?([^()]*)", line)
+            if match:
+                frame, address, function = match.groups()
+                print(f"frame={frame} address={address or 'unknown'} function={function.strip()[:512]}")
+    finally:
+        # Raw memory never belongs in artifacts or persists after inspection.
+        core.unlink()
+
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--core", type=Path)
+    parser.add_argument("--executable", type=Path)
+    options = parser.parse_args()
+    if options.core and options.executable:
+        try:
+            describe_core(options.core, options.executable)
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
+            print(f"Unable to inspect native ELF core: {type(error).__name__}")
     dumps = list(Path("/tmp/android-runner").glob("emu-crash-*.db/**/*.dmp"))
     print(f"Native emulator dumps found: {len(dumps)}")
     for path in dumps:

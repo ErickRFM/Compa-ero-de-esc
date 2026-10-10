@@ -200,7 +200,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Prepare native emulator signal diagnostics
-        run: sudo apt-get install -y strace
+        run: sudo apt-get install -y strace gdb
 
       - name: Enable KVM
         run: |

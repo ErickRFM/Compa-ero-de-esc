@@ -199,6 +199,9 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Prepare native emulator signal diagnostics
+        run: sudo apt-get install -y strace
+
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm-nodes.rules
@@ -221,7 +224,7 @@ jobs:
           # The real visual suite explicitly checks 360 through 1024 dp.
           # Compatibility renderer used by the earlier complete API 35 run.
           # Direct swiftshader lost QEMU with and without the Vulkan override.
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -show-kernel
           # App contains the smoke tests. Root task also launches empty library
           # suites concurrently against the same emulator and can stall ADB.
           script: bash infrastructure/scripts/run-v10-instrumentation.sh
@@ -237,8 +240,8 @@ jobs:
           failures = sum(int(suite.get('failures', 0)) + int(suite.get('errors', 0)) for suite in suites)
           skipped = sum(int(suite.get('skipped', 0)) for suite in suites)
           print(f'instrumentation tests={tests} failures={failures} skipped={skipped}')
-          if tests < 21 or failures != 0 or skipped != 0:
-              raise SystemExit('Instrumentation must execute all 21+ tests without failures or skips')
+          if tests < 23 or failures != 0 or skipped != 0:
+              raise SystemExit('Instrumentation must execute all 23+ tests without failures or skips')
           PY
 
       - name: Upload Android UI evidence

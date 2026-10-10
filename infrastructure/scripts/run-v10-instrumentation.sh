@@ -5,7 +5,20 @@ set -uo pipefail
 # A vanished emulator is distinct from an assertion failure in the app.
 mkdir -p build/v10-runner-diagnostics
 monitor_pid=""
+trace_launcher_pid=""
 if [[ "$OSTYPE" == linux* ]]; then
+  # Only signal/exit metadata from the native main process; no syscall data,
+  # process arguments, environment, raw memory or app network payloads.
+  emulator_pid=$(pgrep -x qemu-system-x86 | head -n 1 || true)
+  if [[ "$emulator_pid" =~ ^[0-9]+$ ]] && command -v strace >/dev/null; then
+    sudo -n bash -c '
+      echo "$$" > build/v10-runner-diagnostics/tracer.pid
+      exec strace -tt -e trace=none -e signal=all -p "$1" \
+        -o build/v10-runner-diagnostics/emulator-signals.log
+    ' v10-native-tracer "$emulator_pid" \
+      > build/v10-runner-diagnostics/tracer-status.log 2>&1 &
+    trace_launcher_pid=$!
+  fi
   (
     while true; do
       date -u
@@ -18,6 +31,15 @@ if [[ "$OSTYPE" == linux* ]]; then
   monitor_pid=$!
 fi
 finish_diagnostics() {
+  if [[ -n "$trace_launcher_pid" ]]; then
+    if [[ -f build/v10-runner-diagnostics/tracer.pid ]]; then
+      read -r tracer_pid < build/v10-runner-diagnostics/tracer.pid
+      # Interrupt the tracer itself: strace detaches and leaves QEMU running.
+      [[ "$tracer_pid" =~ ^[0-9]+$ ]] && sudo -n kill -INT "$tracer_pid" 2>/dev/null || true
+    fi
+    wait "$trace_launcher_pid" 2>/dev/null || true
+    cat build/v10-runner-diagnostics/emulator-signals.log 2>/dev/null || true
+  fi
   if [[ -n "$monitor_pid" ]]; then
     kill "$monitor_pid" 2>/dev/null || true
     wait "$monitor_pid" 2>/dev/null || true

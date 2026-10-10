@@ -37,6 +37,11 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    fun provideMfaRepository(client:HttpClient,tokenStore:SessionTokenStore,refreshCoordinator:SessionRefreshCoordinator):org.companerodeescuela.core.network.MfaRepository =
+        org.companerodeescuela.core.network.MfaRepository(client,tokenStore,refreshCoordinator)
+
+    @Provides
+    @Singleton
     fun provideClock(): java.time.Clock = java.time.Clock.systemUTC()
 
     @Provides

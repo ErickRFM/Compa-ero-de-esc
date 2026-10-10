@@ -108,4 +108,19 @@ class AccountAdministrationServiceTest {
         assertEquals(suspended,f.service.lifecycle(f.actor,target.id,request))
         assertFailsWith<ApiException.Forbidden> { f.service.lifecycle(f.actor,target.id,request.copy(status=AccountStatus.ACTIVE)) }
     }
+
+    @Test fun `staff reviewer can choose actual current scoped group metadata without gaining academic management or member data`()=runBlocking<Unit> {
+        val f=Fixture();f.initialize()
+        val reviewer=PlatformAccount("reviewer","Reviewer","reviewer@example.test","test-hash",setOf(UserRole.ADMIN),institutionId="campus",emailVerifiedAt=f.clock.now,adminCapabilities=setOf(AdminCapability.APPROVE_STAFF))
+        f.accounts.create(reviewer)
+        f.groups.create(AcademicGroupRecord("unknown","Unknown",true,f.clock.now))
+        f.groups.create(AcademicGroupRecord("expired","Expired",true,f.clock.now,"campus","period",f.clock.now.minusSeconds(3600),f.clock.now.minusSeconds(1)))
+        val groups=f.service.approvalGroups(reviewer)
+        assertEquals(listOf("6A","6B"),groups.map { it.id })
+        assertTrue(groups.all { it.institutionId=="campus" && it.periodId=="period" && it.endsAtEpochSeconds==f.clock.now.plusSeconds(3600).epochSecond })
+        val manager=reviewer.copy(id="manager",email="manager@example.test",adminCapabilities=setOf(AdminCapability.MANAGE_ACADEMICS))
+        f.accounts.create(manager)
+        assertFailsWith<ApiException.Forbidden> { f.service.approvalGroups(manager) }
+        assertFailsWith<ApiException.Unauthorized> { f.service.approvalGroups(reviewer.copy(institutionId="other")) }
+    }
 }

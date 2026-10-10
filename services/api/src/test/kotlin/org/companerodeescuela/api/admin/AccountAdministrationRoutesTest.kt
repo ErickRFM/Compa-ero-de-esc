@@ -104,6 +104,15 @@ class AccountAdministrationRoutesTest {
         assertEquals(HttpStatusCode.OK,proofResponse.status)
         return json.decodeFromString<ApiResponse<StepUpProof>>(proofResponse.bodyAsText()).data.proof
     }
+    @Test fun `approval group HTTP returns only actual native reviewer institution metadata`()=scenario { f ->
+        val admin=f.session("reviewer",setOf(UserRole.ADMIN));val teacher=f.session("teacher",setOf(UserRole.TEACHER))
+        f.groups.create(AcademicGroupRecord("6A","Actual Group",true,f.clock.now,"campus","period",f.clock.now,f.clock.now.plusSeconds(3600)))
+        f.groups.create(AcademicGroupRecord("FOREIGN","Foreign",true,f.clock.now,"other","period",f.clock.now,f.clock.now.plusSeconds(3600)))
+        val response=get("/admin/accounts/approval-groups",admin)
+        assertEquals(HttpStatusCode.OK,response.status)
+        assertEquals(listOf("6A"),json.decodeFromString<ApiResponse<List<AcademicGroupSummary>>>(response.bodyAsText()).data.map { it.id })
+        assertEquals(HttpStatusCode.Forbidden,get("/admin/accounts/approval-groups",teacher).status)
+    }
     private suspend fun ApplicationTestBuilder.get(path:String,token:String)=client.get(path){header(HttpHeaders.Authorization,"Bearer $token")}
     private suspend fun ApplicationTestBuilder.post(path:String,body:String,token:String)=client.post(path){header(HttpHeaders.Authorization,"Bearer $token");contentType(ContentType.Application.Json);setBody(body)}
 }

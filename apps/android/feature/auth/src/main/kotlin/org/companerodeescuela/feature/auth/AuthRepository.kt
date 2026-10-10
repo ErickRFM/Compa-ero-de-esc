@@ -31,6 +31,17 @@ class AuthRepository(
     private val refreshCoordinator: SessionRefreshCoordinator =
         SessionRefreshCoordinator(client, tokenStore, clock),
 ) {
+    suspend fun staffApplications():Outcome<List<org.companerodeescuela.shared.contracts.StaffApplication>> = protectedCall { token -> apiCall {
+        client.get("auth/staff-applications") { header(HttpHeaders.Authorization,"Bearer "+token) }
+            .requireBody<ApiResponse<List<org.companerodeescuela.shared.contracts.StaffApplication>>>()
+    }.map { it.data } }
+    suspend fun requestTutor(request:org.companerodeescuela.shared.contracts.TutorApplicationRequest):Outcome<org.companerodeescuela.shared.contracts.StaffApplication> = protectedCall { token -> apiCall {
+        client.post("auth/staff-applications") {
+            header(HttpHeaders.Authorization,"Bearer "+token)
+            header(HttpHeaders.ContentType,ContentType.Application.Json.toString());setBody(request)
+        }.requireBody<ApiResponse<org.companerodeescuela.shared.contracts.StaffApplication>>()
+    }.map { it.data } }
+
     /** Restored sessions must pass the server's live identity/generation authority. */
     suspend fun currentUser(): Outcome<UserSummary> {
         val current = refreshCoordinator.currentAccessToken()

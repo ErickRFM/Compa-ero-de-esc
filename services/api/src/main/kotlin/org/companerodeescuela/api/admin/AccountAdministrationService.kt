@@ -25,6 +25,22 @@ class AccountAdministrationService(private val accounts:PlatformAccountRepositor
             records.count { it.permitsSession && it.accountStatus==AccountStatus.ACTIVE && UserRole.TEACHER in it.roles },
             records.count { it.permitsSession && it.accountStatus==AccountStatus.ACTIVE && UserRole.TUTOR in it.roles },records.count { it.accountStatus==AccountStatus.SUSPENDED }))
     }
+    suspend fun approvalGroups(actor:PlatformAccount):List<AcademicGroupSummary> {
+        val current=policy.live(actor.toUserSummary())
+        policy.require(current.toUserSummary(),AdminCapability.APPROVE_STAFF,current.institutionId ?: "global")
+        val now=clock.instant()
+        val results=mutableListOf<AcademicGroupSummary>()
+        for(group in groups.list().sortedBy { it.id }) {
+            val institution=group.institutionId ?: continue
+            if(UserRole.SUPER_ADMIN !in current.roles && institution!=current.institutionId) continue
+            val start=group.startsAt ?: continue;val end=group.endsAt ?: continue
+            if(!group.active || group.scopeRevision<0 || group.periodId.isNullOrBlank() || start>=end || end<=now || institutions.findEnabled(institution)==null) continue
+            results+=AcademicGroupSummary(group.id,group.name,true,institution,group.periodId,start.epochSecond,end.epochSecond,group.scopeRevision)
+            if(results.size==500) break
+        }
+        return results
+    }
+
     suspend fun requestTutor(actor:PlatformAccount,request:TutorApplicationRequest):StaffApplication {
         val current=policy.live(actor.toUserSummary())
         if(UserRole.TEACHER !in current.roles || UserRole.TUTOR in current.roles || current.roles.any { it==UserRole.ADMIN || it==UserRole.SUPER_ADMIN }) throw ApiException.Forbidden("An approved teacher may request supplementary tutor access")

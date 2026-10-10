@@ -33,6 +33,11 @@ object FeatureBindingsModule {
 
     @Provides
     @Singleton
+    fun provideAdminRepository(client:HttpClient,tokenStore:SessionTokenStore,refreshCoordinator:SessionRefreshCoordinator):org.companerodeescuela.feature.admin.AdminRepository =
+        org.companerodeescuela.feature.admin.AdminRepository(client,tokenStore,refreshCoordinator)
+
+    @Provides
+    @Singleton
     fun provideAuthRepository(
         client: HttpClient,
         tokenStore: SessionTokenStore,

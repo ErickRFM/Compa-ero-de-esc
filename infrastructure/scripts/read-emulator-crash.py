@@ -64,11 +64,15 @@ def describe_core(core: Path, executable: Path) -> None:
             "-ex", "bt 32", str(executable), str(core),
         ], capture_output=True, text=True, timeout=45)
         # Never echo GDB startup, arguments, locals, registers or raw output.
+        frames = 0
         for line in result.stdout.splitlines():
             match = re.match(r"^#([0-9]+)\s+(?:(0x[0-9a-f]+)\s+in\s+)?([^()]*)", line)
             if match:
                 frame, address, function = match.groups()
-                print(f"frame={frame} address={address or 'unknown'} function={function.strip()[:512]}")
+                frames += 1
+                module = Path(line.rsplit(" from ", 1)[1].strip()).name if " from " in line else executable.name
+                print(f"frame={frame} address={address or 'unknown'} function={function.strip()[:512]} module={module}")
+        print(f"gdb_exit={result.returncode} frames={frames}")
     finally:
         # Raw memory never belongs in artifacts or persists after inspection.
         core.unlink()

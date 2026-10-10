@@ -52,6 +52,7 @@ fun ProfileScreen(
     onLogout: () -> Unit,
     onSecurity: (() -> Unit)? = null,
     onTutorRequest: (() -> Unit)? = null,
+    onRepresentatives: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -144,8 +145,13 @@ fun ProfileScreen(
                 )
             }
 
-            if(onSecurity!=null || (onTutorRequest!=null && UserRole.TEACHER in roles && UserRole.TUTOR !in roles)) {
+            if(onSecurity!=null || (onTutorRequest!=null && UserRole.TEACHER in roles && UserRole.TUTOR !in roles) ||
+                (onRepresentatives!=null && UserRole.STUDENT in roles)) {
                 ProfileGroup(title=stringResource(R.string.profile_access)) {
+                    if (onRepresentatives != null && UserRole.STUDENT in roles) {
+                        ProfileRow(title = "Representantes de grupo", detail = "Acepta o rechaza tus nombramientos de grupo.", onClick = onRepresentatives)
+                        if (onSecurity != null || (onTutorRequest != null && UserRole.TEACHER in roles)) GroupDivider()
+                    }
                     onSecurity?.let { action ->
                         ProfileRow(title=stringResource(R.string.profile_security),detail=stringResource(R.string.profile_security_description),onClick=action)
                     }

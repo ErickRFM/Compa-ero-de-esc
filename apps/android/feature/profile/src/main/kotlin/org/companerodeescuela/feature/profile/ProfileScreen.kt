@@ -250,6 +250,7 @@ private fun roleSummary(roles: Set<UserRole>): String = roles
     .joinToString(" · ") { role ->
         when (role) {
             UserRole.STUDENT -> "Estudiante"
+            UserRole.WORKSHOP_PARTICIPANT -> "Participante"
             UserRole.TEACHER_PENDING -> "Docente pendiente"
             UserRole.TEACHER -> "Docente"
             UserRole.TUTOR -> "Tutoría"

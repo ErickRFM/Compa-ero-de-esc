@@ -27,6 +27,10 @@ class InstitutionalCredentialValidatorTest {
         assertNull(InstitutionalCredentialValidator.identifierError("ana.lopez@uptlax.edu.mx"))
     }
 
+    @Test fun `native registered email with percent can log in`() {
+        assertNull(InstitutionalCredentialValidator.identifierIssue("ana%school@example.test"))
+    }
+
     @Test
     fun `rejects malformed identifiers`() {
         assertEquals(

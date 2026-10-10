@@ -31,15 +31,15 @@ import java.util.Locale
 class SmartRoleLoginUiTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun registrationKeepsItsDarkV8ContrastInsideALightAppTheme() {
+    @Test fun registrationUsesReadableLightV8InsideALightAppTheme() {
         compose.setContent {
             CompaneroTheme(darkTheme = false) {
-                RegistrationScreen(SessionUiState(checking = false), { _, _, _, _ -> }, {})
+                RegistrationScreen(SessionUiState(checking = false), { _ -> }, {})
             }
         }
-        // The existing white registration hero requires the legacy dark frame.
+        // Registration shares the same theme-aware campus frame as login.
         val background = compose.onRoot().captureToImage().toPixelMap()[0, 0]
-        org.junit.Assert.assertTrue("Registration background must remain dark", background.luminance() < 0.1f)
+        org.junit.Assert.assertTrue("Registration background follows light theme", background.luminance() > 0.5f)
     }
     @Test fun roleChangesPreserveOneFormAndOnlySendDesiredAccess() {
         var submitted: Triple<String, String, AppExperience>? = null

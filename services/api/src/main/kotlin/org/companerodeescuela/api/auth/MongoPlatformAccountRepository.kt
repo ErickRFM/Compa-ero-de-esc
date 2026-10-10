@@ -12,7 +12,10 @@ import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
 import com.mongodb.kotlin.client.coroutine.MongoCollection
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
+import java.time.Instant
 import java.util.Date
+import org.companerodeescuela.shared.contracts.RegistrationAccountType
+import org.companerodeescuela.shared.contracts.VerificationDeliveryStatus
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -53,6 +56,41 @@ class MongoPlatformAccountRepository(
         } catch (error: MongoWriteException) {
             if (error.error.code == DUPLICATE_KEY_CODE) false else throw error
         }
+    }
+
+    override suspend fun issueEmailVerification(accountId: String, expectedRevision: Long, hash: String, now: Instant, expiresAt: Instant): Boolean {
+        val current = findById(accountId) ?: return false
+        val updated = current.withEmailChallenge(expectedRevision, hash, now, expiresAt) ?: return false
+        return accounts.findOneAndUpdate(
+            and(eq("_id", accountId), eq("authRevision", expectedRevision), eq("active", true),
+                eq("accountStatus", AccountStatus.PENDING_VERIFICATION.name), eq("emailVerifiedAt", null),
+                eq("emailVerification.tokenHash", current.emailVerification?.tokenHash)),
+            Updates.set("emailVerification", updated.emailVerification!!.toDocument()),
+            FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
+        ) != null
+    }
+
+    override suspend fun confirmEmailVerification(accountId: String, hash: String, now: Instant): PlatformAccount? {
+        val current = findById(accountId) ?: return null
+        val updated = current.withVerifiedEmail(hash, now) ?: return null
+        return accounts.findOneAndUpdate(
+            and(eq("_id", accountId), eq("authRevision", current.authRevision), eq("active", true),
+                eq("accountStatus", AccountStatus.PENDING_VERIFICATION.name), eq("emailVerifiedAt", null),
+                eq("emailVerification.tokenHash", hash), eq("emailVerification.authRevision", current.authRevision)),
+            Updates.combine(
+                Updates.set("accountStatus", updated.accountStatus.name), Updates.set("authRevision", updated.authRevision),
+                Updates.set("roles", updated.roles.map(UserRole::name)), Updates.set("emailVerifiedAt", Date.from(now)),
+                Updates.unset("emailVerification"), Updates.push("identityAudit", updated.identityAudit.last().toDocument()),
+            ), FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
+        )?.toAccount()
+    }
+
+    override suspend fun recordEmailDelivery(accountId: String, hash: String, status: VerificationDeliveryStatus): Boolean {
+        val current = findById(accountId) ?: return false
+        return accounts.updateOne(and(eq("_id", accountId), eq("authRevision", current.authRevision),
+            eq("accountStatus", AccountStatus.PENDING_VERIFICATION.name), eq("emailVerification.tokenHash", hash),
+            eq("emailVerification.authRevision", current.authRevision)),
+            Updates.set("emailVerification.deliveryStatus", status.name)).matchedCount > 0
     }
 
     override suspend fun changeIdentity(accountId: String, expectedRevision: Long, change: AccountIdentityChange): PlatformAccount? {
@@ -104,6 +142,9 @@ class MongoPlatformAccountRepository(
         .append("institutionId", institutionId)
         .append("identityAudit", identityAudit.map { it.toDocument() })
         .append("createdAt", Date.from(createdAt))
+        .append("registrationIntent", registrationIntent?.toDocument())
+        .append("emailVerification", emailVerification?.toDocument())
+        .append("emailVerifiedAt", emailVerifiedAt?.let(Date::from))
 
     private fun Document.toAccount(): PlatformAccount = PlatformAccount(
         id = getString("_id"),
@@ -122,7 +163,29 @@ class MongoPlatformAccountRepository(
         institutionId = getString("institutionId"),
         identityAudit = getList("identityAudit", Document::class.java).orEmpty().map { it.toIdentityAudit() },
         createdAt = getDate("createdAt").toInstant(),
+        registrationIntent = get("registrationIntent", Document::class.java)?.toRegistrationIntent(),
+        emailVerification = get("emailVerification", Document::class.java)?.toEmailChallenge(),
+        emailVerifiedAt = getDate("emailVerifiedAt")?.toInstant(),
     )
+
+    private fun RegistrationIntent.toDocument(): Document = Document("profile", profile.name)
+        .append("requestedInstitutionId", requestedInstitutionId).append("identityReference", identityReference)
+        .append("preferredGroup", preferredGroup)
+    private fun Document.toRegistrationIntent(): RegistrationIntent? = runCatching {
+        RegistrationIntent(RegistrationAccountType.valueOf(getString("profile")), getString("requestedInstitutionId"),
+            getString("identityReference"), getString("preferredGroup"))
+    }.getOrNull()
+    private fun EmailVerificationChallenge.toDocument(): Document = Document("tokenHash", tokenHash)
+        .append("issuedAt", Date.from(issuedAt)).append("expiresAt", Date.from(expiresAt))
+        .append("authRevision", authRevision).append("recentIssuedAt", recentIssuedAt.map(Date::from))
+        .append("deliveryStatus", deliveryStatus.name)
+    private fun Document.toEmailChallenge(): EmailVerificationChallenge? = runCatching {
+        val revision = get("authRevision")
+        require(revision is Long || revision is Int)
+        EmailVerificationChallenge(getString("tokenHash"), getDate("issuedAt").toInstant(), getDate("expiresAt").toInstant(),
+            (revision as Number).toLong(), getList("recentIssuedAt", Date::class.java).map(Date::toInstant),
+            VerificationDeliveryStatus.valueOf(getString("deliveryStatus")))
+    }.getOrNull()
 
     private fun AccountIdentityAudit.toDocument(): Document = Document()
         .append("operationId", operationId).append("actorId", actorId)

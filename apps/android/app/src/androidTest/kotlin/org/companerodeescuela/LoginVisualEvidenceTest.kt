@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import org.junit.Rule
@@ -85,6 +86,80 @@ class LoginVisualEvidenceTest {
             device.executeShellCommand("wm density reset")
         }
     }
+    @Test fun actualRegistrationUsesCampusOnPhoneTabletLightAndLargeText() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val device = UiDevice.getInstance(instrumentation)
+        val directory = File(instrumentation.targetContext.filesDir, "v10-evidence").also { it.mkdirs() }
+        val originalScale = device.executeShellCommand("settings get system font_scale").trim()
+        try {
+            device.executeShellCommand("wm density 320")
+            device.executeShellCommand("settings put system font_scale 1.0")
+            listOf(360 to 800, 390 to 844, 430 to 932, 768 to 1024).forEach { (width, height) ->
+                device.executeShellCommand("wm size " + width*2 + "x" + height*2)
+                ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                    scenario.onActivity {
+                        it.appearancePreferences.setLanguage(AppLanguage.SPANISH)
+                        it.appearancePreferences.setThemeMode(AppThemeMode.DARK)
+                        it.appearancePreferences.setHighContrast(false)
+                        it.appearancePreferences.setTextScale(1f)
+                        it.appearancePreferences.setReducedMotion(false)
+                    }
+                    openRegistration()
+                    assertTrue(device.takeScreenshot(File(directory, "registration-dark-" + width + "-top.png")))
+                    compose.onNodeWithTag("registration_submit").performScrollTo().assertIsDisplayed()
+                    compose.waitForIdle(); device.waitForIdle()
+                    assertTrue(device.takeScreenshot(File(directory, "registration-dark-" + width + "-form.png")))
+                }
+            }
+            device.executeShellCommand("wm size 780x1688")
+            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                scenario.onActivity {
+                    it.appearancePreferences.setThemeMode(AppThemeMode.LIGHT)
+                    it.appearancePreferences.setHighContrast(true)
+                    it.appearancePreferences.setLanguage(AppLanguage.ENGLISH)
+                }
+                openRegistration()
+                assertTrue(device.takeScreenshot(File(directory, "registration-light-en-contrast-390-top.png")))
+                compose.onNodeWithTag("registration_submit").performScrollTo().assertIsDisplayed()
+                compose.waitForIdle(); device.waitForIdle()
+                assertTrue(device.takeScreenshot(File(directory, "registration-light-en-contrast-390-form.png")))
+                scenario.onActivity {
+                    it.appearancePreferences.setLanguage(AppLanguage.SPANISH)
+                    it.appearancePreferences.setThemeMode(AppThemeMode.DARK)
+                    it.appearancePreferences.setTextScale(1.2f)
+                    it.appearancePreferences.setReducedMotion(true)
+                }
+                device.executeShellCommand("settings put system font_scale 1.6")
+                scenario.recreate()
+                // Saved navigation returns to the same registration form.
+                compose.onNodeWithTag("registration_type_TUTOR").performScrollTo().assertIsDisplayed()
+                compose.waitForIdle(); device.waitForIdle()
+                assertTrue(device.takeScreenshot(File(directory, "registration-dark-large-text-390-profiles.png")))
+                compose.onNodeWithTag("registration_submit").performScrollTo().assertIsDisplayed()
+                compose.waitForIdle(); device.waitForIdle()
+                assertTrue(device.takeScreenshot(File(directory, "registration-dark-large-text-390-form.png")))
+                scenario.onActivity {
+                    it.appearancePreferences.setTextScale(1f)
+                    it.appearancePreferences.setReducedMotion(false)
+                    it.appearancePreferences.setHighContrast(false)
+                }
+            }
+        } finally {
+            device.executeShellCommand("settings put system font_scale " + if (originalScale == "null") "1.0" else originalScale)
+            device.executeShellCommand("wm size reset")
+            device.executeShellCommand("wm density reset")
+        }
+    }
+    private fun openRegistration() {
+        compose.waitUntil(timeoutMillis = 10_000) { compose.onAllNodesWithText("universitaria,", substring = true).fetchSemanticsNodes().isNotEmpty() ||
+            compose.onAllNodesWithText("university life,", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("login_registration").performScrollTo().performClick()
+        compose.waitUntil(timeoutMillis = 10_000) { compose.onAllNodesWithText("Tipo de cuenta").fetchSemanticsNodes().isNotEmpty() ||
+            compose.onAllNodesWithText("Account type").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitForIdle()
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).waitForIdle()
+    }
+
     private fun waitForHero(text: String) {
         // Drive the Compose test clock, including MainActivity startup state,
         // before querying the native surface for a screenshot.

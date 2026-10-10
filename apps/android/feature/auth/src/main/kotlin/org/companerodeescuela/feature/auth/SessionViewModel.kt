@@ -30,6 +30,16 @@ data class SessionUiState(
     val noticeMessage: String? = null,
     val failure: AppError? = null,
     val noticeReason: SessionNotice? = null,
+    val accountStatus: org.companerodeescuela.shared.contracts.AccountStatus = org.companerodeescuela.shared.contracts.AccountStatus.ACTIVE,
+    val registrationAccountType: RegistrationAccountType? = null,
+    val email: String? = null,
+    val emailVerified: Boolean = false,
+    val verificationDelivery: org.companerodeescuela.shared.contracts.VerificationDeliveryStatus? = null,
+    val institutions: List<org.companerodeescuela.shared.contracts.InstitutionSummary> = emptyList(),
+    val institutionsLoading: Boolean = false,
+    val institutionsFailure: AppError? = null,
+    val verificationFailure: AppError? = null,
+
 )
 
 @HiltViewModel
@@ -90,6 +100,9 @@ class SessionViewModel @Inject constructor(
         _state.update {
             it.copy(checking = false, authenticated = true, submitting = false, userId = user.id,
                 displayName = user.displayName, roles = user.roles, errorMessage = null, noticeMessage = null,
+                accountStatus = user.accountStatus, registrationAccountType = user.registrationAccountType,
+                email = user.email, emailVerified = user.emailVerified, verificationDelivery = user.verificationDelivery,
+                verificationFailure = null,
                 failure = null, noticeReason = null)
         }
     }
@@ -103,6 +116,9 @@ class SessionViewModel @Inject constructor(
         _state.update {
             it.copy(checking = false, authenticated = false, submitting = signingOut, userId = null,
                 displayName = null, roles = emptySet(), errorMessage = null, noticeMessage = message,
+                accountStatus = org.companerodeescuela.shared.contracts.AccountStatus.ACTIVE,
+                registrationAccountType = null, email = null, emailVerified = false, verificationDelivery = null,
+                verificationFailure = null,
                 failure = null, noticeReason = notice)
         }
     }
@@ -120,10 +136,55 @@ class SessionViewModel @Inject constructor(
         }
     }
 
-    fun register(displayName: String, email: String, password: String, accountType: RegistrationAccountType) {
+    fun register(displayName: String, email: String, password: String, accountType: RegistrationAccountType) =
+        register(org.companerodeescuela.shared.contracts.RegisterRequest(displayName, email, password, accountType))
+
+    fun register(request: org.companerodeescuela.shared.contracts.RegisterRequest) {
         if (!beginCredentials()) return
+        credentialJob = viewModelScope.launch { publishCredentialResult(repository.register(request), login = false) }
+    }
+
+    private var institutionsJob: Job? = null
+    fun loadRegistrationInstitutions() {
+        if (institutionsJob?.isActive == true) return
+        _state.update { it.copy(institutionsLoading = true, institutionsFailure = null) }
+        institutionsJob = viewModelScope.launch {
+            when (val result = repository.institutions()) {
+                is Outcome.Success -> _state.update { it.copy(institutions = result.value, institutionsLoading = false) }
+                is Outcome.Failure -> _state.update { it.copy(institutions = emptyList(), institutionsLoading = false, institutionsFailure = result.error) }
+            }
+        }
+    }
+
+    fun verifyEmail(token: String) {
+        if (!_state.value.authenticated || _state.value.accountStatus != org.companerodeescuela.shared.contracts.AccountStatus.PENDING_VERIFICATION || !beginCredentials()) return
+        _state.update { it.copy(verificationFailure = null) }
         credentialJob = viewModelScope.launch {
-            publishCredentialResult(repository.register(displayName, email, password, accountType), login = false)
+            when (val result = repository.confirmVerification(token)) {
+                is Outcome.Success -> Unit // Fresh token emission rechecks live authority.
+                is Outcome.Failure -> _state.update { it.copy(submitting = false, verificationFailure = result.error) }
+            }
+        }
+    }
+
+    fun resendVerification() {
+        if (!_state.value.authenticated || _state.value.accountStatus != org.companerodeescuela.shared.contracts.AccountStatus.PENDING_VERIFICATION || !beginCredentials()) return
+        _state.update { it.copy(verificationFailure = null) }
+        credentialJob = viewModelScope.launch {
+            when (val result = repository.resendVerification()) {
+                is Outcome.Success -> _state.update { it.copy(submitting = false, verificationDelivery = result.value.status) }
+                is Outcome.Failure -> _state.update { it.copy(submitting = false, verificationFailure = result.error) }
+            }
+        }
+    }
+
+    fun refreshIdentity() {
+        if (!_state.value.authenticated || !beginCredentials()) return
+        credentialJob = viewModelScope.launch {
+            when (val result = repository.currentUser()) {
+                is Outcome.Success -> publishAuthenticated(result.value)
+                is Outcome.Failure -> _state.update { it.copy(submitting = false, verificationFailure = result.error) }
+            }
         }
     }
 

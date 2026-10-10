@@ -19,6 +19,9 @@ data class PlatformAccount(
     val authRevision: Long = 0,
     val institutionId: String? = null,
     val identityAudit: List<AccountIdentityAudit> = emptyList(),
+    val registrationIntent: RegistrationIntent? = null,
+    val emailVerification: EmailVerificationChallenge? = null,
+    val emailVerifiedAt: Instant? = null,
 ) {
     val permitsSession: Boolean get() = active && accountStatus.permitsSession && authRevision >= 0
 
@@ -29,6 +32,9 @@ data class PlatformAccount(
         accountStatus = accountStatus,
         authRevision = authRevision,
         institutionId = institutionId,
+        registrationAccountType = registrationIntent?.profile,
+        emailVerified = emailVerifiedAt != null,
+        verificationDelivery = emailVerification?.deliveryStatus,
     )
 }
 
@@ -36,6 +42,11 @@ interface PlatformAccountRepository {
     suspend fun findByIdentifier(identifier: String): PlatformAccount?
     suspend fun findById(id: String): PlatformAccount?
     suspend fun create(account: PlatformAccount): Boolean
+
+    suspend fun issueEmailVerification(accountId: String, expectedRevision: Long, hash: String, now: Instant, expiresAt: Instant): Boolean = false
+    suspend fun confirmEmailVerification(accountId: String, hash: String, now: Instant): PlatformAccount? = null
+
+    suspend fun recordEmailDelivery(accountId: String, hash: String, status: org.companerodeescuela.shared.contracts.VerificationDeliveryStatus): Boolean = false
 
     /** Internal CAS persistence; authorization and step-up are mandatory in the calling service. */
     suspend fun changeIdentity(accountId: String, expectedRevision: Long, change: AccountIdentityChange): PlatformAccount? = null
@@ -56,6 +67,27 @@ class InMemoryPlatformAccountRepository : PlatformAccountRepository {
         val normalized = account.email.trim().lowercase()
         if (account.id in accounts || accounts.values.any { it.email == normalized }) return@withLock false
         accounts[account.id] = account.copy(email = normalized, roles = account.roles.toSet())
+        true
+    }
+
+    override suspend fun issueEmailVerification(accountId: String, expectedRevision: Long, hash: String, now: Instant, expiresAt: Instant): Boolean = mutex.withLock {
+        val current = accounts[accountId] ?: return@withLock false
+        val updated = current.withEmailChallenge(expectedRevision, hash, now, expiresAt) ?: return@withLock false
+        accounts[accountId] = updated
+        true
+    }
+
+    override suspend fun confirmEmailVerification(accountId: String, hash: String, now: Instant): PlatformAccount? = mutex.withLock {
+        val updated = accounts[accountId]?.withVerifiedEmail(hash, now) ?: return@withLock null
+        accounts[accountId] = updated
+        updated
+    }
+
+    override suspend fun recordEmailDelivery(accountId: String, hash: String, status: org.companerodeescuela.shared.contracts.VerificationDeliveryStatus): Boolean = mutex.withLock {
+        val current = accounts[accountId] ?: return@withLock false
+        val challenge = current.emailVerification ?: return@withLock false
+        if (current.accountStatus != AccountStatus.PENDING_VERIFICATION || challenge.tokenHash != hash || challenge.authRevision != current.authRevision) return@withLock false
+        accounts[accountId] = current.copy(emailVerification = challenge.copy(deliveryStatus = status))
         true
     }
 

@@ -32,10 +32,10 @@ class ResendVerificationEmailGateway(private val apiKey: CharArray, private val 
     }
     override suspend fun send(recipient: String, token: String, operationId: String): VerificationDeliveryStatus {
         val payload = buildJsonObject {
-            put("from", "Compañero de Clase <$sender>")
+            put("from", "CompaÃ±ero de Clase <$sender>")
             put("to", buildJsonArray { add(recipient) })
-            put("subject", "Verifica tu correo en Compañero de Clase / Verify your email")
-            put("text", "Pega este código en la aplicación / Paste this code in the app:\n\n$token\n\nCaduca en una hora / Expires in one hour. Si no creaste esta cuenta, ignora este correo / If you did not create this account, ignore this email.")
+            put("subject", "Verifica tu correo en CompaÃ±ero de Clase / Verify your email")
+            put("text", "Pega este cÃ³digo en la aplicaciÃ³n / Paste this code in the app:\n\n$token\n\nCaduca en una hora / Expires in one hour. Si no creaste esta cuenta, ignora este correo / If you did not create this account, ignore this email.")
         }.toString().toByteArray(Charsets.UTF_8)
         repeat(2) { attemptNumber ->
             val result = withContext(Dispatchers.IO) { attempt(payload, operationId) }

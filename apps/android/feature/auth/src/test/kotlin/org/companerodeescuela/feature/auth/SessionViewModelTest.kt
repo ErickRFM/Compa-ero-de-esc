@@ -160,6 +160,26 @@ class SessionViewModelTest {
         )
     }
 
+    @Test fun `restored pending identity shows live verification state without academic authority`() = runTest {
+        val store = FakeSessionStore(token("pending", "session-1", 4102444800, emptyList()), RefreshSessionCredentials("session-1", "refresh"))
+        val repo = AuthRepository(createApiClient(ApiEnvironment("https://example.test/", "test"), MockEngine {
+            respond("""{"data":{"id":"pending","displayName":"QA","email":"qa@example.test","roles":[],"active":true,"accountStatus":"PENDING_VERIFICATION","registrationAccountType":"TUTOR","emailVerified":false,"verificationDelivery":"UNAVAILABLE"}}""",
+                HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+        }), store)
+        val vm = SessionViewModel(repo, store).also(viewModels::add)
+        val restored = vm.state.first { !it.checking }
+        assertTrue(restored.authenticated)
+        assertEquals(org.companerodeescuela.shared.contracts.AccountStatus.PENDING_VERIFICATION, restored.accountStatus)
+        assertEquals(org.companerodeescuela.shared.contracts.RegistrationAccountType.TUTOR, restored.registrationAccountType)
+        assertEquals("qa@example.test", restored.email)
+        assertEquals(org.companerodeescuela.shared.contracts.VerificationDeliveryStatus.UNAVAILABLE, restored.verificationDelivery)
+        assertTrue(restored.roles.isEmpty())
+        vm.logout()
+        vm.state.first { !it.authenticated && !it.submitting }
+        assertNull(vm.state.value.registrationAccountType)
+        assertNull(vm.state.value.email)
+    }
+
     private class FakeSessionStore(
         accessToken: String?,
         var refreshSession: RefreshSessionCredentials?,

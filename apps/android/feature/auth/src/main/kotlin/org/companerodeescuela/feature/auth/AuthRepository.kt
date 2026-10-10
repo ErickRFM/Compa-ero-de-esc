@@ -63,26 +63,43 @@ class AuthRepository(
         return persistSession(result)
     }
 
-    suspend fun register(
-        displayName: String,
-        email: String,
-        password: String,
-        accountType: RegistrationAccountType,
-    ): Outcome<UserSummary> {
-        val result = apiCall {
-            client.post("auth/register") {
+    suspend fun register(displayName: String, email: String, password: String, accountType: RegistrationAccountType): Outcome<UserSummary> =
+        register(RegisterRequest(displayName, email, password, accountType))
+
+    suspend fun register(request: RegisterRequest): Outcome<UserSummary> = persistSession(apiCall {
+        client.post("auth/register") {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody(request)
+        }.requireBody<ApiResponse<LoginResponse>>()
+    }.map { it.data })
+
+    suspend fun institutions(): Outcome<List<org.companerodeescuela.shared.contracts.InstitutionSummary>> = apiCall {
+        client.get("institutions").requireBody<ApiResponse<List<org.companerodeescuela.shared.contracts.InstitutionSummary>>>()
+    }.map { it.data }
+
+    suspend fun confirmVerification(token: String): Outcome<UserSummary> = persistSession(protectedCall { access ->
+        apiCall {
+            client.post("auth/verification/confirm") {
+                header(HttpHeaders.Authorization, "Bearer " + access)
                 header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-                setBody(
-                    RegisterRequest(
-                        displayName = displayName,
-                        email = email,
-                        password = password,
-                        accountType = accountType,
-                    ),
-                )
+                setBody(org.companerodeescuela.shared.contracts.VerifyEmailRequest(token))
             }.requireBody<ApiResponse<LoginResponse>>()
         }.map { it.data }
-        return persistSession(result)
+    })
+
+    suspend fun resendVerification(): Outcome<org.companerodeescuela.shared.contracts.VerificationDeliveryReceipt> = protectedCall { access ->
+        apiCall {
+            client.post("auth/verification/resend") {
+                header(HttpHeaders.Authorization, "Bearer " + access)
+            }.requireBody<ApiResponse<org.companerodeescuela.shared.contracts.VerificationDeliveryReceipt>>()
+        }.map { it.data }
+    }
+
+    private suspend fun <T> protectedCall(action: suspend (String) -> Outcome<T>): Outcome<T> {
+        return when (val current = refreshCoordinator.currentAccessToken()) {
+            is Outcome.Failure -> current
+            is Outcome.Success -> refreshCoordinator.execute(current.value, action)
+        }
     }
 
     private suspend fun persistSession(

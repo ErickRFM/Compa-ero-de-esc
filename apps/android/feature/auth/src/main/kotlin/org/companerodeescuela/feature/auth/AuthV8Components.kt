@@ -45,7 +45,7 @@ internal fun AuthV8Layout(
     if (themeAware) {
         AuthV8Frame(modifier, content)
     } else {
-        // Registration keeps its existing fixed V8 palette and inherits font/motion preferences.
+        // Compatibility for any caller that explicitly requests the fixed V8 palette.
         MaterialTheme(colorScheme = V8ColorScheme) { AuthV8Frame(modifier, content) }
     }
 }

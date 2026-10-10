@@ -19,7 +19,7 @@ object InstitutionalCredentialValidator {
     fun identifierIssue(value: String): CredentialIssue? = when {
         value.isBlank() -> CredentialIssue.IDENTIFIER_REQUIRED
         value.length < 3 -> CredentialIssue.IDENTIFIER_SHORT
-        !identifierPattern.matches(value) -> CredentialIssue.IDENTIFIER_INVALID
+        '@' !in value && !identifierPattern.matches(value) -> CredentialIssue.IDENTIFIER_INVALID
         '@' in value && !emailPattern.matches(value) -> CredentialIssue.IDENTIFIER_EMAIL
         else -> null
     }

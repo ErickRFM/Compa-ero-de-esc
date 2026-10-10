@@ -123,6 +123,17 @@ class UniversalRegistrationRoutesTest {
         assertNull(f.accounts.findByIdentifier("oversized@example.test"))
     }
 
+    @Test fun `normalized duplicate email does not create another identity`() = scenario { f ->
+        register("unique@example.test")
+        assertEquals(HttpStatusCode.Conflict, post("/auth/register", registrationBody(" UNIQUE@EXAMPLE.TEST ", "STUDENT")).status)
+        assertNotNull(f.accounts.findByIdentifier("unique@example.test"))
+    }
+
+    @Test fun `changing email cannot bypass address registration throttling`() = scenario { _ ->
+        repeat(20) { n -> register("signup$n@example.test") }
+        assertEquals(HttpStatusCode.TooManyRequests, post("/auth/register", registrationBody("another@example.test", "STUDENT")).status)
+    }
+
     private class TestClock : Clock() {
         var current=Instant.now()
         override fun instant()=current

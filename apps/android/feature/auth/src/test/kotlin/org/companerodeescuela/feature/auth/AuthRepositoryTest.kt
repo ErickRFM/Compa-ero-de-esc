@@ -200,6 +200,63 @@ class AuthRepositoryTest {
         }
     }
 
+    @Test fun `universal registration sends preferences without requested privileges`() = runTest {
+        var requestBody = ""
+        val store = FakeTokenStore()
+        val access = platformToken("student-1", 4102444800)
+        val repo = AuthRepository(createApiClient(ApiEnvironment("https://example.test/", "test"), MockEngine { request ->
+            requestBody = (request.body as io.ktor.http.content.TextContent).text
+            respond(loginResponse(access, "refresh"), HttpStatusCode.Created, headersOf(HttpHeaders.ContentType, "application/json"))
+        }), store)
+        val result = repo.register(org.companerodeescuela.shared.contracts.RegisterRequest("QA", "qa@example.test", "test-password",
+            org.companerodeescuela.shared.contracts.RegistrationAccountType.TUTOR, "campus", "reference", "preference"))
+        assertIs<Outcome.Success<UserSummary>>(result)
+        assertTrue(requestBody.contains("requestedInstitutionId"))
+        assertTrue(requestBody.contains("preference"))
+        assertTrue(!requestBody.contains("roles"))
+        assertEquals(access, store.token)
+    }
+
+    @Test fun `confirmation persists fresh credentials and failed confirmation preserves prior session`() = runTest {
+        val old = platformToken("student-1", 4102444800, "old-session")
+        val fresh = platformToken("student-1", 4102444800, "new-session")
+        val store = FakeTokenStore(initialAccessToken = old, initialRefreshSession = RefreshSessionCredentials("old-session", "old-refresh"))
+        var reject = true
+        val repo = AuthRepository(createApiClient(ApiEnvironment("https://example.test/", "test"), MockEngine { request ->
+            assertEquals("/auth/verification/confirm", request.url.encodedPath)
+            assertEquals("Bearer $old", request.headers[HttpHeaders.Authorization])
+            if (reject) respond("""{"code":"VALIDATION_ERROR","message":"Invalid code"}""", HttpStatusCode.BadRequest, headersOf(HttpHeaders.ContentType, "application/json"))
+            else respond(loginResponse(fresh, "new-refresh"), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+        }), store)
+        assertIs<AppError.Http>(assertIs<Outcome.Failure>(repo.confirmVerification("A".repeat(43))).error)
+        assertEquals(old, store.token)
+        reject = false
+        assertIs<Outcome.Success<UserSummary>>(repo.confirmVerification("B".repeat(43)))
+        assertEquals(fresh, store.token)
+        assertEquals("new-refresh", store.refreshSession?.refreshToken)
+    }
+
+    @Test fun `institution directory is public and verification resend uses current native session`() = runTest {
+        val access = platformToken("student-1", 4102444800)
+        val repo = AuthRepository(createApiClient(ApiEnvironment("https://example.test/", "test"), MockEngine { request ->
+            val content = when (request.url.encodedPath) {
+                "/institutions" -> {
+                    assertNull(request.headers[HttpHeaders.Authorization])
+                    """{"data":[{"id":"campus","displayName":"Actual campus"}]}"""
+                }
+                "/auth/verification/resend" -> {
+                    assertEquals("Bearer $access", request.headers[HttpHeaders.Authorization])
+                    """{"data":{"status":"UNAVAILABLE","resendAfterSeconds":60}}"""
+                }
+                else -> error("Unexpected endpoint")
+            }
+            respond(content, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+        }), FakeTokenStore(initialAccessToken = access))
+        assertEquals("campus", assertIs<Outcome.Success<List<org.companerodeescuela.shared.contracts.InstitutionSummary>>>(repo.institutions()).value.single().id)
+        assertEquals(org.companerodeescuela.shared.contracts.VerificationDeliveryStatus.UNAVAILABLE,
+            assertIs<Outcome.Success<org.companerodeescuela.shared.contracts.VerificationDeliveryReceipt>>(repo.resendVerification()).value.status)
+    }
+
     private fun platformToken(
         userId: String,
         expiresAt: Long,

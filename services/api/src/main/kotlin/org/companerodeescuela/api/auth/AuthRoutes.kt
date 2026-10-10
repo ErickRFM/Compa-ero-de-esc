@@ -46,6 +46,7 @@ fun Route.authRoutes(
     val tokenService = settings.jwtSecret?.let { AuthTokenService(settings) }
     val verification = AccountVerificationService(accounts, verificationEmail, verificationClock)
     val registrationLimiter = LoginAttemptLimiter()
+    val registrationAddressLimiter = LoginAttemptLimiter(maxAttempts = 20)
     val verificationLimiter = LoginAttemptLimiter(maxAttempts = 8)
 
     route("/auth") {
@@ -86,6 +87,10 @@ fun Route.authRoutes(
             } ?: throw ApiException.DependencyUnavailable(
                 "Authentication is not configured",
             )
+            registrationAddressLimiter.acquire("registration", call.request.local.remoteAddress)?.let { retryAfter ->
+                call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
+                throw ApiException.RateLimited()
+            }
             val request = runCatching { call.boundedAuthRequest(RegisterRequest.serializer()) }
                 .getOrElse { throw ApiException.Validation("Invalid registration request") }
             registrationLimiter.acquire(request.email, call.request.local.remoteAddress)?.let { retryAfter ->

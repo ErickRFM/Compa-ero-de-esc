@@ -46,6 +46,7 @@ import org.companerodeescuela.feature.attendance.AttendanceMode
 import org.companerodeescuela.feature.attendance.AttendanceScreen
 import org.companerodeescuela.feature.attendance.TeacherHomeScreen
 import org.companerodeescuela.feature.auth.LoginScreen
+import org.companerodeescuela.feature.auth.AccountOnboardingScreen
 import org.companerodeescuela.feature.auth.RegistrationScreen
 import org.companerodeescuela.feature.auth.SessionViewModel
 import org.companerodeescuela.feature.channel.ChannelScreen
@@ -115,10 +116,11 @@ class MainActivity : AppCompatActivity() {
                         var activatingAccess by rememberSaveable { mutableStateOf(false) }
                         var loginExperienceName by rememberSaveable { mutableStateOf<String?>(null) }
 
-                        LaunchedEffect(session.authenticated) {
+                        LaunchedEffect(session.authenticated, session.accountStatus, session.roles) {
                             if (session.authenticated) {
                                 activatingAccess = false
-                                attendanceSyncScheduler.schedule()
+                                if (session.accountStatus == org.companerodeescuela.shared.contracts.AccountStatus.ACTIVE &&
+                                    org.companerodeescuela.shared.contracts.UserRole.STUDENT in session.roles) attendanceSyncScheduler.schedule()
                             }
                         }
 
@@ -135,7 +137,8 @@ class MainActivity : AppCompatActivity() {
                                 if (activatingAccess) {
                                     RegistrationScreen(
                                         state = session,
-                                        onRegister = sessionViewModel::register,
+                                        onRegister = { sessionViewModel.register(it) },
+                                        onReloadInstitutions = sessionViewModel::loadRegistrationInstitutions,
                                         onBackToLogin = { activatingAccess = false },
                                     )
                                 } else {
@@ -145,9 +148,14 @@ class MainActivity : AppCompatActivity() {
                                             loginExperienceName = experience.name
                                             sessionViewModel.login(username, password)
                                         },
-                                        onCreateAccount = { loginExperienceName = null; activatingAccess = true },
+                                        onCreateAccount = { loginExperienceName = null; activatingAccess = true; sessionViewModel.loadRegistrationInstitutions() },
                                     )
                                 }
+                            }
+                            session.accountStatus != org.companerodeescuela.shared.contracts.AccountStatus.ACTIVE ||
+                                session.roles == setOf(org.companerodeescuela.shared.contracts.UserRole.WORKSHOP_PARTICIPANT) -> {
+                                AccountOnboardingScreen(session, sessionViewModel::verifyEmail, sessionViewModel::resendVerification,
+                                    sessionViewModel::refreshIdentity, sessionViewModel::logout)
                             }
                             else -> {
                                 val availableExperiences = remember(session.roles) {

@@ -70,7 +70,7 @@ def describe_core(core: Path, executable: Path) -> None:
             if match:
                 frame, address, function = match.groups()
                 frames += 1
-                module = Path(line.rsplit(" from ", 1)[1].strip()).name if " from " in line else executable.name
+                module = Path(line.rsplit(" from ", 1)[1].strip()).name if " from " in line else "unknown"
                 print(f"frame={frame} address={address or 'unknown'} function={function.strip()[:512]} module={module}")
         print(f"gdb_exit={result.returncode} frames={frames}")
     finally:

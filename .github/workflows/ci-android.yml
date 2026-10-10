@@ -220,11 +220,9 @@ jobs:
           # Stable 36.4.9: make the native emulator runtime reproducible.
           emulator-build: "14788078"
           ram-size: 2048M
-          # Use the runner default hardware profile, as in the prior complete run.
-          # The real visual suite explicitly checks 360 through 1024 dp.
-          # Compatibility renderer used by the earlier complete API 35 run.
-          # Direct swiftshader lost QEMU with and without the Vulkan override.
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -show-kernel
+          # Supported software GLES/Vulkan path through ANGLE; retain KVM.
+          # Legacy indirect renderer produced a native QEMU SIGSEGV on API35.
+          emulator-options: -no-window -gpu swangle -no-snapshot -noaudio -no-boot-anim -show-kernel
           # App contains the smoke tests. Root task also launches empty library
           # suites concurrently against the same emulator and can stall ADB.
           script: bash infrastructure/scripts/run-v10-instrumentation.sh

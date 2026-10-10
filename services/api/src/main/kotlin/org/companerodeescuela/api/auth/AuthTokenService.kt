@@ -8,6 +8,7 @@ import java.time.Clock
 import java.time.Duration
 import java.util.Date
 import org.companerodeescuela.api.config.ApiSettings
+import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
 
@@ -59,8 +60,11 @@ class AuthTokenService(
             .withClaim(CLAIM_DISPLAY_NAME, user.displayName)
             .withClaim(CLAIM_ROLES, user.roles.map(UserRole::name))
             .withClaim(CLAIM_ACTIVE, user.active)
+            .withClaim(CLAIM_ACCOUNT_STATUS, user.accountStatus.name)
+            .withClaim(CLAIM_AUTH_REVISION, user.authRevision)
 
         user.email?.let { builder.withClaim(CLAIM_EMAIL, it) }
+        user.institutionId?.let { builder.withClaim(CLAIM_INSTITUTION_ID, it) }
 
         return IssuedAccessToken(builder.sign(algorithm), expiresAt.epochSecond)
     }
@@ -85,6 +89,12 @@ class AuthTokenService(
             email = jwt.getClaim(CLAIM_EMAIL).asString(),
             roles = roles,
             active = jwt.getClaim(CLAIM_ACTIVE).asBoolean() ?: false,
+            accountStatus = if (jwt.getClaim(CLAIM_ACCOUNT_STATUS).isMissing) AccountStatus.ACTIVE
+                else runCatching { AccountStatus.valueOf(jwt.getClaim(CLAIM_ACCOUNT_STATUS).asString()) }
+                    .getOrDefault(AccountStatus.REVOKED),
+            authRevision = if (jwt.getClaim(CLAIM_AUTH_REVISION).isMissing) 0L
+                else nonNegativeIntegerClaim(jwt, CLAIM_AUTH_REVISION) ?: -1L,
+            institutionId = jwt.getClaim(CLAIM_INSTITUTION_ID).asString(),
         )
     }
 
@@ -93,9 +103,16 @@ class AuthTokenService(
         ?.takeIf(String::isNotBlank)
 
     fun sessionGenerationFrom(jwt: Payload): Long? =
-        runCatching { jwt.getClaim(CLAIM_SESSION_GENERATION).asLong() }.getOrNull()
+        nonNegativeIntegerClaim(jwt, CLAIM_SESSION_GENERATION)
+
+    private fun nonNegativeIntegerClaim(jwt: Payload, name: String): Long? {
+        // Claim.asLong coerces fractions. Inspect JSON representation before conversion.
+        val encoded = jwt.getClaim(name).toString()
+        return encoded.takeIf { NON_NEGATIVE_INTEGER.matches(it) }?.toLongOrNull()
+    }
 
     companion object {
+        private val NON_NEGATIVE_INTEGER = Regex("0|[1-9][0-9]*")
         const val PROVIDER_NAME = "auth-jwt"
         const val REALM = "companero-api"
 
@@ -106,6 +123,9 @@ class AuthTokenService(
         private const val CLAIM_EMAIL = "email"
         private const val CLAIM_ROLES = "roles"
         private const val CLAIM_ACTIVE = "active"
+        private const val CLAIM_ACCOUNT_STATUS = "account_status"
+        private const val CLAIM_AUTH_REVISION = "auth_revision"
+        private const val CLAIM_INSTITUTION_ID = "institution_id"
     }
 }
 

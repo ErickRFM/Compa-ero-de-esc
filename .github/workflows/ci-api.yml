@@ -23,8 +23,21 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
 
+    # Disposable local service: lifecycle concurrency is tested against real MongoDB.
+    services:
+      mongo:
+        image: mongo:7.0.14
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1}).ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+
     env:
       GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
+      V12_TEST_MONGODB_URI: mongodb://127.0.0.1:27017
 
     steps:
       - name: Checkout
@@ -94,6 +107,18 @@ jobs:
             echo "::error::Failing tests present."
             exit 1
           fi
+
+      - name: Verify real Mongo lifecycle integration executed
+        run: |
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          report = Path("services/api/build/test-results/test/TEST-org.companerodeescuela.api.auth.MongoAccountLifecycleIntegrationTest.xml")
+          suite = ET.parse(report).getroot()
+          assert int(suite.get("tests", "0")) == 3, "Real Mongo lifecycle tests missing"
+          assert all(int(suite.get(key, "0")) == 0 for key in ("skipped", "failures", "errors")), "Real Mongo lifecycle tests did not all pass"
+          print("Real Mongo lifecycle integration: 3 executed, 0 skipped, 0 failures")
+          PY
 
       - name: Assemble runnable service
         run: ./gradlew :services:api:installDist --console=plain

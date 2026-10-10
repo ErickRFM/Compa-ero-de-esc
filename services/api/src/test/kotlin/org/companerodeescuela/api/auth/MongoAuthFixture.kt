@@ -17,6 +17,7 @@ import org.reactivestreams.Subscription
 /** Deterministic reactive-driver boundary; this is not a real Mongo integration test. */
 internal class MongoAuthFixture(var document: Document) {
     var beforeNextUpdate: (() -> Unit)? = null
+    var beforeNextFindOneAndUpdate: (() -> Unit)? = null
 
     private val registry = MongoClientSettings.getDefaultCodecRegistry()
     private val collection = proxy<MongoCollection<Document>>(MongoCollection::class.java) { name, args ->
@@ -39,6 +40,7 @@ internal class MongoAuthFixture(var document: Document) {
                 }
             }
             "findOneAndUpdate" -> publisher {
+                beforeNextFindOneAndUpdate?.also { beforeNextFindOneAndUpdate = null }?.invoke()
                 val matched = matches(args[0] as Bson, document)
                 if (!matched) null else {
                     applyUpdate(args[1] as Bson)
@@ -77,6 +79,7 @@ internal class MongoAuthFixture(var document: Document) {
                     when (operator) {
                         "$" + "gt" -> actual?.isDateTime == true && actual.asDateTime().value > value.asDateTime().value
                         "$" + "ne" -> !equal(actual, value)
+                        "$" + "exists" -> (actual != null) == value.asBoolean().value
                         else -> error("Unsupported filter operator: $operator")
                     }
                 } else equal(actual, expected)
@@ -95,6 +98,7 @@ internal class MongoAuthFixture(var document: Document) {
             for ((key, value) in fields) when (operator) {
                 "$" + "set" -> document[key] = value
                 "$" + "inc" -> document[key] = (document[key] as? Number)?.toLong()?.plus((value as Number).toLong()) ?: value
+                "$" + "push" -> document[key] = (document.getList(key, Document::class.java).orEmpty() + value)
                 "$" + "addToSet" -> document[key] = (document.getList(key, String::class.java).orEmpty() + value.toString()).distinct()
                 else -> error("Unsupported update operator: $operator")
             }

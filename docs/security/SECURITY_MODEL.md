@@ -1,6 +1,6 @@
 # Security model
 
-Status: foundation controls are in place. Authentication is **not** built.
+Historical foundation status (superseded by the dated implementation cut below): authentication was not built.
 This document describes what is enforced now and what must exist before any
 real user data exists.
 
@@ -111,3 +111,9 @@ worse than none.
 - [Location privacy](../privacy/LOCATION_PRIVACY.md)
 - [API architecture](../architecture/API_ARCHITECTURE.md)
 - [Integration architecture](../integrations/INTEGRATION_ARCHITECTURE.md)
+
+## Implementation cut — 2026-10-09, V12 identity foundation
+
+Current code includes native registration/login, optional institutional identity fallback, short-lived JWTs, hashed refresh families, rotation/replay revocation, `/auth/me` and live identity authority. The earlier foundation text is historical and must not be interpreted as the current authentication inventory.
+
+V12 delivery 1 adds explicit account lifecycle, native authority revision binding, pending-session academic denial and atomic audited identity CAS. See [migration, evidence and limitations](V12_IDENTITY_LIFECYCLE_AUDIT_20261009.md). No public privileged-account mutation endpoint is enabled by this delivery. Production approval and provisioning still require current institutional/resource scope, individual operator MFA and the remaining V12 services and UI.

@@ -56,6 +56,7 @@ fun CompaneroScaffold(
         Destination.Classrooms.route -> "Clases"
         Destination.Schedule.route -> "Horario"
         Destination.Attendance.route -> "Asistencia"
+        Destination.RepresentativeInvitations.route -> "Representantes"
         else -> "Volver"
     }
 

@@ -6,6 +6,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -88,7 +89,7 @@ fun ClassroomAdministrationEditor(state:ClassroomAdministrationState,onRefresh:(
             }
             AcademicCard(R.string.academic_admin_schedule) {
                 AcademicPicker(R.string.academic_admin_class,state.classrooms.filter { it.status==ClassroomStatus.ACTIVE }.map { it.id to (it.name+" · "+it.groupName.orEmpty()) },selectedClass,{ selectedClass=it },"academic_schedule_class",enabled)
-                AcademicPicker(R.string.academic_admin_day,DayOfWeek.entries.map { it.name to it.getDisplayName(TextStyle.FULL,context.resources.configuration.locales[0]) },day,{ day=it },"academic_schedule_day",enabled)
+                AcademicPicker(R.string.academic_admin_day,DayOfWeek.entries.map { it.name to it.getDisplayName(TextStyle.FULL,LocalConfiguration.current.locales[0]) },day,{ day=it },"academic_schedule_day",enabled)
                 AcademicField(fromTime,{ fromTime=it.take(5) },R.string.academic_admin_time_start,"academic_time_start",enabled)
                 AcademicField(untilTime,{ untilTime=it.take(5) },R.string.academic_admin_time_end,"academic_time_end",enabled)
                 Button({ onSchedule(selectedClass,day,fromTime,untilTime) },enabled=enabled && selectedClass.isNotBlank() && day.isNotBlank() && fromTime.length==5 && untilTime.length==5,modifier=Modifier.testTag("academic_schedule_prepare")) { Text(stringResource(R.string.academic_admin_prepare)) }

@@ -25,6 +25,8 @@ fun buildClassroomFeatureGraph(
     academicProvider: AcademicProvider,
     groupRepository: AcademicGroupRepository,
     representativeService: GroupRepresentativeService? = null,
+    accounts:org.companerodeescuela.api.auth.PlatformAccountRepository?=null,
+    mfa:org.companerodeescuela.api.security.MfaService?=null,
 ): ClassroomFeatureGraph {
     val classroomRepository = when {
         !settings.hasAuthentication -> InMemoryClassroomRepository()
@@ -35,6 +37,7 @@ fun buildClassroomFeatureGraph(
     val classroomService = ClassroomService(
         repository = classroomRepository,
         groupRepository = groupRepository,
+        accounts=accounts,mfa=mfa,
     )
     val channelRepository = when {
         !settings.hasAuthentication -> InMemoryChannelRepository()
@@ -50,6 +53,7 @@ fun buildClassroomFeatureGraph(
                 academicProvider = academicProvider,
                 classroomService = classroomService,
                 representativeService = representativeService,
+                accounts=accounts,groupRepository=groupRepository,
             ),
         ),
     )

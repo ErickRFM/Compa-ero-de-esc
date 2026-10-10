@@ -29,6 +29,8 @@ dependencies {
     implementation(project(":shared:contracts"))
     implementation(project(":apps:android:core:academic"))
     implementation(project(":apps:android:core:common"))
+    implementation(project(":apps:android:core:network"))
+    implementation(project(":apps:android:core:security"))
     implementation(project(":apps:android:core:designsystem"))
     implementation(project(":apps:android:core:motion"))
     implementation(project(":apps:android:core:ui"))
@@ -46,6 +48,9 @@ dependencies {
 
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlin.test)
+    testImplementation(platform(libs.ktor.bom))
+    testImplementation(libs.ktor.client.mock)
+    testImplementation(libs.kotlinx.serialization.json)
     testImplementation(libs.kotlinx.coroutines.test)
 }
 

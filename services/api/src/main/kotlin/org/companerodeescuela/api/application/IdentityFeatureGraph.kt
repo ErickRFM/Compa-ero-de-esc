@@ -1,5 +1,6 @@
 package org.companerodeescuela.api.application
 
+import org.companerodeescuela.api.security.*
 import org.companerodeescuela.api.institutions.InstitutionRepository
 import org.companerodeescuela.api.institutions.InMemoryInstitutionRepository
 import org.companerodeescuela.api.institutions.MongoInstitutionRepository
@@ -21,6 +22,7 @@ data class IdentityFeatureGraph(
     val accounts: PlatformAccountRepository,
     val institutions: InstitutionRepository = InMemoryInstitutionRepository(),
     val verificationEmail: VerificationEmailGateway = UnavailableVerificationEmailGateway,
+    val mfa: MfaService = MfaService(accounts, InMemoryMfaRepository(), null),
 )
 
 fun buildIdentityFeatureGraph(
@@ -39,9 +41,12 @@ fun buildIdentityFeatureGraph(
         settings.environment == Environment.LOCAL -> InMemoryPlatformAccountRepository()
         else -> error("Platform accounts require MONGODB_URI outside local development")
     }
+    val mfaRepository = if (settings.hasAuthentication && settings.mongo.isConfigured)
+        MongoMfaRepository(mongoConnection.database()) else InMemoryMfaRepository()
     return IdentityFeatureGraph(
         refreshSessions = refreshSessions,
         accounts = accounts,
+        mfa = MfaService(accounts, mfaRepository, settings.mfaEncryptionKey?.let(::MfaSecretCipher)),
         institutions = if (settings.hasAuthentication && settings.mongo.isConfigured) MongoInstitutionRepository(mongoConnection.database()) else InMemoryInstitutionRepository(),
         verificationEmail = if (settings.hasVerificationEmail)
             ResendVerificationEmailGateway(requireNotNull(settings.verificationEmailApiKey), requireNotNull(settings.verificationEmailSender))

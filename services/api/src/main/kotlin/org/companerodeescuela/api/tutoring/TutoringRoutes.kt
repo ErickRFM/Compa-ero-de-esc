@@ -10,7 +10,9 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.patch
 import io.ktor.server.routing.route
 import org.companerodeescuela.api.auth.AuthTokenService
-import org.companerodeescuela.api.auth.requireActor
+import org.companerodeescuela.api.auth.requireNativeActor
+import org.companerodeescuela.api.auth.boundedAuthRequest
+import org.companerodeescuela.shared.contracts.RevokeTutorAssignmentRequest
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
@@ -32,33 +34,35 @@ fun Route.tutoringRoutes(
         val tokenService = AuthTokenService(settings)
         authenticate(AuthTokenService.PROVIDER_NAME) {
             get("/assignments") {
-                val actor = call.requireActor(tokenService)
+                val actor = call.requireNativeActor(tokenService)
                 call.respond(ApiResponse(data = service.listFor(actor), requestId = call.requestId()))
             }
 
             get("/groups/{groupId}/students") {
-                val actor = call.requireActor(tokenService)
+                val actor = call.requireNativeActor(tokenService)
                 val groupId = call.parameters["groupId"]
                     ?: throw ApiException.Validation("groupId is required")
                 call.respond(ApiResponse(data = service.studentsForGroup(actor, groupId), requestId = call.requestId()))
             }
 
             get("/me") {
-                val actor = call.requireActor(tokenService)
+                val actor = call.requireNativeActor(tokenService)
                 call.respond(ApiResponse(data = service.scopeFor(actor), requestId = call.requestId()))
             }
 
             patch("/assignments/{assignmentId}/revoke") {
-                val actor = call.requireActor(tokenService)
+                val actor = call.requireNativeActor(tokenService)
                 val assignmentId = call.parameters["assignmentId"]
                     ?: throw ApiException.Validation("assignmentId is required")
-                call.respond(ApiResponse(data = service.revoke(actor, assignmentId), requestId = call.requestId()))
+                val request = runCatching { call.boundedAuthRequest(RevokeTutorAssignmentRequest.serializer()) }
+                    .getOrElse { if(it is kotlinx.coroutines.CancellationException) throw it;throw ApiException.Validation("Invalid tutor revocation request") }
+                call.respond(ApiResponse(data = service.revoke(actor, assignmentId, request), requestId = call.requestId()))
             }
 
             post("/assignments") {
-                val actor = call.requireActor(tokenService)
-                val request = runCatching { call.receive<CreateTutorAssignmentRequest>() }
-                    .getOrElse { throw ApiException.Validation("Invalid tutor assignment request") }
+                val actor = call.requireNativeActor(tokenService)
+                val request = runCatching { call.boundedAuthRequest(CreateTutorAssignmentRequest.serializer()) }
+                    .getOrElse { if(it is kotlinx.coroutines.CancellationException) throw it;throw ApiException.Validation("Invalid tutor assignment request") }
                 call.respond(
                     status = HttpStatusCode.Created,
                     message = ApiResponse(

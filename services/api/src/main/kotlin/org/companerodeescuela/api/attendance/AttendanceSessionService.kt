@@ -17,10 +17,12 @@ class AttendanceSessionService(
     private val accessPolicy: AttendanceAccessPolicy = AttendanceAccessPolicy(repository, occurrenceResolver),
     private val clock: Clock = Clock.systemUTC(),
     private val newId: () -> String = { UUID.randomUUID().toString() },
+    private val nativeProjection:org.companerodeescuela.api.academic.NativeAcademicProjection?=null,
 ) {
     suspend fun openSession(
         teacherId: String,
         request: CreateAttendanceSessionRequest,
+        nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null,
     ): AttendanceSessionResponse {
         val occurrenceId = request.occurrenceId.trim()
         if (occurrenceId.isBlank()) {
@@ -32,7 +34,10 @@ class AttendanceSessionService(
         val occurrenceDate = runCatching { LocalDate.parse(request.occurrenceDate) }
             .getOrElse { throw ApiException.Validation("occurrenceDate must be YYYY-MM-DD") }
 
-        val occurrence = occurrenceResolver.resolveTeacherOccurrence(
+        val occurrence = if(nativeActor!=null) {
+            if(nativeActor.id!=teacherId) throw ApiException.Forbidden("Teacher does not match the actual native actor")
+            (nativeProjection ?: throw ApiException.DependencyUnavailable("Native academic projection is unavailable")).teacherOccurrence(nativeActor,occurrenceId,occurrenceDate)
+        } else occurrenceResolver.resolveTeacherOccurrence(
             teacherId = teacherId,
             occurrenceId = occurrenceId,
             occurrenceDate = occurrenceDate,
@@ -55,11 +60,13 @@ class AttendanceSessionService(
             closesAtEpochSeconds = now.plus(Duration.ofMinutes(request.durationMinutes.toLong()))
                 .epochSecond,
             status = AttendanceSessionStatus.OPEN,
-        )
+            identitySource=org.companerodeescuela.shared.contracts.AttendanceIdentitySource.INSTITUTIONAL,
+        ).let { candidate -> if(nativeActor==null) candidate else nativeProjection!!.bindSession(nativeActor,candidate) }
 
         return when (val result = repository.createSession(candidate)) {
             is SessionWriteResult.Created -> result.session
             is SessionWriteResult.Existing -> {
+                if(result.session.identitySource!=candidate.identitySource || result.session.institutionId!=candidate.institutionId || result.session.groupScopeRevision!=candidate.groupScopeRevision) throw ApiException.Forbidden("Existing attendance belongs to a different identity source or scope")
                 if (result.session.openedBy != teacherId) {
                     throw ApiException.Conflict("Attendance session already belongs to another teacher")
                 }
@@ -74,14 +81,14 @@ class AttendanceSessionService(
         }
     }
 
-    suspend fun activeForTeacher(teacherId: String): List<AttendanceSessionResponse> {
+    suspend fun activeForTeacher(teacherId: String,nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null): List<AttendanceSessionResponse> {
         val now = clock.instant().epochSecond
         val candidates = repository.findOpenSessions()
             .filter { it.openedBy == teacherId && it.closesAtEpochSeconds > now }
         val authorized = mutableListOf<AttendanceSessionResponse>()
         for (session in candidates) {
             try {
-                accessPolicy.requireOwnerOrAdministrative(teacherId, session, allowCrossOwner = false)
+                accessPolicy.requireOwnerOrAdministrative(teacherId, session, allowCrossOwner = false,nativeActor=nativeActor)
                 authorized += session
             } catch (_: ApiException.Forbidden) {
                 // Revocation removes this resource; unavailable authority fails the request.
@@ -90,20 +97,30 @@ class AttendanceSessionService(
         return authorized.sortedBy { it.closesAtEpochSeconds }
     }
 
-    suspend fun activeForAdministration(): List<AttendanceSessionResponse> {
+    suspend fun activeForAdministration(actor:org.companerodeescuela.shared.contracts.UserSummary?=null): List<AttendanceSessionResponse> {
         val now = clock.instant().epochSecond
-        return repository.findOpenSessions()
-            .filter { it.status == AttendanceSessionStatus.OPEN && it.closesAtEpochSeconds > now }
-            .sortedBy { it.closesAtEpochSeconds }
+        val current=actor ?: throw ApiException.Forbidden("Actual native academic administration is required")
+        accessPolicy.requireAdministration(current)
+        val authorized=mutableListOf<AttendanceSessionResponse>()
+        for(session in repository.findOpenSessions().filter { it.status==AttendanceSessionStatus.OPEN && it.closesAtEpochSeconds>now }) {
+            try {
+                accessPolicy.requireOwnerOrAdministrative(current.id,session,true,current)
+                authorized+=session
+            } catch (_:ApiException.Forbidden) {
+                // Other tenants and stale class scopes are never disclosed; outages propagate.
+            }
+        }
+        return authorized.sortedBy { it.closesAtEpochSeconds }
     }
 
     suspend fun closeSession(
         actorId: String,
         sessionId: String,
         allowCrossOwner: Boolean = false,
+        nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null,
     ): AttendanceSessionResponse {
         val session = accessPolicy.requireSession(sessionId)
-        accessPolicy.requireOwnerOrAdministrative(actorId, session, allowCrossOwner)
+        accessPolicy.requireOwnerOrAdministrative(actorId, session, allowCrossOwner,nativeActor)
         if (session.status == AttendanceSessionStatus.CLOSED) return session
 
         val closed = session.copy(
@@ -118,9 +135,10 @@ class AttendanceSessionService(
         actorId: String,
         sessionId: String,
         allowCrossOwner: Boolean = false,
+        nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null,
     ): AttendanceRosterResponse {
         val session = accessPolicy.requireSession(sessionId)
-        accessPolicy.requireOwnerOrAdministrative(actorId, session, allowCrossOwner)
+        accessPolicy.requireOwnerOrAdministrative(actorId, session, allowCrossOwner,nativeActor)
         return AttendanceRosterResponse(
             session = session,
             records = repository.recordsForSession(sessionId).map { it.withCurrentPresencePolicy() }.sortedBy { it.studentId },

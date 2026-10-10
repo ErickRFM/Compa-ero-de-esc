@@ -1,9 +1,12 @@
 package org.companerodeescuela.api.tutoring
 
 import java.time.Instant
+import org.companerodeescuela.api.test.ScopedAcademicFixtures
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
+import org.companerodeescuela.api.academic.groups.AcademicGroupScopeChange
 import kotlinx.coroutines.test.runTest
 import org.companerodeescuela.api.academic.groups.AcademicGroupMembershipRecord
 import org.companerodeescuela.api.academic.groups.AcademicGroupRecord
@@ -16,9 +19,9 @@ import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
 
 class TutorCaseServiceTest {
-    private val tutor = UserSummary("tutor-1", "Tutor", roles = setOf(UserRole.TUTOR))
-    private val outsider = UserSummary("tutor-2", "Other tutor", roles = setOf(UserRole.TUTOR))
-    private val student = UserSummary("student-1", "Student", roles = setOf(UserRole.STUDENT))
+    private val tutor = UserSummary("tutor-1", "Tutor", roles = setOf(UserRole.TUTOR), institutionId = ScopedAcademicFixtures.INSTITUTION)
+    private val outsider = UserSummary("tutor-2", "Other tutor", roles = setOf(UserRole.TUTOR), institutionId = ScopedAcademicFixtures.INSTITUTION)
+    private val student = UserSummary("student-1", "Student", roles = setOf(UserRole.STUDENT),institutionId=ScopedAcademicFixtures.INSTITUTION)
 
     @Test
     fun tutorCreatesCaseAndStudentOnlySeesPublishedNotes() = runTest {
@@ -46,13 +49,33 @@ class TutorCaseServiceTest {
         }
     }
 
+    @Test
+    fun `published tutor notes cease to be visible after the student group is migrated`() = runTest {
+        val groups=InMemoryAcademicGroupRepository()
+        groups.create(ScopedAcademicFixtures.group("9A"))
+        groups.assign(AcademicGroupMembershipRecord("9A",student.id,Instant.EPOCH))
+        val tutors=InMemoryTutorAssignmentRepository()
+        tutors.create(ScopedAcademicFixtures.assignment("case-scope",tutor.id,"9A"))
+        val accounts=ScopedAcademicFixtures.accounts(tutor,student)
+        val service=TutorCaseService(InMemoryTutorCaseRepository(),
+            TutorAssignmentService(tutors,groups,accounts=accounts),groups)
+        val record=service.create(tutor,CreateTutorCaseRequest("9A",student.id,"Academic support"))
+        service.addNote(tutor,record.id,AddTutorCaseNoteRequest("Please attend tutorial",TutorNoteVisibility.STUDENT_VISIBLE))
+        assertEquals(1,service.myPublishedNotes(student).size)
+        val change=AcademicGroupScopeChange("period-change","admin",
+            ScopedAcademicFixtures.INSTITUTION,"next-period",Instant.EPOCH,ScopedAcademicFixtures.END,
+            Instant.now(),"a".repeat(64))
+        assertEquals(1,groups.changeScope("9A",0,change)?.scopeRevision)
+        assertTrue(service.myPublishedNotes(student).isEmpty())
+    }
+
     private suspend fun setup(): Pair<TutorCaseService, InMemoryTutorCaseRepository> {
         val groups = InMemoryAcademicGroupRepository()
-        groups.create(AcademicGroupRecord("9A", "9 A", true, Instant.EPOCH))
+        groups.create(ScopedAcademicFixtures.group("9A", "9 A"))
         groups.assign(AcademicGroupMembershipRecord("9A", student.id, Instant.EPOCH))
         val tutors = InMemoryTutorAssignmentRepository()
-        tutors.create(TutorAssignmentRecord("t1", tutor.id, "9A", true, "admin", Instant.EPOCH))
-        val assignmentService = TutorAssignmentService(tutors, groups)
+        tutors.create(ScopedAcademicFixtures.assignment("t1", tutor.id, "9A"))
+        val assignmentService = TutorAssignmentService(tutors, groups, accounts = ScopedAcademicFixtures.accounts(tutor, outsider,student))
         val repository = InMemoryTutorCaseRepository()
         return TutorCaseService(repository, assignmentService, groups) to repository
     }

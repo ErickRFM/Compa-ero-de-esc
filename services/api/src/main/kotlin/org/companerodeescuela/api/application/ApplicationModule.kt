@@ -7,6 +7,9 @@ import org.companerodeescuela.api.academic.groups.academicGroupRoutes
 import org.companerodeescuela.api.academic.academicRoutes
 import org.companerodeescuela.api.attendance.attendanceRoutes
 import org.companerodeescuela.api.institutions.institutionRoutes
+import org.companerodeescuela.api.admin.AccountAdministrationService
+import org.companerodeescuela.api.admin.accountAdministrationRoutes
+import org.companerodeescuela.api.security.mfaRoutes
 import org.companerodeescuela.api.auth.authRoutes
 import org.companerodeescuela.api.auth.PlatformSessionAuthority
 import org.companerodeescuela.api.channel.channelRoutes
@@ -57,17 +60,25 @@ fun Application.module(
         settings = settings,
         mongoConnection = mongoConnection,
         accounts = identityGraph.accounts,
+        mfa = identityGraph.mfa,
+        institutions = identityGraph.institutions,
     )
+    val administrationService = AccountAdministrationService(identityGraph.accounts, identityGraph.institutions,
+        academicGraph.groupRepository, academicGraph.tutoringService, identityGraph.mfa)
     val classroomGraph = buildClassroomFeatureGraph(
         settings = settings,
         mongoConnection = mongoConnection,
         academicProvider = providerRegistry.academic,
         groupRepository = academicGraph.groupRepository,
         representativeService = academicGraph.representativeService,
+        accounts=identityGraph.accounts,mfa=identityGraph.mfa,
     )
+    val scheduleManagement=org.companerodeescuela.api.academic.AcademicScheduleManagementService(academicGraph.scheduleOverrides,accounts=identityGraph.accounts,groups=academicGraph.groupRepository,mfa=identityGraph.mfa,classrooms=classroomGraph.classroomService)
+    val nativeAcademic=org.companerodeescuela.api.academic.NativeAcademicProjection(identityGraph.accounts,classroomGraph.classroomService,academicGraph.groupRepository,academicGraph.scheduleOverrides)
     val presenceGraph = buildPresenceFeatureGraph(
         settings = settings,
         mongoConnection = mongoConnection,
+        accounts=identityGraph.accounts,mfa=identityGraph.mfa,institutions=identityGraph.institutions,
     )
     val attendanceGraph = buildAttendanceFeatureGraph(
         settings = settings,
@@ -75,6 +86,7 @@ fun Application.module(
         academicProvider = providerRegistry.academic,
         schoolPresenceService = presenceGraph?.service,
         groupRepository = academicGraph.groupRepository,
+        accounts=identityGraph.accounts,classrooms=classroomGraph.classroomService,nativeProjection=nativeAcademic,
     )
 
     val operationsGraph = buildOperationsFeatureGraph(
@@ -82,6 +94,7 @@ fun Application.module(
         mongoConnection = mongoConnection,
         tutoringService = academicGraph.tutoringService,
         groupRepository = academicGraph.groupRepository,
+        accounts=identityGraph.accounts,classrooms=classroomGraph.classroomService,institutions=identityGraph.institutions,mfa=identityGraph.mfa,
     )
 
     monitor.subscribe(ApplicationStopped) {
@@ -99,13 +112,16 @@ fun Application.module(
             institutions = identityGraph.institutions,
             verificationEmail = identityGraph.verificationEmail,
         )
+        mfaRoutes(settings, providerRegistry.identity, identityGraph.refreshSessions, identityGraph.accounts, identityGraph.mfa)
+        accountAdministrationRoutes(settings, providerRegistry.identity, identityGraph.refreshSessions, identityGraph.accounts, administrationService)
         institutionRoutes(identityGraph.institutions)
         academicRoutes(
             settings = settings,
             academicProvider = providerRegistry.academic,
-            scheduleManagement = academicGraph.scheduleManagement,
+            scheduleManagement = scheduleManagement,
             scheduleOverrides = academicGraph.scheduleOverrides,
             groupRepository = academicGraph.groupRepository,
+            nativeProjection=nativeAcademic,
         )
         attendanceRoutes(
             settings = settings,

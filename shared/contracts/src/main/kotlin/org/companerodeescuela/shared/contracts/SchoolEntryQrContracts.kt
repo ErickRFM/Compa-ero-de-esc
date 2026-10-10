@@ -16,7 +16,12 @@ data class CreateSchoolEntryQrRequest(
     val location: String? = null,
     val validFromEpochSeconds: Long,
     val expiresAtEpochSeconds: Long,
-)
+    val institutionId:String?=null,
+    val operationId:String?=null,
+    val proof:String?=null,
+) {
+    override fun toString()="CreateSchoolEntryQrRequest(institutionId=$institutionId, operationId=$operationId, proof=[redacted])"
+}
 
 @Serializable
 data class SchoolEntryQrResponse(
@@ -32,7 +37,18 @@ data class SchoolEntryQrResponse(
     val revokedAtEpochSeconds: Long? = null,
     val lastUsedAtEpochSeconds: Long? = null,
     val usageCount: Long = 0,
-)
+    val institutionId:String?=null,
+    val revision:Long=0,
+    val operationId:String?=null,
+    val commandDigest:String?=null,
+    val updatedBy:String?=null,
+    val audit:List<SchoolEntryQrAuditEntry> = emptyList(),
+) {
+    override fun toString()="SchoolEntryQrResponse(id=$id, institutionId=$institutionId, status=$status, revision=$revision, token=[redacted])"
+}
+
+@Serializable
+data class SchoolEntryQrAuditEntry(val actorId:String,val operationId:String,val commandDigest:String,val fromRevision:Long,val status:SchoolEntryQrStatus,val atEpochSeconds:Long)
 
 @Serializable
 data class RegenerateSchoolEntryQrResponse(

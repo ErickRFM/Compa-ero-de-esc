@@ -7,14 +7,19 @@ class SchoolEntryQrVerifier(
     private val managedQrService: SchoolEntryQrService? = null,
     private val legacyQrSha256: String = "",
 ) {
-    suspend fun verify(rawToken: String) {
+    suspend fun verify(rawToken: String,institutionId:String?=null,legacyInstitutionId:String?=null) {
         val token = rawToken.trim()
         if (token.isBlank() || token.length > MAX_QR_TOKEN_LENGTH) {
             throw ApiException.Validation("Institutional QR is invalid")
         }
 
-        if (managedQrService?.verifyAndRecordUse(token) != null) return
+        val managed=managedQrService
+        if(managed!=null && managed.recognizes(token)) {
+            if(managed.verifyAndRecordUse(token,institutionId)==null) throw ApiException.Forbidden("Managed QR is revoked, expired or outside the institution")
+            return
+        }
 
+        if(institutionId!=null && institutionId!=legacyInstitutionId) throw ApiException.Forbidden("Legacy QR requires explicit matching institution")
         val fallbackHash = legacyQrSha256.lowercase()
         if (fallbackHash.isBlank()) {
             throw ApiException.Forbidden("Institutional QR could not be verified")

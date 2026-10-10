@@ -44,10 +44,11 @@ class AttendanceQrService(
         actorId: String,
         sessionId: String,
         allowCrossOwner: Boolean = false,
+        nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null,
     ): AttendanceQrResponse {
         val session = repository.findSession(sessionId)
             ?: throw ApiException.NotFound("Attendance session was not found")
-        accessPolicy.requireOwnerOrAdministrative(actorId, session, allowCrossOwner)
+        accessPolicy.requireOwnerOrAdministrative(actorId, session, allowCrossOwner,nativeActor)
 
         val now = clock.instant().epochSecond
         if (

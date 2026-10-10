@@ -6,17 +6,22 @@ import org.companerodeescuela.api.integrations.academic.AcademicProvider
 
 class AttendanceEnrollmentResolver(
     private val academicProvider: AcademicProvider,
+    private val classrooms:org.companerodeescuela.api.classroom.ClassroomService?=null,
 ) {
-    suspend fun courseGroupsFor(studentId: String): Set<Pair<String, String>> =
-        academicLoad(studentId).enrollments
-            .map { it.course.externalId to it.course.groupName.trim() }
-            .toSet()
+    suspend fun courseGroupsFor(studentId: String,nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null): Set<Pair<String, String>> {
+        if(nativeActor!=null) {
+            if(nativeActor.id!=studentId || org.companerodeescuela.shared.contracts.UserRole.STUDENT !in nativeActor.roles) throw ApiException.Forbidden("Actual native student is required")
+            return (classrooms ?: throw ApiException.DependencyUnavailable("Native classroom authority is unavailable")).nativeChannelsFor(nativeActor).map { it.id to it.groupName.orEmpty() }.toSet()
+        }
+        return academicLoad(studentId).enrollments.map { it.course.externalId to it.course.groupName.trim() }.toSet()
+    }
 
     suspend fun isEnrolled(
         studentId: String,
         courseId: String,
         groupName: String,
-    ): Boolean = (courseId to groupName.trim()) in courseGroupsFor(studentId)
+        nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null,
+    ): Boolean = (courseId to groupName.trim()) in courseGroupsFor(studentId,nativeActor)
 
     private suspend fun academicLoad(studentId: String) =
         try {

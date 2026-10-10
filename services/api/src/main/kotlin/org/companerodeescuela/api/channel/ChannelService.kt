@@ -19,15 +19,17 @@ class ChannelService(
     private val accessPolicy: ChannelAccessPolicy,
     private val clock: Clock = Clock.systemUTC(),
 ) {
-    suspend fun channelsFor(userId: String, roles: Set<UserRole>) =
-        accessPolicy.channelsFor(userId, roles)
+    suspend fun channelsFor(userId:String,roles:Set<UserRole>,actor:org.companerodeescuela.shared.contracts.UserSummary?=null,identitySource:org.companerodeescuela.api.auth.SessionIdentitySource=org.companerodeescuela.api.auth.SessionIdentitySource.INSTITUTIONAL) =
+        accessPolicy.channelsFor(userId,roles,actor,identitySource)
 
     suspend fun postsFor(
         userId: String,
         roles: Set<UserRole>,
         channelId: String,
+        actor:org.companerodeescuela.shared.contracts.UserSummary?=null,
+        identitySource:org.companerodeescuela.api.auth.SessionIdentitySource=org.companerodeescuela.api.auth.SessionIdentitySource.INSTITUTIONAL,
     ): List<ChannelPost> {
-        accessPolicy.requireCanRead(userId, roles, channelId)
+        accessPolicy.requireCanRead(userId, roles, channelId,actor,identitySource)
         return repository.listPosts(channelId).filter { it.state != ChannelPostState.DELETED }
     }
 
@@ -37,8 +39,10 @@ class ChannelService(
         roles: Set<UserRole>,
         channelId: String,
         request: CreateChannelPostRequest,
+        actor:org.companerodeescuela.shared.contracts.UserSummary?=null,
+        identitySource:org.companerodeescuela.api.auth.SessionIdentitySource=org.companerodeescuela.api.auth.SessionIdentitySource.INSTITUTIONAL,
     ): ChannelPost {
-        accessPolicy.requireCanPublish(authorId, roles, channelId)
+        accessPolicy.requireCanPublish(authorId, roles, channelId,actor,identitySource)
         validatePost(request.title, request.body, request.attachments)
         val now = clock.instant().epochSecond
         return repository.createPost(
@@ -64,10 +68,12 @@ class ChannelService(
         channelId: String,
         postId: String,
         request: UpdateChannelPostRequest,
+        actor:org.companerodeescuela.shared.contracts.UserSummary?=null,
+        identitySource:org.companerodeescuela.api.auth.SessionIdentitySource=org.companerodeescuela.api.auth.SessionIdentitySource.INSTITUTIONAL,
     ): ChannelPost {
-        accessPolicy.requireCanPublish(actorId, roles, channelId)
+        accessPolicy.requireCanPublish(actorId, roles, channelId,actor,identitySource)
         val current = requirePost(channelId, postId)
-        if (current.authorId != actorId && roles.none(UserRole::isAdministrative)) {
+        if (current.authorId != actorId && roles.none { it==UserRole.ADMIN || it==UserRole.SUPER_ADMIN }) {
             throw ApiException.Forbidden("Only the author or an administrator can edit this post")
         }
         // Copy public DTO properties to locals before branching. Kotlin cannot
@@ -104,10 +110,12 @@ class ChannelService(
         roles: Set<UserRole>,
         channelId: String,
         postId: String,
+        actor:org.companerodeescuela.shared.contracts.UserSummary?=null,
+        identitySource:org.companerodeescuela.api.auth.SessionIdentitySource=org.companerodeescuela.api.auth.SessionIdentitySource.INSTITUTIONAL,
     ): ChannelPost {
-        accessPolicy.requireCanPublish(actorId, roles, channelId)
+        accessPolicy.requireCanPublish(actorId, roles, channelId,actor,identitySource)
         val current = requirePost(channelId, postId)
-        if (current.authorId != actorId && roles.none(UserRole::isAdministrative)) {
+        if (current.authorId != actorId && roles.none { it==UserRole.ADMIN || it==UserRole.SUPER_ADMIN }) {
             throw ApiException.Forbidden("Only the author or an administrator can delete this post")
         }
         val deleted = current.copy(
@@ -124,11 +132,13 @@ class ChannelService(
         channelId: String,
         postId: String,
         request: ChannelAcknowledgementRequest,
+        actor:org.companerodeescuela.shared.contracts.UserSummary?=null,
+        identitySource:org.companerodeescuela.api.auth.SessionIdentitySource=org.companerodeescuela.api.auth.SessionIdentitySource.INSTITUTIONAL,
     ): ChannelAcknowledgement {
         if (UserRole.STUDENT !in roles) {
             throw ApiException.Forbidden("Student role is required")
         }
-        accessPolicy.requireCanRead(studentId, roles, channelId)
+        accessPolicy.requireCanRead(studentId, roles, channelId,actor,identitySource)
         val post = requirePost(channelId, postId)
         request.response?.let { response ->
             if (response !in post.allowedResponses) {
@@ -153,8 +163,10 @@ class ChannelService(
         roles: Set<UserRole>,
         channelId: String,
         postId: String,
+        actor:org.companerodeescuela.shared.contracts.UserSummary?=null,
+        identitySource:org.companerodeescuela.api.auth.SessionIdentitySource=org.companerodeescuela.api.auth.SessionIdentitySource.INSTITUTIONAL,
     ): ChannelPostStats {
-        accessPolicy.requireCanPublish(actorId, roles, channelId)
+        accessPolicy.requireCanPublish(actorId, roles, channelId,actor,identitySource)
         requirePost(channelId, postId)
         val values = repository.acknowledgementsFor(postId)
         return ChannelPostStats(

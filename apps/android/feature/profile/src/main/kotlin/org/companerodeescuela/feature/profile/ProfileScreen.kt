@@ -26,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.testTag
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
@@ -48,6 +50,8 @@ fun ProfileScreen(
     onAppearance: () -> Unit,
     onIntegrations: () -> Unit = {},
     onLogout: () -> Unit,
+    onSecurity: (() -> Unit)? = null,
+    onTutorRequest: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -138,6 +142,18 @@ fun ProfileScreen(
                     title = "Privacidad",
                     detail = "Datos académicos separados por cuenta.",
                 )
+            }
+
+            if(onSecurity!=null || (onTutorRequest!=null && UserRole.TEACHER in roles && UserRole.TUTOR !in roles)) {
+                ProfileGroup(title=stringResource(R.string.profile_access)) {
+                    onSecurity?.let { action ->
+                        ProfileRow(title=stringResource(R.string.profile_security),detail=stringResource(R.string.profile_security_description),onClick=action)
+                    }
+                    if(onTutorRequest!=null && UserRole.TEACHER in roles && UserRole.TUTOR !in roles) {
+                        GroupDivider()
+                        ProfileRow(title=stringResource(R.string.profile_tutor_request),detail=stringResource(R.string.profile_tutor_description),onClick=onTutorRequest)
+                    }
+                }
             }
 
             if (canSwitchExperience) {

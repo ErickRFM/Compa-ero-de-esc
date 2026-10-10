@@ -22,21 +22,23 @@ class AttendanceStudentService(
     private val qrService: AttendanceQrService? = null,
     private val schoolPresenceService: SchoolPresenceService? = null,
     private val clock: Clock = Clock.systemUTC(),
+    private val nativeProjection:org.companerodeescuela.api.academic.NativeAcademicProjection?=null,
 ) {
-    suspend fun activeFor(studentId: String): List<AttendanceSessionResponse> {
-        schoolPresenceService?.requireActive(studentId)
-        val enrolled = enrollmentResolver.courseGroupsFor(studentId)
+    suspend fun activeFor(studentId: String,nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null): List<AttendanceSessionResponse> {
+        schoolPresenceService?.requireActive(studentId,nativeActor)
+        val enrolled = enrollmentResolver.courseGroupsFor(studentId,nativeActor)
         val now = clock.instant().epochSecond
 
         return repository.findOpenSessions().filter { session ->
             session.closesAtEpochSeconds > now &&
-                (session.courseId to session.groupName) in enrolled
+                (session.courseId to session.groupName) in enrolled && isEnrolled(studentId,session,nativeActor)
         }
     }
 
     suspend fun inspectQr(
         studentId: String,
         request: AttendanceQrInspectionRequest,
+        nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null,
     ): AttendanceQrInspectionResponse {
         val sessionId = request.sessionId.trim()
         val token = request.token.trim()
@@ -49,7 +51,7 @@ class AttendanceStudentService(
                 status = AttendanceQrInspectionStatus.INVALID,
             )
 
-        if (!enrollmentResolver.isEnrolled(studentId, session.courseId, session.groupName)) {
+        if (!isEnrolled(studentId,session,nativeActor)) {
             return AttendanceQrInspectionResponse(
                 status = AttendanceQrInspectionStatus.NOT_ENROLLED,
             )
@@ -100,6 +102,7 @@ class AttendanceStudentService(
         studentId: String,
         sessionId: String,
         request: AttendanceAttemptRequest,
+        nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null,
     ): AttendanceRecordResponse {
         val operationId = request.operationId.trim()
         if (operationId.isBlank() || operationId.length > MAX_OPERATION_ID_LENGTH) {
@@ -132,7 +135,7 @@ class AttendanceStudentService(
             )
         }
 
-        if (!enrollmentResolver.isEnrolled(studentId, session.courseId, session.groupName)) {
+        if (!isEnrolled(studentId,session,nativeActor)) {
             throw ApiException.Domain(
                 status = HttpStatusCode.Forbidden,
                 code = ApiErrorCode.ATTENDANCE_NOT_ENROLLED,
@@ -141,7 +144,7 @@ class AttendanceStudentService(
         }
 
         schoolPresenceService?.let { presence ->
-            presence.requireActive(studentId)
+            presence.requireActive(studentId,nativeActor)
             val network = request.schoolNetwork
                 ?: throw ApiException.Forbidden(
                     "Reconnect to the school Wi-Fi before confirming attendance",
@@ -190,6 +193,7 @@ class AttendanceStudentService(
         studentId: String,
         sessionId: String,
         request: ClassCallConfirmationRequest,
+        nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null,
     ): AttendanceRecordResponse {
         val operationId = request.operationId.trim()
         if (operationId.isBlank() || operationId.length > MAX_OPERATION_ID_LENGTH) {
@@ -209,14 +213,14 @@ class AttendanceStudentService(
                 message = "Attendance session is not currently open",
             )
         }
-        if (!enrollmentResolver.isEnrolled(studentId, session.courseId, session.groupName)) {
+        if (!isEnrolled(studentId,session,nativeActor)) {
             throw ApiException.Domain(
                 status = HttpStatusCode.Forbidden,
                 code = ApiErrorCode.ATTENDANCE_NOT_ENROLLED,
                 message = "You are not enrolled in this class",
             )
         }
-        presence.requireActive(studentId)
+        presence.requireActive(studentId,nativeActor)
         presence.verifyNetworkForAttendance(request.schoolNetwork)
         val candidate = AttendanceRecordResponse(
             id = session.id + ":" + studentId,
@@ -241,17 +245,31 @@ class AttendanceStudentService(
     }
 
     /** Existing canonical decision; only the enrolled student can read their own row. */
-    suspend fun myClassRecord(studentId: String, sessionId: String): AttendanceRecordResponse? {
+    suspend fun myClassRecord(studentId: String, sessionId: String,nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null): AttendanceRecordResponse? {
         val session = repository.findSession(sessionId)
             ?: throw ApiException.NotFound("Attendance session was not found")
-        if (!enrollmentResolver.isEnrolled(studentId, session.courseId, session.groupName)) {
+        if (!isEnrolled(studentId,session,nativeActor)) {
             throw ApiException.Forbidden("You are not enrolled in this class")
         }
         return repository.findRecord("$sessionId:$studentId")?.withCurrentPresencePolicy()
     }
 
+
+    private suspend fun isEnrolled(studentId:String,session:AttendanceSessionResponse,actor:org.companerodeescuela.shared.contracts.UserSummary?):Boolean {
+        if(actor==null) {
+            if(session.identitySource==org.companerodeescuela.shared.contracts.AttendanceIdentitySource.NATIVE || session.institutionId!=null || session.groupId!=null) return false
+        } else {
+            if(actor.id!=studentId) throw ApiException.Forbidden("Actual student identity does not match")
+            try { (nativeProjection ?: throw ApiException.DependencyUnavailable("Native academic authority is unavailable")).requireSession(actor,session) }
+            catch (_:ApiException.Forbidden) { return false }
+            catch (_:ApiException.NotFound) { return false }
+        }
+        return enrollmentResolver.isEnrolled(studentId,session.courseId,session.groupName,actor)
+    }
+
     private fun classifyEvidence(
         request: AttendanceAttemptRequest,
+        nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null,
         sessionId: String,
         lateSyncEligible: Boolean,
         receivedAtEpochSeconds: Long,

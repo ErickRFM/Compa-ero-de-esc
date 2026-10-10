@@ -29,6 +29,9 @@ data class ExcuseRecord(
     val reviewedBy: String? = null,
     val reviewComment: String? = null,
     val version: Long = 0L,
+    val institutionId: String? = null,
+    val periodId: String? = null,
+    val groupScopeRevision: Long = -1L,
 )
 
 interface ExcuseRepository {
@@ -135,6 +138,9 @@ class MongoExcuseRepository(database: MongoDatabase) : ExcuseRepository {
             .append("reviewedBy", reviewedBy)
             .append("reviewComment", reviewComment)
             .append("version", version)
+            .append("institutionId", institutionId)
+            .append("periodId", periodId)
+            .append("groupScopeRevision", groupScopeRevision)
 
     private fun Document.toRecord(): ExcuseRecord =
         ExcuseRecord(
@@ -150,5 +156,12 @@ class MongoExcuseRepository(database: MongoDatabase) : ExcuseRepository {
             reviewedBy = getString("reviewedBy"),
             reviewComment = getString("reviewComment"),
             version = (get("version") as? Number)?.toLong() ?: 0L,
+            institutionId = getString("institutionId"),
+            periodId = getString("periodId"),
+            groupScopeRevision = when(val value=get("groupScopeRevision")) {
+                is Long -> value
+                is Int -> value.toLong()
+                else -> -1L
+            },
         )
 }

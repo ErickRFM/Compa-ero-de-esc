@@ -38,6 +38,8 @@ data class TutorCaseRecord(
     val updatedAt: Instant,
     val notes: List<TutorCaseNoteRecord> = emptyList(),
     val version: Long = 0L,
+    val institutionId:String?=null,
+    val groupScopeRevision:Long=-1,
 )
 
 interface TutorCaseRepository {
@@ -68,6 +70,7 @@ class InMemoryTutorCaseRepository : TutorCaseRepository {
         data.values.sortedByDescending(TutorCaseRecord::updatedAt)
 
     override suspend fun compareAndUpdate(expected: TutorCaseRecord, updated: TutorCaseRecord): TutorCaseRecord? {
+        if(!validCaseUpdate(expected,updated)) return null
         var changed = false
         data.computeIfPresent(expected.id) { _, previous ->
             if (previous.version == expected.version) {
@@ -115,9 +118,10 @@ class MongoTutorCaseRepository(database: MongoDatabase) : TutorCaseRepository {
     }
 
     override suspend fun compareAndUpdate(expected: TutorCaseRecord, updated: TutorCaseRecord): TutorCaseRecord? {
+        if(!validCaseUpdate(expected,updated)) return null
         ensureIndexes()
         return collection.findOneAndReplace(
-            and(eq("_id", expected.id), eq("version", expected.version)),
+            and(eq("_id",expected.id),eq("version",expected.version),eq("institutionId",expected.institutionId),eq("groupScopeRevision",expected.groupScopeRevision),eq("academicGroupId",expected.academicGroupId),eq("studentId",expected.studentId)),
             updated.toDocument(),
             FindOneAndReplaceOptions().returnDocument(ReturnDocument.AFTER),
         )?.toRecord()
@@ -145,6 +149,8 @@ class MongoTutorCaseRepository(database: MongoDatabase) : TutorCaseRepository {
         .append("createdAt", Date.from(createdAt))
         .append("updatedAt", Date.from(updatedAt))
         .append("version", version)
+        .append("institutionId",institutionId)
+        .append("groupScopeRevision",groupScopeRevision)
         .append("notes", notes.map { note ->
             Document()
                 .append("id", note.id)
@@ -163,7 +169,8 @@ class MongoTutorCaseRepository(database: MongoDatabase) : TutorCaseRepository {
         createdBy = getString("createdBy"),
         createdAt = getDate("createdAt").toInstant(),
         updatedAt = getDate("updatedAt").toInstant(),
-        version = (get("version") as? Number)?.toLong() ?: 0L,
+        version = strictLong("version"),
+        institutionId=getString("institutionId"),groupScopeRevision=strictLong("groupScopeRevision"),
         notes = (getList("notes", Document::class.java) ?: emptyList()).map { note ->
             TutorCaseNoteRecord(
                 id = note.getString("id"),
@@ -174,4 +181,10 @@ class MongoTutorCaseRepository(database: MongoDatabase) : TutorCaseRepository {
             )
         },
     )
+    private fun Document.strictLong(name:String):Long = when(val value=get(name)) { is Long -> value;is Int -> value.toLong();else -> -1 }
+
 }
+
+private fun validCaseUpdate(expected:TutorCaseRecord,next:TutorCaseRecord)=expected.version>=0 && expected.version<Long.MAX_VALUE && next.version==expected.version+1 &&
+    !expected.institutionId.isNullOrBlank() && expected.groupScopeRevision>=0 && next.institutionId==expected.institutionId && next.groupScopeRevision==expected.groupScopeRevision &&
+    next.id==expected.id && next.academicGroupId==expected.academicGroupId && next.studentId==expected.studentId && next.createdAt==expected.createdAt && next.createdBy==expected.createdBy

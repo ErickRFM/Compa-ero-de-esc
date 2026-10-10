@@ -31,6 +31,8 @@ dependencies {
     implementation(composeBom)
 
     implementation(project(":shared:contracts"))
+    implementation(project(":apps:android:feature:home"))
+    implementation(project(":apps:android:core:academic"))
     implementation(project(":apps:android:core:common"))
     implementation(project(":apps:android:core:designsystem"))
     implementation(project(":apps:android:core:ui"))
@@ -48,6 +50,10 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
+    testImplementation(project(":apps:android:core:database"))
+    testImplementation(platform(libs.ktor.bom))
+    testImplementation(libs.ktor.client.mock)
+    testImplementation(libs.kotlinx.serialization.json)
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlinx.coroutines.test)

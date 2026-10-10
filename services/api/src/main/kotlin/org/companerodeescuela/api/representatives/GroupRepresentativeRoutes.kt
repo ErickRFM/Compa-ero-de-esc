@@ -15,6 +15,8 @@ import io.ktor.server.routing.route
 import org.companerodeescuela.api.auth.AuthTokenService
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
+import org.companerodeescuela.api.auth.verifiedSessionSource
+import org.companerodeescuela.api.auth.SessionIdentitySource
 import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.AppointRepresentativeRequest
@@ -33,8 +35,7 @@ fun Route.groupRepresentativeRoutes(
                 val groupId = call.requireGroupId()
                 val groupName = call.parameters["groupName"] ?: "Grupo $groupId"
                 val overview = service.getGroupOverview(
-                    actorUserId = principal.subject(),
-                    actorRoles = principal.roles(),
+                    actor = AuthTokenService(settings).userFrom(principal.payload),
                     groupId = groupId,
                     groupName = groupName,
                 )
@@ -52,8 +53,7 @@ fun Route.groupRepresentativeRoutes(
                 val groupName = call.parameters["groupName"] ?: "Grupo $groupId"
                 val request = call.receive<AppointRepresentativeRequest>()
                 val created = service.appointRepresentative(
-                    actorUserId = principal.subject(),
-                    actorRoles = principal.roles(),
+                    actor = AuthTokenService(settings).userFrom(principal.payload),
                     groupId = groupId,
                     groupName = groupName,
                     request = request,
@@ -111,8 +111,7 @@ fun Route.groupRepresentativeRoutes(
                 val principal = call.requirePrincipal()
                 val id = call.requireAssignmentId()
                 val revoked = service.revokeAppointment(
-                    actorUserId = principal.subject(),
-                    actorRoles = principal.roles(),
+                    actor = AuthTokenService(settings).userFrom(principal.payload),
                     assignmentId = id,
                 )
                 call.respond(
@@ -126,8 +125,10 @@ fun Route.groupRepresentativeRoutes(
     }
 }
 
-private fun ApplicationCall.requirePrincipal(): JWTPrincipal =
-    principal<JWTPrincipal>() ?: throw ApiException.Unauthorized()
+private fun ApplicationCall.requirePrincipal(): JWTPrincipal {
+    if(verifiedSessionSource()!=SessionIdentitySource.NATIVE) throw ApiException.Forbidden("Native identity is required")
+    return principal<JWTPrincipal>() ?: throw ApiException.Unauthorized()
+}
 
 private fun ApplicationCall.requireGroupId(): String =
     parameters["groupId"]?.takeIf(String::isNotBlank)

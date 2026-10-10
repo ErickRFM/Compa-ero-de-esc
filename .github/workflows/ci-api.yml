@@ -113,12 +113,17 @@ jobs:
           python3 - <<'PY'
           import xml.etree.ElementTree as ET
           from pathlib import Path
-          for name in ("MongoAccountLifecycleIntegrationTest", "MongoEmailVerificationIntegrationTest"):
-              report = Path(f"services/api/build/test-results/test/TEST-org.companerodeescuela.api.auth.{name}.xml")
+          suites = (("auth", "MongoAccountLifecycleIntegrationTest"), ("auth", "MongoEmailVerificationIntegrationTest"), ("security", "MongoMfaIntegrationTest"), ("auth", "MongoStaffApplicationsIntegrationTest"), ("tutoring", "MongoTutorAssignmentIntegrationTest"), ("academic.groups", "MongoAcademicGroupScopeIntegrationTest"), ("classroom", "MongoClassroomScopeIntegrationTest"), ("academic", "MongoScheduleScopeIntegrationTest"), ("presence", "MongoSchoolQrScopeIntegrationTest"), ("events", "MongoAcademicEventScopeIntegrationTest"), ("presence", "MongoSchoolPresenceScopeIntegrationTest"), ("tutoring", "MongoTutorCaseScopeIntegrationTest"), ("attendance", "MongoAttendanceSourceIntegrationTest"))
+          executed = 0
+          for package, name in suites + (("representatives", "MongoGroupRepresentativeConcurrencyTest"),):
+              report = Path(f"services/api/build/test-results/test/TEST-org.companerodeescuela.api.{package}.{name}.xml")
               suite = ET.parse(report).getroot()
-              assert int(suite.get("tests", "0")) == 3, f"Real Mongo tests missing: {name}"
+              minimum = 1 if name == "MongoGroupRepresentativeConcurrencyTest" else 3
+              count = int(suite.get("tests", "0"))
+              assert count >= minimum, f"Real Mongo tests missing: {name}, got {count}, required {minimum}"
               assert all(int(suite.get(key, "0")) == 0 for key in ("skipped", "failures", "errors")), f"Real Mongo tests did not all pass: {name}"
-          print("Real Mongo integration: 6 executed, 0 skipped, 0 failures")
+              executed += count
+          print(f"Real Mongo integration: {executed} executed, 0 skipped, 0 failures")
           PY
 
       - name: Assemble runnable service

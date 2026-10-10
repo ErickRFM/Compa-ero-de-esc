@@ -44,6 +44,8 @@ import org.companerodeescuela.core.navigation.CompaneroScaffold
 import org.companerodeescuela.core.navigation.Destination
 import org.companerodeescuela.core.navigation.RoleExperienceResolver
 import org.companerodeescuela.feature.admin.AdminHomeScreen
+import org.companerodeescuela.feature.auth.MfaScreen
+import org.companerodeescuela.feature.auth.StaffApplicationScreen
 import org.companerodeescuela.feature.attendance.AttendanceMode
 import org.companerodeescuela.feature.attendance.AttendanceScreen
 import org.companerodeescuela.feature.attendance.TeacherHomeScreen
@@ -306,8 +308,9 @@ class MainActivity : AppCompatActivity() {
                                         }
                                         composable(Destination.AdminHome.route) {
                                             AdminHomeScreen(
+                                                onOpenSecurity = { navController.navigate(Destination.Mfa.route) },
                                                 onOpenSchedule = {
-                                                    navController.navigate(Destination.Schedule.route) {
+                                                    navController.navigate(Destination.Classrooms.route) {
                                                         launchSingleTop = true
                                                     }
                                                 },
@@ -385,8 +388,16 @@ class MainActivity : AppCompatActivity() {
                                                         Destination.IntegrationSettings.route,
                                                     )
                                                 },
+                                                onSecurity = { navController.navigate(Destination.Mfa.route) },
+                                                onTutorRequest = { navController.navigate(Destination.StaffApplication.route) },
                                                 onLogout = { loginExperienceName = null; sessionViewModel.logout() },
                                             )
+                                        }
+                                        composable(Destination.Mfa.route) {
+                                            MfaScreen(onBack = { navController.popBackStack() })
+                                        }
+                                        composable(Destination.StaffApplication.route) {
+                                            StaffApplicationScreen(onBack = { navController.popBackStack() })
                                         }
                                         composable(Destination.IntegrationSettings.route) {
                                             IntegrationSettingsScreen(

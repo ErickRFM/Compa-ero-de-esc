@@ -41,5 +41,5 @@ internal fun PlatformAccount.withVerifiedEmail(hash: String, now: Instant): Plat
     val status = if (intent.profile in setOf(RegistrationAccountType.STUDENT, RegistrationAccountType.PARTICIPANT))
         AccountStatus.ACTIVE else AccountStatus.PENDING_APPROVAL
     return applyIdentityChange(authRevision, AccountIdentityChange("email-verification-${UUID.randomUUID()}", id,
-        status, roles, institutionId, now))?.copy(emailVerifiedAt = now, emailVerification = null)
+        status, roles, institutionId, now))?.copy(emailVerifiedAt = now, emailVerification = null)?.let { it.copy(roleApplications = it.staffApplications()) }
 }

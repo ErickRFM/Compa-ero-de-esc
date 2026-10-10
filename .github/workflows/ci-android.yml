@@ -241,8 +241,10 @@ jobs:
           failures = sum(int(suite.get('failures', 0)) + int(suite.get('errors', 0)) for suite in suites)
           skipped = sum(int(suite.get('skipped', 0)) for suite in suites)
           print(f'instrumentation tests={tests} failures={failures} skipped={skipped}')
-          if tests < 23 or failures != 0 or skipped != 0:
-              raise SystemExit('Instrumentation must execute all 23+ tests without failures or skips')
+          if tests < 36 or failures != 0 or skipped != 0:
+              raise SystemExit('Instrumentation must execute all 36+ tests without failures or skips')
+          administration = [case for suite in suites for case in suite.findall('testcase') if case.get('classname') == 'org.companerodeescuela.V12AdministrationUiTest']
+          assert len(administration) == 5 and len({case.get('name') for case in administration}) == 5, 'All five distinct connected V12 administration tests must run'
           PY
 
       - name: Upload Android UI evidence

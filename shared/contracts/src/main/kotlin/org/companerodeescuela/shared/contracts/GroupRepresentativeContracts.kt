@@ -36,6 +36,7 @@ data class GroupRepresentativeAssignment(
     val revokedAtEpochSeconds: Long? = null,
     val revokedBy: String? = null,
     val version: Long = 1L,
+    val groupScopeRevision:Long=-1,
 )
 
 @Serializable

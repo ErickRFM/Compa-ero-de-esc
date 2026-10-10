@@ -1,0 +1,7 @@
+<resources>
+<string name="profile_access">Seguridad y solicitudes</string>
+<string name="profile_security">Autenticación en dos pasos</string>
+<string name="profile_security_description">Configura tu autenticador para proteger operaciones sensibles.</string>
+<string name="profile_tutor_request">Solicitar acceso de tutor</string>
+<string name="profile_tutor_description">La asignación de grupos requiere revisión administrativa.</string>
+</resources>

@@ -17,17 +17,17 @@ class AcademicGroupServiceTest {
     @Test
     fun adminCreatesGroupAndAssignsStudent() = runTest {
         val repository = InMemoryAcademicGroupRepository()
-        val service = AcademicGroupService(
-            repository,
-            Clock.fixed(Instant.parse("2026-10-06T17:00:00Z"), ZoneOffset.UTC),
-        )
-
-        val group = service.create(ADMIN, CreateAcademicGroupRequest("9a", "9A"))
-        val membership = service.assignMember(
-            ADMIN,
-            group.id,
-            AssignAcademicGroupMemberRequest(STUDENT.id),
-        )
+        val clock=org.companerodeescuela.api.test.QaClock(Instant.parse("2026-10-06T17:00:00Z"))
+        val accounts=org.companerodeescuela.api.auth.InMemoryPlatformAccountRepository()
+        val operator=org.companerodeescuela.api.test.QaMfaOperator.create(accounts,ADMIN,clock)
+        accounts.create(org.companerodeescuela.api.test.ScopedAcademicFixtures.account(STUDENT))
+        val service=AcademicGroupService(repository,clock,accounts,operator.mfa,org.companerodeescuela.api.institutions.InMemoryInstitutionRepository(listOf(org.companerodeescuela.shared.contracts.InstitutionSummary("qa-campus","QA Campus"))))
+        var creation=CreateAcademicGroupRequest("9a","9A","qa-campus","qa-period",0,4102444800L,"create")
+        creation=creation.copy(proof=operator.proof(org.companerodeescuela.shared.contracts.StepUpAction.MANAGE_ACADEMICS,"9A","create",org.companerodeescuela.shared.contracts.PrivilegedCommandDigests.groupCreation("9A",creation)))
+        val group=service.create(ADMIN,creation)
+        var assignment=AssignAcademicGroupMemberRequest(STUDENT.id,"member",group.scopeRevision)
+        assignment=assignment.copy(proof=operator.proof(org.companerodeescuela.shared.contracts.StepUpAction.MANAGE_ACADEMICS,group.id,"member",org.companerodeescuela.shared.contracts.PrivilegedCommandDigests.groupMembership(group.id,assignment)))
+        val membership=service.assignMember(ADMIN,group.id,assignment)
 
         assertEquals("9A", group.id)
         assertEquals(STUDENT.id, membership.userId)
@@ -63,7 +63,7 @@ class AcademicGroupServiceTest {
         val ADMIN = UserSummary(
             id = "admin-1",
             displayName = "Control escolar",
-            roles = setOf(UserRole.ADMIN),
+            roles = setOf(UserRole.ADMIN),institutionId="qa-campus",
         )
         val TEACHER = UserSummary(
             id = "teacher-1",
@@ -73,7 +73,7 @@ class AcademicGroupServiceTest {
         val STUDENT = UserSummary(
             id = "student-1",
             displayName = "Ana",
-            roles = setOf(UserRole.STUDENT),
+            roles = setOf(UserRole.STUDENT),institutionId="qa-campus",
         )
     }
 }

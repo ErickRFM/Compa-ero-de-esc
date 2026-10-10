@@ -28,13 +28,22 @@ data class UpsertScheduleBlockRequest(
     val effectiveDate: String? = null,
     val mutationScope: ScheduleMutationScope = ScheduleMutationScope.ENTIRE_SERIES,
     val reason: String? = null,
-)
+    val operationId:String?=null,
+    val expectedRevision:Long=0,
+    val groupScopeRevision:Long=0,
+    val proof:String?=null,
+) { override fun toString()="UpsertScheduleBlockRequest(ownerId=$ownerId, groupId=$groupId, proof=[redacted])" }
 
 @Serializable
 data class ManagedScheduleBlock(
     val ownerId: String,
     val block: ScheduleBlock,
     val reason: String? = null,
+    val institutionId:String?=null,
+    val groupScopeRevision:Long=-1,
+    val revision:Long=0,
+    val operationId:String?=null,
+    val operationDigest:String?=null,
 )
 
 @Serializable
@@ -52,3 +61,7 @@ data class ScheduleConflictResolution(
     val resolvedAtEpochSeconds: Long,
     val reason: String? = null,
 )
+
+@Serializable data class AcademicOperationRequest(val operationId:String,val expectedRevision:Long,val proof:String) {
+    override fun toString()="AcademicOperationRequest(operationId=$operationId, proof=[redacted])"
+}

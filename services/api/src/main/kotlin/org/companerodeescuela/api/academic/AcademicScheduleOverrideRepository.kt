@@ -6,6 +6,7 @@ import com.mongodb.client.model.Sorts
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.sync.withLock
 import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.codecs.pojo.annotations.BsonProperty
 import org.companerodeescuela.shared.contracts.AcademicDataSource
@@ -20,11 +21,13 @@ interface AcademicScheduleOverrideRepository {
     suspend fun listForOwner(ownerId: String): List<ManagedScheduleBlock>
     suspend fun findById(id: String): ManagedScheduleBlock?
     suspend fun save(value: ManagedScheduleBlock): ManagedScheduleBlock
+    suspend fun saveScoped(value:ManagedScheduleBlock,expectedRevision:Long):ManagedScheduleBlock? = null
     suspend fun delete(id: String): Boolean
 }
 
 class InMemoryAcademicScheduleOverrideRepository : AcademicScheduleOverrideRepository {
     private val storage = ConcurrentHashMap<String, ManagedScheduleBlock>()
+    private val scopeMutex=kotlinx.coroutines.sync.Mutex()
 
     override suspend fun listForOwner(ownerId: String): List<ManagedScheduleBlock> =
         storage.values
@@ -36,6 +39,15 @@ class InMemoryAcademicScheduleOverrideRepository : AcademicScheduleOverrideRepos
     override suspend fun save(value: ManagedScheduleBlock): ManagedScheduleBlock {
         storage[value.block.id] = value
         return value
+    }
+
+    override suspend fun saveScoped(value:ManagedScheduleBlock,expectedRevision:Long):ManagedScheduleBlock? = scopeMutex.withLock {
+        if(!value.validScopedRevision(expectedRevision)) return@withLock null
+        val current=storage[value.block.id]
+        if(current!=null && current.exactScopedRetry(value,expectedRevision)) return@withLock current
+        if((current==null && expectedRevision!=0L) || (current!=null && current.revision!=expectedRevision)) return@withLock null
+        storage[value.block.id]=value
+        value
     }
 
     override suspend fun delete(id: String): Boolean = storage.remove(id) != null
@@ -68,6 +80,11 @@ internal data class AcademicScheduleOverrideDocument(
     @param:BsonProperty("createdAtEpochSeconds") val createdAtEpochSeconds: Long,
     @param:BsonProperty("updatedAtEpochSeconds") val updatedAtEpochSeconds: Long,
     @param:BsonProperty("reason") val reason: String?,
+    @param:BsonProperty("institutionId") val institutionId:String?=null,
+    @param:BsonProperty("groupScopeRevision") val groupScopeRevision:Long?=null,
+    @param:BsonProperty("revision") val revision:Long?=null,
+    @param:BsonProperty("operationId") val operationId:String?=null,
+    @param:BsonProperty("operationDigest") val operationDigest:String?=null,
 ) {
     fun toModel(): ManagedScheduleBlock = ManagedScheduleBlock(
         ownerId = ownerId,
@@ -100,7 +117,7 @@ internal data class AcademicScheduleOverrideDocument(
             seriesId = seriesId,
             effectiveDate = effectiveDate,
         ),
-        reason = reason,
+        reason = reason,institutionId=institutionId,groupScopeRevision=groupScopeRevision ?: -1,revision=revision ?: 0,operationId=operationId,operationDigest=operationDigest,
     )
 
     companion object {
@@ -133,7 +150,7 @@ internal data class AcademicScheduleOverrideDocument(
                 updatedBy = provenance.updatedBy,
                 createdAtEpochSeconds = provenance.createdAtEpochSeconds,
                 updatedAtEpochSeconds = provenance.updatedAtEpochSeconds,
-                reason = value.reason,
+                reason = value.reason,institutionId=value.institutionId,groupScopeRevision=value.groupScopeRevision,revision=value.revision,operationId=value.operationId,operationDigest=value.operationDigest,
             )
         }
     }
@@ -163,6 +180,30 @@ class MongoAcademicScheduleOverrideRepository(
         return value
     }
 
+    override suspend fun saveScoped(value:ManagedScheduleBlock,expectedRevision:Long):ManagedScheduleBlock? {
+        if(!value.validScopedRevision(expectedRevision)) return null
+        val current=findById(value.block.id)
+        if(current!=null && current.exactScopedRetry(value,expectedRevision)) return current
+        if(current==null) {
+            if(expectedRevision!=0L) return null
+            try { collection.insertOne(AcademicScheduleOverrideDocument.fromModel(value));return value }
+            catch(error:com.mongodb.MongoWriteException) { if(error.error.code!=11000) throw error }
+        } else if(current.revision==expectedRevision) {
+            val filter=Filters.and(Filters.eq("_id",value.block.id),Filters.eq("revision",expectedRevision))
+            val changed=collection.findOneAndReplace(filter,AcademicScheduleOverrideDocument.fromModel(value),
+                com.mongodb.client.model.FindOneAndReplaceOptions().returnDocument(com.mongodb.client.model.ReturnDocument.AFTER))
+            if(changed!=null) return changed.toModel()
+        }
+        return findById(value.block.id)?.takeIf { it.exactScopedRetry(value,expectedRevision) }
+    }
+
     override suspend fun delete(id: String): Boolean =
         collection.deleteOne(Filters.eq("_id", id)).deletedCount > 0
+}
+
+private fun ManagedScheduleBlock.validScopedRevision(expectedRevision:Long)=expectedRevision>=0 && expectedRevision<Long.MAX_VALUE && revision==expectedRevision+1 &&
+    !institutionId.isNullOrBlank() && groupScopeRevision>=0 && !operationId.isNullOrBlank() && operationDigest?.matches(Regex("[a-f0-9]{64}"))==true
+private fun ManagedScheduleBlock.exactScopedRetry(request:ManagedScheduleBlock,expectedRevision:Long):Boolean {
+    fun ManagedScheduleBlock.normalized()=copy(block=block.copy(provenance=block.provenance.copy(createdAtEpochSeconds=0,updatedAtEpochSeconds=0)))
+    return revision==expectedRevision+1 && normalized()==request.normalized()
 }

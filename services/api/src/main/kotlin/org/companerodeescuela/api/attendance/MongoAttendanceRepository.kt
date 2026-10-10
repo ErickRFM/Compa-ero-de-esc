@@ -185,6 +185,10 @@ class MongoAttendanceRepository(
         .append("closesAtEpochSeconds", closesAtEpochSeconds)
         .append("closedAtEpochSeconds", closedAtEpochSeconds)
         .append("status", status.name)
+        .append("identitySource",identitySource?.name)
+        .append("institutionId",institutionId)
+        .append("groupId",groupId)
+        .append("groupScopeRevision",groupScopeRevision)
 
     private fun Document.toSession(): AttendanceSessionResponse =
         AttendanceSessionResponse(
@@ -200,6 +204,10 @@ class MongoAttendanceRepository(
             closesAtEpochSeconds = requireLong("closesAtEpochSeconds"),
             closedAtEpochSeconds = numberAsLong("closedAtEpochSeconds"),
             status = AttendanceSessionStatus.valueOf(getString("status")),
+            identitySource=(get("identitySource") as? String)?.let { raw -> org.companerodeescuela.shared.contracts.AttendanceIdentitySource.entries.firstOrNull { it.name==raw } },
+            institutionId=get("institutionId") as? String,
+            groupId=get("groupId") as? String,
+            groupScopeRevision=when(val scope=get("groupScopeRevision")) { is Long -> scope;is Int -> scope.toLong();else -> -1 },
         )
 
     private fun AttendanceRecordResponse.toDocument(): Document = Document()

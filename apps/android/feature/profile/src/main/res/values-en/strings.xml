@@ -1,0 +1,7 @@
+<resources>
+<string name="profile_access">Security and applications</string>
+<string name="profile_security">Two-factor authentication</string>
+<string name="profile_security_description">Set up your authenticator to protect sensitive operations.</string>
+<string name="profile_tutor_request">Request tutor access</string>
+<string name="profile_tutor_description">Group assignments require administrative review.</string>
+</resources>

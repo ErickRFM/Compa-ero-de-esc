@@ -25,83 +25,50 @@ class ClassroomService(
     private val groupRepository: AcademicGroupRepository? = null,
     private val clock: Clock = Clock.systemUTC(),
     private val random: SecureRandom = SecureRandom(),
+    private val accounts:org.companerodeescuela.api.auth.PlatformAccountRepository?=null,
+    private val mfa:org.companerodeescuela.api.security.MfaService?=null,
 ) {
-    suspend fun listFor(actor: UserSummary): List<ClassroomSummary> {
-        val admin = isAcademicAdmin(actor)
-        return if (admin) {
-            repository.listClassrooms().map { classroom ->
-                classroom.toSummary(
-                    canManage = true,
-                    canManageEnrollment = true,
-                )
-            }
-        } else {
-            val direct = repository.listClassroomsForUser(actor.id)
-                .map { (classroom, membership) ->
-                    classroom.toSummary(
-                        canManage = canOperate(actor, classroom),
-                        canManageEnrollment = false,
-                        joinedAtEpochSeconds = membership.joinedAt.epochSecond,
-                    )
-                }
-            val groupIds = groupRepository
-                ?.listGroupsForUser(actor.id)
-                .orEmpty()
-                .map(AcademicGroupRecord::id)
-                .toSet()
-            val inherited = repository.listClassroomsForGroups(groupIds)
-                .map { classroom ->
-                    classroom.toSummary(
-                        canManage = canOperate(actor, classroom),
-                        canManageEnrollment = false,
-                    )
-                }
-            (direct + inherited).distinctBy(ClassroomSummary::id)
-        }.sortedWith(
-            compareBy<ClassroomSummary> { it.groupName.orEmpty() }
-                .thenBy(ClassroomSummary::name),
-        )
-    }
-
-    suspend fun create(
-        actor: UserSummary,
-        request: CreateClassroomRequest,
-    ): ClassroomSummary {
-        requireAcademicAdmin(actor)
-        val name = request.name.trim()
-        if (name.length !in 2..120) {
-            throw ApiException.Validation("Classroom name must contain between 2 and 120 characters")
+    suspend fun listFor(actor:UserSummary):List<ClassroomSummary> {
+        val current=policy().live(actor)
+        val admin=isAcademicAdmin(actor)
+        if(admin) policy().require(actor,org.companerodeescuela.shared.contracts.AdminCapability.MANAGE_ACADEMICS,current.institutionId ?: "global")
+        val direct=if(admin) repository.listClassrooms() else {
+            val groupIds=groupRepository?.listGroupsForUser(actor.id).orEmpty().filter { it.institutionId==current.institutionId }.map { it.id }.toSet()
+            (repository.listClassroomsForUser(actor.id).map { it.first }+repository.listClassroomsForGroups(groupIds)).distinctBy { it.id }
         }
-        val groupId = required(request.groupId, "groupId")
-        val groupName = required(request.groupName, "groupName")
-        val teacherId = required(request.teacherId, "teacherId")
-        val teacherDisplayName = required(request.teacherDisplayName, "teacherDisplayName")
-        val now = clock.instant()
-        val classroom = NativeClassroom(
-            id = UUID.randomUUID().toString(),
-            name = name,
-            description = request.description?.trim()?.takeIf(String::isNotBlank)?.take(500),
-            room = request.room?.trim()?.takeIf(String::isNotBlank)?.take(120),
-            groupId = groupId,
-            groupName = groupName,
-            teacherId = teacherId,
-            teacherDisplayName = teacherDisplayName,
-            status = ClassroomStatus.ACTIVE,
-            createdAt = now,
-        )
+        return direct.filter { classroom ->
+            val group=classroom.groupId?.let { groupRepository?.find(it) }
+            group!=null && validScope(classroom,group) && (UserRole.SUPER_ADMIN in current.roles || group.institutionId==current.institutionId) &&
+                (admin || (UserRole.STUDENT in current.roles) || (UserRole.TEACHER in current.roles && classroom.teacherId==current.id && classroom.teacherRoleGeneration==current.roleGenerations[UserRole.TEACHER]))
+        }.map { classroom -> classroom.toSummary(canManage=canOperate(actor,classroom),canManageEnrollment=admin,
+            joinedAtEpochSeconds=repository.findMembership(classroom.id,actor.id)?.joinedAt?.epochSecond) }
+            .sortedWith(compareBy<ClassroomSummary> { it.groupName.orEmpty() }.thenBy { it.name })
+    }
+    suspend fun create(actor:UserSummary,request:CreateClassroomRequest):ClassroomSummary {
+        requireAcademicAdmin(actor)
+        val groupId=required(request.groupId,"groupId")
+        val group=groupRepository?.find(groupId) ?: throw ApiException.Validation("An actual academic group is required")
+        val institution=group.institutionId ?: throw ApiException.Forbidden("Explicit group institution is required")
+        val current=policy().require(actor,org.companerodeescuela.shared.contracts.AdminCapability.MANAGE_ACADEMICS,institution)
+        val operation=request.operationId ?: throw ApiException.Forbidden("Scoped MFA operation is required")
+        val proof=request.proof ?: throw ApiException.Forbidden("Scoped MFA proof is required")
+        if(!boundedId(operation)) throw ApiException.Validation("A bounded operation is required")
+        if(!group.active || group.scopeRevision<0 || group.scopeRevision!=request.groupScopeRevision || group.startsAt==null || group.endsAt==null || group.endsAt<=clock.instant() || group.periodId.isNullOrBlank()) throw ApiException.Validation("Current group scope is required")
+        val digest=org.companerodeescuela.shared.contracts.PrivilegedCommandDigests.classroomAssignment(groupId,request)
+        (mfa ?: throw ApiException.DependencyUnavailable("MFA is unavailable")).requireStepUp(current,proof,org.companerodeescuela.shared.contracts.StepUpAction.MANAGE_ACADEMICS,groupId,operation,digest)
+        val teacher=accounts?.findById(required(request.teacherId,"teacherId")) ?: throw ApiException.Validation("An actual verified teacher is required")
+        if(!teacher.permitsSession || teacher.accountStatus!=org.companerodeescuela.shared.contracts.AccountStatus.ACTIVE || teacher.emailVerifiedAt==null || teacher.emailVerifiedAt>clock.instant() || UserRole.TEACHER !in teacher.roles || teacher.institutionId!=institution) throw ApiException.Validation("Teacher must be verified and active in this institution")
+        val name=request.name.trim()
+        if(name.length !in 2..120 || name.any(Char::isISOControl)) throw ApiException.Validation("Classroom name must contain between 2 and 120 characters")
+        val now=clock.instant()
+        val classroom=NativeClassroom(id="class-"+UUID.nameUUIDFromBytes((current.id+"\u0000"+operation).toByteArray(Charsets.UTF_8)),name=name,
+            description=request.description?.trim()?.takeIf(String::isNotBlank)?.take(500),room=request.room?.trim()?.takeIf(String::isNotBlank)?.take(120),
+            groupId=group.id,groupName=group.name,teacherId=teacher.id,teacherDisplayName=teacher.displayName,status=ClassroomStatus.ACTIVE,createdAt=now,
+            groupScopeRevision=group.scopeRevision,teacherRoleGeneration=teacher.roleGenerations[UserRole.TEACHER] ?: throw ApiException.Validation("Teacher grant generation is required"),
+            assignedBy=current.id,assignmentOperationId=operation,assignmentDigest=digest)
         repository.createClassroom(classroom)
-        repository.addMembershipIfAbsent(
-            NativeClassroomMembership(
-                classroomId = classroom.id,
-                userId = teacherId,
-                role = ClassroomMemberRole.TEACHER,
-                joinedAt = now,
-            ),
-        )
-        return classroom.toSummary(
-            canManage = true,
-            canManageEnrollment = true,
-        )
+        repository.addMembershipIfAbsent(NativeClassroomMembership(classroom.id,teacher.id,ClassroomMemberRole.TEACHER,now))
+        return (repository.findClassroom(classroom.id) ?: throw ApiException.DependencyUnavailable("Classroom persistence is unavailable")).toSummary(true,true)
     }
 
     suspend fun createInvite(
@@ -112,6 +79,7 @@ class ClassroomService(
         requireAcademicAdmin(actor)
         val classroom = repository.findClassroom(classroomId)
             ?: throw ApiException.NotFound("Classroom was not found")
+        requireScopedAdmin(actor,classroom)
         if (classroom.status != ClassroomStatus.ACTIVE) {
             throw ApiException.Conflict("Archived classrooms cannot create invitations")
         }
@@ -160,6 +128,9 @@ class ClassroomService(
         val classroom = repository.findClassroom(invite.classroomId)
             ?: throw ApiException.NotFound("Classroom was not found")
 
+        val current=policy().live(actor)
+        val group=requireGroup(classroom)
+        if(current.institutionId!=group.institutionId) throw ApiException.Forbidden("Classroom enrollment belongs to another institution")
         repository.findMembership(classroom.id, actor.id)?.let { existing ->
             return JoinClassInviteResponse(
                 classroom = classroom.toSummary(
@@ -198,6 +169,8 @@ class ClassroomService(
         inviteId: String,
     ) {
         requireAcademicAdmin(actor)
+        val classroom=repository.findClassroom(classroomId) ?: throw ApiException.NotFound("Classroom was not found")
+        requireScopedAdmin(actor,classroom,allowStale=true)
         if (!repository.revokeInvite(inviteId, classroomId, clock.instant())) {
             throw ApiException.NotFound("Active invitation was not found")
         }
@@ -205,47 +178,56 @@ class ClassroomService(
 
     suspend fun nativeChannelsFor(actor: UserSummary): List<ClassroomSummary> = listFor(actor)
 
-    suspend fun requireCanRead(actor: UserSummary, classroomId: String): ClassroomSummary {
-        val classroom = repository.findClassroom(classroomId)
-            ?: throw ApiException.NotFound("Classroom was not found")
-        val membership = repository.findMembership(classroomId, actor.id)
-        val inheritedAccess = classroom.groupId?.let { groupId ->
-            groupRepository?.isUserInGroup(actor.id, groupId)
-        } == true
-        if (membership == null && !inheritedAccess && !isAcademicAdmin(actor)) {
-            throw ApiException.Forbidden("This classroom is not assigned to your account or academic group")
+    suspend fun requireCanRead(actor:UserSummary,classroomId:String):ClassroomSummary {
+        val classroom=repository.findClassroom(classroomId) ?: throw ApiException.NotFound("Classroom was not found")
+        val current=policy().live(actor);val group=requireGroup(classroom)
+        if(isAcademicAdmin(actor)) requireScopedAdmin(actor,classroom)
+        else {
+            if(current.institutionId!=group.institutionId) throw ApiException.Forbidden("Classroom belongs to another institution")
+            val membership=repository.findMembership(classroomId,actor.id)
+            val inherited=groupRepository?.isUserInGroup(actor.id,group.id)==true
+            if(!canOperate(actor,classroom) && !(UserRole.STUDENT in current.roles && (membership?.role==ClassroomMemberRole.STUDENT || inherited))) throw ApiException.Forbidden("This classroom is not assigned to your account or group")
         }
-        return classroom.toSummary(
-            canManage = canOperate(actor, classroom),
-            canManageEnrollment = isAcademicAdmin(actor),
-            joinedAtEpochSeconds = membership?.joinedAt?.epochSecond,
-        )
+        return classroom.toSummary(canOperate(actor,classroom),isAcademicAdmin(actor),repository.findMembership(classroomId,actor.id)?.joinedAt?.epochSecond)
     }
-
-    suspend fun requireCanPublish(actor: UserSummary, classroomId: String): ClassroomSummary {
-        val classroom = repository.findClassroom(classroomId)
-            ?: throw ApiException.NotFound("Classroom was not found")
-        if (!canOperate(actor, classroom)) {
-            throw ApiException.Forbidden("Only the assigned teacher or administrators can publish")
-        }
-        return classroom.toSummary(
-            canManage = true,
-            canManageEnrollment = isAcademicAdmin(actor),
-        )
+    suspend fun studentIdsForTeacher(actor:UserSummary,classroomId:String):List<String> {
+        val current=policy().live(actor)
+        val classroom=requireCanPublish(actor,classroomId)
+        if(UserRole.TEACHER !in current.roles || classroom.teacherId!=current.id) throw ApiException.Forbidden("Actual assigned teacher is required")
+        val group=scopedGroupFor(actor,classroomId)
+        val direct=repository.listMembershipsForClass(classroomId).filter { it.role==ClassroomMemberRole.STUDENT }.map { it.userId }
+        return (direct+groupRepository?.memberIdsForGroup(group.id).orEmpty()).distinct()
     }
-
-    private fun canOperate(actor: UserSummary, classroom: NativeClassroom): Boolean =
-        isAcademicAdmin(actor) ||
-            (UserRole.TEACHER in actor.roles && classroom.teacherId == actor.id)
-
-    private fun requireAcademicAdmin(actor: UserSummary) {
-        if (!isAcademicAdmin(actor)) {
-            throw ApiException.Forbidden("Academic administration permission is required")
-        }
+    suspend fun scopedGroupFor(actor:UserSummary,classroomId:String):AcademicGroupRecord {
+        requireCanRead(actor,classroomId)
+        return requireGroup(repository.findClassroom(classroomId) ?: throw ApiException.NotFound("Classroom was not found"))
     }
-
-    private fun isAcademicAdmin(actor: UserSummary): Boolean =
-        UserRole.ADMIN in actor.roles || UserRole.SUPER_ADMIN in actor.roles
+    suspend fun requireCanPublish(actor:UserSummary,classroomId:String):ClassroomSummary {
+        val classroom=repository.findClassroom(classroomId) ?: throw ApiException.NotFound("Classroom was not found")
+        if(!canOperate(actor,classroom)) throw ApiException.Forbidden("Only the current assigned teacher or scoped administration can publish")
+        return classroom.toSummary(true,isAcademicAdmin(actor))
+    }
+    private suspend fun canOperate(actor:UserSummary,classroom:NativeClassroom):Boolean {
+        val current=policy().live(actor);val group=requireGroup(classroom)
+        if(isAcademicAdmin(actor)) { requireScopedAdmin(actor,classroom);return true }
+        return UserRole.TEACHER in current.roles && current.institutionId==group.institutionId && classroom.teacherId==current.id && classroom.teacherRoleGeneration==current.roleGenerations[UserRole.TEACHER]
+    }
+    private fun validScope(classroom:NativeClassroom,group:AcademicGroupRecord)=classroom.status==ClassroomStatus.ACTIVE && group.active && !group.institutionId.isNullOrBlank() &&
+        !group.periodId.isNullOrBlank() && group.scopeRevision>=0 && classroom.groupScopeRevision==group.scopeRevision && group.startsAt!=null && group.endsAt!=null && group.startsAt<=clock.instant() && clock.instant()<group.endsAt
+    private suspend fun requireGroup(classroom:NativeClassroom):AcademicGroupRecord {
+        val group=classroom.groupId?.let { groupRepository?.find(it) } ?: throw ApiException.Forbidden("Actual classroom group scope is unavailable")
+        if(!validScope(classroom,group)) throw ApiException.Forbidden("Current classroom group scope is required")
+        return group
+    }
+    private suspend fun requireScopedAdmin(actor:UserSummary,classroom:NativeClassroom,allowStale:Boolean=false) {
+        requireAcademicAdmin(actor)
+        val group=if(allowStale) classroom.groupId?.let { groupRepository?.find(it) } ?: throw ApiException.Forbidden("Actual classroom group is required") else requireGroup(classroom)
+        policy().require(actor,org.companerodeescuela.shared.contracts.AdminCapability.MANAGE_ACADEMICS,group.institutionId ?: throw ApiException.Forbidden("Explicit institution is required"))
+    }
+    private fun policy()=org.companerodeescuela.api.admin.InstitutionScopePolicy(accounts ?: throw ApiException.DependencyUnavailable("Native account authority is unavailable"),clock)
+    private fun requireAcademicAdmin(actor:UserSummary) { if(!isAcademicAdmin(actor)) throw ApiException.Forbidden("Academic administration permission is required") }
+    private fun isAcademicAdmin(actor:UserSummary)=UserRole.ADMIN in actor.roles || UserRole.SUPER_ADMIN in actor.roles
+    private fun boundedId(value:String)=value.isNotBlank() && value==value.trim() && value.length<=128 && value.none(Char::isISOControl)
 
     private fun required(raw: String, name: String): String =
         raw.trim().takeIf(String::isNotBlank)

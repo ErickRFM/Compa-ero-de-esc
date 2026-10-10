@@ -32,13 +32,14 @@ data class AcademicFeatureGraph(
     val caseService: TutorCaseService,
     val representativeService: GroupRepresentativeService,
     val scheduleOverrides: AcademicScheduleOverrideRepository,
-    val scheduleManagement: AcademicScheduleManagementService,
 )
 
 fun buildAcademicFeatureGraph(
     settings: ApiSettings,
     mongoConnection: MongoConnection,
     accounts: PlatformAccountRepository? = null,
+    mfa: org.companerodeescuela.api.security.MfaService? = null,
+    institutions:org.companerodeescuela.api.institutions.InstitutionRepository?=null,
 ): AcademicFeatureGraph {
     val groupRepository = when {
         !settings.hasAuthentication -> InMemoryAcademicGroupRepository()
@@ -76,6 +77,7 @@ fun buildAcademicFeatureGraph(
         repository = tutorRepository,
         groupRepository = groupRepository,
         accounts = accounts,
+        mfa = mfa,
     )
     val representativeService = GroupRepresentativeService(
         repository = representativeRepository,
@@ -83,11 +85,10 @@ fun buildAcademicFeatureGraph(
     )
     return AcademicFeatureGraph(
         groupRepository = groupRepository,
-        groupService = AcademicGroupService(groupRepository),
+        groupService = AcademicGroupService(groupRepository,accounts=accounts,mfa=mfa,institutions=institutions),
         tutoringService = tutoringService,
         caseService = TutorCaseService(caseRepository, tutoringService, groupRepository),
         representativeService = representativeService,
         scheduleOverrides = scheduleOverrides,
-        scheduleManagement = AcademicScheduleManagementService(scheduleOverrides),
     )
 }

@@ -31,7 +31,10 @@ class MongoClassroomRepository(database: MongoDatabase) : ClassroomRepository {
 
     override suspend fun createClassroom(classroom: NativeClassroom) {
         ensureIndexes()
-        classrooms.insertOne(classroom.toDocument())
+        try { classrooms.insertOne(classroom.toDocument()) } catch(error:com.mongodb.MongoWriteException) {
+            if(error.error.code!=11000) throw error
+            (findClassroom(classroom.id) ?: throw error).requireExactAssignment(classroom)
+        }
     }
 
     override suspend fun findClassroom(classroomId: String): NativeClassroom? {
@@ -63,6 +66,10 @@ class MongoClassroomRepository(database: MongoDatabase) : ClassroomRepository {
         }
     }
 
+    override suspend fun listMembershipsForClass(classroomId:String):List<NativeClassroomMembership> {
+        ensureIndexes()
+        return memberships.find(eq("classroomId",classroomId)).toList().map { it.toMembership() }
+    }
     override suspend fun findMembership(
         classroomId: String,
         userId: String,
@@ -182,6 +189,8 @@ class MongoClassroomRepository(database: MongoDatabase) : ClassroomRepository {
         .append("groupName", groupName)
         .append("teacherId", teacherId)
         .append("teacherDisplayName", teacherDisplayName)
+        .append("groupScopeRevision",groupScopeRevision).append("teacherRoleGeneration",teacherRoleGeneration)
+        .append("assignedBy",assignedBy).append("assignmentOperationId",assignmentOperationId).append("assignmentDigest",assignmentDigest)
         .append("status", status.name)
         .append("createdAt", Date.from(createdAt))
 
@@ -194,6 +203,8 @@ class MongoClassroomRepository(database: MongoDatabase) : ClassroomRepository {
         groupName = getString("groupName"),
         teacherId = getString("teacherId"),
         teacherDisplayName = getString("teacherDisplayName"),
+        groupScopeRevision=strictRevision("groupScopeRevision"),teacherRoleGeneration=strictRevision("teacherRoleGeneration"),
+        assignedBy=getString("assignedBy"),assignmentOperationId=getString("assignmentOperationId"),assignmentDigest=getString("assignmentDigest"),
         status = ClassroomStatus.valueOf(getString("status")),
         createdAt = getDate("createdAt").toInstant(),
     )
@@ -233,6 +244,8 @@ class MongoClassroomRepository(database: MongoDatabase) : ClassroomRepository {
         uses = (get("uses") as Number).toInt(),
         revokedAt = getDate("revokedAt")?.toInstant(),
     )
+
+    private fun Document.strictRevision(key:String)=when(val value=get(key)) { is Long->value;is Int->value.toLong();else-> -1L }
 
     private companion object {
         const val CLASSROOMS = "native_classrooms"

@@ -18,6 +18,8 @@ sealed class Destination(val route: String) {
     data object Grading : Destination("grading")
     data object RoleUnavailable : Destination("role-unavailable")
     data object Profile : Destination("profile")
+    data object Mfa : Destination("account-mfa")
+    data object StaffApplication : Destination("staff-application")
     data object AppearanceSettings : Destination("appearance-settings")
     data object IntegrationSettings : Destination("integration-settings")
     data object DesignSystemCatalog : Destination("design-system-catalog")

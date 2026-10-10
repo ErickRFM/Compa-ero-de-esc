@@ -16,6 +16,11 @@ data class NativeClassroom(
     val teacherDisplayName: String,
     val status: ClassroomStatus,
     val createdAt: Instant,
+    val groupScopeRevision:Long=-1,
+    val teacherRoleGeneration:Long=-1,
+    val assignedBy:String?=null,
+    val assignmentOperationId:String?=null,
+    val assignmentDigest:String?=null,
 )
 
 data class NativeClassroomMembership(
@@ -43,6 +48,7 @@ interface ClassroomRepository {
     suspend fun listClassrooms(): List<NativeClassroom>
     suspend fun listClassroomsForGroups(groupIds: Set<String>): List<NativeClassroom>
     suspend fun listClassroomsForUser(userId: String): List<Pair<NativeClassroom, NativeClassroomMembership>>
+    suspend fun listMembershipsForClass(classroomId:String):List<NativeClassroomMembership>
     suspend fun findMembership(classroomId: String, userId: String): NativeClassroomMembership?
     suspend fun addMembershipIfAbsent(membership: NativeClassroomMembership): NativeClassroomMembership
     suspend fun createInvite(invite: NativeClassInviteRecord)
@@ -57,7 +63,7 @@ class InMemoryClassroomRepository : ClassroomRepository {
     private val invites = ConcurrentHashMap<String, NativeClassInviteRecord>()
 
     override suspend fun createClassroom(classroom: NativeClassroom) {
-        classrooms[classroom.id] = classroom
+        classrooms.putIfAbsent(classroom.id,classroom)?.let { it.requireExactAssignment(classroom) }
     }
 
     override suspend fun findClassroom(classroomId: String): NativeClassroom? = classrooms[classroomId]
@@ -76,6 +82,8 @@ class InMemoryClassroomRepository : ClassroomRepository {
             .mapNotNull { membership ->
                 classrooms[membership.classroomId]?.let { it to membership }
             }
+
+    override suspend fun listMembershipsForClass(classroomId:String):List<NativeClassroomMembership> = memberships.values.filter { it.classroomId==classroomId }
 
     override suspend fun findMembership(
         classroomId: String,
@@ -125,4 +133,8 @@ class InMemoryClassroomRepository : ClassroomRepository {
 
     private fun membershipKey(classroomId: String, userId: String): String =
         "$classroomId::$userId"
+}
+
+internal fun NativeClassroom.requireExactAssignment(request:NativeClassroom) {
+    if(copy(createdAt=Instant.EPOCH)!=request.copy(createdAt=Instant.EPOCH)) throw org.companerodeescuela.api.errors.ApiException.Conflict("Classroom assignment belongs to a different operation or scope")
 }

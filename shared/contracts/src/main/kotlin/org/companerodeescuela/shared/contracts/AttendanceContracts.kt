@@ -85,6 +85,11 @@ data class CreateAttendanceSessionRequest(
     val durationMinutes: Int = 6,
 )
 
+@Serializable enum class AttendanceIdentitySource {
+    @SerialName("native") NATIVE,
+    @SerialName("institutional") INSTITUTIONAL,
+}
+
 @Serializable
 data class AttendanceSessionResponse(
     val id: String,
@@ -99,6 +104,10 @@ data class AttendanceSessionResponse(
     val closesAtEpochSeconds: Long,
     val closedAtEpochSeconds: Long? = null,
     val status: AttendanceSessionStatus,
+    val identitySource:AttendanceIdentitySource?=null,
+    val institutionId:String?=null,
+    val groupId:String?=null,
+    val groupScopeRevision:Long=-1,
 )
 
 @Serializable

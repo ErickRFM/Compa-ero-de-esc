@@ -71,6 +71,14 @@ data class AcademicEvent(
     val effectiveAtEpochSeconds: Long? = null,
     val createdAtEpochSeconds: Long,
     val expiresAtEpochSeconds: Long? = null,
+    val institutionId:String?=null,
+    val groupScopeRevision:Long=-1,
+    val revision:Long=0,
+    val operationId:String?=null,
+    val commandDigest:String?=null,
+    val authorRoleGeneration:Long=-1,
+    val audit:List<AcademicEventAuditEntry> = emptyList(),
+    val cancelled:Boolean=false,
 )
 
 @Serializable
@@ -78,3 +86,10 @@ data class AcademicEventFeedResponse(
     val events: List<AcademicEvent>,
     val generatedAtEpochSeconds: Long,
 )
+
+@Serializable
+data class AcademicEventWriteRequest(val operationId:String,val expectedRevision:Long,val event:AcademicEvent,val proof:String?=null) {
+    override fun toString()="AcademicEventWriteRequest(operationId=$operationId, expectedRevision=$expectedRevision, proof=[redacted])"
+}
+@Serializable
+data class AcademicEventAuditEntry(val actorId:String,val operationId:String,val commandDigest:String,val fromRevision:Long,val atEpochSeconds:Long,val cancelled:Boolean=false)

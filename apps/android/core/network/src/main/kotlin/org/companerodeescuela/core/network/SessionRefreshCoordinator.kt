@@ -196,7 +196,8 @@ class SessionRefreshCoordinator(
 
     private suspend fun clearIfSessionMatches(sessionId: String?) {
         val stored = tokenStore.readRefreshSession()
-        if (sessionId == null || stored?.sessionId == sessionId) {
+        val accessSession=if(stored==null) tokenStore.readAccessToken()?.let(SessionTokenInspector::inspect)?.sessionId else null
+        if (sessionId == null || stored?.sessionId == sessionId || (stored==null && accessSession==sessionId)) {
             runCatching { tokenStore.clear() }
         }
     }

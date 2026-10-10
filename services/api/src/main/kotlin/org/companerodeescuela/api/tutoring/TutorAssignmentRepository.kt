@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.bson.Document
+import org.companerodeescuela.api.errors.ApiException
 
 data class TutorAssignmentRecord(
     val id: String,
@@ -27,6 +28,14 @@ data class TutorAssignmentRecord(
     val assignedAt: Instant,
     val revokedAt: Instant? = null,
     val revokedBy: String? = null,
+    val institutionId: String? = null,
+    val periodId: String? = null,
+    val startsAt: Instant? = null,
+    val endsAt: Instant? = null,
+    val tutorRoleGeneration: Long = -1,
+    val revocationOperationId: String? = null,
+    val revocationDigest: String? = null,
+    val groupScopeRevision: Long = 0,
 )
 
 interface TutorAssignmentRepository {
@@ -35,7 +44,7 @@ interface TutorAssignmentRepository {
     suspend fun listAll(): List<TutorAssignmentRecord>
     suspend fun findActive(tutorUserId: String, academicGroupId: String): TutorAssignmentRecord?
     suspend fun findById(id: String): TutorAssignmentRecord?
-    suspend fun revoke(id: String, actorId: String, now: Instant): TutorAssignmentRecord?
+    suspend fun revoke(id: String, actorId: String, now: Instant, operationId: String? = null, scopeDigest: String? = null): TutorAssignmentRecord?
 }
 
 class InMemoryTutorAssignmentRepository : TutorAssignmentRepository {
@@ -44,8 +53,9 @@ class InMemoryTutorAssignmentRepository : TutorAssignmentRepository {
     private val mutationMutex = Mutex()
 
     override suspend fun create(record: TutorAssignmentRecord): TutorAssignmentRecord = mutationMutex.withLock {
+        records[record.id]?.let { return@withLock it.exactRetry(record) }
         records.values.firstOrNull { it.tutorUserId == record.tutorUserId &&
-            it.academicGroupId == record.academicGroupId && it.active }?.let { return@withLock it }
+            it.academicGroupId == record.academicGroupId && it.active }?.let { return@withLock it.exactRetry(record) }
         records[record.id] = record
         record
     }
@@ -64,11 +74,11 @@ class InMemoryTutorAssignmentRepository : TutorAssignmentRepository {
 
     override suspend fun findById(id: String): TutorAssignmentRecord? = records[id]
 
-    override suspend fun revoke(id: String, actorId: String, now: Instant): TutorAssignmentRecord? =
+    override suspend fun revoke(id: String, actorId: String, now: Instant, operationId: String?, scopeDigest: String?): TutorAssignmentRecord? =
         mutationMutex.withLock {
             val previous = records[id] ?: return@withLock null
             val updated = if (previous.active) previous.copy(
-                active = false, revokedBy = actorId, revokedAt = now,
+                active = false, revokedBy = actorId, revokedAt = now, revocationOperationId = operationId, revocationDigest = scopeDigest,
             ) else previous
             records[id] = updated
             updated
@@ -84,12 +94,15 @@ class MongoTutorAssignmentRepository(database: MongoDatabase) : TutorAssignmentR
 
     override suspend fun create(record: TutorAssignmentRecord): TutorAssignmentRecord {
         ensureIndexes()
-        findActive(record.tutorUserId, record.academicGroupId)?.let { return it }
+        findById(record.id)?.let { return it.exactRetry(record) }
+        findActive(record.tutorUserId, record.academicGroupId)?.let { return it.exactRetry(record) }
         return try {
             collection.insertOne(record.toDocument())
             record
         } catch (error: com.mongodb.MongoWriteException) {
-            findActive(record.tutorUserId, record.academicGroupId) ?: throw error
+            if(error.error.code!=11000) throw error
+            val current=findById(record.id) ?: findActive(record.tutorUserId,record.academicGroupId) ?: throw error
+            current.exactRetry(record)
         }
     }
 
@@ -122,7 +135,7 @@ class MongoTutorAssignmentRepository(database: MongoDatabase) : TutorAssignmentR
         return collection.find(eq("_id", id)).firstOrNull()?.toRecord()
     }
 
-    override suspend fun revoke(id: String, actorId: String, now: Instant): TutorAssignmentRecord? {
+    override suspend fun revoke(id: String, actorId: String, now: Instant, operationId: String?, scopeDigest: String?): TutorAssignmentRecord? {
         ensureIndexes()
         return collection.findOneAndUpdate(
             and(eq("_id", id), eq("active", true)),
@@ -130,6 +143,7 @@ class MongoTutorAssignmentRepository(database: MongoDatabase) : TutorAssignmentR
                 Updates.set("active", false),
                 Updates.set("revokedAt", Date.from(now)),
                 Updates.set("revokedBy", actorId),
+                Updates.set("revocationOperationId", operationId), Updates.set("revocationDigest", scopeDigest),
             ),
             FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
         )?.toRecord() ?: findById(id)
@@ -168,16 +182,35 @@ class MongoTutorAssignmentRepository(database: MongoDatabase) : TutorAssignmentR
             .append("assignedAt", Date.from(assignedAt))
             .append("revokedAt", revokedAt?.let(Date::from))
             .append("revokedBy", revokedBy)
+            .append("institutionId", institutionId).append("periodId", periodId)
+            .append("startsAt", startsAt?.let(Date::from)).append("endsAt", endsAt?.let(Date::from))
+            .append("tutorRoleGeneration", tutorRoleGeneration).append("groupScopeRevision",groupScopeRevision)
+            .append("revocationOperationId", revocationOperationId).append("revocationDigest", revocationDigest)
 
     private fun Document.toRecord(): TutorAssignmentRecord =
         TutorAssignmentRecord(
             id = getString("_id"),
             tutorUserId = getString("tutorUserId"),
             academicGroupId = getString("academicGroupId"),
-            active = getBoolean("active", true),
+            active = get("active") == true,
             assignedBy = getString("assignedBy"),
             assignedAt = getDate("assignedAt")?.toInstant() ?: Instant.EPOCH,
             revokedAt = getDate("revokedAt")?.toInstant(),
             revokedBy = getString("revokedBy"),
+            institutionId = getString("institutionId"), periodId = getString("periodId"),
+            startsAt = (get("startsAt") as? Date)?.toInstant(), endsAt = (get("endsAt") as? Date)?.toInstant(),
+            tutorRoleGeneration = when(val generation=get("tutorRoleGeneration")) { is Long->generation;is Int->generation.toLong();else-> -1L },
+            groupScopeRevision = when(val revision=get("groupScopeRevision")) { is Long->revision;is Int->revision.toLong();else-> -1L },
+            revocationOperationId = getString("revocationOperationId"), revocationDigest = getString("revocationDigest"),
         )
+}
+
+/** Idempotency belongs to an exact operation; an old period or revoked ID cannot be reused. */
+private fun TutorAssignmentRecord.exactRetry(request:TutorAssignmentRecord):TutorAssignmentRecord {
+    if(id!=request.id || tutorUserId!=request.tutorUserId || academicGroupId!=request.academicGroupId ||
+        !active || !request.active || revokedAt!=null || request.revokedAt!=null || revokedBy!=null || request.revokedBy!=null ||
+        assignedBy!=request.assignedBy || institutionId!=request.institutionId || periodId!=request.periodId ||
+        startsAt!=request.startsAt || endsAt!=request.endsAt || tutorRoleGeneration!=request.tutorRoleGeneration || groupScopeRevision!=request.groupScopeRevision)
+        throw ApiException.Conflict("Existing tutor assignment belongs to another operation or scope; revoke it explicitly before reassignment")
+    return this
 }

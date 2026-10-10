@@ -18,27 +18,31 @@ class GroupRepresentativeService(
     private val clock: Clock = Clock.systemUTC(),
 ) {
     suspend fun appointRepresentative(
-        actorUserId: String,
-        actorRoles: Set<UserRole>,
+        actor: UserSummary,
         groupId: String,
         groupName: String,
         request: AppointRepresentativeRequest,
     ): GroupRepresentativeAssignment {
-        requireAuthorizedTutorOrAdmin(actorUserId, actorRoles, groupId)
+        requireAuthorizedTutorOrAdmin(actor, groupId)
 
-        if (actorUserId == request.studentUserId) {
+        if (actor.id == request.studentUserId) {
             throw ApiException.Validation("Self-appointment is not allowed")
         }
 
+        val (group,student)=tutorAssignmentService.requireRepresentativeCandidate(groupId,request.studentUserId)
+        if(request.academicTermId!=null && request.academicTermId!=group.periodId) throw ApiException.Validation("Representative period must match the actual group")
         val currentActive = repository.findActivePosition(groupId, request.position)
-        if (currentActive != null) {
+        if (currentActive != null && currentActive.groupScopeRevision==group.scopeRevision &&
+            tutorAssignmentService.currentRepresentative(currentActive)) {
             throw ApiException.Conflict("An active or pending ${request.position} already exists for this group")
         }
 
         // Check if student already holds the other position in this group
         val otherPosition = if (request.position == RepresentativePosition.CHIEF) RepresentativePosition.DEPUTY else RepresentativePosition.CHIEF
         val studentOtherPosition = repository.findActivePosition(groupId, otherPosition)
-        if (studentOtherPosition?.studentUserId == request.studentUserId) {
+        if (studentOtherPosition?.studentUserId == request.studentUserId &&
+            studentOtherPosition.groupScopeRevision==group.scopeRevision &&
+            tutorAssignmentService.currentRepresentative(studentOtherPosition)) {
             throw ApiException.Conflict("Student already holds the other position in this group")
         }
 
@@ -46,13 +50,14 @@ class GroupRepresentativeService(
         val assignment = GroupRepresentativeAssignment(
             id = "REP-" + UUID.randomUUID().toString().take(8),
             academicGroupId = groupId,
-            academicGroupName = groupName,
-            academicTermId = request.academicTermId,
+            academicGroupName = group.name,
+            institutionId=group.institutionId,groupScopeRevision=group.scopeRevision,expiresAtEpochSeconds=group.endsAt?.epochSecond,
+            academicTermId = group.periodId,
             studentUserId = request.studentUserId,
-            studentDisplayName = "Estudiante ${request.studentUserId}",
+            studentDisplayName = student.displayName,
             position = request.position,
             status = RepresentativeStatus.PENDING,
-            appointedBy = actorUserId,
+            appointedBy = actor.id,
             appointedAtEpochSeconds = now,
             version = 1L,
         )
@@ -72,6 +77,7 @@ class GroupRepresentativeService(
             throw ApiException.Validation("Appointment is no longer pending")
         }
 
+        if(!tutorAssignmentService.currentRepresentative(assignment)) throw ApiException.Forbidden("Current verified student and appointment scope are required")
         val updated = assignment.copy(
             status = RepresentativeStatus.ACTIVE,
             acceptedAtEpochSeconds = clock.instant().epochSecond,
@@ -103,14 +109,13 @@ class GroupRepresentativeService(
     }
 
     suspend fun revokeAppointment(
-        actorUserId: String,
-        actorRoles: Set<UserRole>,
+        actor: UserSummary,
         assignmentId: String,
     ): GroupRepresentativeAssignment {
         val assignment = repository.findById(assignmentId)
             ?: throw ApiException.NotFound("Appointment not found")
 
-        requireAuthorizedTutorOrAdmin(actorUserId, actorRoles, assignment.academicGroupId)
+        requireAuthorizedTutorOrAdmin(actor, assignment.academicGroupId)
 
         if (assignment.status != RepresentativeStatus.ACTIVE && assignment.status != RepresentativeStatus.PENDING) {
             throw ApiException.Validation("Appointment is already inactive")
@@ -119,7 +124,7 @@ class GroupRepresentativeService(
         val updated = assignment.copy(
             status = RepresentativeStatus.REVOKED,
             revokedAtEpochSeconds = clock.instant().epochSecond,
-            revokedBy = actorUserId,
+            revokedBy = actor.id,
             version = assignment.version + 1,
         )
         return repository.update(updated)
@@ -127,15 +132,15 @@ class GroupRepresentativeService(
     }
 
     suspend fun getGroupOverview(
-        actorUserId: String,
-        actorRoles: Set<UserRole>,
+        actor: UserSummary,
         groupId: String,
         groupName: String,
     ): GroupRepresentativesOverview {
-        val list = repository.listByGroup(groupId)
+        val includeAllPending=tutorAssignmentService.requireRepresentativeRead(actor,groupId)
+        val list = repository.listByGroup(groupId).filter { tutorAssignmentService.currentRepresentative(it) }
         val activeChief = list.firstOrNull { it.position == RepresentativePosition.CHIEF && it.status == RepresentativeStatus.ACTIVE }
         val activeDeputy = list.firstOrNull { it.position == RepresentativePosition.DEPUTY && it.status == RepresentativeStatus.ACTIVE }
-        val pending = list.filter { it.status == RepresentativeStatus.PENDING }
+        val pending = list.filter { it.status == RepresentativeStatus.PENDING && (includeAllPending || it.studentUserId==actor.id) }
 
         return GroupRepresentativesOverview(
             groupId = groupId,
@@ -151,20 +156,11 @@ class GroupRepresentativeService(
     }
 
     suspend fun activeAssignmentsForStudent(studentUserId: String): List<GroupRepresentativeAssignment> {
-        return repository.listByStudent(studentUserId).filter { it.status == RepresentativeStatus.ACTIVE }
+        return repository.listByStudent(studentUserId).filter { it.status == RepresentativeStatus.ACTIVE && tutorAssignmentService.currentRepresentative(it) }
     }
 
-    private suspend fun requireAuthorizedTutorOrAdmin(
-        actorUserId: String,
-        actorRoles: Set<UserRole>,
-        groupId: String,
-    ) {
-        if (actorRoles.any(UserRole::isAdministrative)) return
-        val userSummary = UserSummary(
-            id = actorUserId,
-            displayName = actorUserId,
-            roles = actorRoles,
-        )
-        tutorAssignmentService.requireTutorAssignmentForGroup(userSummary, groupId)
+    private suspend fun requireAuthorizedTutorOrAdmin(actor:UserSummary,groupId:String) {
+        if(actor.roles.any { it==UserRole.ADMIN || it==UserRole.SUPER_ADMIN }) tutorAssignmentService.requireCanAccessGroup(actor,groupId)
+        else tutorAssignmentService.requireTutorAssignmentForGroup(actor,groupId)
     }
 }

@@ -1,5 +1,8 @@
 package org.companerodeescuela.api.representatives
 
+import org.companerodeescuela.api.test.ScopedAcademicFixtures
+import org.companerodeescuela.api.tutoring.TutorAssignmentRecord
+import org.companerodeescuela.api.academic.groups.AcademicGroupMembershipRecord
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -35,33 +38,29 @@ class GroupRepresentativeServiceTest {
     private val tutorRoles = setOf(UserRole.TUTOR, UserRole.TEACHER)
 
     @BeforeEach
-    fun setUp() = runBlocking {
+    fun setUp() = runBlocking<Unit> {
         groupRepository = InMemoryAcademicGroupRepository()
-        groupRepository.create(AcademicGroupRecord("G-101", "101-A", active = true, createdAt = Instant.now()))
+        groupRepository.create(ScopedAcademicFixtures.group("G-101", "101-A"))
 
-        val accounts = InMemoryPlatformAccountRepository()
-        accounts.create(PlatformAccount("tutor-1", "Tutor 1", "tutor1@escuela.edu", "", roles = setOf(UserRole.TUTOR)))
-        accounts.create(PlatformAccount("tutor-2", "Tutor 2", "tutor2@escuela.edu", "", roles = setOf(UserRole.TUTOR)))
-
-        tutoringService = TutorAssignmentService(
-            repository = InMemoryTutorAssignmentRepository(),
-            groupRepository = groupRepository,
-            clock = clock,
-            accounts = accounts,
-        )
-        tutoringService.create(
-            actor = adminActor,
-            request = CreateTutorAssignmentRequest("tutor-1", "G-101"),
-        )
+        val tutor1=UserSummary("tutor-1","Tutor 1",roles=tutorRoles,institutionId=ScopedAcademicFixtures.INSTITUTION)
+        val tutor2=UserSummary("tutor-2","Tutor 2",roles=tutorRoles,institutionId=ScopedAcademicFixtures.INSTITUTION)
+        val accounts=ScopedAcademicFixtures.accounts(tutor1,tutor2)
+        for(id in listOf("student-1","student-2")) {
+            val student=UserSummary(id,id,roles=setOf(UserRole.STUDENT),institutionId=ScopedAcademicFixtures.INSTITUTION)
+            accounts.create(ScopedAcademicFixtures.account(student))
+            groupRepository.assign(AcademicGroupMembershipRecord("G-101",id,Instant.EPOCH))
+        }
+        val assignments=InMemoryTutorAssignmentRepository()
+        assignments.create(ScopedAcademicFixtures.assignment("qa-assignment",tutor1.id,"G-101"))
+        tutoringService=TutorAssignmentService(assignments,groupRepository,clock,accounts)
         repository = InMemoryGroupRepresentativeRepository()
         service = GroupRepresentativeService(repository, tutoringService, clock)
     }
 
     @Test
-    fun `tutor can appoint chief and student can accept`() = runBlocking {
+    fun `tutor can appoint chief and student can accept`() = runBlocking<Unit> {
         val appointment = service.appointRepresentative(
-            actorUserId = "tutor-1",
-            actorRoles = tutorRoles,
+            actor = UserSummary("tutor-1","Tutor 1",roles=tutorRoles,institutionId=ScopedAcademicFixtures.INSTITUTION),
             groupId = "G-101",
             groupName = "101-A",
             request = AppointRepresentativeRequest("student-1", RepresentativePosition.CHIEF),
@@ -82,11 +81,10 @@ class GroupRepresentativeServiceTest {
     }
 
     @Test
-    fun `unauthorized tutor cannot appoint representative`() = runBlocking {
+    fun `unauthorized tutor cannot appoint representative`() = runBlocking<Unit> {
         assertThrows<ApiException.Forbidden> {
             service.appointRepresentative(
-                actorUserId = "tutor-2",
-                actorRoles = tutorRoles,
+                actor = UserSummary("tutor-2","Tutor 2",roles=tutorRoles,institutionId=ScopedAcademicFixtures.INSTITUTION),
                 groupId = "G-101",
                 groupName = "101-A",
                 request = AppointRepresentativeRequest("student-1", RepresentativePosition.CHIEF),
@@ -95,10 +93,9 @@ class GroupRepresentativeServiceTest {
     }
 
     @Test
-    fun `cannot appoint duplicate active position in same group`() = runBlocking {
+    fun `cannot appoint duplicate active position in same group`() = runBlocking<Unit> {
         val first = service.appointRepresentative(
-            actorUserId = "tutor-1",
-            actorRoles = tutorRoles,
+            actor = UserSummary("tutor-1","Tutor 1",roles=tutorRoles,institutionId=ScopedAcademicFixtures.INSTITUTION),
             groupId = "G-101",
             groupName = "101-A",
             request = AppointRepresentativeRequest("student-1", RepresentativePosition.CHIEF),
@@ -107,8 +104,7 @@ class GroupRepresentativeServiceTest {
 
         assertThrows<ApiException.Conflict> {
             service.appointRepresentative(
-                actorUserId = "tutor-1",
-                actorRoles = tutorRoles,
+                actor = UserSummary("tutor-1","Tutor 1",roles=tutorRoles,institutionId=ScopedAcademicFixtures.INSTITUTION),
                 groupId = "G-101",
                 groupName = "101-A",
                 request = AppointRepresentativeRequest("student-2", RepresentativePosition.CHIEF),
@@ -117,10 +113,9 @@ class GroupRepresentativeServiceTest {
     }
 
     @Test
-    fun `revoking appointment removes active status`() = runBlocking {
+    fun `revoking appointment removes active status`() = runBlocking<Unit> {
         val appointment = service.appointRepresentative(
-            actorUserId = "tutor-1",
-            actorRoles = tutorRoles,
+            actor = UserSummary("tutor-1","Tutor 1",roles=tutorRoles,institutionId=ScopedAcademicFixtures.INSTITUTION),
             groupId = "G-101",
             groupName = "101-A",
             request = AppointRepresentativeRequest("student-1", RepresentativePosition.CHIEF),
@@ -128,8 +123,7 @@ class GroupRepresentativeServiceTest {
         service.acceptAppointment("student-1", appointment.id)
 
         val revoked = service.revokeAppointment(
-            actorUserId = "tutor-1",
-            actorRoles = tutorRoles,
+            actor = UserSummary("tutor-1","Tutor 1",roles=tutorRoles,institutionId=ScopedAcademicFixtures.INSTITUTION),
             assignmentId = appointment.id,
         )
 

@@ -4,6 +4,12 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
+enum class ChannelType {
+    @SerialName("class") CLASS,
+    @SerialName("representatives") REPRESENTATIVES,
+}
+
+@Serializable
 enum class ChannelPostType {
     @SerialName("announcement") ANNOUNCEMENT,
     @SerialName("material") MATERIAL,
@@ -56,6 +62,7 @@ data class ClassChannelSummary(
     val teacherId: String,
     val teacherDisplayName: String,
     val canPublish: Boolean,
+    val channelType: ChannelType = ChannelType.CLASS,
 )
 
 @Serializable

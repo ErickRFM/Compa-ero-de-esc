@@ -22,6 +22,7 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
 import org.companerodeescuela.core.network.ApiEnvironment
 import org.companerodeescuela.core.network.createApiClient
 import org.companerodeescuela.core.security.SessionTokenStore
+import org.companerodeescuela.feature.tutoring.GroupRepresentativeRepository
 import org.companerodeescuela.feature.tutoring.TutorGroupsScreen
 import org.companerodeescuela.feature.tutoring.TutorRepository
 import org.companerodeescuela.feature.tutoring.TutorRequestsScreen
@@ -106,7 +107,7 @@ class TutorPrivacyUiTest {
             }
             respond(body, status, headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()))
         })
-        val model = TutorViewModel(TutorRepository(client, store))
+        val model = TutorViewModel(TutorRepository(client, store), GroupRepresentativeRepository(client))
     }
 
     companion object {

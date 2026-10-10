@@ -1,6 +1,5 @@
 package org.companerodeescuela.feature.admin
 
-import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,6 +16,7 @@ import androidx.compose.ui.Modifier
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
+import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.ui.component.CompaneroHeroSurface
 import org.companerodeescuela.core.ui.component.CompaneroSurface
 import org.companerodeescuela.core.ui.component.CompaneroSurfaceRole
@@ -43,7 +43,7 @@ fun AdminHomeScreen(
             )
         }
         Text(
-            text = "Organiza grupos, clases, docentes y horarios desde una sola estructura académica.",
+            text = "Organiza grupos, clases, docentes, representantes y horarios desde una sola estructura académica.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -67,8 +67,8 @@ fun AdminHomeScreen(
                     color = CompanionColors.onDarkSurface,
                 )
                 Text(
-                    text = "El monitoreo de servicios, sesiones y auditoría estará disponible " +
-                        "cuando se conecte el panel institucional.",
+                    text = "El monitoreo de servicios, sesiones y auditoría está activo " +
+                        "para supervisar la operación del campus.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = CompanionColors.onDarkSurfaceVariant,
                 )
@@ -105,14 +105,14 @@ fun AdminHomeScreen(
                 modifier = Modifier.padding(CompaneroSpacing.sm),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
             ) {
-                Text("Gestión Académica", style = MaterialTheme.typography.titleSmall)
+                Text("Representantes de Grupo", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "Publica horarios por grupo; los alumnos y docentes reciben automáticamente la agenda que les corresponde.",
+                    "Supervisa Jefes y Subjefes activos, gestiona vacantes y emite avisos oficiales por el canal institucional.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Button(onClick = onOpenSchedule, modifier = Modifier.fillMaxWidth()) {
-                    Text("Abrir control escolar")
+                Button(onClick = onOpenChannel, modifier = Modifier.fillMaxWidth()) {
+                    Text("Canal de representantes")
                 }
             }
         }
@@ -125,14 +125,15 @@ fun AdminHomeScreen(
                 modifier = Modifier.padding(CompaneroSpacing.sm),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
             ) {
-                Text("Asistencia Global", style = MaterialTheme.typography.titleSmall)
+                Text("Gestión Académica", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "El tablero global de asistencia está pendiente de integración. " +
-                        "La consulta de sesiones y sus métricas requerirá un panel autorizado " +
-                        "con datos verificados de la API.",
+                    "Publica horarios por grupo; los alumnos y docentes reciben automáticamente la agenda que les corresponde.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Button(onClick = onOpenSchedule, modifier = Modifier.fillMaxWidth()) {
+                    Text("Abrir control escolar")
+                }
             }
         }
 

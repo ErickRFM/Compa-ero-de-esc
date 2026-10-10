@@ -12,6 +12,7 @@ import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.database.MongoConnection
 import org.companerodeescuela.api.integrations.academic.AcademicProvider
+import org.companerodeescuela.api.representatives.GroupRepresentativeService
 
 data class ClassroomFeatureGraph(
     val classroomService: ClassroomService,
@@ -23,6 +24,7 @@ fun buildClassroomFeatureGraph(
     mongoConnection: MongoConnection,
     academicProvider: AcademicProvider,
     groupRepository: AcademicGroupRepository,
+    representativeService: GroupRepresentativeService? = null,
 ): ClassroomFeatureGraph {
     val classroomRepository = when {
         !settings.hasAuthentication -> InMemoryClassroomRepository()
@@ -47,6 +49,7 @@ fun buildClassroomFeatureGraph(
             accessPolicy = ChannelAccessPolicy(
                 academicProvider = academicProvider,
                 classroomService = classroomService,
+                representativeService = representativeService,
             ),
         ),
     )

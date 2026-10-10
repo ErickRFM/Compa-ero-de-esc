@@ -77,7 +77,7 @@ class AuthService(
 
         val localAccount = authenticationDependency { accounts.findByIdentifier(username) }
         if (localAccount != null) {
-            if (!localAccount.active || !passwordHasher.verify(request.password, localAccount.passwordHash)) {
+            if (!localAccount.permitsSession || !passwordHasher.verify(request.password, localAccount.passwordHash)) {
                 throw ApiException.Unauthorized("Invalid username or password")
             }
             return createSession(localAccount.toUserSummary(), SessionIdentitySource.NATIVE)
@@ -163,14 +163,6 @@ class AuthService(
             user = session.user,
         )
     }
-
-    private fun PlatformAccount.toUserSummary(): UserSummary = UserSummary(
-        id = id,
-        displayName = displayName,
-        email = email,
-        roles = roles,
-        active = active,
-    )
 
     private fun newRefreshToken(): String {
         val bytes = ByteArray(REFRESH_TOKEN_BYTES)

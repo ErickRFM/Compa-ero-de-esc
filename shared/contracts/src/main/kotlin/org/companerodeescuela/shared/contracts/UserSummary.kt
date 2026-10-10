@@ -16,6 +16,9 @@ data class UserSummary(
     val email: String? = null,
     val roles: Set<UserRole> = emptySet(),
     val active: Boolean = true,
+    val accountStatus: AccountStatus = if (active) AccountStatus.ACTIVE else AccountStatus.SUSPENDED,
+    val authRevision: Long = 0,
+    val institutionId: String? = null,
 ) {
     /**
      * True when the user holds at least one staff role. Convenience helper so

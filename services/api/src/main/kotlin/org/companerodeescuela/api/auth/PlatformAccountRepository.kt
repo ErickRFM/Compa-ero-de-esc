@@ -2,6 +2,8 @@ package org.companerodeescuela.api.auth
 
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
+import org.companerodeescuela.shared.contracts.AccountStatus
+import org.companerodeescuela.shared.contracts.UserSummary
 import org.companerodeescuela.shared.contracts.UserRole
 
 data class PlatformAccount(
@@ -12,7 +14,21 @@ data class PlatformAccount(
     val roles: Set<UserRole>,
     val active: Boolean = true,
     val createdAt: Instant = Instant.now(),
-)
+    val accountStatus: AccountStatus = if (active) AccountStatus.ACTIVE else AccountStatus.SUSPENDED,
+    val authRevision: Long = 0,
+    val institutionId: String? = null,
+) {
+    val permitsSession: Boolean get() = active && accountStatus.permitsSession && authRevision >= 0
+
+    fun toUserSummary(): UserSummary = UserSummary(
+        id, displayName, email,
+        roles = if (accountStatus == AccountStatus.ACTIVE) roles else emptySet(),
+        active = permitsSession,
+        accountStatus = accountStatus,
+        authRevision = authRevision,
+        institutionId = institutionId,
+    )
+}
 
 interface PlatformAccountRepository {
     suspend fun findByIdentifier(identifier: String): PlatformAccount?

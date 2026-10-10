@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.bson.Document
+import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
 
@@ -158,6 +159,9 @@ internal object RefreshSessionDocumentCodec {
         .append("email", user.email)
         .append("roles", user.roles.map { it.name })
         .append("active", user.active)
+        .append("accountStatus", user.accountStatus.name)
+        .append("authRevision", user.authRevision)
+        .append("institutionId", user.institutionId)
 
     private fun decodeUser(document: Document): UserSummary = UserSummary(
         id = document.getString("id"),
@@ -166,6 +170,11 @@ internal object RefreshSessionDocumentCodec {
         roles = document.getList("roles", String::class.java).mapNotNull { encoded ->
             runCatching { UserRole.valueOf(encoded) }.getOrNull()
         }.toSet(),
-        active = document.getBoolean("active", true),
+        active = document.get("active") == true,
+        accountStatus = if (!document.containsKey("accountStatus")) AccountStatus.ACTIVE
+            else runCatching { AccountStatus.valueOf(document.getString("accountStatus")) }.getOrDefault(AccountStatus.REVOKED),
+        authRevision = if (!document.containsKey("authRevision")) 0L
+            else (document.get("authRevision") as? Number)?.toLong() ?: -1L,
+        institutionId = document.getString("institutionId"),
     )
 }

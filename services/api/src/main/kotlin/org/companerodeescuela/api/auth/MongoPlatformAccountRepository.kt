@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.bson.Document
+import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.UserRole
 
 class MongoPlatformAccountRepository(
@@ -69,6 +70,9 @@ class MongoPlatformAccountRepository(
         .append("passwordHash", passwordHash)
         .append("roles", roles.map(UserRole::name))
         .append("active", active)
+        .append("accountStatus", accountStatus.name)
+        .append("authRevision", authRevision)
+        .append("institutionId", institutionId)
         .append("createdAt", Date.from(createdAt))
 
     private fun Document.toAccount(): PlatformAccount = PlatformAccount(
@@ -80,9 +84,17 @@ class MongoPlatformAccountRepository(
             .orEmpty()
             .mapNotNull { encoded -> runCatching { UserRole.valueOf(encoded) }.getOrNull() }
             .toSet(),
-        active = get("active") == true,
+        active = get("active") == true && validAuthorityRevision(),
+        accountStatus = if (!containsKey("accountStatus")) {
+            if (get("active") == true) AccountStatus.ACTIVE else AccountStatus.SUSPENDED
+        } else runCatching { AccountStatus.valueOf(getString("accountStatus")) }.getOrDefault(AccountStatus.REVOKED),
+        authRevision = if (validAuthorityRevision()) (get("authRevision") as? Number)?.toLong() ?: 0L else -1L,
+        institutionId = getString("institutionId"),
         createdAt = getDate("createdAt").toInstant(),
     )
+
+    private fun Document.validAuthorityRevision(): Boolean = !containsKey("authRevision") ||
+        ((get("authRevision") is Long || get("authRevision") is Int) && (get("authRevision") as Number).toLong() >= 0)
 
     private companion object {
         const val COLLECTION = "platform_accounts"

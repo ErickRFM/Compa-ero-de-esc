@@ -29,6 +29,7 @@ import org.companerodeescuela.api.auth.PlatformSessionAuthority
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.errors.toApiError
+import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.ApiError
 import org.companerodeescuela.shared.contracts.ApiErrorCode
 import org.slf4j.event.Level
@@ -130,7 +131,9 @@ fun Application.configurePlugins(
                     try {
                         val sessionId = tokenService.sessionIdFrom(credential.payload)
                         val session = sessionId?.let { refreshSessions?.find(it) }
-                        if (session != null && sessionAuthority?.permits(credential.payload, session, tokenService) == true) {
+                        if (session != null && sessionAuthority?.permits(credential.payload, session, tokenService) == true &&
+                            (tokenService.userFrom(credential.payload).accountStatus == AccountStatus.ACTIVE ||
+                                request.path() == "/auth/me")) {
                             JWTPrincipal(credential.payload)
                         } else null
                     } catch (cancelled: CancellationException) {

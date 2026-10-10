@@ -35,6 +35,18 @@ class TutorAssignmentScopeTest {
             assertFailsWith<ApiException.Forbidden> { service.requireTutorAssignmentForGroup(tutor().toUserSummary(),"6A") }
         }
     }
+    @Test fun `restoring group period labels never revives old tutor access`()=runTest {
+        val accounts=InMemoryPlatformAccountRepository();accounts.create(tutor())
+        val groups=InMemoryAcademicGroupRepository();groups.create(group())
+        val assignments=InMemoryTutorAssignmentRepository();assignments.create(assignment())
+        val service=TutorAssignmentService(assignments,groups,Clock.fixed(now,ZoneOffset.UTC),accounts)
+        service.requireTutorAssignmentForGroup(tutor().toUserSummary(),"6A")
+        val change=AcademicGroupScopeChange("next","owner","campus","next",group().startsAt!!,group().endsAt!!,now,"a".repeat(64))
+        assertNotNull(groups.changeScope("6A",0,change))
+        assertNotNull(groups.changeScope("6A",1,change.copy(operationId="restore",periodId="period",payloadDigest="b".repeat(64))))
+        assertFailsWith<ApiException.Forbidden> { service.requireTutorAssignmentForGroup(tutor().toUserSummary(),"6A") }
+        assertTrue(service.scopeFor(tutor().toUserSummary()).groups.isEmpty())
+    }
     @Test fun `live revocation role change and tutor regrant never reactivate old assignment`()=runTest {
         val original=tutor();val (service,repo)=fixture()
         val removed=assertNotNull(repo.changeIdentity("tutor",0,AccountIdentityChange("remove","owner",AccountStatus.ACTIVE,setOf(UserRole.TEACHER),"campus",now)))

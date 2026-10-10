@@ -35,6 +35,7 @@ data class TutorAssignmentRecord(
     val tutorRoleGeneration: Long = -1,
     val revocationOperationId: String? = null,
     val revocationDigest: String? = null,
+    val groupScopeRevision: Long = 0,
 )
 
 interface TutorAssignmentRepository {
@@ -183,7 +184,7 @@ class MongoTutorAssignmentRepository(database: MongoDatabase) : TutorAssignmentR
             .append("revokedBy", revokedBy)
             .append("institutionId", institutionId).append("periodId", periodId)
             .append("startsAt", startsAt?.let(Date::from)).append("endsAt", endsAt?.let(Date::from))
-            .append("tutorRoleGeneration", tutorRoleGeneration)
+            .append("tutorRoleGeneration", tutorRoleGeneration).append("groupScopeRevision",groupScopeRevision)
             .append("revocationOperationId", revocationOperationId).append("revocationDigest", revocationDigest)
 
     private fun Document.toRecord(): TutorAssignmentRecord =
@@ -199,6 +200,7 @@ class MongoTutorAssignmentRepository(database: MongoDatabase) : TutorAssignmentR
             institutionId = getString("institutionId"), periodId = getString("periodId"),
             startsAt = (get("startsAt") as? Date)?.toInstant(), endsAt = (get("endsAt") as? Date)?.toInstant(),
             tutorRoleGeneration = when(val generation=get("tutorRoleGeneration")) { is Long->generation;is Int->generation.toLong();else-> -1L },
+            groupScopeRevision = when(val revision=get("groupScopeRevision")) { is Long->revision;is Int->revision.toLong();else-> -1L },
             revocationOperationId = getString("revocationOperationId"), revocationDigest = getString("revocationDigest"),
         )
 }
@@ -208,7 +210,7 @@ private fun TutorAssignmentRecord.exactRetry(request:TutorAssignmentRecord):Tuto
     if(id!=request.id || tutorUserId!=request.tutorUserId || academicGroupId!=request.academicGroupId ||
         !active || !request.active || revokedAt!=null || request.revokedAt!=null || revokedBy!=null || request.revokedBy!=null ||
         assignedBy!=request.assignedBy || institutionId!=request.institutionId || periodId!=request.periodId ||
-        startsAt!=request.startsAt || endsAt!=request.endsAt || tutorRoleGeneration!=request.tutorRoleGeneration)
+        startsAt!=request.startsAt || endsAt!=request.endsAt || tutorRoleGeneration!=request.tutorRoleGeneration || groupScopeRevision!=request.groupScopeRevision)
         throw ApiException.Conflict("Existing tutor assignment belongs to another operation or scope; revoke it explicitly before reassignment")
     return this
 }

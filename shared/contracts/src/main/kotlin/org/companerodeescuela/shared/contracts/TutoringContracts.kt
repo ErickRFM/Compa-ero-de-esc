@@ -18,6 +18,7 @@ data class TutorAssignmentSummary(
     val startsAtEpochSeconds: Long? = null,
     val endsAtEpochSeconds: Long? = null,
     val tutorRoleGeneration: Long = -1,
+    val groupScopeRevision: Long = -1,
 )
 
 @Serializable
@@ -30,6 +31,7 @@ data class CreateTutorAssignmentRequest(
     val endsAtEpochSeconds: Long? = null,
     val operationId: String? = null,
     val proof: String? = null,
+    val groupScopeRevision: Long = 0,
 ) {
     override fun toString()="CreateTutorAssignmentRequest(tutorUserId=$tutorUserId, group=$academicGroupId, proof=[redacted])"
 }

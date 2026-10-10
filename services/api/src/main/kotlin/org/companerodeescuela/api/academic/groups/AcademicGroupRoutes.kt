@@ -10,6 +10,7 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import org.companerodeescuela.api.auth.AuthTokenService
 import org.companerodeescuela.api.auth.requireActor
+import org.companerodeescuela.api.auth.boundedAuthRequest
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
@@ -43,8 +44,8 @@ fun Route.academicGroupRoutes(
 
             post {
                 val actor = call.requireActor(tokenService)
-                val request = runCatching { call.receive<CreateAcademicGroupRequest>() }
-                    .getOrElse { throw ApiException.Validation("Invalid academic group request") }
+                val request = runCatching { call.boundedAuthRequest(CreateAcademicGroupRequest.serializer()) }
+                    .getOrElse { if(it is kotlinx.coroutines.CancellationException) throw it;throw ApiException.Validation("Invalid academic group request") }
                 call.respond(
                     status = HttpStatusCode.Created,
                     message = ApiResponse(
@@ -54,13 +55,22 @@ fun Route.academicGroupRoutes(
                 )
             }
 
+            post("/{groupId}/scope") {
+                val actor=call.requireActor(tokenService)
+                val id=call.parameters["groupId"] ?: throw ApiException.Validation("groupId is required")
+                val request=try { call.orgBoundedScopeRequest() } catch(cancelled:kotlinx.coroutines.CancellationException) { throw cancelled }
+                    catch(_:Exception) { throw ApiException.Validation("Invalid group scope request") }
+                call.response.headers.append(io.ktor.http.HttpHeaders.CacheControl,"no-store")
+                call.respond(ApiResponse(service.changeScope(actor,id,request),call.requestId()))
+            }
+
             post("/{groupId}/members") {
                 val actor = call.requireActor(tokenService)
                 val groupId = call.parameters["groupId"]
                     ?.takeIf(String::isNotBlank)
                     ?: throw ApiException.Validation("groupId is required")
-                val request = runCatching { call.receive<AssignAcademicGroupMemberRequest>() }
-                    .getOrElse { throw ApiException.Validation("Invalid group membership request") }
+                val request = runCatching { call.boundedAuthRequest(AssignAcademicGroupMemberRequest.serializer()) }
+                    .getOrElse { if(it is kotlinx.coroutines.CancellationException) throw it;throw ApiException.Validation("Invalid group membership request") }
                 call.respond(
                     status = HttpStatusCode.Created,
                     message = ApiResponse(
@@ -72,3 +82,5 @@ fun Route.academicGroupRoutes(
         }
     }
 }
+
+private suspend fun io.ktor.server.application.ApplicationCall.orgBoundedScopeRequest() = boundedAuthRequest(org.companerodeescuela.shared.contracts.AcademicGroupScopeRequest.serializer())

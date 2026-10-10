@@ -61,6 +61,7 @@ fun Application.module(
         mongoConnection = mongoConnection,
         accounts = identityGraph.accounts,
         mfa = identityGraph.mfa,
+        institutions = identityGraph.institutions,
     )
     val administrationService = AccountAdministrationService(identityGraph.accounts, identityGraph.institutions,
         academicGraph.groupRepository, academicGraph.tutoringService, identityGraph.mfa)

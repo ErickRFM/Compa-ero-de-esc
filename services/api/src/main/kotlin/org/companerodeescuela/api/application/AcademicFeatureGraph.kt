@@ -40,6 +40,7 @@ fun buildAcademicFeatureGraph(
     mongoConnection: MongoConnection,
     accounts: PlatformAccountRepository? = null,
     mfa: org.companerodeescuela.api.security.MfaService? = null,
+    institutions:org.companerodeescuela.api.institutions.InstitutionRepository?=null,
 ): AcademicFeatureGraph {
     val groupRepository = when {
         !settings.hasAuthentication -> InMemoryAcademicGroupRepository()
@@ -85,7 +86,7 @@ fun buildAcademicFeatureGraph(
     )
     return AcademicFeatureGraph(
         groupRepository = groupRepository,
-        groupService = AcademicGroupService(groupRepository),
+        groupService = AcademicGroupService(groupRepository,accounts=accounts,mfa=mfa,institutions=institutions),
         tutoringService = tutoringService,
         caseService = TutorCaseService(caseRepository, tutoringService, groupRepository),
         representativeService = representativeService,

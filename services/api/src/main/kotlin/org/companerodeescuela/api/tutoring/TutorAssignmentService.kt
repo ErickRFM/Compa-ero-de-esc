@@ -66,12 +66,12 @@ class TutorAssignmentService(
         val target=(accounts ?: throw ApiException.DependencyUnavailable("Tutor authority is unavailable")).findById(tutorId) ?: throw ApiException.NotFound("Tutor account was not found")
         if(!target.permitsSession || target.accountStatus!=AccountStatus.ACTIVE || target.emailVerifiedAt==null || target.emailVerifiedAt>clock.instant() || UserRole.TUTOR !in target.roles || target.institutionId!=institution) throw ApiException.Validation("A currently verified active tutor in this institution is required")
         val scope=TutorApprovalScope(groupId,request.periodId ?: throw ApiException.Validation("Period is required"),
-            request.startsAtEpochSeconds ?: throw ApiException.Validation("Start date is required"),request.endsAtEpochSeconds ?: throw ApiException.Validation("End date is required"))
+            request.startsAtEpochSeconds ?: throw ApiException.Validation("Start date is required"),request.endsAtEpochSeconds ?: throw ApiException.Validation("End date is required"),request.groupScopeRevision)
         val id="tutor-"+UUID.nameUUIDFromBytes((currentActor.id+"\u0000"+operation).toByteArray(Charsets.UTF_8)).toString()
         val generation=target.roleGenerations[UserRole.TUTOR] ?: throw ApiException.Validation("Current tutor generation is required")
         validateApprovalScope(currentActor,tutorId,institution,scope,id,generation,AdminCapability.MANAGE_ACADEMICS)
         val record=repository.create(TutorAssignmentRecord(id,tutorId,groupId,true,currentActor.id,clock.instant(),
-            institutionId=institution,periodId=scope.periodId,startsAt=java.time.Instant.ofEpochSecond(scope.startsAtEpochSeconds),endsAt=java.time.Instant.ofEpochSecond(scope.endsAtEpochSeconds),tutorRoleGeneration=generation))
+            institutionId=institution,periodId=scope.periodId,startsAt=java.time.Instant.ofEpochSecond(scope.startsAtEpochSeconds),endsAt=java.time.Instant.ofEpochSecond(scope.endsAtEpochSeconds),tutorRoleGeneration=generation,groupScopeRevision=scope.groupScopeRevision))
         return record.toSummary(group.name)
     }
     suspend fun revoke(actor:UserSummary,assignmentId:String,request:org.companerodeescuela.shared.contracts.RevokeTutorAssignmentRequest?=null):TutorAssignmentSummary {
@@ -152,7 +152,7 @@ class TutorAssignmentService(
         revokedAtEpochSeconds = revokedAt?.epochSecond,
         revokedBy = revokedBy,
         institutionId = institutionId, periodId = periodId, startsAtEpochSeconds = startsAt?.epochSecond,
-        endsAtEpochSeconds = endsAt?.epochSecond, tutorRoleGeneration = tutorRoleGeneration,
+        endsAtEpochSeconds = endsAt?.epochSecond, tutorRoleGeneration = tutorRoleGeneration,groupScopeRevision=groupScopeRevision,
     )
 
     /** Returns whether group administration may inspect all pending representative invitations. */
@@ -178,13 +178,13 @@ class TutorAssignmentService(
         val group=groupRepository.find(scope.academicGroupId) ?: throw ApiException.Validation("Tutor group must exist")
         val groupStart=group.startsAt ?: throw ApiException.Validation("Explicit group validity is required")
         val groupEnd=group.endsAt ?: throw ApiException.Validation("Explicit group validity is required")
-        if(!group.active || group.institutionId!=institutionId || group.periodId!=scope.periodId ||
+        if(!group.active || group.institutionId!=institutionId || group.periodId!=scope.periodId || group.scopeRevision<0 || group.scopeRevision!=scope.groupScopeRevision ||
             scope.startsAtEpochSeconds<0 || scope.endsAtEpochSeconds>4102444800L || scope.startsAtEpochSeconds>=scope.endsAtEpochSeconds ||
             scope.startsAtEpochSeconds<groupStart.epochSecond || scope.endsAtEpochSeconds>groupEnd.epochSecond || scope.endsAtEpochSeconds<=clock.instant().epochSecond)
             throw ApiException.Validation("Tutor assignment must match institution, period and bounded valid dates")
         val existing=repository.findById(assignmentId) ?: repository.findActive(targetId,group.id)
         if(existing!=null && (existing.id!=assignmentId || !existing.active || existing.revokedAt!=null || existing.institutionId!=institutionId ||
-            existing.periodId!=scope.periodId || existing.startsAt?.epochSecond!=scope.startsAtEpochSeconds || existing.endsAt?.epochSecond!=scope.endsAtEpochSeconds ||
+            existing.groupScopeRevision!=scope.groupScopeRevision || existing.periodId!=scope.periodId || existing.startsAt?.epochSecond!=scope.startsAtEpochSeconds || existing.endsAt?.epochSecond!=scope.endsAtEpochSeconds ||
             (generation!=null && existing.tutorRoleGeneration!=generation))) throw ApiException.Conflict("Existing assignment must be explicitly revoked before changing scope")
     }
     internal suspend fun createApproved(actor:PlatformAccount,target:PlatformAccount,institutionId:String,scope:TutorApprovalScope,assignmentId:String,decidedAt:java.time.Instant):TutorAssignmentSummary {
@@ -194,7 +194,7 @@ class TutorAssignmentService(
         validateApprovalScope(actor,current.id,institutionId,scope,assignmentId,generation)
         val record=repository.create(TutorAssignmentRecord(assignmentId,current.id,scope.academicGroupId,true,actor.id,decidedAt,
             institutionId=institutionId,periodId=scope.periodId,startsAt=java.time.Instant.ofEpochSecond(scope.startsAtEpochSeconds),
-            endsAt=java.time.Instant.ofEpochSecond(scope.endsAtEpochSeconds),tutorRoleGeneration=generation))
+            endsAt=java.time.Instant.ofEpochSecond(scope.endsAtEpochSeconds),tutorRoleGeneration=generation,groupScopeRevision=scope.groupScopeRevision))
         return record.toSummary(groupRepository.find(record.academicGroupId)?.name ?: record.academicGroupId)
     }
 
@@ -214,7 +214,7 @@ class TutorAssignmentService(
         val start=assignment.startsAt ?: return false;val end=assignment.endsAt ?: return false
         return group.active && !group.institutionId.isNullOrBlank() && !group.periodId.isNullOrBlank() &&
             current.institutionId==group.institutionId && assignment.institutionId==group.institutionId &&
-            assignment.periodId==group.periodId && assignment.tutorUserId==current.id && assignment.academicGroupId==group.id &&
+            group.scopeRevision>=0 && assignment.groupScopeRevision==group.scopeRevision && assignment.periodId==group.periodId && assignment.tutorUserId==current.id && assignment.academicGroupId==group.id &&
             assignment.active && assignment.revokedAt==null && assignment.tutorRoleGeneration>=0 &&
             current.roleGenerations[UserRole.TUTOR]==assignment.tutorRoleGeneration && groupStart<=now && now<groupEnd &&
             groupStart<=start && start<end && end<=groupEnd && start<=now && now<end

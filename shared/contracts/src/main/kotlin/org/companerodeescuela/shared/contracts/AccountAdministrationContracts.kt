@@ -15,7 +15,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class TutorApplicationRequest(val operationId:String,val expectedAuthRevision:Long,
     val institutionId:String,val identityReference:String,val preferredGroup:String?=null)
 @Serializable data class TutorApprovalScope(val academicGroupId:String,val periodId:String,
-    val startsAtEpochSeconds:Long,val endsAtEpochSeconds:Long)
+    val startsAtEpochSeconds:Long,val endsAtEpochSeconds:Long,val groupScopeRevision:Long=0)
 @Serializable data class ApproveStaffRequest(val operationId:String,val expectedAuthRevision:Long,
     val applicationId:String,val institutionId:String,val tutorScopes:List<TutorApprovalScope> = emptyList(),val proof:String) {
     override fun toString()="ApproveStaffRequest(operationId=$operationId, applicationId=$applicationId, proof=[redacted])"

@@ -91,4 +91,3 @@ class AcademicGroupScopeAuthorizationTest {
         assertEquals(0,f.groups.find("6A")?.scopeRevision)
     }
 }
-

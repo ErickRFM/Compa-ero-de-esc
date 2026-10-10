@@ -20,6 +20,9 @@ import org.companerodeescuela.api.plugins.configurePlugins
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.LoginResponse
 import org.companerodeescuela.shared.contracts.UserRole
+import org.companerodeescuela.shared.contracts.AccountStatus
+import org.companerodeescuela.shared.contracts.InstitutionSummary
+import org.companerodeescuela.api.institutions.InMemoryInstitutionRepository
 
 class PlatformRegistrationTest {
     private val json = Json
@@ -38,6 +41,7 @@ class PlatformRegistrationTest {
                     identityProvider = MockIdentityProvider(),
                     sessions = sessions,
                     accounts = accounts,
+                    institutions = InMemoryInstitutionRepository(listOf(InstitutionSummary("test-campus", "Test campus"))),
                 )
             }
         }
@@ -52,7 +56,8 @@ class PlatformRegistrationTest {
         val registered = json.decodeFromString<ApiResponse<LoginResponse>>(
             registration.bodyAsText(),
         ).data
-        assertEquals(setOf(UserRole.STUDENT), registered.user.roles)
+        assertEquals(emptySet(), registered.user.roles)
+        assertEquals(AccountStatus.PENDING_VERIFICATION, registered.user.accountStatus)
 
         val login = client.post("/auth/login") {
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
@@ -75,19 +80,21 @@ class PlatformRegistrationTest {
                     identityProvider = MockIdentityProvider(),
                     sessions = sessions,
                     accounts = accounts,
+                    institutions = InMemoryInstitutionRepository(listOf(InstitutionSummary("test-campus", "Test campus"))),
                 )
             }
         }
 
         val body =
-            """{"displayName":"Profa. Elena","email":"teacher@example.com","password":"password-123","accountType":"TEACHER"}"""
+            """{"displayName":"Profa. Elena","email":"teacher@example.com","password":"password-123","accountType":"TEACHER","requestedInstitutionId":"test-campus","identityReference":"professional-reference"}"""
         val first = client.post("/auth/register") {
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody(body)
         }
         assertEquals(HttpStatusCode.Created, first.status)
         val registered = json.decodeFromString<ApiResponse<LoginResponse>>(first.bodyAsText()).data
-        assertEquals(setOf(UserRole.TEACHER_PENDING), registered.user.roles)
+        assertEquals(emptySet(), registered.user.roles)
+        assertEquals(AccountStatus.PENDING_VERIFICATION, registered.user.accountStatus)
 
         val duplicate = client.post("/auth/register") {
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())

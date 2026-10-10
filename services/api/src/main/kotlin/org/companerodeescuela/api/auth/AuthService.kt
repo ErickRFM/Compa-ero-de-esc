@@ -9,12 +9,15 @@ import java.util.UUID
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.integrations.identity.IdentityProvider
 import org.companerodeescuela.api.integrations.identity.InstitutionalCredentials
+import org.companerodeescuela.shared.contracts.AccountStatus
+import org.companerodeescuela.api.institutions.InstitutionRepository
+import org.companerodeescuela.api.institutions.InMemoryInstitutionRepository
+import org.companerodeescuela.api.mail.UnavailableVerificationEmailGateway
 import org.companerodeescuela.shared.contracts.LoginRequest
 import org.companerodeescuela.shared.contracts.LoginResponse
 import org.companerodeescuela.shared.contracts.RefreshSessionRequest
 import org.companerodeescuela.shared.contracts.RegisterRequest
 import org.companerodeescuela.shared.contracts.RegistrationAccountType
-import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
 
 /**
@@ -32,39 +35,59 @@ class AuthService(
     private val passwordHasher: PasswordHasher = PasswordHasher(),
     private val clock: Clock = Clock.systemUTC(),
     private val random: SecureRandom = SecureRandom(),
+    private val institutions: InstitutionRepository = InMemoryInstitutionRepository(),
+    private val verification: AccountVerificationService = AccountVerificationService(accounts, UnavailableVerificationEmailGateway),
 ) {
     private val authority = PlatformSessionAuthority(accounts, identityProvider, clock)
     suspend fun register(request: RegisterRequest): LoginResponse {
         val displayName = request.displayName.trim()
         val email = request.email.trim().lowercase()
 
-        if (displayName.length !in 2..80) {
+        if (displayName.length !in 2..80 || displayName.any { it.isISOControl() }) {
             throw ApiException.Validation("Display name must contain between 2 and 80 characters")
         }
-        if (!EMAIL_REGEX.matches(email)) {
+        if (!EMAIL_REGEX.matches(email) || email.length > 128 || email.substringBefore('@').length > 64 ||
+            email.substringBefore('@').let { it.startsWith('.') || it.endsWith('.') || ".." in it } ||
+            email.substringAfter('@').split('.').any { it.length !in 1..63 || it.startsWith('-') || it.endsWith('-') }) {
             throw ApiException.Validation("A valid email is required")
         }
-        if (request.password.length !in 8..256) {
+        if (request.password.length !in 8..256 || request.password.any { it.isISOControl() }) {
             throw ApiException.Validation("Password must contain between 8 and 256 characters")
         }
 
-        val roles = when (request.accountType) {
-            RegistrationAccountType.STUDENT -> setOf(UserRole.STUDENT)
-            RegistrationAccountType.TEACHER -> setOf(UserRole.TEACHER_PENDING)
+        fun bounded(value: String?, maximum: Int, field: String): String? {
+            val cleaned = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+            if (cleaned.length > maximum || cleaned.any { it.isISOControl() }) throw ApiException.Validation("Invalid $field")
+            return cleaned
         }
+        val institutionPreference = bounded(request.requestedInstitutionId, 128, "institution")
+        val reference = bounded(request.identityReference, 160, "identity reference")
+        val groupPreference = bounded(request.preferredGroup, 128, "group preference")
+        if (request.accountType in setOf(RegistrationAccountType.TEACHER, RegistrationAccountType.TUTOR) &&
+            (institutionPreference == null || reference == null)) throw ApiException.Validation("Institution and identity reference are required")
+        if (institutionPreference != null && authenticationDependency { institutions.findEnabled(institutionPreference) } == null)
+            throw ApiException.Validation("Institution is not available for registration")
+        if (request.accountType == RegistrationAccountType.PARTICIPANT &&
+            (institutionPreference != null || reference != null || groupPreference != null)) throw ApiException.Validation("Participant registration does not request academic scope")
         val account = PlatformAccount(
             id = UUID.randomUUID().toString(),
             displayName = displayName,
             email = email,
             passwordHash = passwordHasher.hash(request.password),
-            roles = roles,
+            roles = emptySet(),
+            accountStatus = AccountStatus.PENDING_VERIFICATION,
+            registrationIntent = RegistrationIntent(request.accountType, institutionPreference, reference, groupPreference),
             createdAt = clock.instant(),
         )
         if (!authenticationDependency { accounts.create(account) }) {
             throw ApiException.Conflict("An account with that email already exists")
         }
+        verification.issue(account.id)
         return createSession(account.toUserSummary(), SessionIdentitySource.NATIVE)
     }
+
+    suspend fun verifyEmail(userId: String, token: String): LoginResponse =
+        createSession(verification.verify(userId, token).toUserSummary(), SessionIdentitySource.NATIVE)
 
     suspend fun login(request: LoginRequest): LoginResponse {
         val username = request.username.trim()
@@ -177,6 +200,6 @@ class AuthService(
     private companion object {
         val REFRESH_TOKEN_TTL: Duration = Duration.ofDays(30)
         const val REFRESH_TOKEN_BYTES = 32
-        val EMAIL_REGEX = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
+        val EMAIL_REGEX = Regex("^[A-Za-z0-9._%+\\-]+@[A-Za-z0-9\\-]+(?:\\.[A-Za-z0-9\\-]+)+$")
     }
 }

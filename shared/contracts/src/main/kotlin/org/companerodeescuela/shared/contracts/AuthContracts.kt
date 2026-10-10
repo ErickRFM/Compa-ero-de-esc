@@ -41,6 +41,8 @@ data class RefreshSessionRequest(
 enum class RegistrationAccountType {
     STUDENT,
     TEACHER,
+    TUTOR,
+    PARTICIPANT,
 }
 
 @Serializable
@@ -49,4 +51,7 @@ data class RegisterRequest(
     val email: String,
     val password: String,
     val accountType: RegistrationAccountType,
+    val requestedInstitutionId: String? = null,
+    val identityReference: String? = null,
+    val preferredGroup: String? = null,
 )

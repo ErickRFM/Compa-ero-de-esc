@@ -1,5 +1,11 @@
 package org.companerodeescuela.api.application
 
+import org.companerodeescuela.api.institutions.InstitutionRepository
+import org.companerodeescuela.api.institutions.InMemoryInstitutionRepository
+import org.companerodeescuela.api.institutions.MongoInstitutionRepository
+import org.companerodeescuela.api.mail.VerificationEmailGateway
+import org.companerodeescuela.api.mail.UnavailableVerificationEmailGateway
+import org.companerodeescuela.api.mail.ResendVerificationEmailGateway
 import org.companerodeescuela.api.auth.InMemoryPlatformAccountRepository
 import org.companerodeescuela.api.auth.InMemoryRefreshSessionRepository
 import org.companerodeescuela.api.auth.MongoPlatformAccountRepository
@@ -13,6 +19,8 @@ import org.companerodeescuela.api.database.MongoConnection
 data class IdentityFeatureGraph(
     val refreshSessions: RefreshSessionRepository,
     val accounts: PlatformAccountRepository,
+    val institutions: InstitutionRepository = InMemoryInstitutionRepository(),
+    val verificationEmail: VerificationEmailGateway = UnavailableVerificationEmailGateway,
 )
 
 fun buildIdentityFeatureGraph(
@@ -34,5 +42,9 @@ fun buildIdentityFeatureGraph(
     return IdentityFeatureGraph(
         refreshSessions = refreshSessions,
         accounts = accounts,
+        institutions = if (settings.hasAuthentication && settings.mongo.isConfigured) MongoInstitutionRepository(mongoConnection.database()) else InMemoryInstitutionRepository(),
+        verificationEmail = if (settings.hasVerificationEmail)
+            ResendVerificationEmailGateway(requireNotNull(settings.verificationEmailApiKey), requireNotNull(settings.verificationEmailSender))
+            else UnavailableVerificationEmailGateway,
     )
 }

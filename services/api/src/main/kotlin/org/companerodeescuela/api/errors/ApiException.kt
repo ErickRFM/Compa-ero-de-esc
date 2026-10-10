@@ -70,6 +70,7 @@ sealed class ApiException(
 
     class RateLimited(
         message: String = "Too many authentication attempts",
+        val retryAfterSeconds: Long? = null,
     ) : ApiException(
         httpStatus = HttpStatusCode.TooManyRequests,
         errorCode = ApiErrorCode.RATE_LIMITED,

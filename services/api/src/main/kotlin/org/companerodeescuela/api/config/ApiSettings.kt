@@ -56,7 +56,11 @@ data class ApiSettings(
     val schoolWifiSsids: Set<String> = emptySet(),
     val schoolWifiBssids: Set<String> = emptySet(),
     val attendanceGraceMinutes: Int = 5,
+    val verificationEmailApiKey: CharArray? = null,
+    val verificationEmailSender: String? = null,
 ) {
+    val hasVerificationEmail: Boolean get() = verificationEmailApiKey != null && verificationEmailSender != null
+
     val hasAuthentication: Boolean
         get() = jwtSecret != null
 
@@ -83,7 +87,8 @@ data class ApiSettings(
             schoolPresenceQrSha256 == other.schoolPresenceQrSha256 &&
             schoolWifiSsids == other.schoolWifiSsids &&
             schoolWifiBssids == other.schoolWifiBssids &&
-            attendanceGraceMinutes == other.attendanceGraceMinutes
+            attendanceGraceMinutes == other.attendanceGraceMinutes &&
+            hasVerificationEmail == other.hasVerificationEmail && verificationEmailSender == other.verificationEmailSender
     }
 
     override fun hashCode(): Int {
@@ -102,6 +107,8 @@ data class ApiSettings(
         result = 31 * result + schoolWifiSsids.hashCode()
         result = 31 * result + schoolWifiBssids.hashCode()
         result = 31 * result + attendanceGraceMinutes
+        result = 31 * result + hasVerificationEmail.hashCode()
+        result = 31 * result + (verificationEmailSender?.hashCode() ?: 0)
         return result
     }
 
@@ -120,6 +127,7 @@ data class ApiSettings(
             "mongoDatabase=${mongo.databaseName}, " +
             "authenticationConfigured=$hasAuthentication, " +
             "attendanceQrSigningConfigured=$hasAttendanceQrSigning, " +
+            "verificationEmailConfigured=$hasVerificationEmail, " +
             "schoolPresenceConfigured=$hasSchoolPresenceVerification" +
             ")"
 }
@@ -164,6 +172,15 @@ class SettingsLoader(
             )
         }
 
+        val verificationEmailKey = env("VERIFICATION_EMAIL_API_KEY")?.takeIf { it.isNotBlank() }
+        val verificationEmailSender = env("VERIFICATION_EMAIL_SENDER")?.trim()?.takeIf { it.isNotEmpty() }
+        if ((verificationEmailKey == null) != (verificationEmailSender == null)) throw ConfigurationException("Configure both VERIFICATION_EMAIL_API_KEY and VERIFICATION_EMAIL_SENDER")
+        if (verificationEmailKey != null && (verificationEmailKey.length < 20 || verificationEmailKey.any { it.isISOControl() }))
+            throw ConfigurationException("Invalid VERIFICATION_EMAIL_API_KEY")
+        if (verificationEmailSender != null && (verificationEmailSender.length > 128 ||
+            !Regex("^[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Za-z]{2,}$").matches(verificationEmailSender)))
+            throw ConfigurationException("Invalid VERIFICATION_EMAIL_SENDER")
+
         validateSecret(environment, jwtSecret)
         validateOptionalSecret("ATTENDANCE_QR_SECRET", attendanceQrSecret)
         validateSchoolPresence(schoolPresenceQrSha256, schoolWifiSsids, schoolWifiBssids)
@@ -195,6 +212,8 @@ class SettingsLoader(
             schoolWifiSsids = schoolWifiSsids,
             schoolWifiBssids = schoolWifiBssids,
             attendanceGraceMinutes = attendanceGraceMinutes,
+            verificationEmailApiKey = verificationEmailKey?.toCharArray(),
+            verificationEmailSender = verificationEmailSender,
         )
     }
 

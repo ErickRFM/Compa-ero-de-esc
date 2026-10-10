@@ -218,14 +218,9 @@ class LiveSessionAuthorityRoutesTest {
         return json.decodeFromString<ApiResponse<LoginResponse>>(response.bodyAsText()).data
     }
 
-    private suspend fun io.ktor.server.testing.ApplicationTestBuilder.register(): LoginResponse {
-        val response = client.post("/auth/register") {
-            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-            setBody("""{"displayName":"QA Native","email":"native@example.test","password":"test-password","accountType":"STUDENT"}""")
-        }
-        assertEquals(HttpStatusCode.Created, response.status)
-        return json.decodeFromString<ApiResponse<LoginResponse>>(response.bodyAsText()).data
-    }
+    // Authority tests start from an existing verified native account, independent of signup.
+    private suspend fun io.ktor.server.testing.ApplicationTestBuilder.register(): LoginResponse =
+        login("native@example.test", "test-password")
 
     private suspend fun io.ktor.server.testing.ApplicationTestBuilder.me(token: String) = client.get("/auth/me") {
         header(HttpHeaders.Authorization, "Bearer $token")
@@ -237,7 +232,8 @@ class LiveSessionAuthorityRoutesTest {
     }
 
     private class MutableAccounts : PlatformAccountRepository {
-        var account: PlatformAccount? = null
+        var account: PlatformAccount? = PlatformAccount("native-test-account", "QA Native", "native@example.test",
+            PasswordHasher().hash("test-password"), setOf(UserRole.STUDENT))
         override suspend fun findByIdentifier(identifier: String) = account?.takeIf { it.email == identifier || it.id == identifier }
         override suspend fun findById(id: String) = account?.takeIf { it.id == id }
         override suspend fun create(account: PlatformAccount): Boolean {

@@ -6,6 +6,7 @@ import io.ktor.server.routing.routing
 import org.companerodeescuela.api.academic.groups.academicGroupRoutes
 import org.companerodeescuela.api.academic.academicRoutes
 import org.companerodeescuela.api.attendance.attendanceRoutes
+import org.companerodeescuela.api.institutions.institutionRoutes
 import org.companerodeescuela.api.auth.authRoutes
 import org.companerodeescuela.api.auth.PlatformSessionAuthority
 import org.companerodeescuela.api.channel.channelRoutes
@@ -93,7 +94,10 @@ fun Application.module(
             identityProvider = providerRegistry.identity,
             sessions = identityGraph.refreshSessions,
             accounts = identityGraph.accounts,
+            institutions = identityGraph.institutions,
+            verificationEmail = identityGraph.verificationEmail,
         )
+        institutionRoutes(identityGraph.institutions)
         academicRoutes(
             settings = settings,
             academicProvider = providerRegistry.academic,

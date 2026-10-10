@@ -15,6 +15,9 @@ enum class UserRole {
     @SerialName("student")
     STUDENT,
 
+    @SerialName("workshop_participant")
+    WORKSHOP_PARTICIPANT,
+
     @SerialName("teacher_pending")
     TEACHER_PENDING,
 

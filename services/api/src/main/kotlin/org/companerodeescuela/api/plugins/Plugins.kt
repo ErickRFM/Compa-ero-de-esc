@@ -133,8 +133,13 @@ fun Application.configurePlugins(
                         val session = sessionId?.let { refreshSessions?.find(it) }
                         if (session != null && sessionAuthority?.permits(credential.payload, session, tokenService) == true &&
                             (tokenService.userFrom(credential.payload).accountStatus == AccountStatus.ACTIVE ||
-                                request.path() == "/auth/me")) {
-                            JWTPrincipal(credential.payload)
+                                request.path() in setOf("/auth/me", "/auth/verification/resend", "/auth/verification/confirm"))) {
+                            val user = tokenService.userFrom(credential.payload)
+                            // A basic workshop account has no academic access, even on coarse authenticated routes.
+                            if (user.roles == setOf(org.companerodeescuela.shared.contracts.UserRole.WORKSHOP_PARTICIPANT) &&
+                                !request.path().startsWith("/auth/") && request.path() != "/workshops" &&
+                                !request.path().startsWith("/workshops/")) null
+                            else JWTPrincipal(credential.payload)
                         } else null
                     } catch (cancelled: CancellationException) {
                         throw cancelled
@@ -164,6 +169,9 @@ fun Application.configurePlugins(
     val appLogger = log
     install(StatusPages) {
         exception<ApiException> { call, cause ->
+            if (cause is ApiException.RateLimited) cause.retryAfterSeconds?.let {
+                call.response.headers.append(HttpHeaders.RetryAfter, it.toString())
+            }
             call.respond(
                 status = cause.httpStatus,
                 message = cause.toApiError(call.requestId()),

@@ -168,7 +168,7 @@ private fun TutorGroupsContent(state: TutorUiState, viewModel: TutorViewModel, m
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
                             OutlinedButton(onClick = { studentId = student.userId; editingCase = null }) {
-                                Text("Seguimiento")
+                                Text("Ver seguimiento")
                             }
                             val activeGroup = groupId ?: return@Row
                             OutlinedButton(

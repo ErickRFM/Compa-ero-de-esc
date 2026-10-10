@@ -25,11 +25,11 @@ class AccountOnboardingUiTest {
         compose.onNodeWithTag("verification_confirm").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithTag("verification_code").performScrollTo().performTextInput("A".repeat(43))
         compose.onNodeWithTag("verification_confirm").performScrollTo().performClick()
-        assertEquals("A".repeat(43), confirmed)
+        compose.runOnIdle { assertEquals("A".repeat(43), confirmed) }
         compose.onNodeWithText("Reenviar correo").performScrollTo().performClick()
-        assertEquals(1, resent)
+        compose.runOnIdle { assertEquals(1, resent) }
         compose.onNodeWithText("Cerrar sesión").performScrollTo().performClick()
-        assertEquals(1, loggedOut)
+        compose.runOnIdle { assertEquals(1, loggedOut) }
     }
     @Test fun pendingApprovalCannotUseEmailConfirmationOrAcademicNavigation() {
         var checked = 0
@@ -42,6 +42,6 @@ class AccountOnboardingUiTest {
         compose.onNodeWithTag("verification_code").assertDoesNotExist()
         compose.onNodeWithText("Pase de lista").assertDoesNotExist()
         compose.onNodeWithText("Comprobar estado").performScrollTo().performClick()
-        assertEquals(1, checked)
+        compose.runOnIdle { assertEquals(1, checked) }
     }
 }

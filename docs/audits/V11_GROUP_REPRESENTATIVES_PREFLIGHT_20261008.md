@@ -1,8 +1,8 @@
 # Auditoría Preflight V11: Representantes de Grupo y Canal Institucional
 
-**Fecha:** 2026-10-09  
-**Módulo:** Representantes de Grupo y Canal Institucional V11  
-**Repositorio:** `ErickRFM/Compa-ero-de-esc`  
+**Fecha:** 2026-10-09
+**Módulo:** Representantes de Grupo y Canal Institucional V11
+**Repositorio:** `ErickRFM/Compa-ero-de-esc`
 **Entorno de Trabajo:** `C:\proyectos\esc-v11` (git worktree en `feat/v11-group-representatives`)
 
 ---

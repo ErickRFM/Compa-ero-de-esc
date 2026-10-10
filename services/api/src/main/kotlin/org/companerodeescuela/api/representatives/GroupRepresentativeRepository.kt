@@ -6,6 +6,9 @@ import com.mongodb.client.model.Indexes
 import com.mongodb.client.model.Sorts
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import org.companerodeescuela.api.errors.ApiException
 import kotlinx.coroutines.flow.toList
 import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.codecs.pojo.annotations.BsonProperty
@@ -85,6 +88,7 @@ internal data class GroupRepresentativeDocument(
 
 class InMemoryGroupRepresentativeRepository : GroupRepresentativeRepository {
     private val storage = ConcurrentHashMap<String, GroupRepresentativeAssignment>()
+    private val mutex=Mutex()
 
     override suspend fun findById(id: String): GroupRepresentativeAssignment? = storage[id]
 
@@ -106,16 +110,26 @@ class InMemoryGroupRepresentativeRepository : GroupRepresentativeRepository {
                 (it.status == RepresentativeStatus.ACTIVE || it.status == RepresentativeStatus.PENDING)
         }
 
-    override suspend fun save(assignment: GroupRepresentativeAssignment): GroupRepresentativeAssignment {
-        storage[assignment.id] = assignment
-        return assignment
+    override suspend fun save(assignment: GroupRepresentativeAssignment): GroupRepresentativeAssignment = mutex.withLock {
+        if(storage.containsKey(assignment.id)) throw ApiException.Conflict("Representative appointment ID already exists")
+        ensurePositionAvailable(assignment)
+        storage[assignment.id]=assignment
+        assignment
     }
 
-    override suspend fun update(assignment: GroupRepresentativeAssignment): GroupRepresentativeAssignment? {
-        val existing = storage[assignment.id] ?: return null
-        if (existing.version != assignment.version - 1) return null
-        storage[assignment.id] = assignment
-        return assignment
+    override suspend fun update(assignment: GroupRepresentativeAssignment): GroupRepresentativeAssignment? = mutex.withLock {
+        val existing=storage[assignment.id] ?: return@withLock null
+        if(existing.version!=assignment.version-1) return@withLock null
+        ensurePositionAvailable(assignment)
+        storage[assignment.id]=assignment
+        assignment
+    }
+
+    private fun ensurePositionAvailable(candidate:GroupRepresentativeAssignment) {
+        if(candidate.status !in setOf(RepresentativeStatus.ACTIVE,RepresentativeStatus.PENDING)) return
+        if(storage.values.any { it.id!=candidate.id && it.academicGroupId==candidate.academicGroupId &&
+                it.position==candidate.position && it.status in setOf(RepresentativeStatus.ACTIVE,RepresentativeStatus.PENDING) })
+            throw ApiException.Conflict("A current representative appointment already occupies this position")
     }
 }
 
@@ -126,10 +140,10 @@ class MongoGroupRepresentativeRepository(
 
     suspend fun ensureIndexes() {
         collection.createIndex(
-            Indexes.compoundIndex(
-                Indexes.ascending("academicGroupId"),
-                Indexes.ascending("position"),
-                Indexes.ascending("status"),
+            Indexes.compoundIndex(Indexes.ascending("academicGroupId"),Indexes.ascending("position")),
+            IndexOptions().unique(true).name("uq_pending_active_representative_position").partialFilterExpression(
+                Filters.or(Filters.eq("status",RepresentativeStatus.PENDING.name),
+                    Filters.eq("status",RepresentativeStatus.ACTIVE.name))
             ),
         )
         collection.createIndex(Indexes.ascending("studentUserId"))
@@ -163,11 +177,18 @@ class MongoGroupRepresentativeRepository(
         ).toList().firstOrNull()?.toModel()
 
     override suspend fun save(assignment: GroupRepresentativeAssignment): GroupRepresentativeAssignment {
-        collection.insertOne(GroupRepresentativeDocument.fromModel(assignment))
+        // Index creation intentionally fails closed if historic duplicates need manual remediation.
+        ensureIndexes()
+        try { collection.insertOne(GroupRepresentativeDocument.fromModel(assignment)) }
+        catch(error:com.mongodb.MongoWriteException) {
+            if(error.error.code==11000) throw ApiException.Conflict("Representative position is already assigned")
+            throw error
+        }
         return assignment
     }
 
     override suspend fun update(assignment: GroupRepresentativeAssignment): GroupRepresentativeAssignment? {
+        ensureIndexes()
         val filter = Filters.and(
             Filters.eq("_id", assignment.id),
             Filters.eq("version", assignment.version - 1),

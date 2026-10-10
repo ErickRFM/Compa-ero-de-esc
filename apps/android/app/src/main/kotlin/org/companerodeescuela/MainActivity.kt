@@ -1,7 +1,10 @@
 package org.companerodeescuela
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.runtime.key
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.SystemBarStyle
@@ -64,7 +67,7 @@ import org.companerodeescuela.feature.settings.AppearanceSettingsScreen
 import org.companerodeescuela.feature.settings.IntegrationSettingsScreen
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
 
     @Inject
     lateinit var attendanceSyncScheduler: AttendanceSyncScheduler
@@ -78,6 +81,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        appearancePreferences.applySavedLanguage()
 
         setContent {
             val appearance by appearancePreferences.state.collectAsStateWithLifecycle()
@@ -103,12 +107,13 @@ class MainActivity : ComponentActivity() {
                         val sessionViewModel: SessionViewModel = hiltViewModel()
                         val session by sessionViewModel.state.collectAsStateWithLifecycle()
                         SideEffect {
-                            val v8Dark = !session.authenticated || session.roles == setOf(org.companerodeescuela.shared.contracts.UserRole.STUDENT)
+                            val v8Dark = session.authenticated && session.roles == setOf(org.companerodeescuela.shared.contracts.UserRole.STUDENT)
                             val style = if (v8Dark || darkTheme) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
                                 else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
                             enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
                         }
-                        var activatingAccess by remember { mutableStateOf(false) }
+                        var activatingAccess by rememberSaveable { mutableStateOf(false) }
+                        var loginExperienceName by rememberSaveable { mutableStateOf<String?>(null) }
 
                         LaunchedEffect(session.authenticated) {
                             if (session.authenticated) {
@@ -136,8 +141,11 @@ class MainActivity : ComponentActivity() {
                                 } else {
                                     LoginScreen(
                                         state = session,
-                                        onLogin = sessionViewModel::login,
-                                        onCreateAccount = { activatingAccess = true },
+                                        onLogin = { username, password, experience ->
+                                            loginExperienceName = experience.name
+                                            sessionViewModel.login(username, password)
+                                        },
+                                        onCreateAccount = { loginExperienceName = null; activatingAccess = true },
                                     )
                                 }
                             }
@@ -148,21 +156,34 @@ class MainActivity : ComponentActivity() {
                                 val userId = session.userId
                                 var preferredExperience by remember(userId, session.roles) {
                                     mutableStateOf(
-                                        userId
-                                            ?.let(activeExperiencePreferences::read)
-                                            ?.takeIf(availableExperiences::contains),
+                                        RoleExperienceResolver.preferredAfterLogin(
+                                            roles = session.roles,
+                                            requested = AppExperience.entries.firstOrNull { it.name == loginExperienceName },
+                                            saved = userId?.let(activeExperiencePreferences::read),
+                                        ),
                                     )
                                 }
 
+                                LaunchedEffect(userId, session.roles, preferredExperience) {
+                                    val selected = preferredExperience
+                                    if (userId != null && selected in availableExperiences && selected != null) {
+                                        activeExperiencePreferences.write(userId, selected)
+                                        // Consume intent once authorized; recreation now reads the saved choice.
+                                        loginExperienceName = null
+                                    }
+                                }
+
                                 if (
-                                    availableExperiences.size > 1 &&
+                                    availableExperiences.isNotEmpty() &&
                                     preferredExperience == null &&
                                     userId != null
                                 ) {
                                     ExperiencePickerScreen(
                                         experiences = availableExperiences,
+                                        selectionUnavailable = loginExperienceName != null && AppExperience.entries.firstOrNull { it.name == loginExperienceName } !in availableExperiences,
                                         onSelect = { selected ->
                                             activeExperiencePreferences.write(userId, selected)
+                                            loginExperienceName = null
                                             preferredExperience = selected
                                         },
                                     )
@@ -173,7 +194,7 @@ class MainActivity : ComponentActivity() {
                                             preferredExperience = preferredExperience,
                                         )
                                     }
-                                    val navController = rememberNavController()
+                                    val navController = key(userId, roleConfig.experience, session.roles) { rememberNavController() }
                                     SideEffect {
                                         val isDark = roleConfig.startDestination in setOf(Destination.Home, Destination.TeacherHome) || darkTheme
                                         val style = if (isDark) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
@@ -338,6 +359,7 @@ class MainActivity : ComponentActivity() {
                                                 canSwitchExperience = availableExperiences.size > 1,
                                                 onSwitchExperience = {
                                                     userId?.let(activeExperiencePreferences::clear)
+                                                    loginExperienceName = null
                                                     preferredExperience = null
                                                 },
                                                 onAppearance = {
@@ -350,7 +372,7 @@ class MainActivity : ComponentActivity() {
                                                         Destination.IntegrationSettings.route,
                                                     )
                                                 },
-                                                onLogout = sessionViewModel::logout,
+                                                onLogout = { loginExperienceName = null; sessionViewModel.logout() },
                                             )
                                         }
                                         composable(Destination.IntegrationSettings.route) {
@@ -366,6 +388,7 @@ class MainActivity : ComponentActivity() {
                                             AppearanceSettingsScreen(
                                                 settings = appearance,
                                                 onThemeMode = appearancePreferences::setThemeMode,
+                                                onLanguage = appearancePreferences::setLanguage,
                                                 onTextScale = appearancePreferences::setTextScale,
                                                 onReducedMotion = appearancePreferences::setReducedMotion,
                                                 onHighContrast = appearancePreferences::setHighContrast,
@@ -437,6 +460,7 @@ private fun RoleUnavailableScreen(experience: AppExperience) {
 @androidx.compose.runtime.Composable
 private fun ExperiencePickerScreen(
     experiences: List<AppExperience>,
+    selectionUnavailable: Boolean = false,
     onSelect: (AppExperience) -> Unit,
 ) {
     Column(
@@ -446,11 +470,11 @@ private fun ExperiencePickerScreen(
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = "¿Cómo quieres usar Compañero?",
+            text = stringResource(R.string.login_experience_picker_title),
             style = MaterialTheme.typography.headlineMedium,
         )
         Text(
-            text = "Tu cuenta tiene más de un perfil. Puedes cambiar de modo después desde Perfil.",
+            text = stringResource(if (selectionUnavailable) R.string.login_experience_unavailable else R.string.login_experience_picker_description),
             modifier = Modifier.padding(
                 top = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.xs,
                 bottom = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.md,
@@ -471,12 +495,13 @@ private fun ExperiencePickerScreen(
     }
 }
 
-private fun experienceLabel(experience: AppExperience): String = when (experience) {
-    AppExperience.STUDENT -> "Continuar como estudiante"
-    AppExperience.TEACHER -> "Continuar como docente"
-    AppExperience.TUTOR -> "Continuar como tutor académico"
-    AppExperience.COORDINATOR -> "Continuar como coordinación"
-    AppExperience.ADMIN -> "Continuar como administración"
-    AppExperience.SUPER_ADMIN -> "Continuar como administración general"
-    AppExperience.UNSUPPORTED -> "Continuar"
-}
+@androidx.compose.runtime.Composable
+private fun experienceLabel(experience: AppExperience): String = stringResource(when (experience) {
+    AppExperience.STUDENT -> R.string.login_continue_student
+    AppExperience.TEACHER -> R.string.login_continue_teacher
+    AppExperience.TUTOR -> R.string.login_continue_tutor
+    AppExperience.COORDINATOR -> R.string.login_continue_coordinator
+    AppExperience.ADMIN -> R.string.login_continue_admin
+    AppExperience.SUPER_ADMIN -> R.string.login_continue_super_admin
+    AppExperience.UNSUPPORTED -> R.string.login_continue
+})

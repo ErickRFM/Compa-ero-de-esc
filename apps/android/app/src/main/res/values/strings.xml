@@ -33,4 +33,14 @@
     <string name="accessibility_title">Accesibilidad</string>
     <string name="reduced_motion_label">Reducir animaciones</string>
     <string name="high_contrast_label">Mayor contraste</string>
+    <string name="login_experience_picker_title">¿Cómo quieres usar Compañero?</string>
+    <string name="login_experience_picker_description">Puedes cambiar de experiencia después desde Perfil.</string>
+    <string name="login_experience_unavailable">El acceso elegido no está autorizado para tu cuenta. Elige uno de tus perfiles disponibles.</string>
+    <string name="login_continue_student">Continuar como estudiante</string>
+    <string name="login_continue_teacher">Continuar como docente</string>
+    <string name="login_continue_tutor">Continuar como tutor académico</string>
+    <string name="login_continue_coordinator">Continuar como coordinación</string>
+    <string name="login_continue_admin">Continuar como administración</string>
+    <string name="login_continue_super_admin">Continuar como administración general</string>
+    <string name="login_continue">Continuar</string>
 </resources>

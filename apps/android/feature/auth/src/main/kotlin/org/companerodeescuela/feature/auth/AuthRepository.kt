@@ -1,6 +1,7 @@
 package org.companerodeescuela.feature.auth
 
 import io.ktor.client.HttpClient
+import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -30,6 +31,19 @@ class AuthRepository(
     private val refreshCoordinator: SessionRefreshCoordinator =
         SessionRefreshCoordinator(client, tokenStore, clock),
 ) {
+    /** Restored sessions must pass the server's live identity/generation authority. */
+    suspend fun currentUser(): Outcome<UserSummary> {
+        val current = refreshCoordinator.currentAccessToken()
+        if (current is Outcome.Failure) return current
+        return refreshCoordinator.execute((current as Outcome.Success).value) { token ->
+            apiCall {
+                client.get("auth/me") {
+                    header(HttpHeaders.Authorization, "Bearer " + token)
+                }.requireBody<ApiResponse<UserSummary>>()
+            }.map { it.data }
+        }
+    }
+
     suspend fun hasSession(): Boolean {
         return refreshCoordinator.currentAccessToken() is Outcome.Success
     }
@@ -89,6 +103,8 @@ class AuthRepository(
                         refreshToken = result.value.refreshToken,
                     )
                     Outcome.Success(result.value.user)
+                } catch (error: kotlinx.coroutines.CancellationException) {
+                    throw error
                 } catch (error: Exception) {
                     Outcome.Failure(
                         AppError.Storage(
@@ -118,7 +134,7 @@ class AuthRepository(
                 }
             }
         } finally {
-            tokenStore.clear()
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { tokenStore.clear() }
         }
     }
 }

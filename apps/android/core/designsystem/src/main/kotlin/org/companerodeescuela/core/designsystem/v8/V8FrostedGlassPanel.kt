@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -29,10 +31,14 @@ fun Modifier.v8GlassSurface(
     cornerRadius: Dp = V8RedDimensions.CardCorner,
     emphasized: Boolean = false,
     elevation: Dp = 6.dp,
+    themeAware: Boolean = false,
 ): Modifier {
     val shape = RoundedCornerShape(cornerRadius)
     val highContrast = LocalCompaneroHighContrast.current
-    val tint = if (highContrast) {
+    val light = themeAware && MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val tint = if (light) {
+        List(2) { MaterialTheme.colorScheme.surface.copy(alpha = if (highContrast) 1f else 0.96f) }
+    } else if (highContrast) {
         listOf(Color(0xFF0F0E13), Color(0xFF0F0E13))
     } else {
         listOf(
@@ -41,7 +47,9 @@ fun Modifier.v8GlassSurface(
             Color(0xF51C1217),
         )
     }
-    val edge = if (highContrast) {
+    val edge = if (light) {
+        List(2) { if (highContrast) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f) }
+    } else if (highContrast) {
         listOf(Color.White, Color.White)
     } else if (emphasized) {
         listOf(Color(0x80FF5365), Color(0x50C74959), Color(0x30383949))
@@ -66,11 +74,12 @@ fun V8FrostedGlassPanel(
     cornerRadius: Dp = V8RedDimensions.CardCorner,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     emphasized: Boolean = false,
+    themeAware: Boolean = false,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    CompositionLocalProvider(LocalContentColor provides V8RedColors.TextPrimary) {
+    CompositionLocalProvider(LocalContentColor provides if (themeAware) MaterialTheme.colorScheme.onSurface else V8RedColors.TextPrimary) {
         Box(
-            modifier = modifier.v8GlassSurface(cornerRadius, emphasized).padding(contentPadding),
+            modifier = modifier.v8GlassSurface(cornerRadius, emphasized, themeAware = themeAware).padding(contentPadding),
             content = content,
         )
     }

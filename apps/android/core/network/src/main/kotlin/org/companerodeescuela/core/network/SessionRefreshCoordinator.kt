@@ -179,6 +179,8 @@ class SessionRefreshCoordinator(
                             refreshToken = response.refreshToken,
                         )
                         Outcome.Success(response)
+                    } catch (error: kotlinx.coroutines.CancellationException) {
+                        throw error
                     } catch (error: Exception) {
                         Outcome.Failure(
                             AppError.Storage(

@@ -18,12 +18,12 @@ import androidx.compose.ui.unit.sp
 
 /** Student-facing V8 brand identity shared by all five approved surfaces. */
 @Composable
-fun V8BrandHeader(modifier: Modifier = Modifier, stacked: Boolean = false) {
+fun V8BrandHeader(modifier: Modifier = Modifier, stacked: Boolean = false, contentColor: androidx.compose.ui.graphics.Color = V8RedColors.TextPrimary, secondaryColor: androidx.compose.ui.graphics.Color = V8RedColors.TextSecondary, tagline: String = "ESTUDIA · CONECTA · AVANZA") {
     if (stacked) {
         Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             V8BrandMark(Modifier.size(54.dp))
-            Text("Compañero\nde Clase", color = V8RedColors.TextPrimary, fontSize = 22.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold)
-            Text("ESTUDIA · CONECTA · AVANZA", color = V8RedColors.TextSecondary, fontSize = 9.sp, letterSpacing = 2.sp)
+            Text("Compañero\nde Clase", color = contentColor, fontSize = 22.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold)
+            Text(tagline, color = secondaryColor, fontSize = 9.sp, letterSpacing = 2.sp)
         }
         return
     }
@@ -31,13 +31,13 @@ fun V8BrandHeader(modifier: Modifier = Modifier, stacked: Boolean = false) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             V8BrandMark(Modifier.size(36.dp))
             Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-                Text("Compañero", color = V8RedColors.TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold, lineHeight = 19.sp)
-                Text("de Clase", color = V8RedColors.TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.Bold, lineHeight = 19.sp)
+                Text("Compañero", color = contentColor, fontSize = 18.sp, fontWeight = FontWeight.Bold, lineHeight = 19.sp)
+                Text("de Clase", color = contentColor, fontSize = 18.sp, fontWeight = FontWeight.Bold, lineHeight = 19.sp)
             }
         }
         Text(
-            "ESTUDIA · CONECTA · AVANZA",
-            color = V8RedColors.TextSecondary,
+            tagline,
+            color = secondaryColor,
             fontSize = 9.sp,
             letterSpacing = 1.sp,
         )

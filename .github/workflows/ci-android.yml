@@ -51,6 +51,9 @@ jobs:
       - name: Whitespace errors in committed changes
         run: bash infrastructure/scripts/check-whitespace.sh
 
+      - name: Verify evidence exporter regression tests
+        run: python3 -m unittest discover -s infrastructure/scripts/tests -p test_export_v10_evidence.py
+
       - name: Compile Android sources
         run: ./gradlew :apps:android:app:compileDebugKotlin --console=plain
 
@@ -58,7 +61,7 @@ jobs:
       # suite and then reports zero tests without failing. useJUnitPlatform()
       # is set in every Android module; this step proves it took effect.
       - name: Run Android unit tests
-        run: ./gradlew :apps:android:core:common:testDebugUnitTest :apps:android:core:designsystem:testDebugUnitTest :apps:android:core:motion:testDebugUnitTest :apps:android:core:ui:testDebugUnitTest :apps:android:core:network:testDebugUnitTest :apps:android:core:security:testDebugUnitTest :apps:android:core:database:testDebugUnitTest :apps:android:core:academic:testDebugUnitTest :apps:android:core:attendance:testDebugUnitTest :apps:android:core:navigation:testDebugUnitTest :apps:android:feature:auth:testDebugUnitTest :apps:android:feature:home:testDebugUnitTest :apps:android:feature:schedule:testDebugUnitTest :apps:android:feature:attendance:testDebugUnitTest :apps:android:feature:channel:testDebugUnitTest :apps:android:feature:grading:testDebugUnitTest :apps:android:feature:tutoring:testDebugUnitTest --console=plain
+        run: ./gradlew testDebugUnitTest --console=plain
 
       - name: Verify Android tests actually executed
         run: |
@@ -179,9 +182,13 @@ jobs:
           retention-days: 7
 
   instrumentation:
-    name: Android instrumentation smoke test
+    name: Android instrumentation API ${{ matrix.api-level }}
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [31, 35]
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -195,21 +202,33 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Prepare native emulator signal diagnostics
+        run: sudo apt-get install -y strace gdb
+
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm-nodes.rules
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
 
+      - name: Build instrumentation APKs before starting the emulator
+        run: ./gradlew :apps:android:app:assembleDebug :apps:android:app:assembleDebugAndroidTest --max-workers=2 --no-daemon --console=plain
+
       - name: Run Instrumentation Tests
-        timeout-minutes: 10
+        timeout-minutes: 20
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 31
+          api-level: ${{ matrix.api-level }}
           target: google_apis
           arch: x86_64
+          # Stable 36.4.9: make the native emulator runtime reproducible.
+          emulator-build: "14788078"
+          ram-size: 2048M
+          # Supported software GLES/Vulkan path through ANGLE; retain KVM.
+          # Runs with the legacy indirect mode ended in native QEMU SIGSEGV on API35.
+          emulator-options: -no-window -gpu swangle -no-snapshot -noaudio -no-boot-anim -show-kernel
           # App contains the smoke tests. Root task also launches empty library
           # suites concurrently against the same emulator and can stall ADB.
-          script: ./gradlew :apps:android:app:connectedDebugAndroidTest --max-workers=2 --console=plain
+          script: bash infrastructure/scripts/run-v10-instrumentation.sh
 
       - name: Verify instrumentation tests actually executed
         run: |
@@ -220,7 +239,20 @@ jobs:
           suites = [ET.parse(path).getroot() for path in reports]
           tests = sum(int(suite.get('tests', 0)) for suite in suites)
           failures = sum(int(suite.get('failures', 0)) + int(suite.get('errors', 0)) for suite in suites)
-          print(f'instrumentation tests={tests} failures={failures}')
-          if tests == 0 or failures != 0:
-              raise SystemExit('Instrumentation must execute tests without failures')
+          skipped = sum(int(suite.get('skipped', 0)) for suite in suites)
+          print(f'instrumentation tests={tests} failures={failures} skipped={skipped}')
+          if tests < 23 or failures != 0 or skipped != 0:
+              raise SystemExit('Instrumentation must execute all 23+ tests without failures or skips')
           PY
+
+      - name: Upload Android UI evidence
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: v10-login-ui-evidence-api-${{ matrix.api-level }}
+          path: |
+            build/v10-device-evidence/**
+            build/v10-runner-diagnostics/**
+            apps/android/app/build/outputs/androidTest-results/connected/**
+          retention-days: 7

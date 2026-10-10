@@ -4,14 +4,14 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlinx.coroutines.runBlocking
+import org.companerodeescuela.api.academic.groups.AcademicGroupRecord
 import org.companerodeescuela.api.academic.groups.AcademicGroupRepository
 import org.companerodeescuela.api.academic.groups.InMemoryAcademicGroupRepository
 import org.companerodeescuela.api.auth.InMemoryPlatformAccountRepository
-import org.companerodeescuela.api.auth.PlatformAccountRecord
+import org.companerodeescuela.api.auth.PlatformAccount
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.tutoring.InMemoryTutorAssignmentRepository
 import org.companerodeescuela.api.tutoring.TutorAssignmentService
-import org.companerodeescuela.shared.contracts.AcademicGroup
 import org.companerodeescuela.shared.contracts.AppointRepresentativeRequest
 import org.companerodeescuela.shared.contracts.CreateTutorAssignmentRequest
 import org.companerodeescuela.shared.contracts.RepresentativePosition
@@ -37,11 +37,11 @@ class GroupRepresentativeServiceTest {
     @BeforeEach
     fun setUp() = runBlocking {
         groupRepository = InMemoryAcademicGroupRepository()
-        groupRepository.saveGroup(AcademicGroup("G-101", "101-A", "2026-1"))
+        groupRepository.create(AcademicGroupRecord("G-101", "101-A", active = true, createdAt = Instant.now()))
 
         val accounts = InMemoryPlatformAccountRepository()
-        accounts.save(PlatformAccountRecord("tutor-1", "Tutor 1", "tutor1@escuela.edu", roles = setOf(UserRole.TUTOR)))
-        accounts.save(PlatformAccountRecord("tutor-2", "Tutor 2", "tutor2@escuela.edu", roles = setOf(UserRole.TUTOR)))
+        accounts.create(PlatformAccount("tutor-1", "Tutor 1", "tutor1@escuela.edu", "", roles = setOf(UserRole.TUTOR)))
+        accounts.create(PlatformAccount("tutor-2", "Tutor 2", "tutor2@escuela.edu", "", roles = setOf(UserRole.TUTOR)))
 
         tutoringService = TutorAssignmentService(
             repository = InMemoryTutorAssignmentRepository(),

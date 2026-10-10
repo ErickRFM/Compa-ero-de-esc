@@ -38,7 +38,7 @@ class MfaViewModel @Inject constructor(private val repository:MfaRepository):Vie
         }
     }
     fun enroll(password:String) {
-        if(operationJob?.isActive==true) return
+        if(mutable.value.working) return
         val status=mutable.value.status
         if(password.length !in 1..128) { mutable.value=mutable.value.copy(failure=AppError.Http(422));return }
         if(status==null || !status.available || status.enabled) { mutable.value=mutable.value.copy(failure=AppError.Http(if(status?.enabled==true) 409 else 503));return }
@@ -55,7 +55,7 @@ class MfaViewModel @Inject constructor(private val repository:MfaRepository):Vie
         }
     }
     fun confirm(otp:String) {
-        if(operationJob?.isActive==true) return
+        if(mutable.value.working) return
         val enrollment=mutable.value.enrollment
         if(enrollment==null || otp.length!=6 || otp.any { it !in '0'..'9' }) { mutable.value=mutable.value.copy(failure=AppError.Http(422));return }
         val captured=generation;val capturedOwner=owner

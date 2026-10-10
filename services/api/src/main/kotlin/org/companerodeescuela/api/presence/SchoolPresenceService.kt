@@ -63,15 +63,9 @@ class SchoolPresenceService(
         val method = networkVerifier.verify(request.network)
         val now = clock.instant()
 
-        repository.findActiveForStudent(studentId, now.epochSecond)?.let {
-            if(institution==null || it.institutionId==institution) return it.copy(networkVerified=false,serverTimeEpochSeconds=now.epochSecond)
-            // Retain the unscoped legacy evidence, but end its active grant before creating a scoped school day.
-            repository.replace(it.copy(status=SchoolPresenceStatus.CLOSED,closedAtEpochSeconds=now.epochSecond))
-        }
-
-        return repository.save(
-            SchoolPresenceResponse(
-                id = newId(),
+        activeRecord(studentId,institution,now.epochSecond)?.let { return it.copy(networkVerified=false,serverTimeEpochSeconds=now.epochSecond) }
+        val candidate=SchoolPresenceResponse(
+                id = if(institution==null) newId() else "DAY-"+UUID.nameUUIDFromBytes((studentId+"\u0000"+institution+"\u0000"+operationId).toByteArray(Charsets.UTF_8)),
                 studentId = studentId,
                 startedAtEpochSeconds = now.epochSecond,
                 expiresAtEpochSeconds = now.plus(Duration.ofHours(policy.sessionHours)).epochSecond,
@@ -82,14 +76,20 @@ class SchoolPresenceService(
                 networkVerified = false,
                 networkVerificationMethod = method,
                 institutionId=institution,
-            ),
-        ).copy(serverTimeEpochSeconds = now.epochSecond)
+                identitySource=if(institution==null) null else org.companerodeescuela.shared.contracts.SchoolPresenceIdentitySource.NATIVE,
+                operationId=operationId.takeIf { institution!=null },
+            )
+        val stored=if(institution==null) repository.save(candidate) else repository.createNative(candidate,now.epochSecond)
+            ?: throw ApiException.Conflict("School day operation has ended or changed")
+        return stored.copy(serverTimeEpochSeconds=now.epochSecond)
     }
 
+    private suspend fun activeRecord(studentId:String,institution:String?,now:Long)=
+        if(institution==null) repository.findActiveForStudent(studentId,now) else repository.findActiveForNativeStudent(studentId,institution,now)
     suspend fun activeFor(studentId: String,nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null): SchoolPresenceResponse? {
         val now = clock.instant().epochSecond
         val institution=nativeInstitution(studentId,nativeActor)
-        return repository.findActiveForStudent(studentId, now)?.takeIf { institution==null || it.institutionId==institution }?.copy(networkVerified=false,serverTimeEpochSeconds=now)
+        return activeRecord(studentId,institution,now)?.copy(networkVerified=false,serverTimeEpochSeconds=now)
     }
 
     suspend fun requireActive(studentId: String): SchoolPresenceResponse =
@@ -102,7 +102,7 @@ class SchoolPresenceService(
         val now = clock.instant().epochSecond
         val institution=nativeInstitution(studentId,nativeActor)
         // Write from raw storage; read projections must not overwrite evidence.
-        val current = repository.findActiveForStudent(studentId, now)?.takeIf { institution==null || it.institutionId==institution }
+        val current = activeRecord(studentId,institution,now)
             ?: throw ApiException.Forbidden(
                 "Start your school day by scanning the institutional QR while connected to the school network",
             )

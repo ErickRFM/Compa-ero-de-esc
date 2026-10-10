@@ -2,6 +2,15 @@ package org.companerodeescuela.api.presence
 
 import com.mongodb.client.model.Filters.eq
 import com.mongodb.client.model.Filters.and
+import com.mongodb.client.model.Filters.gte
+import com.mongodb.client.model.Filters.lt
+import com.mongodb.client.model.Filters.gt
+import com.mongodb.client.model.Filters.lte
+import com.mongodb.client.model.Filters.or
+import com.mongodb.client.model.Filters.type
+import com.mongodb.client.model.Updates
+import com.mongodb.client.model.FindOneAndUpdateOptions
+import org.bson.BsonType
 import com.mongodb.client.model.FindOneAndReplaceOptions
 import com.mongodb.client.model.ReturnDocument
 import com.mongodb.MongoWriteException
@@ -29,6 +38,7 @@ interface SchoolEntryQrRepository {
     suspend fun findById(id: String): StoredSchoolEntryQr?
     suspend fun list(): List<StoredSchoolEntryQr>
     suspend fun findByTokenHash(tokenHash: String): StoredSchoolEntryQr?
+    suspend fun consumeScoped(id:String,institutionId:String,nowEpochSeconds:Long):StoredSchoolEntryQr? = null
     suspend fun insertScoped(value:StoredSchoolEntryQr):StoredSchoolEntryQr? = null
     suspend fun replaceScoped(value:StoredSchoolEntryQr,expectedRevision:Long):StoredSchoolEntryQr? = null
     suspend fun replace(value: StoredSchoolEntryQr)
@@ -53,6 +63,13 @@ class InMemorySchoolEntryQrRepository : SchoolEntryQrRepository {
     override suspend fun findByTokenHash(tokenHash: String): StoredSchoolEntryQr? =
         mutex.withLock { values.values.firstOrNull { it.tokenHash == tokenHash } }
 
+    override suspend fun consumeScoped(id:String,institutionId:String,nowEpochSeconds:Long):StoredSchoolEntryQr? = mutex.withLock {
+        val stored=values[id] ?: return@withLock null;val current=stored.response
+        if(current.institutionId!=institutionId || current.status!=SchoolEntryQrStatus.ACTIVE || nowEpochSeconds<current.validFromEpochSeconds || nowEpochSeconds>=current.expiresAtEpochSeconds || current.revision<0 || current.revision==Long.MAX_VALUE || current.usageCount==Long.MAX_VALUE) return@withLock null
+        val used=stored.copy(response=current.copy(token=null,lastUsedAtEpochSeconds=nowEpochSeconds,usageCount=current.usageCount+1,revision=current.revision+1))
+        values[id]=used
+        used
+    }
     override suspend fun insertScoped(value:StoredSchoolEntryQr):StoredSchoolEntryQr? = mutex.withLock {
         if(!value.validScopedCreation()) return@withLock null
         val current=values[value.response.id]
@@ -101,6 +118,14 @@ class MongoSchoolEntryQrRepository(
         return collection.find(eq("tokenHash", tokenHash)).toList().firstOrNull()?.toStored()
     }
 
+    override suspend fun consumeScoped(id:String,institutionId:String,nowEpochSeconds:Long):StoredSchoolEntryQr? {
+        ensureIndexes()
+        val filter=and(eq("_id",id),eq("institutionId",institutionId),eq("status",SchoolEntryQrStatus.ACTIVE.name),lte("validFromEpochSeconds",nowEpochSeconds),gt("expiresAtEpochSeconds",nowEpochSeconds),
+            or(type("revision",BsonType.INT64),type("revision",BsonType.INT32)),gte("revision",0L),lt("revision",Long.MAX_VALUE),lt("usageCount",Long.MAX_VALUE))
+        val update=Updates.combine(Updates.inc("usageCount",1L),Updates.inc("revision",1L),Updates.set("lastUsedAtEpochSeconds",nowEpochSeconds))
+        val result=collection.findOneAndUpdate(filter,update,FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER))?.toStored()
+        return result?.takeIf { it.response.revision>=0 }
+    }
     override suspend fun insertScoped(value:StoredSchoolEntryQr):StoredSchoolEntryQr? {
         if(!value.validScopedCreation()) return null
         ensureIndexes()

@@ -201,9 +201,10 @@ class SchoolEntryQrService(
             lastUsedAtEpochSeconds = now,
             usageCount = response.usageCount + 1,
         )
-        if(response.institutionId!=null) {
+        val nativeInstitution=response.institutionId
+        if(nativeInstitution!=null) {
             if(response.revision<0 || response.revision==Long.MAX_VALUE) return null
-            return repository.replaceScoped(stored.copy(response=used.copy(revision=response.revision+1)),response.revision)?.response
+            return repository.consumeScoped(response.id,nativeInstitution,now)?.response
         }
         if(institutionId!=null) return null
         repository.replace(stored.copy(response = used))

@@ -39,6 +39,9 @@ class SchoolPresenceNativeScopeTest {
         assertNull(service.activeFor(f.student.id,f.student))
         val current=service.start(f.student.id,f.request("own"),f.student)
         assertEquals("campus",current.institutionId);assertFalse(current.networkVerified)
+        assertEquals(SchoolPresenceStatus.ACTIVE,f.repository.findById("legacy")!!.status)
+        assertEquals(SchoolPresenceIdentitySource.NATIVE,current.identitySource)
+        assertEquals(current.id,service.activeFor(f.student.id,f.student)?.id)
         val account=assertNotNull(f.accounts.findById(f.student.id))
         assertNotNull(f.accounts.changeIdentity(account.id,0,AccountIdentityChange("suspend","security",AccountStatus.SUSPENDED,account.roles,account.institutionId,f.now)))
         assertFailsWith<ApiException.Unauthorized> { service.activeFor(f.student.id,f.student) }

@@ -19,6 +19,8 @@ class MongoSchoolQrScopeIntegrationTest {
         assertTrue(results.all { it!=null });assertEquals(1,results.map { it!!.tokenHash }.toSet().size)
         val stored=assertNotNull(MongoSchoolEntryQrRepository(db).findById("qr"));assertEquals(results.first(),stored)
         assertNull(MongoSchoolEntryQrRepository(db).insertScoped(value().copy(response=value().response.copy(commandDigest="b".repeat(64)))))
+        val uses=coroutineScope { (1..24).map { async { MongoSchoolEntryQrRepository(db).consumeScoped("qr","campus",10) } }.awaitAll() }
+        assertTrue(uses.all { it!=null });assertEquals(24,MongoSchoolEntryQrRepository(db).findById("qr")!!.response.usageCount)
     }
     @Test fun `Mongo revision CAS prevents a stale usage write from reviving revoked QR`()=database { db ->
         val repo=MongoSchoolEntryQrRepository(db);val initial=assertNotNull(repo.insertScoped(value()))

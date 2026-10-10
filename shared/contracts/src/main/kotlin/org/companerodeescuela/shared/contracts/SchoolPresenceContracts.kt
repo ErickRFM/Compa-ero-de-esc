@@ -44,9 +44,14 @@ data class SchoolPresenceResponse(
     val networkVerificationMethod: NetworkVerificationMethod,
     val serverTimeEpochSeconds: Long? = null,
     val institutionId:String?=null,
+    val identitySource:SchoolPresenceIdentitySource?=null,
+    val operationId:String?=null,
 )
 
 @Serializable
 data class CloseSchoolPresenceRequest(
     val reason: String? = null,
 )
+
+@Serializable
+enum class SchoolPresenceIdentitySource { @SerialName("native") NATIVE, @SerialName("institutional") INSTITUTIONAL }

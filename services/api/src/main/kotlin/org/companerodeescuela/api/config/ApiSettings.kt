@@ -1,6 +1,7 @@
 package org.companerodeescuela.api.config
 
 import org.companerodeescuela.shared.validation.Validators
+import java.util.Base64
 
 /**
  * MongoDB connection settings, resolved once at startup.
@@ -58,6 +59,7 @@ data class ApiSettings(
     val attendanceGraceMinutes: Int = 5,
     val verificationEmailApiKey: CharArray? = null,
     val verificationEmailSender: String? = null,
+    val mfaEncryptionKey: ByteArray? = null,
 ) {
     val hasVerificationEmail: Boolean get() = verificationEmailApiKey != null && verificationEmailSender != null
 
@@ -88,7 +90,8 @@ data class ApiSettings(
             schoolWifiSsids == other.schoolWifiSsids &&
             schoolWifiBssids == other.schoolWifiBssids &&
             attendanceGraceMinutes == other.attendanceGraceMinutes &&
-            hasVerificationEmail == other.hasVerificationEmail && verificationEmailSender == other.verificationEmailSender
+            hasVerificationEmail == other.hasVerificationEmail && verificationEmailSender == other.verificationEmailSender &&
+            (mfaEncryptionKey != null) == (other.mfaEncryptionKey != null)
     }
 
     override fun hashCode(): Int {
@@ -109,6 +112,7 @@ data class ApiSettings(
         result = 31 * result + attendanceGraceMinutes
         result = 31 * result + hasVerificationEmail.hashCode()
         result = 31 * result + (verificationEmailSender?.hashCode() ?: 0)
+        result = 31 * result + (mfaEncryptionKey != null).hashCode()
         return result
     }
 
@@ -128,6 +132,7 @@ data class ApiSettings(
             "authenticationConfigured=$hasAuthentication, " +
             "attendanceQrSigningConfigured=$hasAttendanceQrSigning, " +
             "verificationEmailConfigured=$hasVerificationEmail, " +
+            "mfaEncryptionConfigured=${mfaEncryptionKey != null}, " +
             "schoolPresenceConfigured=$hasSchoolPresenceVerification" +
             ")"
 }
@@ -181,6 +186,14 @@ class SettingsLoader(
             !Regex("^[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Za-z]{2,}$").matches(verificationEmailSender)))
             throw ConfigurationException("Invalid VERIFICATION_EMAIL_SENDER")
 
+        val mfaKey = env("MFA_ENCRYPTION_KEY")?.let { encoded ->
+            val decoded = runCatching { Base64.getUrlDecoder().decode(encoded) }.getOrNull()
+            if (!Regex("[A-Za-z0-9_-]{43}").matches(encoded) || decoded?.size != 32 ||
+                Base64.getUrlEncoder().withoutPadding().encodeToString(decoded) != encoded)
+                throw ConfigurationException("Invalid MFA_ENCRYPTION_KEY; require canonical unpadded base64url of 32 random bytes")
+            decoded
+        }
+
         validateSecret(environment, jwtSecret)
         validateOptionalSecret("ATTENDANCE_QR_SECRET", attendanceQrSecret)
         validateSchoolPresence(schoolPresenceQrSha256, schoolWifiSsids, schoolWifiBssids)
@@ -214,6 +227,7 @@ class SettingsLoader(
             attendanceGraceMinutes = attendanceGraceMinutes,
             verificationEmailApiKey = verificationEmailKey?.toCharArray(),
             verificationEmailSender = verificationEmailSender,
+            mfaEncryptionKey = mfaKey,
         )
     }
 

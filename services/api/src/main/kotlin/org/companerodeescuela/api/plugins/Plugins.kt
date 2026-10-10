@@ -133,7 +133,9 @@ fun Application.configurePlugins(
                         val session = sessionId?.let { refreshSessions?.find(it) }
                         if (session != null && sessionAuthority?.permits(credential.payload, session, tokenService) == true &&
                             (tokenService.userFrom(credential.payload).accountStatus == AccountStatus.ACTIVE ||
-                                request.path() in setOf("/auth/me", "/auth/verification/resend", "/auth/verification/confirm"))) {
+                                request.path() in setOf("/auth/me", "/auth/verification/resend", "/auth/verification/confirm") ||
+                                (tokenService.userFrom(credential.payload).accountStatus == AccountStatus.PENDING_APPROVAL &&
+                                    request.path() in setOf("/auth/mfa/status", "/auth/mfa/enrollment", "/auth/mfa/confirmation")))) {
                             val user = tokenService.userFrom(credential.payload)
                             // A basic workshop account has no academic access, even on coarse authenticated routes.
                             if (user.roles == setOf(org.companerodeescuela.shared.contracts.UserRole.WORKSHOP_PARTICIPANT) &&

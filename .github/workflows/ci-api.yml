@@ -113,12 +113,12 @@ jobs:
           python3 - <<'PY'
           import xml.etree.ElementTree as ET
           from pathlib import Path
-          for name in ("MongoAccountLifecycleIntegrationTest", "MongoEmailVerificationIntegrationTest"):
-              report = Path(f"services/api/build/test-results/test/TEST-org.companerodeescuela.api.auth.{name}.xml")
+          for package, name in (("auth", "MongoAccountLifecycleIntegrationTest"), ("auth", "MongoEmailVerificationIntegrationTest"), ("security", "MongoMfaIntegrationTest")):
+              report = Path(f"services/api/build/test-results/test/TEST-org.companerodeescuela.api.{package}.{name}.xml")
               suite = ET.parse(report).getroot()
               assert int(suite.get("tests", "0")) == 3, f"Real Mongo tests missing: {name}"
               assert all(int(suite.get(key, "0")) == 0 for key in ("skipped", "failures", "errors")), f"Real Mongo tests did not all pass: {name}"
-          print("Real Mongo integration: 6 executed, 0 skipped, 0 failures")
+          print("Real Mongo integration: 9 executed, 0 skipped, 0 failures")
           PY
 
       - name: Assemble runnable service

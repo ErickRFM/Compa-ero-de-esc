@@ -66,6 +66,10 @@ class MongoClassroomRepository(database: MongoDatabase) : ClassroomRepository {
         }
     }
 
+    override suspend fun listMembershipsForClass(classroomId:String):List<NativeClassroomMembership> {
+        ensureIndexes()
+        return memberships.find(eq("classroomId",classroomId)).toList().map { it.toMembership() }
+    }
     override suspend fun findMembership(
         classroomId: String,
         userId: String,

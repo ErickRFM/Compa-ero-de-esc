@@ -17,10 +17,12 @@ class AttendanceSessionService(
     private val accessPolicy: AttendanceAccessPolicy = AttendanceAccessPolicy(repository, occurrenceResolver),
     private val clock: Clock = Clock.systemUTC(),
     private val newId: () -> String = { UUID.randomUUID().toString() },
+    private val nativeProjection:org.companerodeescuela.api.academic.NativeAcademicProjection?=null,
 ) {
     suspend fun openSession(
         teacherId: String,
         request: CreateAttendanceSessionRequest,
+        nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null,
     ): AttendanceSessionResponse {
         val occurrenceId = request.occurrenceId.trim()
         if (occurrenceId.isBlank()) {
@@ -32,7 +34,10 @@ class AttendanceSessionService(
         val occurrenceDate = runCatching { LocalDate.parse(request.occurrenceDate) }
             .getOrElse { throw ApiException.Validation("occurrenceDate must be YYYY-MM-DD") }
 
-        val occurrence = occurrenceResolver.resolveTeacherOccurrence(
+        val occurrence = if(nativeActor!=null) {
+            if(nativeActor.id!=teacherId) throw ApiException.Forbidden("Teacher does not match the actual native actor")
+            (nativeProjection ?: throw ApiException.DependencyUnavailable("Native academic projection is unavailable")).teacherOccurrence(nativeActor,occurrenceId,occurrenceDate)
+        } else occurrenceResolver.resolveTeacherOccurrence(
             teacherId = teacherId,
             occurrenceId = occurrenceId,
             occurrenceDate = occurrenceDate,
@@ -55,11 +60,13 @@ class AttendanceSessionService(
             closesAtEpochSeconds = now.plus(Duration.ofMinutes(request.durationMinutes.toLong()))
                 .epochSecond,
             status = AttendanceSessionStatus.OPEN,
-        )
+            identitySource=org.companerodeescuela.shared.contracts.AttendanceIdentitySource.INSTITUTIONAL,
+        ).let { candidate -> if(nativeActor==null) candidate else nativeProjection!!.bindSession(nativeActor,candidate) }
 
         return when (val result = repository.createSession(candidate)) {
             is SessionWriteResult.Created -> result.session
             is SessionWriteResult.Existing -> {
+                if(result.session.identitySource!=candidate.identitySource || result.session.institutionId!=candidate.institutionId || result.session.groupScopeRevision!=candidate.groupScopeRevision) throw ApiException.Forbidden("Existing attendance belongs to a different identity source or scope")
                 if (result.session.openedBy != teacherId) {
                     throw ApiException.Conflict("Attendance session already belongs to another teacher")
                 }

@@ -33,6 +33,7 @@ fun buildAttendanceFeatureGraph(
     groupRepository: AcademicGroupRepository,
     accounts:org.companerodeescuela.api.auth.PlatformAccountRepository,
     classrooms:org.companerodeescuela.api.classroom.ClassroomService,
+    nativeProjection:org.companerodeescuela.api.academic.NativeAcademicProjection,
 ): AttendanceFeatureGraph {
     val repository = when {
         !settings.hasAuthentication -> InMemoryAttendanceRepository()
@@ -41,7 +42,7 @@ fun buildAttendanceFeatureGraph(
         else -> error("Attendance requires MONGODB_URI outside local development")
     }
     val occurrenceResolver = ProviderAttendanceOccurrenceResolver(academicProvider)
-    val accessPolicy = AttendanceAccessPolicy(repository, occurrenceResolver,org.companerodeescuela.api.attendance.AttendanceAdministrationPolicy(accounts,classrooms))
+    val accessPolicy = AttendanceAccessPolicy(repository, occurrenceResolver,org.companerodeescuela.api.attendance.AttendanceAdministrationPolicy(accounts,classrooms,nativeProjection))
     val qrService = settings.attendanceQrSecret?.let { secret ->
         AttendanceQrService(
             secret = secret,
@@ -54,12 +55,14 @@ fun buildAttendanceFeatureGraph(
             repository = repository,
             occurrenceResolver = occurrenceResolver,
             accessPolicy = accessPolicy,
+            nativeProjection=nativeProjection,
         ),
         studentService = AttendanceStudentService(
             repository = repository,
-            enrollmentResolver = AttendanceEnrollmentResolver(academicProvider),
+            enrollmentResolver = AttendanceEnrollmentResolver(academicProvider,classrooms),
             qrService = qrService,
             schoolPresenceService = schoolPresenceService,
+            nativeProjection=nativeProjection,
         ),
         reviewService = AttendanceReviewService(
             repository = repository,
@@ -67,7 +70,7 @@ fun buildAttendanceFeatureGraph(
         ),
         qrService = qrService,
         campusRoster = schoolPresenceService?.let { presence ->
-            TeacherCampusRosterService(occurrenceResolver, groupRepository, presence, repository)
+            TeacherCampusRosterService(occurrenceResolver, groupRepository, presence, repository,nativeProjection,accounts)
         },
     )
 }

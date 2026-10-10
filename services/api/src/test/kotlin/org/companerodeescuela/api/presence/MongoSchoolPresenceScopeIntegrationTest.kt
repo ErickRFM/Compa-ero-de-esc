@@ -16,8 +16,9 @@ class MongoSchoolPresenceScopeIntegrationTest {
         val repo=MongoSchoolPresenceRepository(db)
         val legacy=value("legacy",null,null);val external=value("external",source=SchoolPresenceIdentitySource.INSTITUTIONAL);val foreign=value("foreign","other")
         for(row in listOf(legacy,external,foreign)) repo.save(row)
-        val own=assertNotNull(repo.createNative(value(),10))
+        val own=assertNotNull(repo.createNative(value().copy(startedAtEpochSeconds=2),10))
         assertEquals(own,repo.findActiveForNativeStudent("student","campus",10))
+        assertNotEquals(SchoolPresenceIdentitySource.NATIVE,assertNotNull(repo.findActiveForStudent("student",10)).identitySource)
         assertEquals(legacy,repo.findById("legacy"));assertEquals(external,repo.findById("external"));assertEquals(foreign,repo.findById("foreign"))
     }
     @Test fun `independent Mongo replicas retain only one active native school day even across different operations`()=database { db ->
@@ -26,7 +27,7 @@ class MongoSchoolPresenceScopeIntegrationTest {
         assertEquals(results.first(),MongoSchoolPresenceRepository(db).findActiveForNativeStudent("student","campus",10))
     }
     @Test fun `ended native days remain retained and old operation cannot create another grant`()=database { db ->
-        val repo=MongoSchoolPresenceRepository(db);val old=assertNotNull(repo.createNative(value(),10))
+        val repo=MongoSchoolPresenceRepository(db);val old=assertNotNull(repo.createNative(value().copy(startedAtEpochSeconds=2),10))
         val next=assertNotNull(repo.createNative(value("next").copy(startedAtEpochSeconds=1100,expiresAtEpochSeconds=2000),1100))
         assertEquals(SchoolPresenceStatus.EXPIRED,repo.findById(old.id)!!.status)
         assertEquals(next,repo.findActiveForNativeStudent("student","campus",1100))

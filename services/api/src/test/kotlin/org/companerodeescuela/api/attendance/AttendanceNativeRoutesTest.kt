@@ -34,7 +34,7 @@ class AttendanceNativeRoutesTest {
             groups.create(ScopedAcademicFixtures.group("6A").copy(institutionId="campus"));groups.create(ScopedAcademicFixtures.group("6B").copy(institutionId="other"))
             classes.createClassroom(NativeClassroom("own-class","Own",null,null,"6A","6A",teacher.id,"Teacher",ClassroomStatus.ACTIVE,now,0,0))
             classes.createClassroom(NativeClassroom("foreign-class","Foreign",null,null,"6B","6B","outside","Outside",ClassroomStatus.ACTIVE,now,0,0))
-            for((id,course,owner,group) in listOf(listOf("own","own-class",teacher.id,"6A"),listOf("foreign","foreign-class","outside","6B"))) repository.createSession(AttendanceSessionResponse(id,"occurrence-$id",course,group,LocalDate.now(ZoneOffset.UTC).toString(),"07:00","07:50",owner,now.epochSecond,now.plusSeconds(3600).epochSecond,status=AttendanceSessionStatus.OPEN))
+            for((id,course,owner,group) in listOf(listOf("own","own-class",teacher.id,"6A"),listOf("foreign","foreign-class","outside","6B"))) repository.createSession(AttendanceSessionResponse(id,"occurrence-$id",course,group,LocalDate.now(ZoneOffset.UTC).toString(),"07:00","07:50",owner,now.epochSecond,now.plusSeconds(3600).epochSecond,status=AttendanceSessionStatus.OPEN,identitySource=AttendanceIdentitySource.NATIVE,institutionId=if(id=="foreign") "other" else "campus",groupId=group,groupScopeRevision=0))
         }
         suspend fun token(actor:UserSummary,source:SessionIdentitySource=SessionIdentitySource.NATIVE):String {
             val id=actor.id+source.name

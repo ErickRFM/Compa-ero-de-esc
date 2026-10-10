@@ -190,6 +190,18 @@ class ClassroomService(
         }
         return classroom.toSummary(canOperate(actor,classroom),isAcademicAdmin(actor),repository.findMembership(classroomId,actor.id)?.joinedAt?.epochSecond)
     }
+    suspend fun studentIdsForTeacher(actor:UserSummary,classroomId:String):List<String> {
+        val current=policy().live(actor)
+        val classroom=requireCanPublish(actor,classroomId)
+        if(UserRole.TEACHER !in current.roles || classroom.teacherId!=current.id) throw ApiException.Forbidden("Actual assigned teacher is required")
+        val group=scopedGroupFor(actor,classroomId)
+        val direct=repository.listMembershipsForClass(classroomId).filter { it.role==ClassroomMemberRole.STUDENT }.map { it.userId }
+        return (direct+groupRepository?.memberIdsForGroup(group.id).orEmpty()).distinct()
+    }
+    suspend fun scopedGroupFor(actor:UserSummary,classroomId:String):AcademicGroupRecord {
+        requireCanRead(actor,classroomId)
+        return requireGroup(repository.findClassroom(classroomId) ?: throw ApiException.NotFound("Classroom was not found"))
+    }
     suspend fun requireCanPublish(actor:UserSummary,classroomId:String):ClassroomSummary {
         val classroom=repository.findClassroom(classroomId) ?: throw ApiException.NotFound("Classroom was not found")
         if(!canOperate(actor,classroom)) throw ApiException.Forbidden("Only the current assigned teacher or scoped administration can publish")

@@ -34,7 +34,7 @@ class InMemorySchoolPresenceRepository : SchoolPresenceRepository {
     ): SchoolPresenceResponse? = mutex.withLock {
         records.values
             .asSequence()
-            .filter { it.studentId == studentId }
+            .filter { it.studentId == studentId && it.identitySource!=SchoolPresenceIdentitySource.NATIVE }
             .filter { it.status == SchoolPresenceStatus.ACTIVE }
             .filter { it.expiresAtEpochSeconds > nowEpochSeconds }
             .maxByOrNull { it.startedAtEpochSeconds }

@@ -29,8 +29,13 @@ class AcademicService(
     private val provider: AcademicProvider,
     private val scheduleOverrides: AcademicScheduleOverrideRepository? = null,
     private val groupRepository: AcademicGroupRepository? = null,
+    private val nativeProjection:NativeAcademicProjection?=null,
 ) {
-    suspend fun loadFor(externalId: String): AcademicLoadResponse {
+    suspend fun loadFor(externalId: String,nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null): AcademicLoadResponse {
+        if(nativeActor!=null) {
+            if(nativeActor.id!=externalId) throw ApiException.Forbidden("Academic identity does not match the native actor")
+            return (nativeProjection ?: throw ApiException.DependencyUnavailable("Native academic projection is unavailable")).load(nativeActor)
+        }
         val inheritedEntries = inheritedGroupEntries(externalId)
         return try {
             val load = provider.getAcademicLoad(externalId)
@@ -101,6 +106,8 @@ class AcademicService(
         }
     }
 
+    suspend fun loadInstitutional(externalId:String):AcademicLoadResponse=AcademicService(provider).loadFor(externalId)
+
     private suspend fun inheritedGroupEntries(userId: String): List<ScheduleEntry> {
         val groups = groupRepository?.listGroupsForUser(userId).orEmpty()
         if (groups.isEmpty()) return emptyList()
@@ -161,14 +168,18 @@ class AcademicService(
         else -> 8
     }
 
-    suspend fun scheduleFor(externalId: String): AcademicScheduleResponse =
-        loadFor(externalId).schedule
+    suspend fun scheduleFor(externalId: String,nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null): AcademicScheduleResponse =
+        loadFor(externalId,nativeActor).schedule
 
     suspend fun scheduleWeekFor(
         externalId: String,
         weekOf: LocalDate,
+        nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null,
     ): AcademicWeekResponse =
-        translateIntegrationFailure {
+        if(nativeActor!=null) {
+            if(nativeActor.id!=externalId) throw ApiException.Forbidden("Native actor does not match the academic identity")
+            (nativeProjection ?: throw ApiException.DependencyUnavailable("Native academic projection is unavailable")).week(nativeActor,weekOf)
+        } else translateIntegrationFailure {
             val coursesById = provider.listCourses().associateBy { it.externalId }
             val schedule = AcademicMappers.toSchedule(
                 ownerId = PersonId(externalId),

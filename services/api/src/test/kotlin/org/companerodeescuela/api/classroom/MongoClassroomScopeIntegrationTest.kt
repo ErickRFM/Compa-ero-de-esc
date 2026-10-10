@@ -39,6 +39,7 @@ class MongoClassroomScopeIntegrationTest {
         val membership=NativeClassroomMembership(current.id,"student",ClassroomMemberRole.STUDENT,now)
         val results=coroutineScope { (1..24).map { async { MongoClassroomRepository(db).addMembershipIfAbsent(membership) } }.awaitAll() }
         assertTrue(results.all { it==membership });assertEquals(1,repo.listClassroomsForUser("student").size)
+        assertEquals(listOf(membership),repo.listMembershipsForClass(current.id));assertTrue(repo.listMembershipsForClass("other").isEmpty())
         val invite=NativeClassInviteRecord("invite",current.id,"test-only-hash","admin",now,now.plusSeconds(600),1)
         repo.createInvite(invite);assertTrue(repo.revokeInvite(invite.id,current.id,now))
         assertNull(MongoClassroomRepository(db).consumeInvite(invite.id,now.plusSeconds(1)))

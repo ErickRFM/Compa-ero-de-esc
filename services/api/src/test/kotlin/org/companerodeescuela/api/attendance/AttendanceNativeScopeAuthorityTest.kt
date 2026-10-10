@@ -18,7 +18,7 @@ class AttendanceNativeScopeAuthorityTest {
         val teacher=UserSummary("teacher","Teacher",roles=setOf(UserRole.TEACHER),institutionId="campus")
         val groups=InMemoryAcademicGroupRepository();val classrooms=InMemoryClassroomRepository();val repository=InMemoryAttendanceRepository()
         lateinit var policy:AttendanceAccessPolicy;lateinit var service:AttendanceSessionService
-        fun session(id:String="own",course:String="own-class",owner:String="teacher")=AttendanceSessionResponse(id,"occurrence-$id",course,"6A","2026-10-10","07:00","07:50",owner,now.epochSecond,now.plusSeconds(3600).epochSecond,status=AttendanceSessionStatus.OPEN)
+        fun session(id:String="own",course:String="own-class",owner:String="teacher")=AttendanceSessionResponse(id,"occurrence-$id",course,"6A","2026-10-10","07:00","07:50",owner,now.epochSecond,now.plusSeconds(3600).epochSecond,status=AttendanceSessionStatus.OPEN,identitySource=AttendanceIdentitySource.NATIVE,institutionId=if(course=="foreign-class") "other" else "campus",groupId=if(course=="foreign-class") "6B" else "6A",groupScopeRevision=0)
         suspend fun initialize() {
             val accounts=ScopedAcademicFixtures.accounts(actor,teacher)
             groups.create(ScopedAcademicFixtures.group("6A").copy(institutionId="campus"));groups.create(ScopedAcademicFixtures.group("6B").copy(institutionId="other"))

@@ -50,6 +50,7 @@ class MongoSchoolPresenceRepository(
         return collection.find(
             and(
                 eq("studentId", studentId),
+                com.mongodb.client.model.Filters.ne("identitySource",SchoolPresenceIdentitySource.NATIVE.name),
                 eq("status", SchoolPresenceStatus.ACTIVE.name),
                 gt("expiresAtEpochSeconds", nowEpochSeconds),
             ),

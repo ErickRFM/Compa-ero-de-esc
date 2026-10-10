@@ -13,6 +13,8 @@ import io.ktor.server.routing.route
 import java.time.LocalDate
 import org.companerodeescuela.api.academic.groups.AcademicGroupRepository
 import org.companerodeescuela.api.auth.AuthTokenService
+import org.companerodeescuela.api.auth.verifiedSessionSource
+import org.companerodeescuela.api.auth.SessionIdentitySource
 import org.companerodeescuela.api.auth.requireNativeActor
 import org.companerodeescuela.api.auth.boundedAuthRequest
 import org.companerodeescuela.api.auth.platformRoles
@@ -33,7 +35,11 @@ fun Route.academicRoutes(
     scheduleManagement: AcademicScheduleManagementService? = null,
     scheduleOverrides: AcademicScheduleOverrideRepository? = null,
     groupRepository: AcademicGroupRepository? = null,
+    nativeProjection:NativeAcademicProjection?=null,
 ) {
+    val tokens=if(settings.hasAuthentication) AuthTokenService(settings) else null
+    val service=AcademicService(academicProvider,scheduleOverrides,groupRepository,nativeProjection)
+    suspend fun actor(call:ApplicationCall)=if(call.verifiedSessionSource()==SessionIdentitySource.NATIVE) call.requireNativeActor(tokens!!) else null
     route("/academic") {
         if (!settings.hasAuthentication) {
             get("/load") {
@@ -51,11 +57,7 @@ fun Route.academicRoutes(
                     val externalId = call.requirePlatformPrincipal().subjectId()
                     call.respond(
                         ApiResponse(
-                            data = AcademicService(
-                                provider = academicProvider,
-                                scheduleOverrides = scheduleOverrides,
-                                groupRepository = groupRepository,
-                            ).loadFor(externalId),
+                            data = actor(call).let { current -> if(current==null) service.loadInstitutional(externalId) else service.loadFor(externalId,current) },
                             requestId = call.requestId(),
                         ),
                     )
@@ -64,11 +66,7 @@ fun Route.academicRoutes(
                     val externalId = call.requirePlatformPrincipal().subjectId()
                     call.respond(
                         ApiResponse(
-                            data = AcademicService(
-                                provider = academicProvider,
-                                scheduleOverrides = scheduleOverrides,
-                                groupRepository = groupRepository,
-                            ).scheduleFor(externalId),
+                            data = actor(call).let { current -> if(current==null) service.loadInstitutional(externalId).schedule else service.scheduleFor(externalId,current) },
                             requestId = call.requestId(),
                         ),
                     )
@@ -84,13 +82,10 @@ fun Route.academicRoutes(
 
                     call.respond(
                         ApiResponse(
-                            data = AcademicService(
-                                provider = academicProvider,
-                                scheduleOverrides = scheduleOverrides,
-                                groupRepository = groupRepository,
-                            ).scheduleWeekFor(
+                            data = service.scheduleWeekFor(
                                 externalId = externalId,
                                 weekOf = weekOf,
+                                nativeActor = actor(call),
                             ),
                             requestId = call.requestId(),
                         ),

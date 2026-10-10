@@ -92,8 +92,8 @@ class SchoolPresenceService(
         return activeRecord(studentId,institution,now)?.copy(networkVerified=false,serverTimeEpochSeconds=now)
     }
 
-    suspend fun requireActive(studentId: String): SchoolPresenceResponse =
-        activeFor(studentId)
+    suspend fun requireActive(studentId: String,nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null): SchoolPresenceResponse =
+        activeFor(studentId,nativeActor)
             ?: throw ApiException.Forbidden(
                 "Start your school day by scanning the institutional QR while connected to the school network",
             )

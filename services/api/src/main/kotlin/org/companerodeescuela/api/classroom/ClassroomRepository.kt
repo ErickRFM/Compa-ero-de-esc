@@ -48,6 +48,7 @@ interface ClassroomRepository {
     suspend fun listClassrooms(): List<NativeClassroom>
     suspend fun listClassroomsForGroups(groupIds: Set<String>): List<NativeClassroom>
     suspend fun listClassroomsForUser(userId: String): List<Pair<NativeClassroom, NativeClassroomMembership>>
+    suspend fun listMembershipsForClass(classroomId:String):List<NativeClassroomMembership>
     suspend fun findMembership(classroomId: String, userId: String): NativeClassroomMembership?
     suspend fun addMembershipIfAbsent(membership: NativeClassroomMembership): NativeClassroomMembership
     suspend fun createInvite(invite: NativeClassInviteRecord)
@@ -81,6 +82,8 @@ class InMemoryClassroomRepository : ClassroomRepository {
             .mapNotNull { membership ->
                 classrooms[membership.classroomId]?.let { it to membership }
             }
+
+    override suspend fun listMembershipsForClass(classroomId:String):List<NativeClassroomMembership> = memberships.values.filter { it.classroomId==classroomId }
 
     override suspend fun findMembership(
         classroomId: String,

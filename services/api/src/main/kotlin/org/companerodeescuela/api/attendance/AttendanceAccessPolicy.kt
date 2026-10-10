@@ -30,6 +30,7 @@ class AttendanceAccessPolicy(
             nativePolicy().requireResource(actor,session,allowCrossOwner)
             return
         }
+        if(session.identitySource==org.companerodeescuela.shared.contracts.AttendanceIdentitySource.NATIVE || session.institutionId!=null || session.groupId!=null) throw ApiException.Forbidden("Native attendance cannot be accessed through an institutional identity")
         if (session.openedBy != actorId) {
             throw ApiException.Forbidden("This attendance session belongs to another teacher")
         }

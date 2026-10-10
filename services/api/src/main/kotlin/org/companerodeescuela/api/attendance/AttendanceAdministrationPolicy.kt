@@ -7,13 +7,15 @@ import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.shared.contracts.*
 
 /** Native authority comes from current account capabilities and the persisted class scope. */
-class AttendanceAdministrationPolicy(private val accounts:PlatformAccountRepository,private val classrooms:ClassroomService) {
+class AttendanceAdministrationPolicy(private val accounts:PlatformAccountRepository,private val classrooms:ClassroomService,private val projection:org.companerodeescuela.api.academic.NativeAcademicProjection?=null) {
     private val scopes=InstitutionScopePolicy(accounts)
     suspend fun requireAdministration(actor:UserSummary) {
         val current=scopes.live(actor)
+        if(UserRole.SUPER_ADMIN in current.roles) return
         scopes.require(actor,AdminCapability.MANAGE_ACADEMICS,current.institutionId ?: "")
     }
     suspend fun requireResource(actor:UserSummary,session:AttendanceSessionResponse,administrative:Boolean) {
+        if(session.identitySource!=AttendanceIdentitySource.NATIVE || session.institutionId.isNullOrBlank() || session.groupId.isNullOrBlank() || session.groupScopeRevision<0) throw ApiException.Forbidden("Persisted native attendance source and scope are required")
         if(administrative) requireAdministration(actor)
         else {
             val current=scopes.live(actor)
@@ -23,6 +25,12 @@ class AttendanceAdministrationPolicy(private val accounts:PlatformAccountReposit
             if(administrative) classrooms.requireCanRead(actor,session.courseId)
             else classrooms.requireCanPublish(actor,session.courseId)
         } catch (_:ApiException.NotFound) { throw ApiException.Forbidden("Attendance has no current native classroom scope") }
+        val group=classrooms.scopedGroupFor(actor,session.courseId)
+        if(session.institutionId!=group.institutionId || session.groupId!=group.id || session.groupScopeRevision!=group.scopeRevision) throw ApiException.Forbidden("Attendance group scope is stale or inconsistent")
+        if(projection!=null) {
+            val teacher=accounts.findById(classroom.teacherId) ?: throw ApiException.Forbidden("Actual assigned teacher is unavailable")
+            try { projection.requireSession(teacher.toUserSummary(),session) } catch (_:ApiException.Unauthorized) { throw ApiException.Forbidden("Attendance teacher identity is no longer active") }
+        }
         if(classroom.teacherId!=session.openedBy || classroom.groupName!=session.groupName) throw ApiException.Forbidden("Attendance does not match its actual classroom")
     }
 }

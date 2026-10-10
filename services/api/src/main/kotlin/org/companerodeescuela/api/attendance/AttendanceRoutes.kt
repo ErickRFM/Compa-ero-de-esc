@@ -65,7 +65,7 @@ fun Route.attendanceRoutes(
                 principal.requireRole(UserRole.STUDENT)
                 call.respond(
                     ApiResponse(
-                        data = studentService.activeFor(principal.subjectId()),
+                        data = studentService.activeFor(principal.subjectId(),nativeActor(call)),
                         requestId = call.requestId(),
                     ),
                 )
@@ -79,6 +79,7 @@ fun Route.attendanceRoutes(
                         data = studentService.inspectQr(
                             studentId = principal.subjectId(),
                             request = call.receive<AttendanceQrInspectionRequest>(),
+                            nativeActor = nativeActor(call),
                         ),
                         requestId = call.requestId(),
                     ),
@@ -100,6 +101,7 @@ fun Route.attendanceRoutes(
                             teacherId = principal.subjectId(),
                             occurrenceId = occurrenceId,
                             date = occurrenceDate,
+                            nativeActor = nativeActor(call),
                         ),
                         requestId = call.requestId(),
                     ),
@@ -125,6 +127,7 @@ fun Route.attendanceRoutes(
                         data = sessionService.openSession(
                             teacherId = principal.subjectId(),
                             request = call.receive<CreateAttendanceSessionRequest>(),
+                            nativeActor = nativeActor(call),
                         ),
                         requestId = call.requestId(),
                     ),
@@ -164,6 +167,7 @@ fun Route.attendanceRoutes(
                             studentId = principal.subjectId(),
                             sessionId = sessionId,
                             request = call.receive<AttendanceAttemptRequest>(),
+                            nativeActor = nativeActor(call),
                         ),
                         requestId = call.requestId(),
                     ),
@@ -177,7 +181,7 @@ fun Route.attendanceRoutes(
                     ?: throw ApiException.Validation("sessionId is required")
                 call.respond(
                     ApiResponse(
-                        data = studentService.myClassRecord(principal.subjectId(), sessionId),
+                        data = studentService.myClassRecord(principal.subjectId(), sessionId,nativeActor(call)),
                         requestId = call.requestId(),
                     ),
                 )
@@ -194,6 +198,7 @@ fun Route.attendanceRoutes(
                             studentId = principal.subjectId(),
                             sessionId = sessionId,
                             request = call.receive<ClassCallConfirmationRequest>(),
+                            nativeActor = nativeActor(call),
                         ),
                         requestId = call.requestId(),
                     ),

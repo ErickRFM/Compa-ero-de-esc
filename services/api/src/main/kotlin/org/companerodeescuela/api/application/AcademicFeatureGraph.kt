@@ -32,7 +32,6 @@ data class AcademicFeatureGraph(
     val caseService: TutorCaseService,
     val representativeService: GroupRepresentativeService,
     val scheduleOverrides: AcademicScheduleOverrideRepository,
-    val scheduleManagement: AcademicScheduleManagementService,
 )
 
 fun buildAcademicFeatureGraph(
@@ -91,6 +90,5 @@ fun buildAcademicFeatureGraph(
         caseService = TutorCaseService(caseRepository, tutoringService, groupRepository),
         representativeService = representativeService,
         scheduleOverrides = scheduleOverrides,
-        scheduleManagement = AcademicScheduleManagementService(scheduleOverrides),
     )
 }

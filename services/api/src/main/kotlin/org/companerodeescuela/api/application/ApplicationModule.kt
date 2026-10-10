@@ -73,6 +73,7 @@ fun Application.module(
         representativeService = academicGraph.representativeService,
         accounts=identityGraph.accounts,mfa=identityGraph.mfa,
     )
+    val scheduleManagement=org.companerodeescuela.api.academic.AcademicScheduleManagementService(academicGraph.scheduleOverrides,accounts=identityGraph.accounts,groups=academicGraph.groupRepository,mfa=identityGraph.mfa,classrooms=classroomGraph.classroomService)
     val presenceGraph = buildPresenceFeatureGraph(
         settings = settings,
         mongoConnection = mongoConnection,
@@ -113,7 +114,7 @@ fun Application.module(
         academicRoutes(
             settings = settings,
             academicProvider = providerRegistry.academic,
-            scheduleManagement = academicGraph.scheduleManagement,
+            scheduleManagement = scheduleManagement,
             scheduleOverrides = academicGraph.scheduleOverrides,
             groupRepository = academicGraph.groupRepository,
         )

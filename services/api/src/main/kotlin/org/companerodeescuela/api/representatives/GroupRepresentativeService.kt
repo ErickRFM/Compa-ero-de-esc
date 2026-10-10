@@ -32,14 +32,17 @@ class GroupRepresentativeService(
         val (group,student)=tutorAssignmentService.requireRepresentativeCandidate(groupId,request.studentUserId)
         if(request.academicTermId!=null && request.academicTermId!=group.periodId) throw ApiException.Validation("Representative period must match the actual group")
         val currentActive = repository.findActivePosition(groupId, request.position)
-        if (currentActive != null) {
+        if (currentActive != null && currentActive.groupScopeRevision==group.scopeRevision &&
+            tutorAssignmentService.currentRepresentative(currentActive)) {
             throw ApiException.Conflict("An active or pending ${request.position} already exists for this group")
         }
 
         // Check if student already holds the other position in this group
         val otherPosition = if (request.position == RepresentativePosition.CHIEF) RepresentativePosition.DEPUTY else RepresentativePosition.CHIEF
         val studentOtherPosition = repository.findActivePosition(groupId, otherPosition)
-        if (studentOtherPosition?.studentUserId == request.studentUserId) {
+        if (studentOtherPosition?.studentUserId == request.studentUserId &&
+            studentOtherPosition.groupScopeRevision==group.scopeRevision &&
+            tutorAssignmentService.currentRepresentative(studentOtherPosition)) {
             throw ApiException.Conflict("Student already holds the other position in this group")
         }
 

@@ -29,7 +29,10 @@ class PlatformSessionAuthority(
     }
 
     suspend fun currentUser(session: RefreshSession): UserSummary? = try {
-        when (session.identitySource) {
+        // Validate the persisted snapshot before resolving or replacing live authority.
+        if (!session.user.active || !session.user.accountStatus.permitsSession ||
+            session.user.authRevision < 0 || session.generation < 0) null
+        else when (session.identitySource) {
             SessionIdentitySource.LEGACY -> null // Unknown source requires fresh credentials, not inference.
             SessionIdentitySource.NATIVE -> accounts.findById(session.user.id)?.let {
                 if (it.authRevision != session.user.authRevision) null else it.toUserSummary()

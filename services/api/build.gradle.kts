@@ -58,6 +58,9 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    // Cached results must distinguish real Mongo integration from local skipped tests.
+    inputs.property("v12MongoIntegrationEnabled", providers.environmentVariable("V12_TEST_MONGODB_URI")
+        .map { it.isNotBlank() }.orElse(false))
     testLogging {
         events("passed", "skipped", "failed")
     }

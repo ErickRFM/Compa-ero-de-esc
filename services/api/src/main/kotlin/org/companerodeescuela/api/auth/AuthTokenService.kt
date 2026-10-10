@@ -93,7 +93,7 @@ class AuthTokenService(
                 else runCatching { AccountStatus.valueOf(jwt.getClaim(CLAIM_ACCOUNT_STATUS).asString()) }
                     .getOrDefault(AccountStatus.REVOKED),
             authRevision = if (jwt.getClaim(CLAIM_AUTH_REVISION).isMissing) 0L
-                else jwt.getClaim(CLAIM_AUTH_REVISION).asLong() ?: -1L,
+                else nonNegativeIntegerClaim(jwt, CLAIM_AUTH_REVISION) ?: -1L,
             institutionId = jwt.getClaim(CLAIM_INSTITUTION_ID).asString(),
         )
     }
@@ -103,9 +103,16 @@ class AuthTokenService(
         ?.takeIf(String::isNotBlank)
 
     fun sessionGenerationFrom(jwt: Payload): Long? =
-        runCatching { jwt.getClaim(CLAIM_SESSION_GENERATION).asLong() }.getOrNull()
+        nonNegativeIntegerClaim(jwt, CLAIM_SESSION_GENERATION)
+
+    private fun nonNegativeIntegerClaim(jwt: Payload, name: String): Long? {
+        // Claim.asLong coerces fractions. Inspect JSON representation before conversion.
+        val encoded = jwt.getClaim(name).toString()
+        return encoded.takeIf { NON_NEGATIVE_INTEGER.matches(it) }?.toLongOrNull()
+    }
 
     companion object {
+        private val NON_NEGATIVE_INTEGER = Regex("0|[1-9][0-9]*")
         const val PROVIDER_NAME = "auth-jwt"
         const val REALM = "companero-api"
 

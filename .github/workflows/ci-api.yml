@@ -108,6 +108,18 @@ jobs:
             exit 1
           fi
 
+      - name: Verify real Mongo lifecycle integration executed
+        run: |
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          report = Path("services/api/build/test-results/test/TEST-org.companerodeescuela.api.auth.MongoAccountLifecycleIntegrationTest.xml")
+          suite = ET.parse(report).getroot()
+          assert int(suite.get("tests", "0")) == 3, "Real Mongo lifecycle tests missing"
+          assert all(int(suite.get(key, "0")) == 0 for key in ("skipped", "failures", "errors")), "Real Mongo lifecycle tests did not all pass"
+          print("Real Mongo lifecycle integration: 3 executed, 0 skipped, 0 failures")
+          PY
+
       - name: Assemble runnable service
         run: ./gradlew :services:api:installDist --console=plain
 

@@ -2,6 +2,7 @@ package org.companerodeescuela.feature.attendance
 
 import androidx.lifecycle.viewModelScope
 import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.MockEngineConfig
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -22,6 +23,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -45,7 +48,7 @@ import org.companerodeescuela.shared.contracts.*
 class AttendanceTeacherPrivacyTest {
     @Test fun `roster permission denial clears cached teacher data and QR`() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
-        val fixture = Fixture()
+        val fixture = Fixture(testScheduler)
         try {
             fixture.populate()
             fixture.rosterStatus = HttpStatusCode.Forbidden
@@ -57,7 +60,7 @@ class AttendanceTeacherPrivacyTest {
 
     @Test fun `unavailable authority hides cached private rows until revalidation`() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
-        val fixture = Fixture()
+        val fixture = Fixture(testScheduler)
         try {
             fixture.populate()
             fixture.rosterStatus = HttpStatusCode.ServiceUnavailable
@@ -69,7 +72,7 @@ class AttendanceTeacherPrivacyTest {
 
     @Test fun `QR permission denial also clears cached roster and school entry data`() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
-        val fixture = Fixture()
+        val fixture = Fixture(testScheduler)
         try {
             fixture.populate()
             fixture.qrStatus = HttpStatusCode.Forbidden
@@ -82,7 +85,7 @@ class AttendanceTeacherPrivacyTest {
 
     @Test fun `review permission denial removes the private record rather than retaining its editor`() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
-        val fixture = Fixture()
+        val fixture = Fixture(testScheduler)
         try {
             fixture.populate()
             fixture.reviewStatus = HttpStatusCode.Forbidden
@@ -94,7 +97,7 @@ class AttendanceTeacherPrivacyTest {
 
     @Test fun `close permission denial clears the session and private data`() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
-        val fixture = Fixture()
+        val fixture = Fixture(testScheduler)
         try {
             fixture.populate()
             fixture.closeStatus = HttpStatusCode.Forbidden
@@ -106,7 +109,7 @@ class AttendanceTeacherPrivacyTest {
 
     @Test fun `campus permission denial invalidates the shared occurrence scope`() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
-        val fixture = Fixture()
+        val fixture = Fixture(testScheduler)
         try {
             fixture.populate()
             fixture.campusStatus = HttpStatusCode.Forbidden
@@ -118,7 +121,7 @@ class AttendanceTeacherPrivacyTest {
 
     @Test fun `ordinary review validation error preserves authorized private rows`() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
-        val fixture = Fixture()
+        val fixture = Fixture(testScheduler)
         try {
             fixture.populate()
             fixture.reviewStatus = HttpStatusCode.BadRequest
@@ -131,7 +134,7 @@ class AttendanceTeacherPrivacyTest {
 
     @Test fun `late roster response cannot restore private data after QR denies authority`() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
-        val fixture = Fixture()
+        val fixture = Fixture(testScheduler)
         try {
             fixture.populate()
             fixture.rosterGate = CompletableDeferred()
@@ -157,7 +160,7 @@ class AttendanceTeacherPrivacyTest {
         kotlin.test.assertTrue(state.occurrences.isEmpty())
     }
 
-    private class Fixture {
+    private class Fixture(scheduler: TestCoroutineScheduler) {
         var rosterStatus = HttpStatusCode.OK
         var qrStatus = HttpStatusCode.OK
         var reviewStatus = HttpStatusCode.OK
@@ -174,7 +177,10 @@ class AttendanceTeacherPrivacyTest {
             AttendanceStatus.REVIEW_REQUIRED, AttendanceReasonCode.QR_VALID, now, now)
         private val occurrence = ClassOccurrenceContract("occurrence", null, "course", "group", "QA", "QA subject", "QA teacher",
             date, "08:00", "08:50", ClassOccurrenceStatusContract.SCHEDULED)
-        private val client = createApiClient(ApiEnvironment("https://example.test/", "test"), MockEngine { request ->
+        private val client = createApiClient(ApiEnvironment("https://example.test/", "test"), MockEngine(MockEngineConfig().apply {
+            // Network completion and QR timers must advance on the same virtual clock.
+            dispatcher = StandardTestDispatcher(scheduler)
+            addHandler { request ->
             val path = request.url.encodedPath
             val status = when {
                 path.endsWith("/roster") -> rosterStatus
@@ -201,7 +207,8 @@ class AttendanceTeacherPrivacyTest {
                 else -> error("Unexpected fixture request: $path")
             }
             respond(body, status, headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()))
-        })
+            }
+        }))
         private val tokenStore = object : SessionTokenStore {
             private var token: String? = "e30." + Base64.getUrlEncoder().withoutPadding().encodeToString(
                 """{"sub":"teacher","exp":2000000000,"roles":["teacher"],"session_id":"qa-session"}""".toByteArray()) + ".signature"

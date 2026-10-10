@@ -22,6 +22,15 @@ Pending accounts may authenticate with no granted academic roles and inspect `/a
 
 Route regressions reproduce ignored suspension, restored-session resurrection, pending academic access and malformed authority metadata before implementation. Tests use real Ktor auth routes/services and the actual Mongo repository against a deterministic driver boundary; that fixture is explicitly not a running MongoDB.
 
+The final security review found two important defects: a malformed persisted session state could be overwritten by live account data, and numeric coercion could turn a fractional revision into zero. Six Ktor route regressions reproduced five failures before the correction and then all passed. Persisted session state is now validated before resolving authority; revisions and generations accept only nonnegative integral values, rejecting null, strings, fractions, nonfinite values and overflow. Truly absent legacy lifecycle fields retain compatibility.
+
+The attendance privacy test fixture now uses its existing virtual scheduler for the MockEngine as well as QR timers. Its eight privacy tests pass locally; the earlier PR CI executor ran out of memory on a real/virtual-time boundary. No production attendance behavior or heap-only workaround was introduced.
+
+Mongo enablement is a Gradle test input so a skipped local suite cannot become cached CI evidence. CI also explicitly rejects a missing, skipped or failing real-Mongo lifecycle report.
+
 The real-database concurrency suite is run separately in CI against an isolated Mongo service/database; local checks without that service must report the suite as skipped, never passed. Final test counts, CI heads and reviewer findings are recorded after execution.
 
 Production email delivery, privileged owners/secrets, actual operator MFA enrollment, administrative approval screens and workshops remain subsequent V12 deliveries. No credentials are provisioned by this change.
+## Local candidate evidence (before final CI / integration)
+
+The post-fix broad run produced 216 API tests (0 failures/errors; 3 real-Mongo tests skipped locally), 23 shared tests and 191 Android JVM tests (0 failures/errors/skips). Lint and Debug/Release tasks completed. Local instrumentation did not execute: the previous CI-built APK has a different debug signature. Its app/data were preserved; an isolated V12 API30 AVD is being used for the remaining device gate. The previous c560544 CI ran all three real-Mongo lifecycle tests successfully and passed API31/35 instrumentation; all final-head CI must pass again before merge.

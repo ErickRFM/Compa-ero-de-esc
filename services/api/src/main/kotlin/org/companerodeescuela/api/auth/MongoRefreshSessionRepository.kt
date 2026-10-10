@@ -143,7 +143,7 @@ internal object RefreshSessionDocumentCodec {
             user = decodeUser(userDocument),
             createdAt = document.getDate("createdAt").toInstant(),
             expiresAt = document.getDate("expiresAt").toInstant(),
-            generation = (document.get("generation") as? Number)?.toLong() ?: 0L,
+            generation = nonNegativeInteger(document, "generation"),
             identitySource = runCatching { SessionIdentitySource.valueOf(document.getString("identitySource")) }
                 .getOrDefault(SessionIdentitySource.LEGACY),
             previousTokenHashes = document.getList("previousTokenHashes", String::class.java)
@@ -163,6 +163,15 @@ internal object RefreshSessionDocumentCodec {
         .append("authRevision", user.authRevision)
         .append("institutionId", user.institutionId)
 
+    private fun nonNegativeInteger(document: Document, key: String): Long {
+        if (!document.containsKey(key)) return 0L // Truly absent legacy field only.
+        return when (val encoded = document[key]) {
+            is Int -> encoded.toLong().takeIf { it >= 0 } ?: -1L
+            is Long -> encoded.takeIf { it >= 0 } ?: -1L
+            else -> -1L
+        }
+    }
+
     private fun decodeUser(document: Document): UserSummary = UserSummary(
         id = document.getString("id"),
         displayName = document.getString("displayName"),
@@ -173,8 +182,7 @@ internal object RefreshSessionDocumentCodec {
         active = document.get("active") == true,
         accountStatus = if (!document.containsKey("accountStatus")) AccountStatus.ACTIVE
             else runCatching { AccountStatus.valueOf(document.getString("accountStatus")) }.getOrDefault(AccountStatus.REVOKED),
-        authRevision = if (!document.containsKey("authRevision")) 0L
-            else (document.get("authRevision") as? Number)?.toLong() ?: -1L,
+        authRevision = nonNegativeInteger(document, "authRevision"),
         institutionId = document.getString("institutionId"),
     )
 }

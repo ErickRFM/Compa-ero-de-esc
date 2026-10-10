@@ -1,7 +1,12 @@
 package org.companerodeescuela.api.auth
 
 import com.mongodb.MongoWriteException
+import com.mongodb.client.model.Filters.and
+import com.mongodb.client.model.Filters.exists
 import com.mongodb.client.model.Filters.or
+import com.mongodb.client.model.FindOneAndUpdateOptions
+import com.mongodb.client.model.ReturnDocument
+import com.mongodb.client.model.Updates
 import com.mongodb.client.model.Filters.eq
 import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
@@ -43,11 +48,35 @@ class MongoPlatformAccountRepository(
     override suspend fun create(account: PlatformAccount): Boolean {
         ensureIndexes()
         return try {
-            accounts.insertOne(account.toDocument())
+            accounts.insertOne(account.copy(email = account.email.trim().lowercase()).toDocument())
             true
         } catch (error: MongoWriteException) {
             if (error.error.code == DUPLICATE_KEY_CODE) false else throw error
         }
+    }
+
+    override suspend fun changeIdentity(accountId: String, expectedRevision: Long, change: AccountIdentityChange): PlatformAccount? {
+        val current = findById(accountId) ?: return null
+        if (current.isExactIdentityRetry(expectedRevision, change)) return current
+        val updated = current.applyIdentityChange(expectedRevision, change) ?: return null
+        val revisionFilter = if (expectedRevision == 0L)
+            or(eq("authRevision", 0L), exists("authRevision", false)) else eq("authRevision", expectedRevision)
+        val statusFilter = or(eq("accountStatus", current.accountStatus.name), exists("accountStatus", false))
+        val result = accounts.findOneAndUpdate(
+            and(eq("_id", accountId), revisionFilter, statusFilter, eq("active", current.active)),
+            Updates.combine(
+                Updates.set("accountStatus", updated.accountStatus.name),
+                Updates.set("active", updated.active),
+                Updates.set("authRevision", updated.authRevision),
+                Updates.set("roles", updated.roles.map(UserRole::name)),
+                Updates.set("institutionId", updated.institutionId),
+                Updates.push("identityAudit", updated.identityAudit.last().toDocument()),
+            ),
+            FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
+        )
+        if (result != null) return result.toAccount()
+        // A simultaneous exact retry may have committed first; a changed payload is never accepted.
+        return findById(accountId)?.takeIf { it.isExactIdentityRetry(expectedRevision, change) }
     }
 
     private suspend fun ensureIndexes() {
@@ -73,6 +102,7 @@ class MongoPlatformAccountRepository(
         .append("accountStatus", accountStatus.name)
         .append("authRevision", authRevision)
         .append("institutionId", institutionId)
+        .append("identityAudit", identityAudit.map { it.toDocument() })
         .append("createdAt", Date.from(createdAt))
 
     private fun Document.toAccount(): PlatformAccount = PlatformAccount(
@@ -90,7 +120,26 @@ class MongoPlatformAccountRepository(
         } else runCatching { AccountStatus.valueOf(getString("accountStatus")) }.getOrDefault(AccountStatus.REVOKED),
         authRevision = if (validAuthorityRevision()) (get("authRevision") as? Number)?.toLong() ?: 0L else -1L,
         institutionId = getString("institutionId"),
+        identityAudit = getList("identityAudit", Document::class.java).orEmpty().map { it.toIdentityAudit() },
         createdAt = getDate("createdAt").toInstant(),
+    )
+
+    private fun AccountIdentityAudit.toDocument(): Document = Document()
+        .append("operationId", operationId).append("actorId", actorId)
+        .append("fromRevision", fromRevision).append("toRevision", toRevision)
+        .append("fromStatus", fromStatus.name).append("toStatus", toStatus.name)
+        .append("rolesBefore", rolesBefore.map(UserRole::name)).append("rolesAfter", rolesAfter.map(UserRole::name))
+        .append("institutionBefore", institutionBefore).append("institutionAfter", institutionAfter)
+        .append("occurredAt", Date.from(occurredAt))
+
+    private fun Document.toIdentityAudit(): AccountIdentityAudit = AccountIdentityAudit(
+        operationId = getString("operationId"), actorId = getString("actorId"),
+        fromRevision = (get("fromRevision") as Number).toLong(), toRevision = (get("toRevision") as Number).toLong(),
+        fromStatus = AccountStatus.valueOf(getString("fromStatus")), toStatus = AccountStatus.valueOf(getString("toStatus")),
+        rolesBefore = getList("rolesBefore", String::class.java).map(UserRole::valueOf).toSet(),
+        rolesAfter = getList("rolesAfter", String::class.java).map(UserRole::valueOf).toSet(),
+        institutionBefore = getString("institutionBefore"), institutionAfter = getString("institutionAfter"),
+        occurredAt = getDate("occurredAt").toInstant(),
     )
 
     private fun Document.validAuthorityRevision(): Boolean = !containsKey("authRevision") ||

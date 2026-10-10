@@ -23,8 +23,21 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
 
+    # Disposable local service: lifecycle concurrency is tested against real MongoDB.
+    services:
+      mongo:
+        image: mongo:7.0.14
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1}).ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+
     env:
       GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8
+      V12_TEST_MONGODB_URI: mongodb://127.0.0.1:27017
 
     steps:
       - name: Checkout

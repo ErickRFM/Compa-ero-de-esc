@@ -141,11 +141,17 @@ fun Route.authRoutes(
         } else {
             authenticate(AuthTokenService.PROVIDER_NAME) {
                 post("/verification/resend") {
+                    if (call.verifiedSessionSource() != SessionIdentitySource.NATIVE) {
+                        throw ApiException.Forbidden("A native account is required for email verification")
+                    }
                     val user = tokenService.userFrom(call.principal<JWTPrincipal>()?.payload ?: throw ApiException.Unauthorized())
                     val result = verification.issue(user.id)
                     call.respond(ApiResponse(result, call.requestId()))
                 }
                 post("/verification/confirm") {
+                    if (call.verifiedSessionSource() != SessionIdentitySource.NATIVE) {
+                        throw ApiException.Forbidden("A native account is required for email verification")
+                    }
                     val user = tokenService.userFrom(call.principal<JWTPrincipal>()?.payload ?: throw ApiException.Unauthorized())
                     verificationLimiter.acquire(user.id, call.request.local.remoteAddress)?.let { retryAfter ->
                         call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())

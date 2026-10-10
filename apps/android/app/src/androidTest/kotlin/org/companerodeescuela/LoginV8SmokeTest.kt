@@ -12,17 +12,21 @@ import androidx.test.uiautomator.UiScrollable
 import androidx.test.uiautomator.UiSelector
 import org.junit.Assert.assertTrue
 import org.companerodeescuela.feature.settings.AppLanguage
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class LoginV8SmokeTest {
+    @get:Rule val compose = createEmptyComposeRule()
     @Test
     fun registrationAccountTypeCanBeSelectedByItsLabel() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { it.appearancePreferences.setLanguage(AppLanguage.SPANISH) }
             val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-            assertTrue(device.wait(Until.hasObject(By.textContains("universitaria,")), 10_000))
+            compose.waitForIdle()
+            assertLoginVisible(device, By.textContains("universitaria,"), "smoke-hero")
             findVisible(device, By.text("Crear cuenta")).click()
             findVisible(device, By.text("Alumno"))
             findVisible(device, By.text("Docente")).click()
@@ -38,7 +42,8 @@ class LoginV8SmokeTest {
             scenario.onActivity { it.appearancePreferences.setLanguage(AppLanguage.SPANISH) }
             val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
 
-            assertTrue(device.wait(Until.hasObject(By.textContains("Compañero")), 10_000))
+            compose.waitForIdle()
+            assertLoginVisible(device, By.textContains("Compañero"), "smoke-brand")
             assertTrue(device.hasObject(By.textContains("universitaria,")))
             findVisible(device, By.text("Correo electrónico o matrícula"))
         }
@@ -50,7 +55,8 @@ class LoginV8SmokeTest {
             scenario.onActivity { it.appearancePreferences.setLanguage(AppLanguage.SPANISH) }
             val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
 
-            assertTrue(device.wait(Until.hasObject(By.textContains("universitaria,")), 10_000))
+            compose.waitForIdle()
+            assertLoginVisible(device, By.textContains("universitaria,"), "smoke-hero")
             findVisible(device, By.text("Crear cuenta")).click()
 
             device.waitForIdle()
@@ -63,6 +69,7 @@ class LoginV8SmokeTest {
         val scroll = UiScrollable(UiSelector().packageName("org.companerodeescuela").scrollable(true))
             .setAsVerticalList()
         repeat(6) {
+            compose.waitForIdle()
             device.waitForIdle()
             device.wait(Until.findObject(selector), 2_000)?.let { return it }
             if (forward) scroll.scrollForward() else scroll.scrollBackward()

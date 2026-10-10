@@ -22,6 +22,7 @@ import org.companerodeescuela.api.grading.gradingRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
 import org.companerodeescuela.api.plugins.configurePlugins
 import org.companerodeescuela.api.presence.schoolPresenceRoutes
+import org.companerodeescuela.api.representatives.groupRepresentativeRoutes
 import org.companerodeescuela.api.tutoring.tutoringRoutes
 import org.companerodeescuela.api.tutoring.tutorCaseRoutes
 
@@ -61,6 +62,7 @@ fun Application.module(
         mongoConnection = mongoConnection,
         academicProvider = providerRegistry.academic,
         groupRepository = academicGraph.groupRepository,
+        representativeService = academicGraph.representativeService,
     )
     val presenceGraph = buildPresenceFeatureGraph(
         settings = settings,
@@ -119,6 +121,7 @@ fun Application.module(
         academicGroupRoutes(settings = settings, service = academicGraph.groupService)
         tutoringRoutes(settings = settings, service = academicGraph.tutoringService)
         tutorCaseRoutes(settings = settings, service = academicGraph.caseService)
+        groupRepresentativeRoutes(settings = settings, service = academicGraph.representativeService)
         classroomRoutes(settings = settings, service = classroomGraph.classroomService)
         channelRoutes(settings = settings, service = classroomGraph.channelService)
         academicEventRoutes(settings = settings, service = operationsGraph.eventService)

@@ -5,6 +5,8 @@ import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.integrations.IntegrationException
 import org.companerodeescuela.api.integrations.academic.AcademicProvider
 import org.companerodeescuela.api.integrations.academic.dto.ExternalCourse
+import org.companerodeescuela.api.representatives.GroupRepresentativeService
+import org.companerodeescuela.shared.contracts.ChannelType
 import org.companerodeescuela.shared.contracts.ClassChannelSummary
 import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
@@ -12,6 +14,7 @@ import org.companerodeescuela.shared.contracts.UserSummary
 class ChannelAccessPolicy(
     private val academicProvider: AcademicProvider,
     private val classroomService: ClassroomService? = null,
+    private val representativeService: GroupRepresentativeService? = null,
 ) {
     suspend fun channelsFor(userId: String, roles: Set<UserRole>): List<ClassChannelSummary> {
         val native = classroomService
@@ -34,6 +37,7 @@ class ChannelAccessPolicy(
                     teacherId = classroom.teacherId,
                     teacherDisplayName = classroom.teacherDisplayName,
                     canPublish = classroom.canManage,
+                    channelType = ChannelType.CLASS,
                 )
             }
 
@@ -67,9 +71,30 @@ class ChannelAccessPolicy(
                     teacherId = course.teacher.externalId,
                     teacherDisplayName = course.teacher.fullName,
                     canPublish = canPublishCourse(userId, roles, course),
+                    channelType = ChannelType.CLASS,
                 )
             }
-        return (native + institutional).distinctBy(ClassChannelSummary::id)
+
+        val repChannel = if (canAccessRepresentativesChannel(userId, roles)) {
+            listOf(
+                ClassChannelSummary(
+                    id = "channel-representatives",
+                    courseId = "representatives",
+                    subjectCode = "INST",
+                    subjectName = "Representantes de Grupo",
+                    groupName = "Institucional",
+                    term = "Compañero",
+                    teacherId = "admin",
+                    teacherDisplayName = "Administración Institucional",
+                    canPublish = roles.any(UserRole::isAdministrative),
+                    channelType = ChannelType.REPRESENTATIVES,
+                ),
+            )
+        } else {
+            emptyList()
+        }
+
+        return (native + institutional + repChannel).distinctBy(ClassChannelSummary::id)
     }
 
     suspend fun requireCanRead(
@@ -90,6 +115,19 @@ class ChannelAccessPolicy(
             throw ApiException.Forbidden("Only assigned teachers or administrators can publish")
         }
         return channel
+    }
+
+    private suspend fun canAccessRepresentativesChannel(
+        userId: String,
+        roles: Set<UserRole>,
+    ): Boolean {
+        if (roles.any(UserRole::isAdministrative)) return true
+        if (UserRole.TEACHER in roles) return true
+        if (representativeService != null) {
+            val active = representativeService.activeAssignmentsForStudent(userId)
+            if (active.isNotEmpty()) return true
+        }
+        return false
     }
 
     private suspend fun accessibleCourses(

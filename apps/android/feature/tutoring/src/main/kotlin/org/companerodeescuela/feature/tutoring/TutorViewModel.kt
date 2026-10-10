@@ -4,22 +4,24 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Job
 import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.shared.contracts.AcademicGroupSummary
-import org.companerodeescuela.shared.contracts.ExcuseRequestSummary
-import org.companerodeescuela.shared.contracts.TutorStudentSummary
-import org.companerodeescuela.shared.contracts.TutorCaseSummary
-import org.companerodeescuela.shared.contracts.CreateTutorCaseRequest
 import org.companerodeescuela.shared.contracts.AddTutorCaseNoteRequest
-import org.companerodeescuela.shared.contracts.TutorNoteVisibility
+import org.companerodeescuela.shared.contracts.CreateTutorCaseRequest
+import org.companerodeescuela.shared.contracts.ExcuseRequestSummary
 import org.companerodeescuela.shared.contracts.ExcuseStatus
+import org.companerodeescuela.shared.contracts.GroupRepresentativesOverview
+import org.companerodeescuela.shared.contracts.RepresentativePosition
+import org.companerodeescuela.shared.contracts.TutorCaseSummary
+import org.companerodeescuela.shared.contracts.TutorNoteVisibility
+import org.companerodeescuela.shared.contracts.TutorStudentSummary
 
 data class TutorUiState(
     val scopeGeneration: Long = 0,
@@ -31,12 +33,16 @@ data class TutorUiState(
     val rosterGroupId: String? = null,
     val rosterLoading: Boolean = false,
     val cases: List<TutorCaseSummary> = emptyList(),
+    val representativesOverview: GroupRepresentativesOverview? = null,
     val error: String? = null,
     val notice: String? = null,
 )
 
 @HiltViewModel
-class TutorViewModel @Inject constructor(private val repository: TutorRepository) : ViewModel() {
+class TutorViewModel @Inject constructor(
+    private val repository: TutorRepository,
+    private val representativeRepository: GroupRepresentativeRepository,
+) : ViewModel() {
     private val mutable = MutableStateFlow(TutorUiState())
     val state: StateFlow<TutorUiState> = mutable.asStateFlow()
 
@@ -96,6 +102,46 @@ class TutorViewModel @Inject constructor(private val repository: TutorRepository
                     if (it.rosterGroupId != groupId) it else it.copy(roster = result.value.filter { student -> student.academicGroupId == groupId }, rosterLoading = false)
                 }
                 is Outcome.Failure -> failInScope(generation, result.error)
+            }
+            loadRepresentativesOverview(groupId)
+        }
+    }
+
+    fun loadRepresentativesOverview(groupId: String) {
+        viewModelScope.launch {
+            when (val overview = representativeRepository.getOverview(groupId)) {
+                is Outcome.Success -> mutable.update { it.copy(representativesOverview = overview.value) }
+                is Outcome.Failure -> {}
+            }
+        }
+    }
+
+    fun appointRepresentative(groupId: String, studentUserId: String, position: RepresentativePosition) {
+        viewModelScope.launch {
+            mutable.update { it.copy(submitting = true, error = null, notice = null) }
+            when (val result = representativeRepository.appoint(groupId, studentUserId, position)) {
+                is Outcome.Success -> {
+                    mutable.update { it.copy(submitting = false, notice = "Nombramiento enviado.") }
+                    loadRepresentativesOverview(groupId)
+                }
+                is Outcome.Failure -> {
+                    mutable.update { it.copy(submitting = false, error = result.error.userMessage) }
+                }
+            }
+        }
+    }
+
+    fun revokeRepresentative(groupId: String, assignmentId: String) {
+        viewModelScope.launch {
+            mutable.update { it.copy(submitting = true, error = null, notice = null) }
+            when (val result = representativeRepository.revoke(assignmentId)) {
+                is Outcome.Success -> {
+                    mutable.update { it.copy(submitting = false, notice = "Nombramiento revocado.") }
+                    loadRepresentativesOverview(groupId)
+                }
+                is Outcome.Failure -> {
+                    mutable.update { it.copy(submitting = false, error = result.error.userMessage) }
+                }
             }
         }
     }

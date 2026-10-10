@@ -64,7 +64,7 @@ class AdminViewModelTest {
         val vm=AdminViewModel(AdminRepository(client,store),MfaRepository(client,store),clock)
         suspend fun ready() { awaitState { !it.loading };assertEquals(overview,vm.state.value.overview) }
         suspend fun awaitState(predicate:(AdminUiState)->Boolean)=withContext(Dispatchers.Default) { withTimeout(5000) { vm.state.first(predicate) } }
-        fun close() { gate?.complete(Unit);vm.viewModelScope.cancel();client.close() }
+        suspend fun close() { gate?.complete(Unit);vm.viewModelScope.coroutineContext[Job]?.cancelAndJoin();client.close() }
     }
     @Test fun `actual approval binds selected current group revision and digest to MFA and refreshes real overview`()=runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler));val f=Fixture()

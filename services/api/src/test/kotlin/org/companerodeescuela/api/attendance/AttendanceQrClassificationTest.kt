@@ -92,6 +92,7 @@ class AttendanceQrClassificationTest {
         val qr = AttendanceQrService(
             secret = "q".repeat(48).toCharArray(),
             repository = repository,
+            accessPolicy = AttendanceAccessPolicy(repository, ProviderAttendanceOccurrenceResolver(provider)),
             clock = clock,
         )
         val sessionService = AttendanceSessionService(

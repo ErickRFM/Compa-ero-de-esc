@@ -116,6 +116,7 @@ class AttendanceServiceTest {
         val qrService = AttendanceQrService(
             secret = "0123456789abcdef0123456789abcdef".toCharArray(),
             repository = repository,
+            accessPolicy = AttendanceAccessPolicy(repository, ProviderAttendanceOccurrenceResolver(provider)),
             clock = Clock.fixed(initialInstant, ZoneOffset.UTC),
         )
         val service = service(
@@ -513,7 +514,7 @@ class AttendanceServiceTest {
         schoolPresenceService: SchoolPresenceService? = null,
         qrService: AttendanceQrService? = null,
     ): TestAttendanceServices {
-        val accessPolicy = AttendanceAccessPolicy(repository)
+        val accessPolicy = AttendanceAccessPolicy(repository, ProviderAttendanceOccurrenceResolver(provider))
         return TestAttendanceServices(
             session = AttendanceSessionService(
                 repository = repository,

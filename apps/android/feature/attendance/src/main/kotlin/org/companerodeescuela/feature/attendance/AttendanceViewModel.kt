@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.companerodeescuela.core.attendance.AttendanceRepository
 import org.companerodeescuela.core.common.result.Outcome
+import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.database.LocalAttendanceRecord
 import org.companerodeescuela.shared.contracts.AttendanceDisposition
 import org.companerodeescuela.shared.contracts.TeacherCampusRosterResponse
@@ -56,7 +57,12 @@ enum class QrVisualState {
     UNAVAILABLE,
 }
 
+/** UI acknowledgement only; the server remains the authority for each reviewed record. */
+data class TeacherReviewCompletion(val recordId: String, val version: Long)
+
 data class AttendanceUiState(
+    val teacherScopeGeneration: Long = 0,
+    val teacherReviewCompletion: TeacherReviewCompletion? = null,
     val mode: AttendanceMode = AttendanceMode.LOADING,
     val loading: Boolean = true,
     val actionInProgress: Boolean = false,
@@ -101,6 +107,32 @@ class AttendanceViewModel @Inject constructor(
 
     private fun launchTeacherRequest(block: suspend CoroutineScope.() -> Unit): Job =
         CoroutineScope(viewModelScope.coroutineContext + teacherRequests).launch(block = block)
+
+    private fun clearTeacherScope(error: AppError? = null, loading: Boolean = false) {
+        modeGeneration++
+        teacherRequests.cancel()
+        teacherRequests = SupervisorJob(viewModelScope.coroutineContext[Job])
+        qrRotationJob?.cancel()
+        rosterPollingJob?.cancel()
+        _state.update {
+            AttendanceUiState(
+                teacherScopeGeneration = it.teacherScopeGeneration + 1,
+                mode = AttendanceMode.TEACHER,
+                loading = loading,
+                userId = it.userId,
+                qrVisualState = if (error == null) QrVisualState.IDLE else QrVisualState.UNAVAILABLE,
+                errorMessage = error?.userMessage,
+            )
+        }
+    }
+
+    private fun teacherActionFailed(error: AppError) {
+        if (teacherScopeFailed(error)) clearTeacherScope(error)
+        else _state.update { it.copy(actionInProgress = false, errorMessage = error.userMessage) }
+    }
+
+    private fun teacherScopeFailed(error: AppError): Boolean =
+        error !is AppError.Http || error.status in setOf(401, 403, 404) || error.status >= 500
 
     fun setClassroomContext(selection: TeacherClassContext?) {
         modeGeneration++
@@ -385,6 +417,7 @@ class AttendanceViewModel @Inject constructor(
                             errorMessage = teacherPassOpenError(result.error),
                         )
                     }
+                    if (teacherScopeFailed(result.error)) clearTeacherScope(result.error)
                 }
             }
         }
@@ -417,8 +450,10 @@ class AttendanceViewModel @Inject constructor(
                 is Outcome.Success -> _state.update {
                     it.copy(campusRoster = result.value, campusRosterError = null)
                 }
-                is Outcome.Failure -> _state.update {
-                    it.copy(campusRoster = null, campusRosterError = result.error.userMessage)
+                is Outcome.Failure -> {
+                    val error = result.error
+                    if (error is AppError.Http && error.status in setOf(401, 403, 404)) clearTeacherScope(error)
+                    else _state.update { it.copy(campusRoster = null, campusRosterError = error.userMessage) }
                 }
             }
         }
@@ -446,14 +481,7 @@ class AttendanceViewModel @Inject constructor(
                     }
                     refreshTeacher()
                 }
-                is Outcome.Failure -> {
-                    _state.update {
-                        it.copy(
-                            actionInProgress = false,
-                            errorMessage = result.error.userMessage,
-                        )
-                    }
-                }
+                is Outcome.Failure -> teacherActionFailed(result.error)
             }
         }
     }
@@ -465,7 +493,7 @@ class AttendanceViewModel @Inject constructor(
             ensureActive()
             when (result) {
                 is Outcome.Success -> _state.update { it.copy(roster = result.value) }
-                is Outcome.Failure -> _state.update { it.copy(errorMessage = result.error.userMessage) }
+                is Outcome.Failure -> clearTeacherScope(result.error)
             }
         }
     }
@@ -499,6 +527,7 @@ class AttendanceViewModel @Inject constructor(
                                     if (item.id == result.value.id) result.value else item
                                 },
                             ),
+                            teacherReviewCompletion = TeacherReviewCompletion(record.id, (it.teacherReviewCompletion?.version ?: 0) + 1),
                             successMessage = when (disposition) {
                                 AttendanceDisposition.PRESENT -> "Alumno marcado como presente."
                                 AttendanceDisposition.LATE -> "Alumno marcado con retardo."
@@ -507,12 +536,7 @@ class AttendanceViewModel @Inject constructor(
                         )
                     }
                 }
-                is Outcome.Failure -> _state.update {
-                    it.copy(
-                        actionInProgress = false,
-                        errorMessage = result.error.userMessage,
-                    )
-                }
+                is Outcome.Failure -> teacherActionFailed(result.error)
             }
         }
     }
@@ -542,16 +566,12 @@ class AttendanceViewModel @Inject constructor(
                                     if (item.id == result.value.id) result.value else item
                                 },
                             ),
+                            teacherReviewCompletion = TeacherReviewCompletion(record.id, (it.teacherReviewCompletion?.version ?: 0) + 1),
                             successMessage = "Registro actualizado por el servidor.",
                         )
                     }
                 }
-                is Outcome.Failure -> _state.update {
-                    it.copy(
-                        actionInProgress = false,
-                        errorMessage = result.error.userMessage,
-                    )
-                }
+                is Outcome.Failure -> teacherActionFailed(result.error)
             }
         }
     }
@@ -654,11 +674,15 @@ class AttendanceViewModel @Inject constructor(
     }
 
     private fun refreshTeacher() {
+        clearTeacherScope(loading = true)
         launchTeacherRequest {
-            _state.update { it.copy(loading = true, errorMessage = null) }
             val week = repository.academicWeek(LocalDate.now().toString())
             val active = repository.activeTeacherSessions()
             ensureActive()
+            if (week is Outcome.Failure || active is Outcome.Failure) {
+                clearTeacherScope(if (week is Outcome.Failure) week.error else (active as Outcome.Failure).error)
+                return@launchTeacherRequest
+            }
 
             val context = requestedClassroom
             val matching = week.valueOrNull()?.occurrences.orEmpty().filter {
@@ -763,14 +787,8 @@ class AttendanceViewModel @Inject constructor(
                         delay(result.value.rotateAfterSeconds.coerceAtLeast(5) * 1_000L)
                     }
                     is Outcome.Failure -> {
-                        _state.update {
-                            it.copy(
-                                qr = null,
-                                qrVisualState = QrVisualState.UNAVAILABLE,
-                                errorMessage = result.error.userMessage,
-                            )
-                        }
-                        delay(QR_RETRY_DELAY_MS)
+                        clearTeacherScope(result.error)
+                        return@launchTeacherRequest
                     }
                 }
             }
@@ -790,7 +808,10 @@ class AttendanceViewModel @Inject constructor(
                 ensureActive()
                 when (result) {
                     is Outcome.Success -> _state.update { it.copy(roster = result.value) }
-                    is Outcome.Failure -> Unit
+                    is Outcome.Failure -> {
+                        clearTeacherScope(result.error)
+                        return@launchTeacherRequest
+                    }
                 }
                 val occurrence = _state.value.occurrences.firstOrNull { it.id == _state.value.teacherSession?.occurrenceId }
                 if (occurrence != null) {
@@ -800,7 +821,14 @@ class AttendanceViewModel @Inject constructor(
                         is Outcome.Success -> _state.update {
                             it.copy(campusRoster = campus.value, campusRosterError = null)
                         }
-                        is Outcome.Failure -> Unit // Do not wipe a valid roster on network drops.
+                        is Outcome.Failure -> {
+                            val error = campus.error
+                            if (error is AppError.Http && error.status in setOf(401, 403, 404)) {
+                                clearTeacherScope(error)
+                                return@launchTeacherRequest
+                            }
+                            _state.update { it.copy(campusRoster = null, campusRosterError = error.userMessage) }
+                        }
                     }
                 }
                 delay(ROSTER_POLL_INTERVAL_MS)
@@ -818,7 +846,6 @@ class AttendanceViewModel @Inject constructor(
     }
 
     private companion object {
-        const val QR_RETRY_DELAY_MS = 5_000L
         const val ROSTER_POLL_INTERVAL_MS = 4_000L
         const val STUDENT_POLL_INTERVAL_MS = 20_000L
     }

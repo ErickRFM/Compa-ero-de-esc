@@ -14,7 +14,7 @@ import org.companerodeescuela.shared.model.ClassOccurrenceStatus
 class AttendanceSessionService(
     private val repository: AttendanceRepository,
     private val occurrenceResolver: AttendanceOccurrenceResolver,
-    private val accessPolicy: AttendanceAccessPolicy = AttendanceAccessPolicy(repository),
+    private val accessPolicy: AttendanceAccessPolicy = AttendanceAccessPolicy(repository, occurrenceResolver),
     private val clock: Clock = Clock.systemUTC(),
     private val newId: () -> String = { UUID.randomUUID().toString() },
 ) {
@@ -76,9 +76,18 @@ class AttendanceSessionService(
 
     suspend fun activeForTeacher(teacherId: String): List<AttendanceSessionResponse> {
         val now = clock.instant().epochSecond
-        return repository.findOpenSessions()
+        val candidates = repository.findOpenSessions()
             .filter { it.openedBy == teacherId && it.closesAtEpochSeconds > now }
-            .sortedBy { it.closesAtEpochSeconds }
+        val authorized = mutableListOf<AttendanceSessionResponse>()
+        for (session in candidates) {
+            try {
+                accessPolicy.requireOwnerOrAdministrative(teacherId, session, allowCrossOwner = false)
+                authorized += session
+            } catch (_: ApiException.Forbidden) {
+                // Revocation removes this resource; unavailable authority fails the request.
+            }
+        }
+        return authorized.sortedBy { it.closesAtEpochSeconds }
     }
 
     suspend fun activeForAdministration(): List<AttendanceSessionResponse> {

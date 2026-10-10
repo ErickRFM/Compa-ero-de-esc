@@ -25,6 +25,12 @@ class GroupRepresentativeConcurrencyTest {
         assertTrue(results.filter { it.isFailure }.all { it.exceptionOrNull() is ApiException.Conflict })
         assertEquals(1,repo.listByGroup("9A").size)
     }
+    @Test fun `a later academic generation can appoint a new chief without deleting retained history`()=runBlocking {
+        val repo=InMemoryGroupRepresentativeRepository()
+        repo.save(appointment(1))
+        repo.save(appointment(2).copy(groupScopeRevision=2))
+        assertEquals(2,repo.listByGroup("9A").size)
+    }
 }
 
 @EnabledIfEnvironmentVariable(named="V12_TEST_MONGODB_URI",matches=".+")
@@ -42,6 +48,9 @@ class MongoGroupRepresentativeConcurrencyTest {
                 assertEquals(1,results.count { it.isSuccess })
                 assertTrue(results.filter { it.isFailure }.all { it.exceptionOrNull() is ApiException.Conflict })
                 assertEquals(1,MongoGroupRepresentativeRepository(db).listByGroup("9A").size)
+                // Historical pending slots remain retained but do not block the next scope revision.
+                MongoGroupRepresentativeRepository(db).save(appointment(100).copy(groupScopeRevision=2))
+                assertEquals(2,MongoGroupRepresentativeRepository(db).listByGroup("9A").size)
             } finally { db.drop() }
         }
     }

@@ -33,8 +33,7 @@ fun Route.groupRepresentativeRoutes(
                 val groupId = call.requireGroupId()
                 val groupName = call.parameters["groupName"] ?: "Grupo $groupId"
                 val overview = service.getGroupOverview(
-                    actorUserId = principal.subject(),
-                    actorRoles = principal.roles(),
+                    actor = AuthTokenService(settings).userFrom(principal.payload),
                     groupId = groupId,
                     groupName = groupName,
                 )
@@ -52,8 +51,7 @@ fun Route.groupRepresentativeRoutes(
                 val groupName = call.parameters["groupName"] ?: "Grupo $groupId"
                 val request = call.receive<AppointRepresentativeRequest>()
                 val created = service.appointRepresentative(
-                    actorUserId = principal.subject(),
-                    actorRoles = principal.roles(),
+                    actor = AuthTokenService(settings).userFrom(principal.payload),
                     groupId = groupId,
                     groupName = groupName,
                     request = request,
@@ -111,8 +109,7 @@ fun Route.groupRepresentativeRoutes(
                 val principal = call.requirePrincipal()
                 val id = call.requireAssignmentId()
                 val revoked = service.revokeAppointment(
-                    actorUserId = principal.subject(),
-                    actorRoles = principal.roles(),
+                    actor = AuthTokenService(settings).userFrom(principal.payload),
                     assignmentId = id,
                 )
                 call.respond(

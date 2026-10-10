@@ -1,6 +1,7 @@
 package org.companerodeescuela.api.tutoring
 
 import java.time.Instant
+import org.companerodeescuela.api.test.ScopedAcademicFixtures
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -16,8 +17,8 @@ import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
 
 class TutorCaseServiceTest {
-    private val tutor = UserSummary("tutor-1", "Tutor", roles = setOf(UserRole.TUTOR))
-    private val outsider = UserSummary("tutor-2", "Other tutor", roles = setOf(UserRole.TUTOR))
+    private val tutor = UserSummary("tutor-1", "Tutor", roles = setOf(UserRole.TUTOR), institutionId = ScopedAcademicFixtures.INSTITUTION)
+    private val outsider = UserSummary("tutor-2", "Other tutor", roles = setOf(UserRole.TUTOR), institutionId = ScopedAcademicFixtures.INSTITUTION)
     private val student = UserSummary("student-1", "Student", roles = setOf(UserRole.STUDENT))
 
     @Test
@@ -48,11 +49,11 @@ class TutorCaseServiceTest {
 
     private suspend fun setup(): Pair<TutorCaseService, InMemoryTutorCaseRepository> {
         val groups = InMemoryAcademicGroupRepository()
-        groups.create(AcademicGroupRecord("9A", "9 A", true, Instant.EPOCH))
+        groups.create(ScopedAcademicFixtures.group("9A", "9 A"))
         groups.assign(AcademicGroupMembershipRecord("9A", student.id, Instant.EPOCH))
         val tutors = InMemoryTutorAssignmentRepository()
-        tutors.create(TutorAssignmentRecord("t1", tutor.id, "9A", true, "admin", Instant.EPOCH))
-        val assignmentService = TutorAssignmentService(tutors, groups)
+        tutors.create(ScopedAcademicFixtures.assignment("t1", tutor.id, "9A"))
+        val assignmentService = TutorAssignmentService(tutors, groups, accounts = ScopedAcademicFixtures.accounts(tutor, outsider))
         val repository = InMemoryTutorCaseRepository()
         return TutorCaseService(repository, assignmentService, groups) to repository
     }

@@ -22,8 +22,12 @@ data class PlatformAccount(
     val registrationIntent: RegistrationIntent? = null,
     val emailVerification: EmailVerificationChallenge? = null,
     val emailVerifiedAt: Instant? = null,
+    val roleApplications: List<org.companerodeescuela.shared.contracts.StaffApplication> = emptyList(),
+    val applicationRevision: Long = 0,
+    val roleGenerations: Map<UserRole, Long> = roles.associateWith { 0L },
+    val adminCapabilities: Set<org.companerodeescuela.shared.contracts.AdminCapability> = emptySet(),
 ) {
-    val permitsSession: Boolean get() = active && accountStatus.permitsSession && authRevision >= 0
+    val permitsSession: Boolean get() = active && accountStatus.permitsSession && authRevision >= 0 && applicationRevision >= 0 && roleGenerations.values.all { it >= 0 }
 
     fun toUserSummary(): UserSummary = UserSummary(
         id, displayName, email,
@@ -42,6 +46,8 @@ interface PlatformAccountRepository {
     suspend fun findByIdentifier(identifier: String): PlatformAccount?
     suspend fun findById(id: String): PlatformAccount?
     suspend fun create(account: PlatformAccount): Boolean
+    suspend fun listAccounts(): List<PlatformAccount> = emptyList()
+    suspend fun submitStaffApplication(accountId:String, expectedRevision:Long, application:org.companerodeescuela.shared.contracts.StaffApplication):PlatformAccount? = null
 
     suspend fun issueEmailVerification(accountId: String, expectedRevision: Long, hash: String, now: Instant, expiresAt: Instant): Boolean = false
     suspend fun confirmEmailVerification(accountId: String, hash: String, now: Instant): PlatformAccount? = null
@@ -62,6 +68,14 @@ class InMemoryPlatformAccountRepository : PlatformAccountRepository {
     }
 
     override suspend fun findById(id: String): PlatformAccount? = mutex.withLock { accounts[id] }
+
+    override suspend fun listAccounts(): List<PlatformAccount> = mutex.withLock { accounts.values.toList() }
+    override suspend fun submitStaffApplication(accountId:String,expectedRevision:Long,application:org.companerodeescuela.shared.contracts.StaffApplication):PlatformAccount? = mutex.withLock {
+        val current=accounts[accountId] ?: return@withLock null
+        val updated=current.withStaffApplication(expectedRevision,application) ?: return@withLock null
+        accounts[accountId]=updated
+        updated
+    }
 
     override suspend fun create(account: PlatformAccount): Boolean = mutex.withLock {
         val normalized = account.email.trim().lowercase()

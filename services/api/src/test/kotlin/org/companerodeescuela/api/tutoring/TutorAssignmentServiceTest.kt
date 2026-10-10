@@ -1,5 +1,11 @@
 package org.companerodeescuela.api.tutoring
 
+import org.companerodeescuela.api.test.ScopedAcademicFixtures
+import org.companerodeescuela.api.test.QaMfaOperator
+import org.companerodeescuela.api.test.QaClock
+import org.companerodeescuela.shared.contracts.RevokeTutorAssignmentRequest
+import org.companerodeescuela.shared.contracts.PrivilegedCommandDigests
+import org.companerodeescuela.shared.contracts.StepUpAction
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -21,20 +27,22 @@ class TutorAssignmentServiceTest {
     @Test
     fun adminAssignsTutorAndTutorSeesOnlyAssignedScope() = runTest {
         val groups = InMemoryAcademicGroupRepository()
-        groups.create(AcademicGroupRecord("6A", "6A", true, Instant.EPOCH))
-        groups.create(AcademicGroupRecord("6B", "6B", true, Instant.EPOCH))
+        groups.create(ScopedAcademicFixtures.group("6A"))
+        groups.create(ScopedAcademicFixtures.group("6B"))
         val accounts = InMemoryPlatformAccountRepository()
-        accounts.create(PlatformAccount(TUTOR.id, TUTOR.displayName, "tutor@example.edu", "test-only", TUTOR.roles))
+        accounts.create(ScopedAcademicFixtures.account(TUTOR))
         accounts.create(PlatformAccount("student-1", "Ana", "ana@example.edu", "test-only", setOf(UserRole.STUDENT)))
         groups.assign(AcademicGroupMembershipRecord("6A", "student-1", Instant.EPOCH))
+        val operator=QaMfaOperator.create(accounts,ADMIN,QaClock(Instant.parse("2026-10-06T18:30:00Z")))
         val service = TutorAssignmentService(
             repository = InMemoryTutorAssignmentRepository(),
             groupRepository = groups,
-            clock = Clock.fixed(Instant.parse("2026-10-06T18:30:00Z"), ZoneOffset.UTC),
-            accounts = accounts,
+            clock = operator.clock,
+            accounts = accounts, mfa = operator.mfa,
         )
 
-        service.create(ADMIN, CreateTutorAssignmentRequest(TUTOR.id, "6A"))
+        val command=assignmentRequest(TUTOR.id,"6A","assign")
+        service.create(ADMIN,command.copy(proof=operator.proof(StepUpAction.MANAGE_ACADEMICS,"6A","assign",PrivilegedCommandDigests.tutorAssignment("6A",command))))
 
         assertEquals(listOf("6A"), service.scopeFor(TUTOR).groups.map { it.id })
         assertEquals(1, service.listFor(TUTOR).size)
@@ -46,28 +54,33 @@ class TutorAssignmentServiceTest {
             service.requireCanAccessGroup(TUTOR, "6B")
         }
         val assignment = service.listFor(TUTOR).single()
-        val revoked = service.revoke(ADMIN, assignment.id)
+        var revoke=RevokeTutorAssignmentRequest("revoke","")
+        revoke=revoke.copy(proof=operator.proof(StepUpAction.MANAGE_ACADEMICS,assignment.id,revoke.operationId,PrivilegedCommandDigests.tutorRevocation(assignment.id,revoke)))
+        val revoked = service.revoke(ADMIN, assignment.id,revoke)
         assertEquals(false, revoked.active)
         assertEquals(ADMIN.id, revoked.revokedBy)
         assertEquals(emptyList(), service.scopeFor(TUTOR).groups)
         assertFailsWith<ApiException.Forbidden> {
             service.requireCanAccessGroup(TUTOR, "6A")
         }
-        assertEquals(revoked, service.revoke(ADMIN, assignment.id))
+        assertEquals(revoked, service.revoke(ADMIN, assignment.id,revoke))
     }
 
     @Test
     fun adminRejectsUnknownOrNonTutorIdentity() = runTest {
         val groups = InMemoryAcademicGroupRepository()
-        groups.create(AcademicGroupRecord("6A", "6A", true, Instant.EPOCH))
+        groups.create(ScopedAcademicFixtures.group("6A"))
         val accounts = InMemoryPlatformAccountRepository()
-        accounts.create(PlatformAccount(TEACHER.id, TEACHER.displayName, "teacher@example.edu", "test-only", TEACHER.roles))
-        val service = TutorAssignmentService(InMemoryTutorAssignmentRepository(), groups, accounts = accounts)
+        accounts.create(ScopedAcademicFixtures.account(TEACHER))
+        val operator=QaMfaOperator.create(accounts,ADMIN)
+        val service = TutorAssignmentService(InMemoryTutorAssignmentRepository(), groups,operator.clock,accounts,operator.mfa)
         assertFailsWith<ApiException.NotFound> {
-            service.create(ADMIN, CreateTutorAssignmentRequest("unknown", "6A"))
+            val command=assignmentRequest("unknown","6A","unknown-target")
+            service.create(ADMIN,command.copy(proof=operator.proof(StepUpAction.MANAGE_ACADEMICS,"6A","unknown-target",PrivilegedCommandDigests.tutorAssignment("6A",command))))
         }
         assertFailsWith<ApiException.Validation> {
-            service.create(ADMIN, CreateTutorAssignmentRequest(TEACHER.id, "6A"))
+            val command=assignmentRequest(TEACHER.id,"6A","non-tutor-target")
+            service.create(ADMIN,command.copy(proof=operator.proof(StepUpAction.MANAGE_ACADEMICS,"6A","non-tutor-target",PrivilegedCommandDigests.tutorAssignment("6A",command))))
         }
     }
 
@@ -86,7 +99,7 @@ class TutorAssignmentServiceTest {
     @Test
     fun nonAdminCannotAssignTutor() = runTest {
         val groups = InMemoryAcademicGroupRepository()
-        groups.create(AcademicGroupRecord("6A", "6A", true, Instant.EPOCH))
+        groups.create(ScopedAcademicFixtures.group("6A"))
         val service = TutorAssignmentService(
             repository = InMemoryTutorAssignmentRepository(),
             groupRepository = groups,
@@ -97,21 +110,27 @@ class TutorAssignmentServiceTest {
         }
     }
 
+    private fun assignmentRequest(tutor:String,group:String,operation:String)=CreateTutorAssignmentRequest(tutor,group,
+        ScopedAcademicFixtures.INSTITUTION,ScopedAcademicFixtures.PERIOD,0,ScopedAcademicFixtures.END.epochSecond,operation,null)
+
     private companion object {
         val ADMIN = UserSummary(
             id = "admin-1",
             displayName = "Control escolar",
             roles = setOf(UserRole.ADMIN),
+            institutionId = ScopedAcademicFixtures.INSTITUTION,
         )
         val TUTOR = UserSummary(
             id = "teacher-tutor-1",
             displayName = "Mtra. Elena",
             roles = setOf(UserRole.TEACHER, UserRole.TUTOR),
+            institutionId = ScopedAcademicFixtures.INSTITUTION,
         )
         val TEACHER = UserSummary(
             id = "teacher-1",
             displayName = "Mtro. Luis",
             roles = setOf(UserRole.TEACHER),
+            institutionId = ScopedAcademicFixtures.INSTITUTION,
         )
     }
 }

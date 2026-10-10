@@ -16,6 +16,11 @@ import java.time.Instant
 import java.util.Date
 import org.companerodeescuela.shared.contracts.RegistrationAccountType
 import org.companerodeescuela.shared.contracts.VerificationDeliveryStatus
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import org.companerodeescuela.shared.contracts.StaffApplication
+import org.companerodeescuela.shared.contracts.AdminCapability
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -46,6 +51,22 @@ class MongoPlatformAccountRepository(
     override suspend fun findById(id: String): PlatformAccount? {
         ensureIndexes()
         return accounts.find(eq("_id", id)).firstOrNull()?.toAccount()
+    }
+
+    override suspend fun listAccounts():List<PlatformAccount> {
+        ensureIndexes()
+        return accounts.find().toList().map { it.toAccount() }
+    }
+    override suspend fun submitStaffApplication(accountId:String,expectedRevision:Long,application:StaffApplication):PlatformAccount? {
+        val current=findById(accountId) ?: return null
+        val updated=current.withStaffApplication(expectedRevision,application) ?: return null
+        if(updated==current) return current
+        val result=accounts.findOneAndUpdate(and(eq("_id",accountId),eq("authRevision",expectedRevision),eq("active",true),
+            eq("accountStatus",AccountStatus.ACTIVE.name),applicationRevisionFilter(current.applicationRevision)),
+            Updates.combine(Updates.set("roleApplicationsJson",Json.encodeToString(updated.roleApplications)),Updates.set("applicationRevision",updated.applicationRevision)),
+            FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER))
+        if(result!=null) return result.toAccount()
+        return findById(accountId)?.takeIf { it.authRevision==expectedRevision && it.roleApplications.any { row -> row==application } }
     }
 
     override suspend fun create(account: PlatformAccount): Boolean {
@@ -80,6 +101,9 @@ class MongoPlatformAccountRepository(
             Updates.combine(
                 Updates.set("accountStatus", updated.accountStatus.name), Updates.set("authRevision", updated.authRevision),
                 Updates.set("roles", updated.roles.map(UserRole::name)), Updates.set("emailVerifiedAt", Date.from(now)),
+                Updates.set("roleGenerations", updated.generationDocument()),
+                Updates.set("roleApplicationsJson", Json.encodeToString(updated.roleApplications)),
+                Updates.set("applicationRevision", updated.applicationRevision),
                 Updates.unset("emailVerification"), Updates.push("identityAudit", updated.identityAudit.last().toDocument()),
             ), FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
         )?.toAccount()
@@ -101,13 +125,17 @@ class MongoPlatformAccountRepository(
             or(eq("authRevision", 0L), exists("authRevision", false)) else eq("authRevision", expectedRevision)
         val statusFilter = or(eq("accountStatus", current.accountStatus.name), exists("accountStatus", false))
         val result = accounts.findOneAndUpdate(
-            and(eq("_id", accountId), revisionFilter, statusFilter, eq("active", current.active)),
+            and(eq("_id", accountId), revisionFilter, statusFilter, eq("active", current.active), applicationRevisionFilter(current.applicationRevision)),
             Updates.combine(
                 Updates.set("accountStatus", updated.accountStatus.name),
                 Updates.set("active", updated.active),
                 Updates.set("authRevision", updated.authRevision),
                 Updates.set("roles", updated.roles.map(UserRole::name)),
                 Updates.set("institutionId", updated.institutionId),
+                Updates.set("roleGenerations", updated.generationDocument()),
+                Updates.set("roleApplicationsJson", Json.encodeToString(updated.roleApplications)),
+                Updates.set("applicationRevision", updated.applicationRevision),
+                Updates.set("adminCapabilities", updated.adminCapabilities.map(AdminCapability::name)),
                 Updates.push("identityAudit", updated.identityAudit.last().toDocument()),
             ),
             FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
@@ -145,6 +173,10 @@ class MongoPlatformAccountRepository(
         .append("registrationIntent", registrationIntent?.toDocument())
         .append("emailVerification", emailVerification?.toDocument())
         .append("emailVerifiedAt", emailVerifiedAt?.let(Date::from))
+        .append("roleApplicationsJson", Json.encodeToString(roleApplications))
+        .append("applicationRevision", applicationRevision)
+        .append("roleGenerations", generationDocument())
+        .append("adminCapabilities", adminCapabilities.map(AdminCapability::name))
 
     private fun Document.toAccount(): PlatformAccount = PlatformAccount(
         id = getString("_id"),
@@ -155,7 +187,7 @@ class MongoPlatformAccountRepository(
             .orEmpty()
             .mapNotNull { encoded -> runCatching { UserRole.valueOf(encoded) }.getOrNull() }
             .toSet(),
-        active = get("active") == true && validAuthorityRevision(),
+        active = get("active") == true && validAuthorityRevision() && validStaffMetadata(),
         accountStatus = if (!containsKey("accountStatus")) {
             if (get("active") == true) AccountStatus.ACTIVE else AccountStatus.SUSPENDED
         } else runCatching { AccountStatus.valueOf(getString("accountStatus")) }.getOrDefault(AccountStatus.REVOKED),
@@ -166,6 +198,10 @@ class MongoPlatformAccountRepository(
         registrationIntent = get("registrationIntent", Document::class.java)?.toRegistrationIntent(),
         emailVerification = get("emailVerification", Document::class.java)?.toEmailChallenge(),
         emailVerifiedAt = getDate("emailVerifiedAt")?.toInstant(),
+        roleApplications = readApplications().orEmpty(),
+        applicationRevision = readApplicationRevision() ?: -1,
+        roleGenerations = readGenerations().orEmpty(),
+        adminCapabilities = readCapabilities().orEmpty(),
     )
 
     private fun RegistrationIntent.toDocument(): Document = Document("profile", profile.name)
@@ -194,6 +230,8 @@ class MongoPlatformAccountRepository(
         .append("rolesBefore", rolesBefore.map(UserRole::name)).append("rolesAfter", rolesAfter.map(UserRole::name))
         .append("institutionBefore", institutionBefore).append("institutionAfter", institutionAfter)
         .append("occurredAt", Date.from(occurredAt))
+        .append("scopeDigest", scopeDigest).append("approvedApplicationId", approvedApplicationId)
+        .append("capabilitiesAfter", capabilitiesAfter.map(AdminCapability::name))
 
     private fun Document.toIdentityAudit(): AccountIdentityAudit = AccountIdentityAudit(
         operationId = getString("operationId"), actorId = getString("actorId"),
@@ -203,7 +241,34 @@ class MongoPlatformAccountRepository(
         rolesAfter = getList("rolesAfter", String::class.java).map(UserRole::valueOf).toSet(),
         institutionBefore = getString("institutionBefore"), institutionAfter = getString("institutionAfter"),
         occurredAt = getDate("occurredAt").toInstant(),
+        scopeDigest = getString("scopeDigest"), approvedApplicationId = getString("approvedApplicationId"),
+        capabilitiesAfter = getList("capabilitiesAfter", String::class.java).orEmpty().map(AdminCapability::valueOf).toSet(),
     )
+
+    private fun applicationRevisionFilter(revision:Long)=if(revision==0L) or(eq("applicationRevision",0L),exists("applicationRevision",false)) else eq("applicationRevision",revision)
+    private fun PlatformAccount.generationDocument()=Document().apply { roleGenerations.forEach { (role,generation) -> append(role.name,generation) } }
+    private fun Document.readApplicationRevision():Long? = if(!containsKey("applicationRevision")) 0L else when(val value=get("applicationRevision")) { is Long->value.takeIf { it>=0 };is Int->value.toLong().takeIf { it>=0 };else->null }
+    private fun Document.readGenerations():Map<UserRole,Long>? = runCatching {
+        if(!containsKey("roleGenerations")) return getList("roles",String::class.java).orEmpty().map(UserRole::valueOf).associateWith { 0L }
+        val doc=get("roleGenerations") as? Document ?: return null
+        doc.map { (encoded,value) ->
+            val role=UserRole.valueOf(encoded)
+            val generation=when(value) { is Long->value;is Int->value.toLong();else->return null }
+            if(generation<0) return null
+            role to generation
+        }.toMap()
+    }.getOrNull()
+    private fun Document.readApplications():List<StaffApplication>? = runCatching {
+        if(!containsKey("roleApplicationsJson")) return emptyList()
+        val encoded=getString("roleApplicationsJson") ?: return null
+        if(encoded.length>131072) return null
+        Json.decodeFromString<List<StaffApplication>>(encoded).takeIf { it.size<=20 && it.map { row -> row.id }.distinct().size==it.size }
+    }.getOrNull()
+    private fun Document.readCapabilities():Set<AdminCapability>? = runCatching {
+        if(!containsKey("adminCapabilities")) return emptySet()
+        getList("adminCapabilities",String::class.java).map(AdminCapability::valueOf).toSet()
+    }.getOrNull()
+    private fun Document.validStaffMetadata()=readApplicationRevision()!=null && readGenerations()!=null && readApplications()!=null && readCapabilities()!=null
 
     private fun Document.validAuthorityRevision(): Boolean = !containsKey("authRevision") ||
         ((get("authRevision") is Long || get("authRevision") is Int) && (get("authRevision") as Number).toLong() >= 0)

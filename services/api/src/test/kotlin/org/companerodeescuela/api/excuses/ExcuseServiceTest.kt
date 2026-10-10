@@ -1,5 +1,6 @@
 package org.companerodeescuela.api.excuses
 
+import org.companerodeescuela.api.test.ScopedAcademicFixtures
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -102,8 +103,8 @@ class ExcuseServiceTest {
 
     private suspend fun setup(): Setup {
         val groups = InMemoryAcademicGroupRepository().also {
-            it.create(AcademicGroupRecord("6A", "6A", true, Instant.EPOCH))
-            it.create(AcademicGroupRecord("6B", "6B", true, Instant.EPOCH))
+            it.create(ScopedAcademicFixtures.group("6A"))
+            it.create(ScopedAcademicFixtures.group("6B"))
         }
         groups.assign(AcademicGroupMembershipRecord("6A", STUDENT.id, Instant.EPOCH))
         groups.assign(AcademicGroupMembershipRecord("6B", OTHER_STUDENT.id, Instant.EPOCH))
@@ -116,10 +117,12 @@ class ExcuseServiceTest {
                     active = true,
                     assignedBy = ADMIN.id,
                     assignedAt = Instant.EPOCH,
+                    institutionId = ScopedAcademicFixtures.INSTITUTION, periodId = ScopedAcademicFixtures.PERIOD,
+                    startsAt = Instant.EPOCH, endsAt = ScopedAcademicFixtures.END, tutorRoleGeneration = 0,
                 ),
             )
         }
-        val tutoring = TutorAssignmentService(assignments, groups)
+        val tutoring = TutorAssignmentService(assignments, groups, accounts = ScopedAcademicFixtures.accounts(TUTOR))
         val service = ExcuseService(
             repository = InMemoryExcuseRepository(),
             tutoring = tutoring,
@@ -138,6 +141,7 @@ class ExcuseServiceTest {
             "teacher-tutor-1",
             "Mtra. Elena",
             roles = setOf(UserRole.TEACHER, UserRole.TUTOR),
+            institutionId = ScopedAcademicFixtures.INSTITUTION,
         )
         val TEACHER = UserSummary("teacher-2", "Mtro. Luis", roles = setOf(UserRole.TEACHER))
         val ADMIN = UserSummary("admin-1", "Control escolar", roles = setOf(UserRole.ADMIN))

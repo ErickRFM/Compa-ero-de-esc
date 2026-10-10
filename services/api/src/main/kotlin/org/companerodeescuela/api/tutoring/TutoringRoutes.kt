@@ -11,6 +11,8 @@ import io.ktor.server.routing.patch
 import io.ktor.server.routing.route
 import org.companerodeescuela.api.auth.AuthTokenService
 import org.companerodeescuela.api.auth.requireActor
+import org.companerodeescuela.api.auth.boundedAuthRequest
+import org.companerodeescuela.shared.contracts.RevokeTutorAssignmentRequest
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
@@ -52,12 +54,14 @@ fun Route.tutoringRoutes(
                 val actor = call.requireActor(tokenService)
                 val assignmentId = call.parameters["assignmentId"]
                     ?: throw ApiException.Validation("assignmentId is required")
-                call.respond(ApiResponse(data = service.revoke(actor, assignmentId), requestId = call.requestId()))
+                val request = runCatching { call.boundedAuthRequest(RevokeTutorAssignmentRequest.serializer()) }
+                    .getOrElse { throw ApiException.Validation("Invalid tutor revocation request") }
+                call.respond(ApiResponse(data = service.revoke(actor, assignmentId, request), requestId = call.requestId()))
             }
 
             post("/assignments") {
                 val actor = call.requireActor(tokenService)
-                val request = runCatching { call.receive<CreateTutorAssignmentRequest>() }
+                val request = runCatching { call.boundedAuthRequest(CreateTutorAssignmentRequest.serializer()) }
                     .getOrElse { throw ApiException.Validation("Invalid tutor assignment request") }
                 call.respond(
                     status = HttpStatusCode.Created,

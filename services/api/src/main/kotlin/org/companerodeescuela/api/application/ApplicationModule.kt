@@ -7,6 +7,8 @@ import org.companerodeescuela.api.academic.groups.academicGroupRoutes
 import org.companerodeescuela.api.academic.academicRoutes
 import org.companerodeescuela.api.attendance.attendanceRoutes
 import org.companerodeescuela.api.institutions.institutionRoutes
+import org.companerodeescuela.api.admin.AccountAdministrationService
+import org.companerodeescuela.api.admin.accountAdministrationRoutes
 import org.companerodeescuela.api.security.mfaRoutes
 import org.companerodeescuela.api.auth.authRoutes
 import org.companerodeescuela.api.auth.PlatformSessionAuthority
@@ -58,7 +60,10 @@ fun Application.module(
         settings = settings,
         mongoConnection = mongoConnection,
         accounts = identityGraph.accounts,
+        mfa = identityGraph.mfa,
     )
+    val administrationService = AccountAdministrationService(identityGraph.accounts, identityGraph.institutions,
+        academicGraph.groupRepository, academicGraph.tutoringService, identityGraph.mfa)
     val classroomGraph = buildClassroomFeatureGraph(
         settings = settings,
         mongoConnection = mongoConnection,
@@ -101,6 +106,7 @@ fun Application.module(
             verificationEmail = identityGraph.verificationEmail,
         )
         mfaRoutes(settings, providerRegistry.identity, identityGraph.refreshSessions, identityGraph.accounts, identityGraph.mfa)
+        accountAdministrationRoutes(settings, providerRegistry.identity, identityGraph.refreshSessions, identityGraph.accounts, administrationService)
         institutionRoutes(identityGraph.institutions)
         academicRoutes(
             settings = settings,

@@ -20,6 +20,10 @@ data class AcademicGroupRecord(
     val name: String,
     val active: Boolean,
     val createdAt: Instant,
+    val institutionId: String? = null,
+    val periodId: String? = null,
+    val startsAt: Instant? = null,
+    val endsAt: Instant? = null,
 )
 
 data class AcademicGroupMembershipRecord(
@@ -90,7 +94,9 @@ class MongoAcademicGroupRepository(
                 .append("_id", group.id)
                 .append("name", group.name)
                 .append("active", group.active)
-                .append("createdAt", Date.from(group.createdAt)),
+                .append("createdAt", Date.from(group.createdAt))
+                .append("institutionId", group.institutionId).append("periodId", group.periodId)
+                .append("startsAt", group.startsAt?.let(Date::from)).append("endsAt", group.endsAt?.let(Date::from)),
         )
     }
 
@@ -172,8 +178,10 @@ class MongoAcademicGroupRepository(
     private fun Document.toGroup(): AcademicGroupRecord = AcademicGroupRecord(
         id = getString("_id"),
         name = getString("name"),
-        active = getBoolean("active", true),
+        active = get("active") == true,
         createdAt = getDate("createdAt")?.toInstant() ?: Instant.EPOCH,
+        institutionId = getString("institutionId"), periodId = getString("periodId"),
+        startsAt = (get("startsAt") as? Date)?.toInstant(), endsAt = (get("endsAt") as? Date)?.toInstant(),
     )
 
     private fun Document.toMembership(): AcademicGroupMembershipRecord =

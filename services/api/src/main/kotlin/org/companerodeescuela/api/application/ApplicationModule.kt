@@ -93,6 +93,7 @@ fun Application.module(
         mongoConnection = mongoConnection,
         tutoringService = academicGraph.tutoringService,
         groupRepository = academicGraph.groupRepository,
+        accounts=identityGraph.accounts,classrooms=classroomGraph.classroomService,institutions=identityGraph.institutions,mfa=identityGraph.mfa,
     )
 
     monitor.subscribe(ApplicationStopped) {

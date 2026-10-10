@@ -20,6 +20,8 @@ object PrivilegedCommandDigests {
     fun schoolQrCreation(institutionId:String,request:CreateSchoolEntryQrRequest):String = digest("school-qr-create-v1",institutionId,json.encodeToJsonElement(request.copy(proof=null)))
     fun schoolQrRevocation(id:String,request:AcademicOperationRequest):String = digest("school-qr-revoke-v1",id,json.encodeToJsonElement(request.copy(proof="")))
     fun schoolQrRegeneration(id:String,request:AcademicOperationRequest):String = digest("school-qr-regenerate-v1",id,json.encodeToJsonElement(request.copy(proof="")))
+    fun eventWrite(id:String,request:AcademicEventWriteRequest):String = digest("academic-event-write-v1",id,json.encodeToJsonElement(request.copy(proof=null)))
+    fun eventCancellation(id:String,request:AcademicOperationRequest):String = digest("academic-event-cancel-v1",id,json.encodeToJsonElement(request.copy(proof="")))
     private fun digest(kind:String,targetId:String,payload:JsonElement):String {
         val envelope=buildJsonObject { put("kind",kind);put("targetId",targetId);put("command",payload) }
         return MessageDigest.getInstance("SHA-256").digest(json.encodeToString(envelope).toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it.toInt() and 255) }

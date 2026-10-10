@@ -25,6 +25,10 @@ fun buildOperationsFeatureGraph(
     mongoConnection: MongoConnection,
     tutoringService: TutorAssignmentService,
     groupRepository: AcademicGroupRepository? = null,
+    accounts:org.companerodeescuela.api.auth.PlatformAccountRepository?=null,
+    classrooms:org.companerodeescuela.api.classroom.ClassroomService?=null,
+    institutions:org.companerodeescuela.api.institutions.InstitutionRepository?=null,
+    mfa:org.companerodeescuela.api.security.MfaService?=null,
 ): OperationsFeatureGraph {
     val eventRepository = when {
         !settings.hasAuthentication -> InMemoryAcademicEventRepository()
@@ -40,7 +44,7 @@ fun buildOperationsFeatureGraph(
     }
 
     return OperationsFeatureGraph(
-        eventService = AcademicEventService(repository = eventRepository),
+        eventService = AcademicEventService(repository=eventRepository,accounts=accounts,groups=groupRepository,classrooms=classrooms,institutions=institutions,mfa=mfa),
         excuseService = ExcuseService(
             repository = excuseRepository,
             tutoring = tutoringService,

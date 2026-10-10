@@ -214,6 +214,8 @@ jobs:
           api-level: ${{ matrix.api-level }}
           target: google_apis
           arch: x86_64
+          # Stable 36.4.9: make the native emulator runtime reproducible.
+          emulator-build: "14788078"
           ram-size: 2048M
           # Use the runner default hardware profile, as in the prior complete run.
           # The real visual suite explicitly checks 360 through 1024 dp.

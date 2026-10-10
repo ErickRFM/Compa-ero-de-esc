@@ -31,6 +31,8 @@ fun buildAttendanceFeatureGraph(
     academicProvider: AcademicProvider,
     schoolPresenceService: SchoolPresenceService?,
     groupRepository: AcademicGroupRepository,
+    accounts:org.companerodeescuela.api.auth.PlatformAccountRepository,
+    classrooms:org.companerodeescuela.api.classroom.ClassroomService,
 ): AttendanceFeatureGraph {
     val repository = when {
         !settings.hasAuthentication -> InMemoryAttendanceRepository()
@@ -39,7 +41,7 @@ fun buildAttendanceFeatureGraph(
         else -> error("Attendance requires MONGODB_URI outside local development")
     }
     val occurrenceResolver = ProviderAttendanceOccurrenceResolver(academicProvider)
-    val accessPolicy = AttendanceAccessPolicy(repository, occurrenceResolver)
+    val accessPolicy = AttendanceAccessPolicy(repository, occurrenceResolver,org.companerodeescuela.api.attendance.AttendanceAdministrationPolicy(accounts,classrooms))
     val qrService = settings.attendanceQrSecret?.let { secret ->
         AttendanceQrService(
             secret = secret,

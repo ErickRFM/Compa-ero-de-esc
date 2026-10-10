@@ -9,7 +9,11 @@ import org.companerodeescuela.shared.model.ClassOccurrenceStatus
 class AttendanceAccessPolicy(
     private val repository: AttendanceRepository,
     private val occurrenceResolver: AttendanceOccurrenceResolver? = null,
+    private val administration:AttendanceAdministrationPolicy?=null,
 ) {
+    suspend fun requireAdministration(actor:org.companerodeescuela.shared.contracts.UserSummary) =
+        nativePolicy().requireAdministration(actor)
+    private fun nativePolicy()=administration ?: throw ApiException.Forbidden("Actual native academic scope is required")
     suspend fun requireSession(sessionId: String): AttendanceSessionResponse =
         repository.findSession(sessionId)
             ?: throw ApiException.NotFound("Attendance session was not found")
@@ -18,8 +22,14 @@ class AttendanceAccessPolicy(
         actorId: String,
         session: AttendanceSessionResponse,
         allowCrossOwner: Boolean,
+        nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null,
     ) {
-        if (allowCrossOwner) return
+        if (allowCrossOwner || nativeActor!=null) {
+            val actor=nativeActor ?: throw ApiException.Forbidden("An administrative flag cannot grant resource authority")
+            if(actor.id!=actorId) throw ApiException.Forbidden("Resource actor does not match the session identity")
+            nativePolicy().requireResource(actor,session,allowCrossOwner)
+            return
+        }
         if (session.openedBy != actorId) {
             throw ApiException.Forbidden("This attendance session belongs to another teacher")
         }

@@ -192,17 +192,13 @@ class AttendanceServiceTest {
     }
 
     @Test
-    fun `administrative scope can inspect another teacher session`() = runTest {
+    fun `administrative boolean cannot inspect another teacher session`() = runTest {
         val service = service()
         val session = service.openSession("T-0001", requestFor(teacherOccurrence()))
 
-        val roster = service.roster(
-            actorId = "admin-1",
-            sessionId = session.id,
-            allowCrossOwner = true,
-        )
-
-        assertSame(session, roster.session)
+        assertFailsWith<ApiException.Forbidden> {
+            service.roster(actorId="admin-1",sessionId=session.id,allowCrossOwner=true)
+        }
     }
 
     @Test

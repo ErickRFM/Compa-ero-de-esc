@@ -56,11 +56,11 @@ class AttendanceTeacherAuthorityTest {
         assertFailsWith<ApiException.DependencyUnavailable> { fixture.service.activeForTeacher("T-0001") }
     }
 
-    @Test fun `explicit administrative scope retains access during teacher revocation`() = runTest {
+    @Test fun `administrative boolean cannot bypass native scope during teacher revocation`() = runTest {
         val fixture = Fixture()
         val session = fixture.open()
         fixture.provider.revoked = true
-        assertEquals(session.id, fixture.service.roster("admin", session.id, allowCrossOwner = true).session.id)
+        assertFailsWith<ApiException.Forbidden> { fixture.service.roster("admin", session.id, allowCrossOwner = true) }
     }
 
     @Test fun `revoked teacher cannot change a prior human review`() = runTest {

@@ -19,12 +19,13 @@ class AttendanceReviewService(
         recordId: String,
         request: ReviewAttendanceRequest,
         allowCrossOwner: Boolean = false,
+        nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null,
     ): AttendanceRecordResponse = reviewMutex.withLock {
         val record = repository.findRecord(recordId)
             ?.withCurrentPresencePolicy()
             ?: throw ApiException.NotFound("Attendance record was not found")
         val session = accessPolicy.requireSession(record.sessionId)
-        accessPolicy.requireOwnerOrAdministrative(reviewerId, session, allowCrossOwner)
+        accessPolicy.requireOwnerOrAdministrative(reviewerId, session, allowCrossOwner,nativeActor)
         val note = request.note?.trim() ?: request.reasonCode.name.lowercase().replace('_', ' ')
         if (note.length !in 3..500) throw ApiException.Validation("A review reason between 3 and 500 characters is required")
 

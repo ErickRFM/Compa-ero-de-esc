@@ -155,4 +155,3 @@ fun Route.academicRoutes(
         }
     }
 }
-

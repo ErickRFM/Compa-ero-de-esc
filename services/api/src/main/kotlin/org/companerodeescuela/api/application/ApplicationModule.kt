@@ -84,6 +84,7 @@ fun Application.module(
         academicProvider = providerRegistry.academic,
         schoolPresenceService = presenceGraph?.service,
         groupRepository = academicGraph.groupRepository,
+        accounts=identityGraph.accounts,classrooms=classroomGraph.classroomService,
     )
 
     val operationsGraph = buildOperationsFeatureGraph(

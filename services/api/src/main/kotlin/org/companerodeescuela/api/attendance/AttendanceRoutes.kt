@@ -9,7 +9,10 @@ import io.ktor.server.routing.patch
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import org.companerodeescuela.api.auth.AuthTokenService
-import org.companerodeescuela.api.auth.hasAdministrativeScope
+import org.companerodeescuela.api.auth.platformRoles
+import org.companerodeescuela.api.auth.requireNativeActor
+import org.companerodeescuela.api.auth.verifiedSessionSource
+import org.companerodeescuela.api.auth.SessionIdentitySource
 import org.companerodeescuela.api.auth.requireAdministrative
 import org.companerodeescuela.api.auth.requirePlatformPrincipal
 import org.companerodeescuela.api.auth.requireRole
@@ -34,6 +37,9 @@ fun Route.attendanceRoutes(
     qrService: AttendanceQrService? = null,
     campusRoster: TeacherCampusRosterService? = null,
 ) {
+    val tokens=if(settings.hasAuthentication) AuthTokenService(settings) else null
+    suspend fun nativeActor(call:io.ktor.server.application.ApplicationCall)=
+        if(call.verifiedSessionSource()==SessionIdentitySource.NATIVE) call.requireNativeActor(tokens!!) else null
     route("/attendance") {
         if (!settings.hasAuthentication) {
             get("/sessions/active") {
@@ -48,7 +54,7 @@ fun Route.attendanceRoutes(
                 principal.requireAdministrative()
                 call.respond(
                     ApiResponse(
-                        data = sessionService.activeForAdministration(),
+                        data = sessionService.activeForAdministration(call.requireNativeActor(tokens!!)),
                         requestId = call.requestId(),
                     ),
                 )
@@ -105,7 +111,7 @@ fun Route.attendanceRoutes(
                 principal.requireRole(UserRole.TEACHER)
                 call.respond(
                     ApiResponse(
-                        data = sessionService.activeForTeacher(principal.subjectId()),
+                        data = sessionService.activeForTeacher(principal.subjectId(),nativeActor(call)),
                         requestId = call.requestId(),
                     ),
                 )
@@ -139,7 +145,8 @@ fun Route.attendanceRoutes(
                         data = serviceQr.issue(
                             actorId = principal.subjectId(),
                             sessionId = sessionId,
-                            allowCrossOwner = principal.hasAdministrativeScope(),
+                            allowCrossOwner = principal.platformRoles().any { it==UserRole.ADMIN || it==UserRole.SUPER_ADMIN },
+                            nativeActor = nativeActor(call),
                         ),
                         requestId = call.requestId(),
                     ),
@@ -203,7 +210,8 @@ fun Route.attendanceRoutes(
                         data = sessionService.closeSession(
                             actorId = principal.subjectId(),
                             sessionId = sessionId,
-                            allowCrossOwner = principal.hasAdministrativeScope(),
+                            allowCrossOwner = principal.platformRoles().any { it==UserRole.ADMIN || it==UserRole.SUPER_ADMIN },
+                            nativeActor = nativeActor(call),
                         ),
                         requestId = call.requestId(),
                     ),
@@ -220,7 +228,8 @@ fun Route.attendanceRoutes(
                         data = sessionService.roster(
                             actorId = principal.subjectId(),
                             sessionId = sessionId,
-                            allowCrossOwner = principal.hasAdministrativeScope(),
+                            allowCrossOwner = principal.platformRoles().any { it==UserRole.ADMIN || it==UserRole.SUPER_ADMIN },
+                            nativeActor = nativeActor(call),
                         ),
                         requestId = call.requestId(),
                     ),
@@ -238,7 +247,8 @@ fun Route.attendanceRoutes(
                             reviewerId = principal.subjectId(),
                             recordId = recordId,
                             request = call.receive<ReviewAttendanceRequest>(),
-                            allowCrossOwner = principal.hasAdministrativeScope(),
+                            allowCrossOwner = principal.platformRoles().any { it==UserRole.ADMIN || it==UserRole.SUPER_ADMIN },
+                            nativeActor = nativeActor(call),
                         ),
                         requestId = call.requestId(),
                     ),

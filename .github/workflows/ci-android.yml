@@ -221,7 +221,7 @@ jobs:
           emulator-build: "14788078"
           ram-size: 2048M
           # Supported software GLES/Vulkan path through ANGLE; retain KVM.
-          # Legacy indirect renderer produced a native QEMU SIGSEGV on API35.
+          # Runs with the legacy indirect mode ended in native QEMU SIGSEGV on API35.
           emulator-options: -no-window -gpu swangle -no-snapshot -noaudio -no-boot-anim -show-kernel
           # App contains the smoke tests. Root task also launches empty library
           # suites concurrently against the same emulator and can stall ADB.

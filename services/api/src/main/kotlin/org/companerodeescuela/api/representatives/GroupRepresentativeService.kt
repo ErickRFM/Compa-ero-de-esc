@@ -10,6 +10,7 @@ import org.companerodeescuela.shared.contracts.GroupRepresentativesOverview
 import org.companerodeescuela.shared.contracts.RepresentativePosition
 import org.companerodeescuela.shared.contracts.RepresentativeStatus
 import org.companerodeescuela.shared.contracts.UserRole
+import org.companerodeescuela.shared.contracts.UserSummary
 
 class GroupRepresentativeService(
     private val repository: GroupRepresentativeRepository,
@@ -31,7 +32,7 @@ class GroupRepresentativeService(
 
         val currentActive = repository.findActivePosition(groupId, request.position)
         if (currentActive != null) {
-            throw ApiException.Conflict("An active or pending $request.position already exists for this group")
+            throw ApiException.Conflict("An active or pending ${request.position} already exists for this group")
         }
 
         // Check if student already holds the other position in this group
@@ -48,7 +49,7 @@ class GroupRepresentativeService(
             academicGroupName = groupName,
             academicTermId = request.academicTermId,
             studentUserId = request.studentUserId,
-            studentDisplayName = "Estudiante $request.studentUserId",
+            studentDisplayName = "Estudiante ${request.studentUserId}",
             position = request.position,
             status = RepresentativeStatus.PENDING,
             appointedBy = actorUserId,
@@ -159,13 +160,11 @@ class GroupRepresentativeService(
         groupId: String,
     ) {
         if (actorRoles.any(UserRole::isAdministrative)) return
-        if (UserRole.TEACHER in actorRoles) {
-            val assignments = tutorAssignmentService.assignedGroupsFor(actorUserId)
-            if (assignments.none { it.id == groupId }) {
-                throw ApiException.Forbidden("You are not the assigned tutor for this group")
-            }
-            return
-        }
-        throw ApiException.Forbidden("Teacher or Administrator role is required")
+        val userSummary = UserSummary(
+            id = actorUserId,
+            displayName = actorUserId,
+            roles = actorRoles,
+        )
+        tutorAssignmentService.requireTutorAssignmentForGroup(userSummary, groupId)
     }
 }

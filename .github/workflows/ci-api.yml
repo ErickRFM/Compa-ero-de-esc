@@ -115,10 +115,10 @@ jobs:
           from pathlib import Path
           suites = (("auth", "MongoAccountLifecycleIntegrationTest"), ("auth", "MongoEmailVerificationIntegrationTest"), ("security", "MongoMfaIntegrationTest"), ("auth", "MongoStaffApplicationsIntegrationTest"), ("tutoring", "MongoTutorAssignmentIntegrationTest"), ("academic.groups", "MongoAcademicGroupScopeIntegrationTest"), ("classroom", "MongoClassroomScopeIntegrationTest"), ("academic", "MongoScheduleScopeIntegrationTest"), ("presence", "MongoSchoolQrScopeIntegrationTest"), ("events", "MongoAcademicEventScopeIntegrationTest"), ("presence", "MongoSchoolPresenceScopeIntegrationTest"), ("tutoring", "MongoTutorCaseScopeIntegrationTest"), ("attendance", "MongoAttendanceSourceIntegrationTest"))
           executed = 0
-          for package, name in suites + (("representatives", "MongoGroupRepresentativeConcurrencyTest"),):
+          for package, name in suites + (("representatives", "MongoGroupRepresentativeConcurrencyTest"), ("devices", "MongoDeviceTokenRegistryIntegrationTest")):
               report = Path(f"services/api/build/test-results/test/TEST-org.companerodeescuela.api.{package}.{name}.xml")
               suite = ET.parse(report).getroot()
-              minimum = 1 if name == "MongoGroupRepresentativeConcurrencyTest" else 3
+              minimum = 2 if name == "MongoDeviceTokenRegistryIntegrationTest" else 1 if name == "MongoGroupRepresentativeConcurrencyTest" else 3
               count = int(suite.get("tests", "0"))
               assert count >= minimum, f"Real Mongo tests missing: {name}, got {count}, required {minimum}"
               assert all(int(suite.get(key, "0")) == 0 for key in ("skipped", "failures", "errors")), f"Real Mongo tests did not all pass: {name}"

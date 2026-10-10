@@ -105,7 +105,7 @@ class TutorCaseService(
         val own=mutableListOf<TutorCaseRecord>()
         for(record in repository.listForStudent(student.id)) {
             val group=groups.find(record.academicGroupId)
-            if(record.institutionId!=null && record.institutionId==student.institutionId && group?.institutionId==record.institutionId && record.groupScopeRevision>=0 && record.studentId==student.id) own+=record
+            if(record.institutionId!=null && record.institutionId==student.institutionId && group?.active==true && group.institutionId==record.institutionId && record.groupScopeRevision>=0 && group.scopeRevision==record.groupScopeRevision && record.studentId==student.id && groups.isUserInGroup(student.id,record.academicGroupId)) own+=record
         }
         return own.flatMap { record ->
             record.notes.filter { it.visibility == TutorNoteVisibility.STUDENT_VISIBLE }.map { note ->

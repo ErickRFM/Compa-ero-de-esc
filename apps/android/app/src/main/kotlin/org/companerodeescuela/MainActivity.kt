@@ -66,6 +66,7 @@ import org.companerodeescuela.feature.schedule.ScheduleScreen
 import org.companerodeescuela.feature.tutoring.TutorHomeScreen
 import org.companerodeescuela.feature.tutoring.TutorGroupsScreen
 import org.companerodeescuela.feature.tutoring.TutorRequestsScreen
+import org.companerodeescuela.feature.tutoring.StudentRepresentativesScreen
 import org.companerodeescuela.feature.settings.AppThemeMode
 import org.companerodeescuela.feature.settings.AppearancePreferences
 import org.companerodeescuela.feature.settings.AppearanceSettingsScreen
@@ -287,6 +288,13 @@ class MainActivity : AppCompatActivity() {
                                         composable(Destination.TutorRequests.route) {
                                             TutorRequestsScreen()
                                         }
+                                        composable(Destination.RepresentativeInvitations.route) {
+                                            if (org.companerodeescuela.shared.contracts.UserRole.STUDENT in session.roles) {
+                                                StudentRepresentativesScreen()
+                                            } else {
+                                                RoleUnavailableScreen(AppExperience.UNSUPPORTED)
+                                            }
+                                        }
                                         composable(Destination.CoordinatorHome.route) {
                                             CoordinatorHomeScreen(
                                                 onOpenSchedule = {
@@ -390,6 +398,9 @@ class MainActivity : AppCompatActivity() {
                                                 },
                                                 onSecurity = { navController.navigate(Destination.Mfa.route) },
                                                 onTutorRequest = { navController.navigate(Destination.StaffApplication.route) },
+                                                onRepresentatives = if (org.companerodeescuela.shared.contracts.UserRole.STUDENT in session.roles) {
+                                                    { navController.navigate(Destination.RepresentativeInvitations.route) { launchSingleTop = true } }
+                                                } else null,
                                                 onLogout = { loginExperienceName = null; sessionViewModel.logout() },
                                             )
                                         }

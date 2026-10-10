@@ -72,7 +72,7 @@ class TutorCasePrivacyTest {
         val tutors = InMemoryTutorAssignmentRepository()
         tutors.create(ScopedAcademicFixtures.assignment("assignment-1", tutor.id, "9A"))
         val cases = InMemoryTutorCaseRepository()
-        val accounts = ScopedAcademicFixtures.accounts(tutor)
+        val accounts = ScopedAcademicFixtures.accounts(tutor,UserSummary("student-1","Student",roles=setOf(UserRole.STUDENT),institutionId=ScopedAcademicFixtures.INSTITUTION))
         return Fixture(TutorCaseService(cases, TutorAssignmentService(tutors, groups, accounts = accounts), groups), tutors, cases, accounts)
     }
 }

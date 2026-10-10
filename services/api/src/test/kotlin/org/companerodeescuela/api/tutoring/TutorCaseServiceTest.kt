@@ -19,7 +19,7 @@ import org.companerodeescuela.shared.contracts.UserSummary
 class TutorCaseServiceTest {
     private val tutor = UserSummary("tutor-1", "Tutor", roles = setOf(UserRole.TUTOR), institutionId = ScopedAcademicFixtures.INSTITUTION)
     private val outsider = UserSummary("tutor-2", "Other tutor", roles = setOf(UserRole.TUTOR), institutionId = ScopedAcademicFixtures.INSTITUTION)
-    private val student = UserSummary("student-1", "Student", roles = setOf(UserRole.STUDENT))
+    private val student = UserSummary("student-1", "Student", roles = setOf(UserRole.STUDENT),institutionId=ScopedAcademicFixtures.INSTITUTION)
 
     @Test
     fun tutorCreatesCaseAndStudentOnlySeesPublishedNotes() = runTest {
@@ -53,7 +53,7 @@ class TutorCaseServiceTest {
         groups.assign(AcademicGroupMembershipRecord("9A", student.id, Instant.EPOCH))
         val tutors = InMemoryTutorAssignmentRepository()
         tutors.create(ScopedAcademicFixtures.assignment("t1", tutor.id, "9A"))
-        val assignmentService = TutorAssignmentService(tutors, groups, accounts = ScopedAcademicFixtures.accounts(tutor, outsider))
+        val assignmentService = TutorAssignmentService(tutors, groups, accounts = ScopedAcademicFixtures.accounts(tutor, outsider,student))
         val repository = InMemoryTutorCaseRepository()
         return TutorCaseService(repository, assignmentService, groups) to repository
     }

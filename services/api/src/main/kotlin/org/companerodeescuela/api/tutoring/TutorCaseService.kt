@@ -27,12 +27,16 @@ class TutorCaseService(
     suspend fun list(actor: UserSummary): List<TutorCaseSummary> {
         val groupIds = assignments.scopeFor(actor).groups.map { it.id }.toSet()
         val records = repository.listForGroups(groupIds)
-        return records.map { it.toSummary() }
+        val authorized=mutableListOf<TutorCaseSummary>()
+        for(record in records) {
+            try { requireCaseScope(actor,record);authorized+=record.toSummary() } catch(_:ApiException.Forbidden) { /* Old or different-period records remain retained and private. */ }
+        }
+        return authorized
     }
 
     suspend fun detail(actor: UserSummary, id: String): TutorCaseSummary {
         val record = repository.find(id) ?: throw ApiException.NotFound("Tutor case not found")
-        requireScope(actor, record.academicGroupId)
+        requireCaseScope(actor,record)
         return record.toSummary()
     }
 
@@ -48,6 +52,8 @@ class TutorCaseService(
         if (group?.active != true || !groups.isUserInGroup(studentId, groupId)) {
             throw ApiException.Forbidden("Student is not enrolled in this active group")
         }
+        try { assignments.requireRepresentativeCandidate(groupId,studentId) }
+        catch(_:ApiException.Validation) { throw ApiException.Forbidden("Case student must be verified and active in this group institution") }
         val now = clock.instant()
         return repository.create(TutorCaseRecord(
             id = UUID.randomUUID().toString(),
@@ -58,6 +64,8 @@ class TutorCaseService(
             createdBy = actor.id,
             createdAt = now,
             updatedAt = now,
+            institutionId=group.institutionId,
+            groupScopeRevision=group.scopeRevision,
         )).toSummary()
     }
 
@@ -67,7 +75,7 @@ class TutorCaseService(
         request: AddTutorCaseNoteRequest,
     ): TutorCaseSummary {
         val current = repository.find(id) ?: throw ApiException.NotFound("Tutor case not found")
-        requireScope(actor, current.academicGroupId)
+        requireCaseScope(actor,current)
         if (current.status == TutorCaseStatus.CLOSED) {
             throw ApiException.Conflict("Closed cases cannot accept new notes")
         }
@@ -93,10 +101,13 @@ class TutorCaseService(
     }
 
     suspend fun myPublishedNotes(actor: UserSummary): List<StudentTutorNoteSummary> {
-        if (UserRole.STUDENT !in actor.roles) {
-            throw ApiException.Forbidden("Student role is required")
+        val student=assignments.liveStudent(actor)
+        val own=mutableListOf<TutorCaseRecord>()
+        for(record in repository.listForStudent(student.id)) {
+            val group=groups.find(record.academicGroupId)
+            if(record.institutionId!=null && record.institutionId==student.institutionId && group?.institutionId==record.institutionId && record.groupScopeRevision>=0 && record.studentId==student.id) own+=record
         }
-        return repository.listForStudent(actor.id).flatMap { record ->
+        return own.flatMap { record ->
             record.notes.filter { it.visibility == TutorNoteVisibility.STUDENT_VISIBLE }.map { note ->
                 StudentTutorNoteSummary(
                     id = note.id,
@@ -109,6 +120,11 @@ class TutorCaseService(
         }
     }
 
+    private suspend fun requireCaseScope(actor:UserSummary,record:TutorCaseRecord) {
+        requireScope(actor,record.academicGroupId)
+        val group=groups.find(record.academicGroupId) ?: throw ApiException.Forbidden("Actual case group is required")
+        if(record.institutionId==null || record.institutionId!=group.institutionId || record.groupScopeRevision<0 || record.groupScopeRevision!=group.scopeRevision || record.version<0) throw ApiException.Forbidden("Case has unknown or stale native scope; explicit review is required")
+    }
     private suspend fun requireScope(actor: UserSummary, groupId: String) {
         assignments.requireTutorAssignmentForGroup(actor, groupId)
     }

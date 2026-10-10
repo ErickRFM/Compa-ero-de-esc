@@ -1,8 +1,12 @@
 package org.companerodeescuela.core.academic
 
 import io.ktor.client.HttpClient
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import java.time.Clock
 import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
@@ -42,6 +46,13 @@ class AcademicRepository(
     private val refreshCoordinator: SessionRefreshCoordinator =
         SessionRefreshCoordinator(client, tokenStore, clock),
 ) {
+    suspend fun publishSchoolSchedule(request:org.companerodeescuela.shared.contracts.UpsertScheduleBlockRequest):Outcome<org.companerodeescuela.shared.contracts.ManagedScheduleBlock> {
+        val token=when(val access=refreshCoordinator.currentAccessToken()) { is Outcome.Success -> access.value;is Outcome.Failure -> return access }
+        return refreshCoordinator.execute(token) { current -> apiCall {
+            client.post("academic/manual-schedule") { bearerAuth(current);contentType(ContentType.Application.Json);setBody(request) }
+                .requireBody<ApiResponse<org.companerodeescuela.shared.contracts.ManagedScheduleBlock>>()
+        }.map { it.data } }
+    }
     suspend fun load(): Outcome<AcademicContent> {
         val session = activeSession() ?: return Outcome.Failure(AppError.Http(status = 401))
         val (token, claims) = session

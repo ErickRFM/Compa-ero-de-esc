@@ -120,6 +120,22 @@ class AdminViewModelTest {
             assertEquals(PrivilegedCommandDigests.tutorRevocation("assignment",f.revocations.single()),f.proofs[1].payloadDigest);assertEquals(original,f.store.token.value)
         } finally { f.close();Dispatchers.resetMain() }
     }
+    @Test fun `operator selected tutor validity remains bounded by actual group period`()=runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler));val f=Fixture()
+        try {
+            f.ready();f.vm.prepareApprovalWithValidity("target","application",setOf("group"),2)
+            f.vm.authorize("test-password","123456");f.awaitState { !it.loading && !it.working && it.completedOperationId!=null }
+            val request=f.approvals.single();assertEquals(1900172800,request.tutorScopes.single().endsAtEpochSeconds)
+            assertEquals(PrivilegedCommandDigests.staffApproval("target",request),f.proofs.single().payloadDigest)
+        } finally { f.close();Dispatchers.resetMain() }
+    }
+    @Test fun `invalid tutor duration cannot prepare a grant or obtain MFA evidence`()=runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler));val f=Fixture()
+        try {
+            f.ready();f.vm.prepareApprovalWithValidity("target","application",setOf("group"),0)
+            assertNull(f.vm.state.value.operation);assertEquals(422,assertIs<AppError.Http>(f.vm.state.value.failure).status);assertTrue(f.proofs.isEmpty())
+        } finally { f.close();Dispatchers.resetMain() }
+    }
     companion object {
         private fun jwt(id:String)="e30."+Base64.getUrlEncoder().withoutPadding().encodeToString("""{"sub":"$id","session_id":"session-$id","roles":["ADMIN"],"exp":4102444800}""".toByteArray())+".test"
     }

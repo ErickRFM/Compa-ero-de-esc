@@ -11,6 +11,9 @@ import org.companerodeescuela.shared.contracts.*
 
 /** The existing native session owns all administrative requests; results are never demo counters. */
 class AdminRepository(private val client:HttpClient,private val tokens:SessionTokenStore,private val refresh:SessionRefreshCoordinator=SessionRefreshCoordinator(client,tokens)) {
+    suspend fun academicDirectory():Outcome<List<UserSummary>> = get("admin/accounts/academic-directory")
+    suspend fun currentUser():Outcome<UserSummary> = get("auth/me")
+    suspend fun institutions():Outcome<List<InstitutionSummary>> = get("institutions")
     suspend fun overview():Outcome<AdministrationOverview> = get("admin/accounts")
     suspend fun approvalGroups():Outcome<List<AcademicGroupSummary>> = get("admin/accounts/approval-groups")
     suspend fun assignments():Outcome<List<TutorAssignmentSummary>> = get("tutoring/assignments")

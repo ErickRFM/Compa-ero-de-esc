@@ -123,4 +123,18 @@ class AccountAdministrationServiceTest {
         assertFailsWith<ApiException.Forbidden> { f.service.approvalGroups(manager) }
         assertFailsWith<ApiException.Unauthorized> { f.service.approvalGroups(reviewer.copy(institutionId="other")) }
     }
+    @Test fun `delegated academic manager reads only verified scoped academic identities without contact or application data`()=runBlocking<Unit> {
+        val f=Fixture();f.initialize()
+        val manager=PlatformAccount("manager","Manager","manager@example.test","test-hash",setOf(UserRole.ADMIN),institutionId="campus",emailVerifiedAt=f.clock.now,adminCapabilities=setOf(AdminCapability.MANAGE_ACADEMICS))
+        f.accounts.create(manager)
+        val student=PlatformAccount("student","Actual Student","student@example.test","test-hash",setOf(UserRole.STUDENT),institutionId="campus",emailVerifiedAt=f.clock.now)
+        val teacher=student.copy(id="teacher",displayName="Actual Teacher",email="teacher@example.test",roles=setOf(UserRole.TEACHER))
+        for(record in listOf(student,teacher,student.copy(id="foreign",email="foreign@example.test",institutionId="other"),student.copy(id="unverified",email="unverified@example.test",emailVerifiedAt=null),student.copy(id="suspended",email="suspended@example.test",accountStatus=AccountStatus.SUSPENDED),student.copy(id="unknown",email="unknown@example.test",institutionId=null))) f.accounts.create(record)
+        val identities=f.service.academicDirectory(manager)
+        assertEquals(listOf("student","teacher"),identities.map { it.id })
+        assertTrue(identities.all { it.email==null && it.registrationAccountType==null && it.verificationDelivery==null && it.institutionId=="campus" && it.emailVerified })
+        assertFailsWith<ApiException.Forbidden> { f.service.overview(manager) }
+        assertFailsWith<ApiException.Forbidden> { f.service.academicDirectory(student) }
+        assertFailsWith<ApiException.Unauthorized> { f.service.academicDirectory(manager.copy(institutionId="other")) }
+    }
 }

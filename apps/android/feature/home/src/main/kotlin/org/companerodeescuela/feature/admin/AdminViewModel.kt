@@ -86,8 +86,10 @@ class AdminViewModel @Inject constructor(
         command=next;proof=null
         mutable.value=mutable.value.copy(operation=AdminOperation(next.operationId,next.target,next.action,name),failure=null,completedOperationId=null)
     }
-    fun prepareApproval(userId:String,applicationId:String,groupIds:Set<String> = emptySet()) {
-        if(!ready()) return
+    fun prepareApproval(userId:String,applicationId:String,groupIds:Set<String> = emptySet()) = prepareApprovalWithValidity(userId,applicationId,groupIds,null)
+    fun prepareApprovalWithValidity(userId:String,applicationId:String,groupIds:Set<String>,validityDays:Int?) {
+        if(!ready() || command!=null) return
+        if(validityDays!=null && validityDays !in 1..36500) return invalid()
         val target=mutable.value.overview?.users?.find { it.user.id==userId } ?: return invalid()
         val application=target.applications.find { it.id==applicationId && it.status==StaffApplicationStatus.PENDING } ?: return invalid()
         if(!target.user.emailVerified || target.user.accountStatus !in setOf(AccountStatus.PENDING_APPROVAL,AccountStatus.ACTIVE)) return invalid()
@@ -101,19 +103,20 @@ class AdminViewModel @Inject constructor(
                 val period=group.periodId ?: return invalid()
                 val validFrom=maxOf(start,clock.instant().epochSecond)
                 if(!group.active || group.institutionId!=application.requestedInstitutionId || group.scopeRevision<0 || period.isBlank() || validFrom>=end) return invalid()
-                scopes+=TutorApprovalScope(id,period,validFrom,end,group.scopeRevision)
+                val validUntil=validityDays?.let { minOf(end,validFrom+it*86400L) } ?: end
+                scopes+=TutorApprovalScope(id,period,validFrom,validUntil,group.scopeRevision)
             }
-        } else if(groupIds.isNotEmpty()) return invalid()
+        } else if(groupIds.isNotEmpty() || validityDays!=null) return invalid()
         prepare(Command.Approval(userId,ApproveStaffRequest(UUID.randomUUID().toString(),target.user.authRevision,applicationId,application.requestedInstitutionId,scopes,"")),target.user.displayName)
     }
     fun prepareLifecycle(userId:String,status:AccountStatus) {
-        if(!ready()) return
+        if(!ready() || command!=null) return
         val target=mutable.value.overview?.users?.find { it.user.id==userId } ?: return invalid()
         if(target.user.accountStatus==AccountStatus.REVOKED || status !in setOf(AccountStatus.SUSPENDED,AccountStatus.REVOKED)) return invalid()
         prepare(Command.Lifecycle(userId,AccountLifecycleRequest(UUID.randomUUID().toString(),target.user.authRevision,status,"")),target.user.displayName)
     }
     fun prepareRevocation(id:String) {
-        if(!ready()) return
+        if(!ready() || command!=null) return
         val assignment=mutable.value.assignments.find { it.id==id && it.active } ?: return invalid()
         prepare(Command.Revocation(id,RevokeTutorAssignmentRequest(UUID.randomUUID().toString(),"")),assignment.academicGroupName)
     }

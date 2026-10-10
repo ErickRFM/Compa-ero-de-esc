@@ -113,6 +113,16 @@ class AccountAdministrationRoutesTest {
         assertEquals(listOf("6A"),json.decodeFromString<ApiResponse<List<AcademicGroupSummary>>>(response.bodyAsText()).data.map { it.id })
         assertEquals(HttpStatusCode.Forbidden,get("/admin/accounts/approval-groups",teacher).status)
     }
+    @Test fun `academic identity HTTP is scope limited strips contacts and cannot be read by a teacher`()=scenario { f ->
+        val admin=f.session("admin",setOf(UserRole.ADMIN));val teacher=f.session("teacher",setOf(UserRole.TEACHER));f.session("student",setOf(UserRole.STUDENT));f.session("foreign",setOf(UserRole.STUDENT),"other")
+        val response=get("/admin/accounts/academic-directory",admin)
+        assertEquals(HttpStatusCode.OK,response.status)
+        assertEquals("no-store",response.headers[HttpHeaders.CacheControl])
+        val identities=json.decodeFromString<ApiResponse<List<UserSummary>>>(response.bodyAsText()).data
+        assertEquals(listOf("student","teacher"),identities.map { it.id });assertTrue(identities.all { it.email==null && it.institutionId=="campus" })
+        assertEquals(HttpStatusCode.Forbidden,get("/admin/accounts/academic-directory",teacher).status)
+        assertEquals(HttpStatusCode.Unauthorized,client.get("/admin/accounts/academic-directory").status)
+    }
     private suspend fun ApplicationTestBuilder.get(path:String,token:String)=client.get(path){header(HttpHeaders.Authorization,"Bearer $token")}
     private suspend fun ApplicationTestBuilder.post(path:String,body:String,token:String)=client.post(path){header(HttpHeaders.Authorization,"Bearer $token");contentType(ContentType.Application.Json);setBody(body)}
 }

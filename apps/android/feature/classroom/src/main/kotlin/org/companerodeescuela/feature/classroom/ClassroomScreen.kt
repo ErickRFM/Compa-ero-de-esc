@@ -40,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -62,14 +63,19 @@ fun ClassroomScreen(
     onOpenAttendance: (ClassroomSummary) -> Unit = {},
     onOpenChannel: (ClassroomSummary?) -> Unit = {},
     onOpenGrading: (ClassroomSummary) -> Unit = {},
-    viewModel: ClassroomViewModel = hiltViewModel(),
+    viewModel: ClassroomViewModel? = null,
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
+    if(!teacherExperience && roles.any { it==UserRole.ADMIN || it==UserRole.SUPER_ADMIN }) {
+        ClassroomAdministrationEditor(onOpenChannel={ onOpenChannel(null) },modifier=modifier)
+        return
+    }
+    val model=viewModel ?: hiltViewModel<ClassroomViewModel>()
+    val state by model.state.collectAsStateWithLifecycle()
     if (teacherExperience && UserRole.TEACHER in roles) {
         TeacherAssignedClassrooms(
             state = state,
             teacherUserId = teacherUserId,
-            onRefresh = viewModel::refresh,
+            onRefresh = model::refresh,
             onOpenAttendance = onOpenAttendance,
             onOpenChannel = onOpenChannel,
             onOpenGrading = onOpenGrading,
@@ -79,20 +85,9 @@ fun ClassroomScreen(
     }
     val context = LocalContext.current
     val isStudent = UserRole.STUDENT in roles
-    val canCreate = UserRole.ADMIN in roles || UserRole.SUPER_ADMIN in roles
     val pendingTeacher = UserRole.TEACHER_PENDING in roles
 
     var joinCode by remember { mutableStateOf("") }
-    var className by remember { mutableStateOf("") }
-    var room by remember { mutableStateOf("") }
-    var groupId by remember { mutableStateOf("") }
-    var groupName by remember { mutableStateOf("") }
-    var teacherId by remember { mutableStateOf("") }
-    var teacherDisplayName by remember { mutableStateOf("") }
-    var newGroupId by remember { mutableStateOf("") }
-    var newGroupName by remember { mutableStateOf("") }
-    var memberGroupId by remember { mutableStateOf("") }
-    var memberUserId by remember { mutableStateOf("") }
 
     Column(
         modifier = modifier
@@ -168,7 +163,7 @@ fun ClassroomScreen(
                         placeholder = { Text("ABCD-2345") },
                     )
                     Button(
-                        onClick = { viewModel.join(joinCode) },
+                        onClick = { model.join(joinCode) },
                         enabled = !state.submitting && joinCode.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
@@ -219,175 +214,12 @@ fun ClassroomScreen(
             }
         }
 
-        if (canCreate) {
-            CompaneroSurface(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(CompaneroSpacing.md),
-                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
-                ) {
-                    Text(
-                        text = "Grupos académicos",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = "Crea el grupo una sola vez y vincula cuentas. Sus clases y horario se heredan automáticamente.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (state.groups.isNotEmpty()) {
-                        Text(
-                            text = state.groups.joinToString(" · ") { it.name },
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                    OutlinedTextField(
-                        value = newGroupName,
-                        onValueChange = { newGroupName = it.take(120) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        label = { Text("Nombre del grupo") },
-                        placeholder = { Text("9A") },
-                    )
-                    OutlinedTextField(
-                        value = newGroupId,
-                        onValueChange = { newGroupId = it.uppercase().filter { ch -> ch.isLetterOrDigit() || ch == '-' }.take(120) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        label = { Text("ID del grupo") },
-                        placeholder = { Text("9A") },
-                    )
-                    Button(
-                        onClick = {
-                            viewModel.createGroup(newGroupId, newGroupName)
-                            memberGroupId = newGroupId
-                            groupId = newGroupId
-                            groupName = newGroupName
-                            newGroupId = ""
-                            newGroupName = ""
-                        },
-                        enabled = !state.submitting && newGroupId.isNotBlank() && newGroupName.isNotBlank(),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Crear grupo")
-                    }
-                    HorizontalDivider()
-                    OutlinedTextField(
-                        value = memberGroupId,
-                        onValueChange = { memberGroupId = it.uppercase().filter { ch -> ch.isLetterOrDigit() || ch == '-' }.take(120) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        label = { Text("Grupo a vincular") },
-                    )
-                    OutlinedTextField(
-                        value = memberUserId,
-                        onValueChange = { memberUserId = it.trim().take(160) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        label = { Text("ID de cuenta del alumno") },
-                    )
-                    Button(
-                        onClick = {
-                            viewModel.assignGroupMember(memberGroupId, memberUserId)
-                            memberUserId = ""
-                        },
-                        enabled = !state.submitting && memberGroupId.isNotBlank() && memberUserId.isNotBlank(),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Vincular cuenta al grupo")
-                    }
-                }
-            }
-
-            CompaneroSurface(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(CompaneroSpacing.md),
-                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
-                ) {
-                    Text(
-                        text = "Asignar materia al grupo",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    OutlinedTextField(
-                        value = className,
-                        onValueChange = { className = it.take(120) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        label = { Text("Materia") },
-                    )
-                    OutlinedTextField(
-                        value = room,
-                        onValueChange = { room = it.take(120) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        label = { Text("Aula (opcional)") },
-                    )
-                    OutlinedTextField(
-                        value = groupName,
-                        onValueChange = { groupName = it.take(80) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        label = { Text("Grupo") },
-                        placeholder = { Text("9A") },
-                    )
-                    OutlinedTextField(
-                        value = groupId,
-                        onValueChange = { groupId = it.trim().take(120) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        label = { Text("ID de grupo") },
-                    )
-                    OutlinedTextField(
-                        value = teacherDisplayName,
-                        onValueChange = { teacherDisplayName = it.take(120) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        label = { Text("Docente asignado") },
-                    )
-                    OutlinedTextField(
-                        value = teacherId,
-                        onValueChange = { teacherId = it.trim().take(120) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        label = { Text("ID de docente") },
-                    )
-                    Button(
-                        onClick = {
-                            viewModel.createClassroom(
-                                name = className,
-                                description = null,
-                                room = room.ifBlank { null },
-                                groupId = groupId,
-                                groupName = groupName,
-                                teacherId = teacherId,
-                                teacherDisplayName = teacherDisplayName,
-                            )
-                            className = ""
-                            room = ""
-                            groupId = ""
-                            groupName = ""
-                            teacherId = ""
-                            teacherDisplayName = ""
-                        },
-                        enabled = !state.submitting &&
-                            className.trim().length >= 2 &&
-                            groupId.isNotBlank() &&
-                            groupName.isNotBlank() &&
-                            teacherId.isNotBlank() &&
-                            teacherDisplayName.isNotBlank(),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Guardar asignación")
-                    }
-                }
-            }
-        }
-
         state.activeInvite?.let { invite ->
             InviteCard(
                 invite = invite,
                 onCopy = { copyInvite(context, invite) },
                 onShare = { shareInvite(context, invite) },
-                onRevoke = viewModel::revokeInvite,
+                onRevoke = model::revokeInvite,
                 enabled = !state.submitting,
             )
         }
@@ -413,7 +245,7 @@ fun ClassroomScreen(
             ClassroomCard(
                 classroom = classroom,
                 enabled = !state.submitting,
-                onGenerateInvite = { viewModel.generateInvite(classroom.id) },
+                onGenerateInvite = { model.generateInvite(classroom.id) },
             )
             if (index != state.classrooms.lastIndex) {
                 HorizontalDivider()
@@ -539,7 +371,7 @@ private fun TeacherAssignedClassrooms(
 }
 
 @Composable
-private fun ClassroomCard(
+internal fun ClassroomCard(
     classroom: ClassroomSummary,
     enabled: Boolean,
     onGenerateInvite: () -> Unit,
@@ -581,7 +413,7 @@ private fun ClassroomCard(
                     enabled = enabled,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Generar código de incorporación · 30 min")
+                    Text(stringResource(R.string.academic_invite_generate))
                 }
             }
         }
@@ -589,7 +421,7 @@ private fun ClassroomCard(
 }
 
 @Composable
-private fun InviteCard(
+internal fun InviteCard(
     invite: ClassInvite,
     onCopy: () -> Unit,
     onShare: () -> Unit,
@@ -602,7 +434,7 @@ private fun InviteCard(
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
         ) {
             Text(
-                text = "Código de incorporación activo",
+                text = stringResource(R.string.academic_invite_title),
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
@@ -610,7 +442,7 @@ private fun InviteCard(
                 style = MaterialTheme.typography.headlineMedium,
             )
             Text(
-                text = "Expira " + expiryLabel(invite.expiresAtEpochSeconds),
+                text = stringResource(R.string.academic_invite_expiry, expiryLabel(invite.expiresAtEpochSeconds)),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(
@@ -623,14 +455,14 @@ private fun InviteCard(
                     enabled = enabled,
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text("Copiar")
+                    Text(stringResource(R.string.academic_invite_copy))
                 }
                 Button(
                     onClick = onShare,
                     enabled = enabled,
                     modifier = Modifier.weight(1f),
                 ) {
-                    Text("Compartir")
+                    Text(stringResource(R.string.academic_invite_share))
                 }
             }
             OutlinedButton(
@@ -638,13 +470,13 @@ private fun InviteCard(
                 enabled = enabled,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Revocar clave")
+                Text(stringResource(R.string.academic_invite_revoke))
             }
         }
     }
 }
 
-private fun copyInvite(context: Context, invite: ClassInvite) {
+internal fun copyInvite(context: Context, invite: ClassInvite) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(
         ClipData.newPlainText(
@@ -654,7 +486,7 @@ private fun copyInvite(context: Context, invite: ClassInvite) {
     )
 }
 
-private fun shareInvite(context: Context, invite: ClassInvite) {
+internal fun shareInvite(context: Context, invite: ClassInvite) {
     val text = "Control escolar te invita a vincular una clase en Compañero con el código " +
         invite.code +
         ". El código es temporal."

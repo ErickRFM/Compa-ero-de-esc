@@ -43,6 +43,7 @@ fun Route.accountAdministrationRoutes(settings:ApiSettings,identity:IdentityProv
         }
         route("/admin/accounts") {
             get { call.respond(ApiResponse(service.overview(call.actor()),call.requestId())) }
+            get("/academic-directory") { call.respond(ApiResponse(service.academicDirectory(call.actor()),call.requestId())) }
             get("/approval-groups") { call.respond(ApiResponse(service.approvalGroups(call.actor()),call.requestId())) }
             post("/{accountId}/staff-approval") {
                 val actor=call.actor(true);val request=call.administrationRequest(ApproveStaffRequest.serializer())

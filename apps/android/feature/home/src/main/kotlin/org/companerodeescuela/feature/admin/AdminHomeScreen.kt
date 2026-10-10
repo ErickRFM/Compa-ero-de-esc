@@ -34,12 +34,12 @@ fun AdminHomeScreen(onOpenSchedule:()->Unit,onOpenChannel:()->Unit,onOpenClassro
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(viewModel) { viewModel.refresh() }
     DisposableEffect(viewModel) { onDispose { viewModel.cancelOperation() } }
-    AdminHomeScreen(state,viewModel::refresh,viewModel::prepareApproval,viewModel::prepareLifecycle,
+    AdminHomeScreen(state,viewModel::refresh,viewModel::prepareApprovalWithValidity,viewModel::prepareLifecycle,
         viewModel::prepareRevocation,viewModel::authorize,viewModel::cancelOperation,onOpenSchedule,onOpenChannel,onOpenClassrooms,onOpenSecurity,modifier)
 }
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun AdminHomeScreen(state:AdminUiState,onRefresh:()->Unit,onApprove:(String,String,Set<String>)->Unit,
+fun AdminHomeScreen(state:AdminUiState,onRefresh:()->Unit,onApprove:(String,String,Set<String>,Int?)->Unit,
     onLifecycle:(String,AccountStatus)->Unit,onRevokeAssignment:(String)->Unit,onAuthorize:(String,String)->Unit,
     onCancel:()->Unit,onOpenSchedule:()->Unit,onOpenChannel:()->Unit,onOpenClassrooms:()->Unit,onOpenSecurity:()->Unit,modifier:Modifier=Modifier) {
     var tutorSelection by remember(state.ownerKey) { mutableStateOf<Pair<AdminUserSummary,StaffApplication>?>(null) }
@@ -71,7 +71,7 @@ fun AdminHomeScreen(state:AdminUiState,onRefresh:()->Unit,onApprove:(String,Stri
                         Text(stringResource(if(application.role==StaffRole.TEACHER) R.string.admin_teacher else R.string.admin_tutor))
                         Text(stringResource(R.string.admin_identity,application.identityReference))
                         application.preferredGroup?.let { Text(stringResource(R.string.admin_preference,it)) }
-                        Button({ if(application.role==StaffRole.TUTOR) tutorSelection=user to application else onApprove(user.user.id,application.id,emptySet()) },
+                        Button({ if(application.role==StaffRole.TUTOR) tutorSelection=user to application else onApprove(user.user.id,application.id,emptySet(),null) },
                             enabled=!state.loading && !state.working && user.user.emailVerified,modifier=Modifier.fillMaxWidth().testTag("admin_approve_"+application.id)) { Text(stringResource(R.string.admin_approve)) }
                     }
                 }
@@ -116,17 +116,22 @@ fun AdminHomeScreen(state:AdminUiState,onRefresh:()->Unit,onApprove:(String,Stri
     }
     tutorSelection?.let { (user,application) ->
         TutorApprovalDialog(state.groups.filter { it.institutionId==application.requestedInstitutionId },state.groupFailure,
-            { tutorSelection=null },{ ids -> tutorSelection=null;onApprove(user.user.id,application.id,ids) })
+            { tutorSelection=null },{ ids,days -> tutorSelection=null;onApprove(user.user.id,application.id,ids,days) })
     }
     state.operation?.let { operation ->
         ProtectedAdminDialog(operation,state.working,state.failure,onCancel,onAuthorize)
     }
 }
-@Composable private fun TutorApprovalDialog(groups:List<AcademicGroupSummary>,failure:AppError?,onDismiss:()->Unit,onConfirm:(Set<String>)->Unit) {
+@Composable private fun TutorApprovalDialog(groups:List<AcademicGroupSummary>,failure:AppError?,onDismiss:()->Unit,onConfirm:(Set<String>,Int?)->Unit) {
     var selected by remember { mutableStateOf(emptySet<String>()) }
+    var validityDays by remember { mutableStateOf("") }
+    val validDuration=validityDays.isEmpty() || validityDays.toIntOrNull()?.let { it in 1..36500 }==true
     AlertDialog(onDismissRequest=onDismiss,title={ Text(stringResource(R.string.admin_groups)) },text={
         Column(Modifier.heightIn(max=420.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.admin_groups_description))
+            OutlinedTextField(validityDays,{ validityDays=it.filter { char -> char in '0'..'9' }.take(5) },singleLine=true,
+                label={ Text(stringResource(R.string.admin_validity_days)) },supportingText={ Text(stringResource(R.string.admin_validity_description)) },
+                keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),isError=!validDuration,modifier=Modifier.fillMaxWidth().testTag("admin_validity_days"))
             failure?.let { AdminFailure(it) }
             if(groups.isEmpty() && failure==null) Text(stringResource(R.string.admin_groups_empty))
             groups.forEach { group ->
@@ -139,9 +144,9 @@ fun AdminHomeScreen(state:AdminUiState,onRefresh:()->Unit,onApprove:(String,Stri
                 }
             }
         }
-    },confirmButton={ TextButton({ onConfirm(selected) },enabled=selected.isNotEmpty(),modifier=Modifier.testTag("admin_groups_confirm")) { Text(stringResource(R.string.admin_approve)) } },dismissButton={ TextButton(onDismiss) { Text(stringResource(R.string.admin_cancel)) } })
+    },confirmButton={ TextButton({ onConfirm(selected,validityDays.toIntOrNull()) },enabled=selected.isNotEmpty() && validDuration,modifier=Modifier.testTag("admin_groups_confirm")) { Text(stringResource(R.string.admin_approve)) } },dismissButton={ TextButton(onDismiss) { Text(stringResource(R.string.admin_cancel)) } })
 }
-@Composable private fun ProtectedAdminDialog(operation:AdminOperation,working:Boolean,failure:AppError?,onDismiss:()->Unit,onConfirm:(String,String)->Unit) {
+@Composable fun ProtectedAdminDialog(operation:AdminOperation,working:Boolean,failure:AppError?,onDismiss:()->Unit,onConfirm:(String,String)->Unit) {
     var password by remember(operation.operationId) { mutableStateOf("") }
     var otp by remember(operation.operationId) { mutableStateOf("") }
     AlertDialog(properties=DialogProperties(securePolicy=SecureFlagPolicy.SecureOn),onDismissRequest={ if(!working) onDismiss() },title={ Text(stringResource(R.string.admin_confirm_title)) },text={

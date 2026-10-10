@@ -25,6 +25,21 @@ class AccountAdministrationService(private val accounts:PlatformAccountRepositor
             records.count { it.permitsSession && it.accountStatus==AccountStatus.ACTIVE && UserRole.TEACHER in it.roles },
             records.count { it.permitsSession && it.accountStatus==AccountStatus.ACTIVE && UserRole.TUTOR in it.roles },records.count { it.accountStatus==AccountStatus.SUSPENDED }))
     }
+    suspend fun academicDirectory(actor:PlatformAccount):List<UserSummary> {
+        val current=policy.live(actor.toUserSummary())
+        policy.require(current.toUserSummary(),AdminCapability.MANAGE_ACADEMICS,current.institutionId ?: "global")
+        val now=clock.instant();val academicRoles=setOf(UserRole.STUDENT,UserRole.TEACHER,UserRole.TUTOR)
+        val result=mutableListOf<UserSummary>()
+        for(account in accounts.listAccounts().sortedBy { it.id }) {
+            val institution=account.institutionId ?: continue
+            val verified=account.emailVerifiedAt ?: continue
+            if(!account.permitsSession || account.accountStatus!=AccountStatus.ACTIVE || verified>now || account.roles.none { it in academicRoles } ||
+                (UserRole.SUPER_ADMIN !in current.roles && institution!=current.institutionId) || institutions.findEnabled(institution)==null) continue
+            result+=UserSummary(account.id,account.displayName,roles=account.roles.intersect(academicRoles),institutionId=institution,emailVerified=true)
+            if(result.size==500) break
+        }
+        return result
+    }
     suspend fun approvalGroups(actor:PlatformAccount):List<AcademicGroupSummary> {
         val current=policy.live(actor.toUserSummary())
         policy.require(current.toUserSummary(),AdminCapability.APPROVE_STAFF,current.institutionId ?: "global")

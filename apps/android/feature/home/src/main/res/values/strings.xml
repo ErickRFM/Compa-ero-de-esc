@@ -50,4 +50,6 @@
 <string name="admin_error_unavailable">El servicio está temporalmente indisponible. Reintentar conserva la misma operación.</string>
 <string name="admin_error_network">No pudimos conectar. Revisa tu conexión; puedes reintentar la misma operación.</string>
 <string name="admin_error_generic">No pudimos completar la operación.</string>
+<string name="admin_validity_days">Días de vigencia (opcional)</string>
+<string name="admin_validity_description">Vacío: hasta el final de cada periodo. El plazo elegido queda limitado por sus fechas.</string>
 </resources>

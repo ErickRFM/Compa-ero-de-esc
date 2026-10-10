@@ -50,4 +50,6 @@
 <string name="admin_error_unavailable">The service is temporarily unavailable. Retrying preserves the same operation.</string>
 <string name="admin_error_network">Could not connect. Check your connection; you can retry the same operation.</string>
 <string name="admin_error_generic">Could not complete the operation.</string>
+<string name="admin_validity_days">Validity in days (optional)</string>
+<string name="admin_validity_description">Empty: until each period ends. The chosen duration is bounded by its dates.</string>
 </resources>

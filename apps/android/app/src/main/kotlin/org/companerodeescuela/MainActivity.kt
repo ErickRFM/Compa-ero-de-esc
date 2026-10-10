@@ -310,7 +310,7 @@ class MainActivity : AppCompatActivity() {
                                             AdminHomeScreen(
                                                 onOpenSecurity = { navController.navigate(Destination.Mfa.route) },
                                                 onOpenSchedule = {
-                                                    navController.navigate(Destination.Schedule.route) {
+                                                    navController.navigate(Destination.Classrooms.route) {
                                                         launchSingleTop = true
                                                     }
                                                 },

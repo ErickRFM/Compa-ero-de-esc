@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -27,11 +27,11 @@ fun MfaScreen(onBack:()->Unit,modifier:Modifier=Modifier,viewModel:MfaViewModel=
 fun MfaScreen(state:MfaUiState,onEnroll:(String)->Unit,onConfirm:(String)->Unit,onRefresh:()->Unit,onBack:()->Unit,modifier:Modifier=Modifier) {
     var password by remember(state.ownerKey) { mutableStateOf("") }
     var otp by remember(state.ownerKey,state.enrollment?.enrollmentId) { mutableStateOf("") }
-    val context=LocalContext.current
+    val context=LocalView.current.context
     // Enrollment material and credential entry never enter screenshots or saved state.
     DisposableEffect(context) {
         val window=context.activity()?.window
-        val previouslySecure=window?.attributes?.flags?.and(WindowManager.LayoutParams.FLAG_SECURE)!=0
+        val previouslySecure=((window?.attributes?.flags ?: 0) and WindowManager.LayoutParams.FLAG_SECURE)!=0
         window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         onDispose { if(!previouslySecure) window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
     }

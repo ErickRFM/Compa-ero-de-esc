@@ -1,6 +1,8 @@
 package org.companerodeescuela.feature.classroom
 
 import io.ktor.client.HttpClient
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.request.post
@@ -22,6 +24,12 @@ class AcademicGroupRepository(
     private val refreshCoordinator: SessionRefreshCoordinator =
         SessionRefreshCoordinator(client, tokenStore),
 ) {
+    suspend fun create(request:CreateAcademicGroupRequest):Outcome<AcademicGroupSummary> = authorized { token -> apiCall {
+        client.post("academic/groups") { bearerAuth(token);contentType(ContentType.Application.Json);setBody(request) }.requireBody<ApiResponse<AcademicGroupSummary>>()
+    }.map { it.data } }
+    suspend fun assignMember(groupId:String,request:AssignAcademicGroupMemberRequest):Outcome<AcademicGroupMembership> = authorized { token -> apiCall {
+        client.post("academic/groups/"+java.net.URLEncoder.encode(groupId,"UTF-8").replace("+","%20")+"/members") { bearerAuth(token);contentType(ContentType.Application.Json);setBody(request) }.requireBody<ApiResponse<AcademicGroupMembership>>()
+    }.map { it.data } }
     suspend fun groups(): Outcome<List<AcademicGroupSummary>> =
         authorized { token ->
             apiCall {
@@ -30,31 +38,8 @@ class AcademicGroupRepository(
             }.map { it.data }
         }
 
-    suspend fun create(
-        id: String,
-        name: String,
-    ): Outcome<AcademicGroupSummary> =
-        authorized { token ->
-            apiCall {
-                client.post("academic/groups") {
-                    bearerAuth(token)
-                    setBody(CreateAcademicGroupRequest(id = id, name = name))
-                }.requireBody<ApiResponse<AcademicGroupSummary>>()
-            }.map { it.data }
-        }
-
-    suspend fun assignMember(
-        groupId: String,
-        userId: String,
-    ): Outcome<AcademicGroupMembership> =
-        authorized { token ->
-            apiCall {
-                client.post("academic/groups/$groupId/members") {
-                    bearerAuth(token)
-                    setBody(AssignAcademicGroupMemberRequest(userId = userId))
-                }.requireBody<ApiResponse<AcademicGroupMembership>>()
-            }.map { it.data }
-        }
+    suspend fun create(id:String,name:String):Outcome<AcademicGroupSummary> = create(CreateAcademicGroupRequest(id,name))
+    suspend fun assignMember(groupId:String,userId:String):Outcome<AcademicGroupMembership> = assignMember(groupId,AssignAcademicGroupMemberRequest(userId))
 
     private suspend fun <T> authorized(
         block: suspend (String) -> Outcome<T>,

@@ -1,6 +1,8 @@
 package org.companerodeescuela.feature.classroom
 
 import io.ktor.client.HttpClient
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
@@ -26,6 +28,9 @@ class ClassroomRepository(
     private val refreshCoordinator: SessionRefreshCoordinator =
         SessionRefreshCoordinator(client, tokenStore),
 ) {
+    suspend fun create(request:CreateClassroomRequest):Outcome<ClassroomSummary> = authorized { token -> apiCall {
+        client.post("classrooms") { bearerAuth(token);contentType(ContentType.Application.Json);setBody(request) }.requireBody<ApiResponse<ClassroomSummary>>()
+    }.map { it.data } }
     suspend fun classrooms(): Outcome<List<ClassroomSummary>> =
         authorized { token ->
             apiCall {
@@ -34,39 +39,15 @@ class ClassroomRepository(
             }.map { it.data }
         }
 
-    suspend fun create(
-        name: String,
-        description: String?,
-        room: String?,
-        groupId: String,
-        groupName: String,
-        teacherId: String,
-        teacherDisplayName: String,
-    ): Outcome<ClassroomSummary> =
-        authorized { token ->
-            apiCall {
-                client.post("classrooms") {
-                    bearerAuth(token)
-                    setBody(
-                        CreateClassroomRequest(
-                            name = name,
-                            description = description,
-                            room = room,
-                            groupId = groupId,
-                            groupName = groupName,
-                            teacherId = teacherId,
-                            teacherDisplayName = teacherDisplayName,
-                        ),
-                    )
-                }.requireBody<ApiResponse<ClassroomSummary>>()
-            }.map { it.data }
-        }
+    suspend fun create(name:String,description:String?,room:String?,groupId:String,groupName:String,teacherId:String,teacherDisplayName:String):Outcome<ClassroomSummary> =
+        create(CreateClassroomRequest(name,description,room,groupId,groupName,teacherId,teacherDisplayName))
 
     suspend fun join(code: String): Outcome<JoinClassInviteResponse> =
         authorized { token ->
             apiCall {
                 client.post("classrooms/join") {
                     bearerAuth(token)
+                    contentType(ContentType.Application.Json)
                     setBody(JoinClassInviteRequest(code = code))
                 }.requireBody<ApiResponse<JoinClassInviteResponse>>()
             }.map { it.data }
@@ -80,6 +61,7 @@ class ClassroomRepository(
             apiCall {
                 client.post("classrooms/$classroomId/invites") {
                     bearerAuth(token)
+                    contentType(ContentType.Application.Json)
                     setBody(CreateClassInviteRequest(ttlMinutes = ttlMinutes))
                 }.requireBody<ApiResponse<ClassInvite>>()
             }.map { it.data }

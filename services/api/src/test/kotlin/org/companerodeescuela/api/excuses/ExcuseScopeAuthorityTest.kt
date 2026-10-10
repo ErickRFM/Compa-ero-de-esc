@@ -16,7 +16,10 @@ class ExcuseScopeAuthorityTest {
         val accounts=ScopedAcademicFixtures.accounts(actor)
         val groups=InMemoryAcademicGroupRepository();groups.create(ScopedAcademicFixtures.group("6A").copy(institutionId="campus"));groups.create(ScopedAcademicFixtures.group("6B").copy(institutionId="other"))
         val repo=InMemoryExcuseRepository()
-        for(group in listOf("6A","6B")) repo.create(ExcuseRecord(group,"student",group,"2026-10-10","Private reason",emptyList(),ExcuseStatus.PENDING,Instant.EPOCH))
+        for(group in listOf("6A","6B")) repo.create(ExcuseRecord(group,"student",group,"2026-10-10",
+            "Private reason",emptyList(),ExcuseStatus.PENDING,Instant.EPOCH,
+            institutionId=if(group=="6A") "campus" else "other",
+            periodId=ScopedAcademicFixtures.PERIOD,groupScopeRevision=0))
         val tutoring=TutorAssignmentService(InMemoryTutorAssignmentRepository(),groups,accounts=accounts)
         val service=ExcuseService(repo,tutoring,groupRepository=groups)
         assertEquals(listOf("6A"),service.listFor(actor).map { it.academicGroupId })
@@ -33,4 +36,21 @@ class ExcuseScopeAuthorityTest {
         assertFailsWith<ApiException.Forbidden> { service.submit(actor,SubmitExcuseRequest("6B","2026-10-10","Wrong institution")) }
         assertTrue(repo.listAll().isEmpty())
     }
+    @Test fun `historical excuses without explicit scope are never returned or reviewable`()=runTest {
+        val actor=UserSummary("admin","Admin",roles=setOf(UserRole.ADMIN),institutionId="campus")
+        val accounts=ScopedAcademicFixtures.accounts(actor)
+        val groups=InMemoryAcademicGroupRepository()
+        groups.create(ScopedAcademicFixtures.group("6A").copy(institutionId="campus"))
+        val repo=InMemoryExcuseRepository()
+        repo.create(ExcuseRecord("legacy","student","6A","2026-10-10","Old private reason",emptyList(),
+            ExcuseStatus.PENDING,Instant.EPOCH))
+        val service=ExcuseService(repo,TutorAssignmentService(InMemoryTutorAssignmentRepository(),groups,accounts=accounts),
+            groupRepository=groups)
+        assertTrue(service.listFor(actor).isEmpty())
+        assertFailsWith<ApiException.Forbidden> {
+            service.review(actor,"legacy",ReviewExcuseRequest(ExcuseStatus.APPROVED))
+        }
+        assertEquals(ExcuseStatus.PENDING,repo.find("legacy")?.status)
+    }
+
 }

@@ -24,6 +24,9 @@ finish_diagnostics() {
     sudo -n dmesg --ctime 2>/dev/null | grep -Ei 'out of memory|oom|killed process|segfault' \
       > build/v10-runner-diagnostics/kernel-events.log || true
     cat build/v10-runner-diagnostics/kernel-events.log
+    python3 infrastructure/scripts/read-emulator-crash.py \
+      > build/v10-runner-diagnostics/native-exceptions.log 2>&1 || true
+    cat build/v10-runner-diagnostics/native-exceptions.log
   fi
 }
 trap finish_diagnostics EXIT

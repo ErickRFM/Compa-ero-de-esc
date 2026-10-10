@@ -22,6 +22,7 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
 import org.companerodeescuela.core.network.ApiEnvironment
 import org.companerodeescuela.core.network.createApiClient
 import org.companerodeescuela.core.security.SessionTokenStore
+import org.companerodeescuela.feature.tutoring.GroupRepresentativeRepository
 import org.companerodeescuela.feature.tutoring.TutorGroupsScreen
 import org.companerodeescuela.feature.tutoring.TutorRepository
 import org.companerodeescuela.feature.tutoring.TutorRequestsScreen

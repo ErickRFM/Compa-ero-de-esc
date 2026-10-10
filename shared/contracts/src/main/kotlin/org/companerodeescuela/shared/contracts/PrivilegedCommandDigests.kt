@@ -17,6 +17,9 @@ object PrivilegedCommandDigests {
     fun classroomAssignment(groupId:String,request:CreateClassroomRequest):String = digest("classroom-assignment-v1",groupId,json.encodeToJsonElement(request.copy(proof=null)))
     fun scheduleUpsert(ownerId:String,request:UpsertScheduleBlockRequest):String = digest("schedule-upsert-v1",ownerId,json.encodeToJsonElement(request.copy(proof=null)))
     fun scheduleCancellation(id:String,request:AcademicOperationRequest):String = digest("schedule-cancel-v1",id,json.encodeToJsonElement(request.copy(proof="")))
+    fun schoolQrCreation(institutionId:String,request:CreateSchoolEntryQrRequest):String = digest("school-qr-create-v1",institutionId,json.encodeToJsonElement(request.copy(proof=null)))
+    fun schoolQrRevocation(id:String,request:AcademicOperationRequest):String = digest("school-qr-revoke-v1",id,json.encodeToJsonElement(request.copy(proof="")))
+    fun schoolQrRegeneration(id:String,request:AcademicOperationRequest):String = digest("school-qr-regenerate-v1",id,json.encodeToJsonElement(request.copy(proof="")))
     private fun digest(kind:String,targetId:String,payload:JsonElement):String {
         val envelope=buildJsonObject { put("kind",kind);put("targetId",targetId);put("command",payload) }
         return MessageDigest.getInstance("SHA-256").digest(json.encodeToString(envelope).toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it.toInt() and 255) }

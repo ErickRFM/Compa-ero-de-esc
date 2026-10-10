@@ -54,6 +54,7 @@ data class ApiSettings(
     val jwtAudience: String,
     val attendanceQrSecret: CharArray? = null,
     val schoolPresenceQrSha256: String = "",
+    val schoolPresenceInstitutionId:String?=null,
     val schoolWifiSsids: Set<String> = emptySet(),
     val schoolWifiBssids: Set<String> = emptySet(),
     val attendanceGraceMinutes: Int = 5,
@@ -87,6 +88,7 @@ data class ApiSettings(
             hasAuthentication == other.hasAuthentication &&
             hasAttendanceQrSigning == other.hasAttendanceQrSigning &&
             schoolPresenceQrSha256 == other.schoolPresenceQrSha256 &&
+            schoolPresenceInstitutionId == other.schoolPresenceInstitutionId &&
             schoolWifiSsids == other.schoolWifiSsids &&
             schoolWifiBssids == other.schoolWifiBssids &&
             attendanceGraceMinutes == other.attendanceGraceMinutes &&
@@ -107,6 +109,7 @@ data class ApiSettings(
         result = 31 * result + hasAuthentication.hashCode()
         result = 31 * result + hasAttendanceQrSigning.hashCode()
         result = 31 * result + schoolPresenceQrSha256.hashCode()
+        result = 31 * result + (schoolPresenceInstitutionId?.hashCode() ?: 0)
         result = 31 * result + schoolWifiSsids.hashCode()
         result = 31 * result + schoolWifiBssids.hashCode()
         result = 31 * result + attendanceGraceMinutes
@@ -158,6 +161,8 @@ class SettingsLoader(
         val jwtAudience = env("JWT_AUDIENCE")?.trim().orEmpty().ifEmpty { DEFAULT_JWT_AUDIENCE }
         val attendanceQrSecret = env("ATTENDANCE_QR_SECRET")?.takeIf { it.isNotBlank() }
         val schoolPresenceQrSha256 = env("SCHOOL_PRESENCE_QR_SHA256")?.trim().orEmpty().lowercase()
+        val schoolPresenceInstitutionId=env("SCHOOL_PRESENCE_INSTITUTION_ID")?.takeIf(String::isNotEmpty)
+        if(schoolPresenceInstitutionId!=null && (schoolPresenceInstitutionId.isBlank() || schoolPresenceInstitutionId!=schoolPresenceInstitutionId.trim() || schoolPresenceInstitutionId.length>128 || schoolPresenceInstitutionId.any(Char::isISOControl))) throw ConfigurationException("SCHOOL_PRESENCE_INSTITUTION_ID must be an explicit bounded institution identifier")
         val schoolWifiSsids = parseCsv(env("SCHOOL_WIFI_SSIDS"))
         val schoolWifiBssids = parseCsv(env("SCHOOL_WIFI_BSSIDS")).map { it.lowercase() }.toSet()
         val attendanceGraceMinutes = env("ATTENDANCE_GRACE_MINUTES")?.trim()?.toIntOrNull() ?: 5
@@ -222,6 +227,7 @@ class SettingsLoader(
             jwtAudience = jwtAudience,
             attendanceQrSecret = attendanceQrSecret?.toCharArray(),
             schoolPresenceQrSha256 = schoolPresenceQrSha256,
+            schoolPresenceInstitutionId=schoolPresenceInstitutionId,
             schoolWifiSsids = schoolWifiSsids,
             schoolWifiBssids = schoolWifiBssids,
             attendanceGraceMinutes = attendanceGraceMinutes,

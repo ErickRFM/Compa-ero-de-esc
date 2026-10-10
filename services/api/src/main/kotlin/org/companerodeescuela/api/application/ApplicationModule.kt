@@ -77,6 +77,7 @@ fun Application.module(
     val presenceGraph = buildPresenceFeatureGraph(
         settings = settings,
         mongoConnection = mongoConnection,
+        accounts=identityGraph.accounts,mfa=identityGraph.mfa,institutions=identityGraph.institutions,
     )
     val attendanceGraph = buildAttendanceFeatureGraph(
         settings = settings,

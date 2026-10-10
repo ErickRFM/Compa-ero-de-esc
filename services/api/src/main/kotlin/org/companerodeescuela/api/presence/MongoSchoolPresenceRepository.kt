@@ -83,6 +83,7 @@ class MongoSchoolPresenceRepository(
     private fun SchoolPresenceResponse.toDocument(): Document = Document()
         .append("_id", id)
         .append("studentId", studentId)
+        .append("institutionId",institutionId)
         .append("startedAtEpochSeconds", startedAtEpochSeconds)
         .append("expiresAtEpochSeconds", expiresAtEpochSeconds)
         .append("closedAtEpochSeconds", closedAtEpochSeconds)
@@ -95,6 +96,7 @@ class MongoSchoolPresenceRepository(
         SchoolPresenceResponse(
             id = getString("_id"),
             studentId = getString("studentId"),
+            institutionId=getString("institutionId"),
             startedAtEpochSeconds = requireLong("startedAtEpochSeconds"),
             expiresAtEpochSeconds = requireLong("expiresAtEpochSeconds"),
             closedAtEpochSeconds = numberAsLong("closedAtEpochSeconds"),

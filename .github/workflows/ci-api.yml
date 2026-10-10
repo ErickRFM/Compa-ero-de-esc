@@ -113,7 +113,7 @@ jobs:
           python3 - <<'PY'
           import xml.etree.ElementTree as ET
           from pathlib import Path
-          for package, name in (("auth", "MongoAccountLifecycleIntegrationTest"), ("auth", "MongoEmailVerificationIntegrationTest"), ("security", "MongoMfaIntegrationTest"), ("auth", "MongoStaffApplicationsIntegrationTest"), ("tutoring", "MongoTutorAssignmentIntegrationTest"), ("academic.groups", "MongoAcademicGroupScopeIntegrationTest"), ("classroom", "MongoClassroomScopeIntegrationTest"), ("academic", "MongoScheduleScopeIntegrationTest")):
+          for package, name in (("auth", "MongoAccountLifecycleIntegrationTest"), ("auth", "MongoEmailVerificationIntegrationTest"), ("security", "MongoMfaIntegrationTest"), ("auth", "MongoStaffApplicationsIntegrationTest"), ("tutoring", "MongoTutorAssignmentIntegrationTest"), ("academic.groups", "MongoAcademicGroupScopeIntegrationTest"), ("classroom", "MongoClassroomScopeIntegrationTest"), ("academic", "MongoScheduleScopeIntegrationTest"), ("presence", "MongoSchoolQrScopeIntegrationTest")):
               report = Path(f"services/api/build/test-results/test/TEST-org.companerodeescuela.api.{package}.{name}.xml")
               suite = ET.parse(report).getroot()
               assert int(suite.get("tests", "0")) == 3, f"Real Mongo tests missing: {name}"

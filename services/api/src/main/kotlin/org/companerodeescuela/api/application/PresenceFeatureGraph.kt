@@ -21,6 +21,9 @@ data class PresenceFeatureGraph(
 fun buildPresenceFeatureGraph(
     settings: ApiSettings,
     mongoConnection: MongoConnection,
+    accounts:org.companerodeescuela.api.auth.PlatformAccountRepository,
+    mfa:org.companerodeescuela.api.security.MfaService,
+    institutions:org.companerodeescuela.api.institutions.InstitutionRepository,
 ): PresenceFeatureGraph? {
     if (!settings.hasSchoolPresenceVerification) return null
 
@@ -35,14 +38,16 @@ fun buildPresenceFeatureGraph(
         else -> error("School entry QR management requires MONGODB_URI outside local development")
     }
 
-    val entryQrService = SchoolEntryQrService(entryQrRepository)
+    val entryQrService = SchoolEntryQrService(entryQrRepository,accounts=accounts,mfa=mfa,institutions=institutions)
     val policy = SchoolPresencePolicy(
         entryQrSha256 = settings.schoolPresenceQrSha256,
         allowedSsids = settings.schoolWifiSsids,
         allowedBssids = settings.schoolWifiBssids,
+        institutionId=settings.schoolPresenceInstitutionId,
     )
     val service = SchoolPresenceService(
         repository = presenceRepository,
+        accounts=accounts,
         policy = policy,
         qrVerifier = SchoolEntryQrVerifier(
             managedQrService = entryQrService,

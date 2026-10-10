@@ -43,6 +43,7 @@ data class SchoolPresenceResponse(
     val networkVerified: Boolean,
     val networkVerificationMethod: NetworkVerificationMethod,
     val serverTimeEpochSeconds: Long? = null,
+    val institutionId:String?=null,
 )
 
 @Serializable

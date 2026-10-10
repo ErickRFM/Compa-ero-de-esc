@@ -4,6 +4,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -29,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -39,6 +43,7 @@ import org.companerodeescuela.core.designsystem.v8.V8FrostedGlassPanel
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.shared.contracts.RegistrationAccountType
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun RegistrationScreen(
     state: SessionUiState,
@@ -177,24 +182,31 @@ fun RegistrationScreen(
                     fontWeight = FontWeight.SemiBold,
                     color = V8RedColors.TextPrimary,
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth().selectableGroup(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    AccountTypeOption(
-                        label = "Alumno",
-                        selected = accountType == RegistrationAccountType.STUDENT,
-                        onClick = { accountType = RegistrationAccountType.STUDENT },
-                        enabled = !state.submitting,
-                        modifier = Modifier.weight(1f),
-                    )
-                    AccountTypeOption(
-                        label = "Docente",
-                        selected = accountType == RegistrationAccountType.TEACHER,
-                        onClick = { accountType = RegistrationAccountType.TEACHER },
-                        enabled = !state.submitting,
-                        modifier = Modifier.weight(1f),
-                    )
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    // Keep the existing paired cards when both labels have room;
+                    // enlarged text gets a full-width card for each choice.
+                    val columns = if (maxWidth >= 280.dp * LocalDensity.current.fontScale) 2 else 1
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth().selectableGroup(),
+                        maxItemsInEachRow = columns,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        AccountTypeOption(
+                            label = "Alumno",
+                            selected = accountType == RegistrationAccountType.STUDENT,
+                            onClick = { accountType = RegistrationAccountType.STUDENT },
+                            enabled = !state.submitting,
+                            modifier = Modifier.weight(1f),
+                        )
+                        AccountTypeOption(
+                            label = "Docente",
+                            selected = accountType == RegistrationAccountType.TEACHER,
+                            onClick = { accountType = RegistrationAccountType.TEACHER },
+                            enabled = !state.submitting,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
                 if (accountType == RegistrationAccountType.TEACHER) {
                     Text(

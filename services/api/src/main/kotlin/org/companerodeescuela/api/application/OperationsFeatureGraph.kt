@@ -52,6 +52,7 @@ fun buildOperationsFeatureGraph(
             groupRepository = groupRepository,
         ),
         deviceTokenRepository = when {
+            !settings.hasAuthentication -> InMemoryDeviceTokenRepository()
             settings.mongo.isConfigured -> MongoDeviceTokenRepository(mongoConnection.database())
             settings.environment == Environment.LOCAL -> InMemoryDeviceTokenRepository()
             else -> error("FCM device registration requires MongoDB outside local development")

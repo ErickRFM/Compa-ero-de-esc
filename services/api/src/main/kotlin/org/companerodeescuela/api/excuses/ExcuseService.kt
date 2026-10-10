@@ -34,7 +34,8 @@ class ExcuseService(
             ?: throw ApiException.DependencyUnavailable("Academic group verification is not configured")
         val group = groupRepository.find(groupId)
             ?: throw ApiException.NotFound("Academic group was not found")
-        if (!group.active || !groupRepository.isUserInGroup(actor.id, group.id)) {
+        if (!group.active || group.institutionId==null || group.periodId.isNullOrBlank() ||
+            group.scopeRevision<0 || !groupRepository.isUserInGroup(actor.id, group.id)) {
             throw ApiException.Forbidden("Student is not enrolled in this active academic group")
         }
         tutoring.requireStudentGroup(actor,group.id)
@@ -63,6 +64,9 @@ class ExcuseService(
             attachmentRefs = emptyList(),
             status = ExcuseStatus.PENDING,
             submittedAt = clock.instant(),
+            institutionId = group.institutionId,
+            periodId = group.periodId,
+            groupScopeRevision = group.scopeRevision,
         )
         repository.create(record)
         return record.toSummary()
@@ -72,17 +76,17 @@ class ExcuseService(
         when {
             isAdmin(actor) -> {
                 val authorized=tutoring.administrativeGroupIds(actor)
-                repository.listForGroups(authorized).map { it.toSummary() }
+                repository.listForGroups(authorized).filter { scopedRecord(it) }.map { it.toSummary() }
             }
 
             UserRole.STUDENT in actor.roles -> {
                 tutoring.liveStudent(actor)
-                repository.listForStudent(actor.id).map { it.toSummary() }
+                repository.listForStudent(actor.id).filter { scopedRecord(it) }.map { it.toSummary() }
             }
 
             UserRole.TUTOR in actor.roles -> {
                 val authorizedGroups = tutoring.scopeFor(actor).groups.map { it.id }.toSet()
-                repository.listForGroups(authorizedGroups).map { it.toSummary() }
+                repository.listForGroups(authorizedGroups).filter { scopedRecord(it) }.map { it.toSummary() }
             }
 
             else -> throw ApiException.Forbidden("Excuse access is not allowed for this account")
@@ -97,6 +101,7 @@ class ExcuseService(
             ?: throw ApiException.NotFound("Excuse request was not found")
 
         tutoring.requireCanAccessGroup(actor,current.academicGroupId)
+        if (!scopedRecord(current)) throw ApiException.Forbidden("Excuse scope is historical or unknown; administrative migration is required")
 
         if (current.status !in setOf(ExcuseStatus.PENDING, ExcuseStatus.UNDER_REVIEW)) {
             throw ApiException.Conflict("Excuse request is already finalized")
@@ -114,6 +119,14 @@ class ExcuseService(
         )
         return (repository.compareAndUpdate(current, updated)
             ?: throw ApiException.Conflict("Excuse request changed; reload before reviewing")).toSummary()
+    }
+
+    /** Legacy records without provenance remain retained but are not disclosed in current views. */
+    private suspend fun scopedRecord(record:ExcuseRecord):Boolean {
+        if(record.institutionId.isNullOrBlank() || record.periodId.isNullOrBlank() || record.groupScopeRevision<0) return false
+        val group=groupRepository?.find(record.academicGroupId) ?: return false
+        return group.active && group.institutionId==record.institutionId && group.periodId==record.periodId &&
+            group.scopeRevision==record.groupScopeRevision
     }
 
     private fun isAdmin(actor: UserSummary): Boolean =

@@ -74,8 +74,6 @@ trap finish_diagnostics EXIT
 instrumentation_status=$?
 # UTP otherwise uninstalls the tested APK, deleting its private screenshots.
 set -e
-mkdir -p build/v10-device-evidence
-adb exec-out run-as org.companerodeescuela tar -C files -cf - v10-evidence > build/v10-evidence.tar
-tar -xf build/v10-evidence.tar -C build/v10-device-evidence
-test "$(find build/v10-device-evidence/v10-evidence -name '*.png' | wc -l)" -ge 19
+# Validate full tar/PNG integrity; retry only evidence transport, never tests.
+python3 infrastructure/scripts/export-v10-evidence.py
 exit "$instrumentation_status"

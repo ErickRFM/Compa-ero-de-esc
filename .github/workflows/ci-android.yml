@@ -51,6 +51,9 @@ jobs:
       - name: Whitespace errors in committed changes
         run: bash infrastructure/scripts/check-whitespace.sh
 
+      - name: Verify evidence exporter regression tests
+        run: python3 -m unittest discover -s infrastructure/scripts/tests -p test_export_v10_evidence.py
+
       - name: Compile Android sources
         run: ./gradlew :apps:android:app:compileDebugKotlin --console=plain
 

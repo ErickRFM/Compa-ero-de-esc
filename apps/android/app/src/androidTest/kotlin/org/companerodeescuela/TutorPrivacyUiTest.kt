@@ -107,7 +107,7 @@ class TutorPrivacyUiTest {
             }
             respond(body, status, headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()))
         })
-        val model = TutorViewModel(TutorRepository(client, store), GroupRepresentativeRepository(client))
+        val model = TutorViewModel(TutorRepository(client, store), GroupRepresentativeRepository(client, org.companerodeescuela.core.network.SessionRefreshCoordinator(client, store)))
     }
 
     companion object {

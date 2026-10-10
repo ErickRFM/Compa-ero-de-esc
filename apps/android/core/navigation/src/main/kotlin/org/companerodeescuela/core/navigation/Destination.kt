@@ -9,6 +9,7 @@ sealed class Destination(val route: String) {
     data object TutorHome : Destination("tutor-home")
     data object TutorGroups : Destination("tutor-groups")
     data object TutorRequests : Destination("tutor-requests")
+    data object RepresentativeInvitations : Destination("representative-invitations")
     data object CoordinatorHome : Destination("coordinator-home")
     data object AdminHome : Destination("admin-home")
     data object Schedule : Destination("schedule")

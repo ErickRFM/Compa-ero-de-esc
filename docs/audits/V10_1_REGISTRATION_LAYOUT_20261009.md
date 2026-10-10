@@ -32,6 +32,14 @@ Se conserva el grupo semántico de selección única y el desplazamiento existen
   Captura: `build/v10-1-qa/registration-layout-font200.png` (evidencia local).
 - Los 404 archivos seleccionados de runtime/build coinciden con el candidato
   aislado; escaneo de secretos y comprobación de formato: PASS.
+- CI del primer SHA: API y empaquetado pasan, pero falla una de 15 pruebas
+  instrumentadas. El emulador de CI mide 320dp y limitaba el `width(360.dp)`
+  del fixture. Reproducido localmente a 320dp: RED 1/2. Solo se ajusta el fixture
+  para mapear los píxeles disponibles a sus 360dp declarados, manteniendo todas
+  las aserciones. GREEN 2/2 en ese host estrecho; la disposición productiva
+  permanece idéntica al árbol revisado. Batería final repetida en ese host:
+  392 unitarias y 15 instrumentadas sin fallos, lint cero errores/52 advertencias,
+  debug y release R8: `BUILD SUCCESSFUL` (1m58s). CI del nuevo SHA requerido.
 - Base integrada: `3d5b016d3b5e5910bcc938ad402ebed0a674e4f1` (squash #134),
   árbol idéntico al padre revisado `10feb32`. Solo se incluyen estos tres archivos
   de Registro; no se duplica la implementación docente. CI del SHA final pendiente.

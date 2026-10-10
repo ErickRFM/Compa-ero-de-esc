@@ -1,10 +1,11 @@
 package org.companerodeescuela
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -58,11 +59,15 @@ class RegistrationLayoutUiTest {
 
     private fun render(fontScale: Float) {
         compose.setContent {
-            val density = LocalDensity.current.density
             CompaneroTheme {
-                CompositionLocalProvider(LocalDensity provides Density(density, fontScale)) {
-                    Box(Modifier.width(360.dp)) {
-                        RegistrationScreen(SessionUiState(checking = false), { _, _, _, _ -> error("Empty form cannot register") }, {})
+                BoxWithConstraints(Modifier.fillMaxSize()) {
+                    // A width modifier alone is constrained by the host (CI is 320dp).
+                    // Map the available pixels to the declared 360dp test viewport.
+                    val density = constraints.maxWidth / 360f
+                    CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides Density(density, fontScale)) {
+                        Box(Modifier.width(360.dp)) {
+                            RegistrationScreen(SessionUiState(checking = false), { _, _, _, _ -> error("Empty form cannot register") }, {})
+                        }
                     }
                 }
             }

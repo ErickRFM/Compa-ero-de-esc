@@ -210,7 +210,7 @@ class TutorPrivacyViewModelTest {
             }
             respond(body, status, headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()))
         })
-        val model = TutorViewModel(TutorRepository(client, store))
+        val model = TutorViewModel(TutorRepository(client, store), GroupRepresentativeRepository(client))
         suspend fun populate() {
             model.state.first { !it.loading }
             assertEquals(1, model.state.value.cases.size)

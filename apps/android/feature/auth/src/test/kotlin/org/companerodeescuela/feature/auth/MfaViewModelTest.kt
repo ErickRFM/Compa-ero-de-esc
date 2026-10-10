@@ -37,11 +37,11 @@ class MfaViewModelTest {
         try {
             awaitReal { vm.state.first { !it.loading } }
             vm.enroll("test-password")
-            val enrolled=awaitReal { vm.state.first { !it.working } }
+            val enrolled=awaitReal { vm.state.first { !it.working && it.enrollment != null } }
             assertEquals("TESTONLY",enrolled.enrollment?.secret)
             assertFalse(enrolled.toString().contains("TESTONLY"))
             vm.confirm("123456")
-            val confirmed=awaitReal { vm.state.first { !it.working } }
+            val confirmed=awaitReal { vm.state.first { !it.working && it.status?.enabled == true } }
             assertEquals(true,confirmed.status?.enabled);assertNull(confirmed.enrollment);assertEquals(original,store.flow.value)
         } finally { vm.viewModelScope.cancel();client.close();Dispatchers.resetMain() }
     }

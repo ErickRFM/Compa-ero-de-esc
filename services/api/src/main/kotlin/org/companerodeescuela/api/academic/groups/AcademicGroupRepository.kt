@@ -82,10 +82,25 @@ class InMemoryAcademicGroupRepository : AcademicGroupRepository {
         updated
     }
 
-    override suspend fun assign(
-        membership: AcademicGroupMembershipRecord,
-    ): AcademicGroupMembershipRecord =
-        memberships.putIfAbsent(key(membership.groupId, membership.userId), membership) ?: membership
+    override suspend fun assign(membership: AcademicGroupMembershipRecord): AcademicGroupMembershipRecord = scopeMutex.withLock {
+        val group=groups[membership.groupId]
+            ?: throw org.companerodeescuela.api.errors.ApiException.Conflict("Academic group not found")
+        if(!group.currentMember(membership)) throw org.companerodeescuela.api.errors.ApiException.Conflict("Current membership revision is required")
+        val key=key(membership.groupId,membership.userId)
+        val previous=memberships[key]
+        if(previous==null) {
+            memberships[key]=membership
+            membership
+        } else if(previous.groupScopeRevision==membership.groupScopeRevision) {
+            if(previous.operationId!=membership.operationId || previous.payloadDigest!=membership.payloadDigest)
+                throw org.companerodeescuela.api.errors.ApiException.Conflict("Member already assigned by another operation")
+            previous
+        } else {
+            // Re-enrollment requires a new operation and current scope after a period change.
+            memberships[key]=membership
+            membership
+        }
+    }
 
     override suspend fun listGroupsForUser(userId: String): List<AcademicGroupRecord> =
         memberships.values
@@ -163,7 +178,26 @@ class MongoAcademicGroupRepository(
             eq("groupId", membership.groupId),
             eq("userId", membership.userId),
         )
-        memberships.find(filter).firstOrNull()?.let { return it.toMembership() }
+        val group=find(membership.groupId)
+            ?: throw org.companerodeescuela.api.errors.ApiException.Conflict("Academic group not found")
+        if(!group.currentMember(membership)) throw org.companerodeescuela.api.errors.ApiException.Conflict("Current membership revision is required")
+        memberships.find(filter).firstOrNull()?.toMembership()?.let { previous ->
+            if(previous.groupScopeRevision==membership.groupScopeRevision) {
+                if(previous.operationId!=membership.operationId || previous.payloadDigest!=membership.payloadDigest)
+                    throw org.companerodeescuela.api.errors.ApiException.Conflict("Member already assigned by another operation")
+                return previous
+            }
+            val revisionFilter=if(previous.groupScopeRevision==-1L)
+                or(eq("groupScopeRevision",-1L),exists("groupScopeRevision",false))
+                else eq("groupScopeRevision",previous.groupScopeRevision)
+            val updated=memberships.findOneAndUpdate(and(filter,revisionFilter),
+                Updates.combine(Updates.set("groupScopeRevision",membership.groupScopeRevision),
+                    Updates.set("joinedAt",Date.from(membership.joinedAt)),Updates.set("assignedBy",membership.assignedBy),
+                    Updates.set("operationId",membership.operationId),Updates.set("payloadDigest",membership.payloadDigest)),
+                FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER))
+            return updated?.toMembership()
+                ?: throw org.companerodeescuela.api.errors.ApiException.Conflict("Membership changed concurrently")
+        }
         return try {
             memberships.insertOne(
                 Document()
@@ -174,7 +208,9 @@ class MongoAcademicGroupRepository(
             )
             membership
         } catch (error: com.mongodb.MongoWriteException) {
-            memberships.find(filter).firstOrNull()?.toMembership() ?: throw error
+            memberships.find(filter).firstOrNull()?.toMembership()?.takeIf {
+                it.groupScopeRevision==membership.groupScopeRevision && it.operationId==membership.operationId && it.payloadDigest==membership.payloadDigest
+            } ?: throw org.companerodeescuela.api.errors.ApiException.Conflict("Membership changed concurrently")
         }
     }
 

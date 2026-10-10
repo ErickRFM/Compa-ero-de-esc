@@ -40,7 +40,10 @@ data class CreateClassroomRequest(
     val groupName: String,
     val teacherId: String,
     val teacherDisplayName: String,
-)
+    val operationId:String?=null,
+    val groupScopeRevision:Long=0,
+    val proof:String?=null,
+) { override fun toString()="CreateClassroomRequest(name=$name, groupId=$groupId, proof=[redacted])" }
 
 @Serializable
 data class ClassroomMembership(

@@ -141,7 +141,10 @@ fun Application.configurePlugins(
                             if (user.roles == setOf(org.companerodeescuela.shared.contracts.UserRole.WORKSHOP_PARTICIPANT) &&
                                 !request.path().startsWith("/auth/") && request.path() != "/workshops" &&
                                 !request.path().startsWith("/workshops/")) null
-                            else JWTPrincipal(credential.payload)
+                            else {
+                                attributes.put(org.companerodeescuela.api.auth.VERIFIED_SESSION_SOURCE,session.identitySource)
+                                JWTPrincipal(credential.payload)
+                            }
                         } else null
                     } catch (cancelled: CancellationException) {
                         throw cancelled

@@ -37,6 +37,7 @@ class ExcuseService(
         if (!group.active || !groupRepository.isUserInGroup(actor.id, group.id)) {
             throw ApiException.Forbidden("Student is not enrolled in this active academic group")
         }
+        tutoring.requireStudentGroup(actor,group.id)
         val date = request.attendanceDateIso.trim()
         try {
             LocalDate.parse(date)
@@ -69,11 +70,15 @@ class ExcuseService(
 
     suspend fun listFor(actor: UserSummary): List<ExcuseRequestSummary> =
         when {
-            isAdmin(actor) ->
-                repository.listAll().map { it.toSummary() }
+            isAdmin(actor) -> {
+                val authorized=tutoring.administrativeGroupIds(actor)
+                repository.listForGroups(authorized).map { it.toSummary() }
+            }
 
-            UserRole.STUDENT in actor.roles ->
+            UserRole.STUDENT in actor.roles -> {
+                tutoring.liveStudent(actor)
                 repository.listForStudent(actor.id).map { it.toSummary() }
+            }
 
             UserRole.TUTOR in actor.roles -> {
                 val authorizedGroups = tutoring.scopeFor(actor).groups.map { it.id }.toSet()
@@ -91,9 +96,7 @@ class ExcuseService(
         val current = repository.find(excuseId)
             ?: throw ApiException.NotFound("Excuse request was not found")
 
-        if (!isAdmin(actor)) {
-            tutoring.requireCanAccessGroup(actor, current.academicGroupId)
-        }
+        tutoring.requireCanAccessGroup(actor,current.academicGroupId)
 
         if (current.status !in setOf(ExcuseStatus.PENDING, ExcuseStatus.UNDER_REVIEW)) {
             throw ApiException.Conflict("Excuse request is already finalized")

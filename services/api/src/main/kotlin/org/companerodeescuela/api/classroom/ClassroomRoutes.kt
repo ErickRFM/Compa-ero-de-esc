@@ -10,7 +10,8 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import org.companerodeescuela.api.auth.AuthTokenService
-import org.companerodeescuela.api.auth.requireActor
+import org.companerodeescuela.api.auth.requireNativeActor
+import org.companerodeescuela.api.auth.boundedAuthRequest
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
@@ -34,7 +35,7 @@ fun Route.classroomRoutes(
         val tokenService = AuthTokenService(settings)
         authenticate(AuthTokenService.PROVIDER_NAME) {
             get {
-                val actor = call.requireActor(tokenService)
+                val actor = call.requireNativeActor(tokenService)
                 call.respond(
                     ApiResponse(
                         data = service.listFor(actor),
@@ -44,9 +45,9 @@ fun Route.classroomRoutes(
             }
 
             post {
-                val actor = call.requireActor(tokenService)
-                val request = runCatching { call.receive<CreateClassroomRequest>() }
-                    .getOrElse { throw ApiException.Validation("Invalid classroom request") }
+                val actor = call.requireNativeActor(tokenService)
+                val request = runCatching { call.boundedAuthRequest(CreateClassroomRequest.serializer()) }
+                    .getOrElse { if(it is kotlinx.coroutines.CancellationException) throw it;throw ApiException.Validation("Invalid classroom request") }
                 call.respond(
                     status = HttpStatusCode.Created,
                     message = ApiResponse(
@@ -57,9 +58,9 @@ fun Route.classroomRoutes(
             }
 
             post("/join") {
-                val actor = call.requireActor(tokenService)
-                val request = runCatching { call.receive<JoinClassInviteRequest>() }
-                    .getOrElse { throw ApiException.Validation("Invalid invite request") }
+                val actor = call.requireNativeActor(tokenService)
+                val request = runCatching { call.boundedAuthRequest(JoinClassInviteRequest.serializer()) }
+                    .getOrElse { if(it is kotlinx.coroutines.CancellationException) throw it;throw ApiException.Validation("Invalid invite request") }
                 call.respond(
                     ApiResponse(
                         data = service.join(actor, request.code),
@@ -69,10 +70,10 @@ fun Route.classroomRoutes(
             }
 
             post("/{classroomId}/invites") {
-                val actor = call.requireActor(tokenService)
+                val actor = call.requireNativeActor(tokenService)
                 val classroomId = call.requireClassroomId()
-                val request = runCatching { call.receive<CreateClassInviteRequest>() }
-                    .getOrElse { throw ApiException.Validation("Invalid invite configuration") }
+                val request = runCatching { call.boundedAuthRequest(CreateClassInviteRequest.serializer()) }
+                    .getOrElse { if(it is kotlinx.coroutines.CancellationException) throw it;throw ApiException.Validation("Invalid invite configuration") }
                 call.respond(
                     status = HttpStatusCode.Created,
                     message = ApiResponse(
@@ -83,7 +84,7 @@ fun Route.classroomRoutes(
             }
 
             delete("/{classroomId}/invites/{inviteId}") {
-                val actor = call.requireActor(tokenService)
+                val actor = call.requireNativeActor(tokenService)
                 service.revokeInvite(
                     actor = actor,
                     classroomId = call.requireClassroomId(),

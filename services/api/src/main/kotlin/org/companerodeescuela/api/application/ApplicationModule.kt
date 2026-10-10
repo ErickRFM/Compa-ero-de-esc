@@ -71,6 +71,7 @@ fun Application.module(
         academicProvider = providerRegistry.academic,
         groupRepository = academicGraph.groupRepository,
         representativeService = academicGraph.representativeService,
+        accounts=identityGraph.accounts,mfa=identityGraph.mfa,
     )
     val presenceGraph = buildPresenceFeatureGraph(
         settings = settings,

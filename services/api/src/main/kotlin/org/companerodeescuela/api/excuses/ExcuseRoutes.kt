@@ -10,7 +10,7 @@ import io.ktor.server.routing.patch
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import org.companerodeescuela.api.auth.AuthTokenService
-import org.companerodeescuela.api.auth.requireActor
+import org.companerodeescuela.api.auth.requireNativeActor
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
@@ -33,12 +33,12 @@ fun Route.excuseRoutes(
         val tokenService = AuthTokenService(settings)
         authenticate(AuthTokenService.PROVIDER_NAME) {
             get {
-                val actor = call.requireActor(tokenService)
+                val actor = call.requireNativeActor(tokenService)
                 call.respond(ApiResponse(data = service.listFor(actor), requestId = call.requestId()))
             }
 
             post {
-                val actor = call.requireActor(tokenService)
+                val actor = call.requireNativeActor(tokenService)
                 val request = runCatching { call.receive<SubmitExcuseRequest>() }
                     .getOrElse { throw ApiException.Validation("Invalid excuse request") }
                 call.respond(
@@ -51,7 +51,7 @@ fun Route.excuseRoutes(
             }
 
             patch("/{excuseId}/review") {
-                val actor = call.requireActor(tokenService)
+                val actor = call.requireNativeActor(tokenService)
                 val excuseId = call.parameters["excuseId"]
                     ?.takeIf(String::isNotBlank)
                     ?: throw ApiException.Validation("excuseId is required")

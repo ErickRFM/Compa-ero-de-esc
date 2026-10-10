@@ -9,7 +9,7 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import org.companerodeescuela.api.auth.AuthTokenService
-import org.companerodeescuela.api.auth.requireActor
+import org.companerodeescuela.api.auth.requireNativeActor
 import org.companerodeescuela.api.auth.boundedAuthRequest
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
@@ -33,7 +33,7 @@ fun Route.academicGroupRoutes(
         val tokenService = AuthTokenService(settings)
         authenticate(AuthTokenService.PROVIDER_NAME) {
             get {
-                val actor = call.requireActor(tokenService)
+                val actor = call.requireNativeActor(tokenService)
                 call.respond(
                     ApiResponse(
                         data = service.listFor(actor),
@@ -43,7 +43,7 @@ fun Route.academicGroupRoutes(
             }
 
             post {
-                val actor = call.requireActor(tokenService)
+                val actor = call.requireNativeActor(tokenService)
                 val request = runCatching { call.boundedAuthRequest(CreateAcademicGroupRequest.serializer()) }
                     .getOrElse { if(it is kotlinx.coroutines.CancellationException) throw it;throw ApiException.Validation("Invalid academic group request") }
                 call.respond(
@@ -56,7 +56,7 @@ fun Route.academicGroupRoutes(
             }
 
             post("/{groupId}/scope") {
-                val actor=call.requireActor(tokenService)
+                val actor=call.requireNativeActor(tokenService)
                 val id=call.parameters["groupId"] ?: throw ApiException.Validation("groupId is required")
                 val request=try { call.orgBoundedScopeRequest() } catch(cancelled:kotlinx.coroutines.CancellationException) { throw cancelled }
                     catch(_:Exception) { throw ApiException.Validation("Invalid group scope request") }
@@ -65,7 +65,7 @@ fun Route.academicGroupRoutes(
             }
 
             post("/{groupId}/members") {
-                val actor = call.requireActor(tokenService)
+                val actor = call.requireNativeActor(tokenService)
                 val groupId = call.parameters["groupId"]
                     ?.takeIf(String::isNotBlank)
                     ?: throw ApiException.Validation("groupId is required")

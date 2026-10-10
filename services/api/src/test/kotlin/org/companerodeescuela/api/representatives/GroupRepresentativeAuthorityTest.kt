@@ -30,7 +30,7 @@ class GroupRepresentativeAuthorityTest {
         val (service,repo,groups)=fixture(listOf(student,tutor,actor("other-student",UserRole.STUDENT)))
         groups.assign(AcademicGroupMembershipRecord("6A",student.id,Instant.EPOCH))
         groups.assign(AcademicGroupMembershipRecord("6A","other-student",Instant.EPOCH))
-        val invitation=repo.save(GroupRepresentativeAssignment("invitation",academicGroupId="6A",academicGroupName="6A",studentUserId="other-student",position=RepresentativePosition.CHIEF,appointedBy=tutor.id,appointedAtEpochSeconds=Instant.now().epochSecond))
+        val invitation=repo.save(GroupRepresentativeAssignment("invitation",institutionId=ScopedAcademicFixtures.INSTITUTION,academicTermId=ScopedAcademicFixtures.PERIOD,expiresAtEpochSeconds=ScopedAcademicFixtures.END.epochSecond,groupScopeRevision=0,academicGroupId="6A",academicGroupName="6A",studentUserId="other-student",position=RepresentativePosition.CHIEF,appointedBy=tutor.id,appointedAtEpochSeconds=Instant.now().epochSecond))
         assertTrue(service.getGroupOverview(student,"6A","6A").pendingInvitations.isEmpty())
         assertEquals(listOf(invitation.id),service.getGroupOverview(tutor,"6A","6A").pendingInvitations.map { it.id })
     }

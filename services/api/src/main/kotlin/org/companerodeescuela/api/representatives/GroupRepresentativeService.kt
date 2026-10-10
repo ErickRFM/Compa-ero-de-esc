@@ -29,7 +29,8 @@ class GroupRepresentativeService(
             throw ApiException.Validation("Self-appointment is not allowed")
         }
 
-        tutorAssignmentService.requireRepresentativeCandidate(groupId, request.studentUserId)
+        val (group,student)=tutorAssignmentService.requireRepresentativeCandidate(groupId,request.studentUserId)
+        if(request.academicTermId!=null && request.academicTermId!=group.periodId) throw ApiException.Validation("Representative period must match the actual group")
         val currentActive = repository.findActivePosition(groupId, request.position)
         if (currentActive != null) {
             throw ApiException.Conflict("An active or pending ${request.position} already exists for this group")
@@ -46,10 +47,11 @@ class GroupRepresentativeService(
         val assignment = GroupRepresentativeAssignment(
             id = "REP-" + UUID.randomUUID().toString().take(8),
             academicGroupId = groupId,
-            academicGroupName = groupName,
-            academicTermId = request.academicTermId,
+            academicGroupName = group.name,
+            institutionId=group.institutionId,groupScopeRevision=group.scopeRevision,expiresAtEpochSeconds=group.endsAt?.epochSecond,
+            academicTermId = group.periodId,
             studentUserId = request.studentUserId,
-            studentDisplayName = "Estudiante ${request.studentUserId}",
+            studentDisplayName = student.displayName,
             position = request.position,
             status = RepresentativeStatus.PENDING,
             appointedBy = actor.id,
@@ -72,6 +74,7 @@ class GroupRepresentativeService(
             throw ApiException.Validation("Appointment is no longer pending")
         }
 
+        if(!tutorAssignmentService.currentRepresentative(assignment)) throw ApiException.Forbidden("Current verified student and appointment scope are required")
         val updated = assignment.copy(
             status = RepresentativeStatus.ACTIVE,
             acceptedAtEpochSeconds = clock.instant().epochSecond,
@@ -131,7 +134,7 @@ class GroupRepresentativeService(
         groupName: String,
     ): GroupRepresentativesOverview {
         val includeAllPending=tutorAssignmentService.requireRepresentativeRead(actor,groupId)
-        val list = repository.listByGroup(groupId)
+        val list = repository.listByGroup(groupId).filter { tutorAssignmentService.currentRepresentative(it) }
         val activeChief = list.firstOrNull { it.position == RepresentativePosition.CHIEF && it.status == RepresentativeStatus.ACTIVE }
         val activeDeputy = list.firstOrNull { it.position == RepresentativePosition.DEPUTY && it.status == RepresentativeStatus.ACTIVE }
         val pending = list.filter { it.status == RepresentativeStatus.PENDING && (includeAllPending || it.studentUserId==actor.id) }
@@ -150,7 +153,7 @@ class GroupRepresentativeService(
     }
 
     suspend fun activeAssignmentsForStudent(studentUserId: String): List<GroupRepresentativeAssignment> {
-        return repository.listByStudent(studentUserId).filter { it.status == RepresentativeStatus.ACTIVE }
+        return repository.listByStudent(studentUserId).filter { it.status == RepresentativeStatus.ACTIVE && tutorAssignmentService.currentRepresentative(it) }
     }
 
     private suspend fun requireAuthorizedTutorOrAdmin(actor:UserSummary,groupId:String) {

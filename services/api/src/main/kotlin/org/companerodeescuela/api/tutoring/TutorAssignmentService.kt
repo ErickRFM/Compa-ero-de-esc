@@ -165,11 +165,36 @@ class TutorAssignmentService(
         if(!group.active || current.institutionId!=group.institutionId || !groupRepository.isUserInGroup(actor.id,groupId)) throw ApiException.Forbidden("Student does not belong to this group")
         return false
     }
-    internal suspend fun requireRepresentativeCandidate(groupId:String,studentId:String) {
+    internal suspend fun requireRepresentativeCandidate(groupId:String,studentId:String):Pair<AcademicGroupRecord,PlatformAccount> {
         val group=groupRepository.find(groupId) ?: throw ApiException.Forbidden("Group scope is unavailable")
         val account=accounts?.findById(studentId) ?: throw ApiException.Validation("A verified native student is required")
-        if(!group.active || !account.permitsSession || account.accountStatus!=AccountStatus.ACTIVE || account.emailVerifiedAt==null || account.emailVerifiedAt>clock.instant() ||
+        if(!group.active || group.scopeRevision<0 || group.periodId.isNullOrBlank() || group.startsAt==null || group.endsAt==null || group.startsAt>clock.instant() || group.endsAt<=clock.instant() || !account.permitsSession || account.accountStatus!=AccountStatus.ACTIVE || account.emailVerifiedAt==null || account.emailVerifiedAt>clock.instant() ||
             UserRole.STUDENT !in account.roles || account.institutionId!=group.institutionId || !groupRepository.isUserInGroup(studentId,groupId)) throw ApiException.Validation("Representative candidate must belong to this active group")
+        return group to account
+    }
+
+    internal suspend fun administrativeGroupIds(actor:UserSummary):Set<String> {
+        val current=policy().require(actor,AdminCapability.MANAGE_ACADEMICS,actor.institutionId ?: "global")
+        return groupRepository.list().filter { it.active && it.scopeRevision>=0 && it.institutionId!=null && (UserRole.SUPER_ADMIN in current.roles || it.institutionId==current.institutionId) }.map { it.id }.toSet()
+    }
+    internal suspend fun liveStudent(actor:UserSummary):PlatformAccount {
+        if(UserRole.STUDENT !in actor.roles) throw ApiException.Forbidden("Student role is required")
+        return policy().live(actor)
+    }
+    internal suspend fun requireStudentGroup(actor:UserSummary,groupId:String) {
+        val current=liveStudent(actor)
+        val group=groupRepository.find(groupId) ?: throw ApiException.NotFound("Academic group was not found")
+        if(!group.active || group.scopeRevision<0 || group.institutionId==null || current.institutionId!=group.institutionId || group.periodId==null ||
+            group.startsAt==null || group.endsAt==null || group.startsAt>clock.instant() || group.endsAt<=clock.instant() || !groupRepository.isUserInGroup(current.id,groupId))
+            throw ApiException.Forbidden("Current student group scope is required")
+    }
+    internal suspend fun currentRepresentative(assignment:org.companerodeescuela.shared.contracts.GroupRepresentativeAssignment):Boolean {
+        val candidate=try { requireRepresentativeCandidate(assignment.academicGroupId,assignment.studentUserId) }
+            catch(_:ApiException.Forbidden) { return false } catch(_:ApiException.Validation) { return false }
+        val group=candidate.first
+        val expiry=assignment.expiresAtEpochSeconds ?: return false
+        return assignment.institutionId==group.institutionId && assignment.academicTermId==group.periodId && assignment.groupScopeRevision==group.scopeRevision &&
+            expiry<=group.endsAt!!.epochSecond && clock.instant().epochSecond<expiry && assignment.revokedAtEpochSeconds==null
     }
 
     /** Internal approval continuation: the administrative service has already consumed exact command MFA. */

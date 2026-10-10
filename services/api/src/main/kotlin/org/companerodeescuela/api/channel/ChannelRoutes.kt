@@ -15,6 +15,8 @@ import org.companerodeescuela.api.auth.displayNameOr
 import org.companerodeescuela.api.auth.platformRoles
 import org.companerodeescuela.api.auth.requirePlatformPrincipal
 import org.companerodeescuela.api.auth.subjectId
+import org.companerodeescuela.api.auth.requireActor
+import org.companerodeescuela.api.auth.verifiedSessionSource
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
@@ -35,12 +37,13 @@ fun Route.channelRoutes(
             return@route
         }
 
+        val tokens=AuthTokenService(settings)
         authenticate(AuthTokenService.PROVIDER_NAME) {
             get {
                 val principal = call.requirePlatformPrincipal()
                 call.respond(
                     ApiResponse(
-                        data = service.channelsFor(principal.subjectId(), principal.platformRoles()),
+                        data = service.channelsFor(principal.subjectId(),principal.platformRoles(),call.requireActor(tokens),call.verifiedSessionSource()),
                         requestId = call.requestId(),
                     ),
                 )
@@ -54,6 +57,7 @@ fun Route.channelRoutes(
                         data = service.postsFor(
                             userId = principal.subjectId(),
                             roles = principal.platformRoles(),
+                            actor=call.requireActor(tokens),identitySource=call.verifiedSessionSource(),
                             channelId = channelId,
                         ),
                         requestId = call.requestId(),
@@ -70,6 +74,7 @@ fun Route.channelRoutes(
                             authorId = principal.subjectId(),
                             authorDisplayName = principal.displayNameOr("Docente"),
                             roles = principal.platformRoles(),
+                            actor=call.requireActor(tokens),identitySource=call.verifiedSessionSource(),
                             channelId = channelId,
                             request = call.receive<CreateChannelPostRequest>(),
                         ),
@@ -87,6 +92,7 @@ fun Route.channelRoutes(
                         data = service.updatePost(
                             actorId = principal.subjectId(),
                             roles = principal.platformRoles(),
+                            actor=call.requireActor(tokens),identitySource=call.verifiedSessionSource(),
                             channelId = channelId,
                             postId = postId,
                             request = call.receive<UpdateChannelPostRequest>(),
@@ -105,6 +111,7 @@ fun Route.channelRoutes(
                         data = service.deletePost(
                             actorId = principal.subjectId(),
                             roles = principal.platformRoles(),
+                            actor=call.requireActor(tokens),identitySource=call.verifiedSessionSource(),
                             channelId = channelId,
                             postId = postId,
                         ),
@@ -122,6 +129,7 @@ fun Route.channelRoutes(
                         data = service.acknowledge(
                             studentId = principal.subjectId(),
                             roles = principal.platformRoles(),
+                            actor=call.requireActor(tokens),identitySource=call.verifiedSessionSource(),
                             channelId = channelId,
                             postId = postId,
                             request = call.receive<ChannelAcknowledgementRequest>(),
@@ -140,6 +148,7 @@ fun Route.channelRoutes(
                         data = service.statsFor(
                             actorId = principal.subjectId(),
                             roles = principal.platformRoles(),
+                            actor=call.requireActor(tokens),identitySource=call.verifiedSessionSource(),
                             channelId = channelId,
                             postId = postId,
                         ),

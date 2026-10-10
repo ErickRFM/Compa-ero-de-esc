@@ -16,6 +16,11 @@ data class NativeClassroom(
     val teacherDisplayName: String,
     val status: ClassroomStatus,
     val createdAt: Instant,
+    val groupScopeRevision:Long=-1,
+    val teacherRoleGeneration:Long=-1,
+    val assignedBy:String?=null,
+    val assignmentOperationId:String?=null,
+    val assignmentDigest:String?=null,
 )
 
 data class NativeClassroomMembership(
@@ -57,7 +62,7 @@ class InMemoryClassroomRepository : ClassroomRepository {
     private val invites = ConcurrentHashMap<String, NativeClassInviteRecord>()
 
     override suspend fun createClassroom(classroom: NativeClassroom) {
-        classrooms[classroom.id] = classroom
+        classrooms.putIfAbsent(classroom.id,classroom)?.let { it.requireExactAssignment(classroom) }
     }
 
     override suspend fun findClassroom(classroomId: String): NativeClassroom? = classrooms[classroomId]
@@ -125,4 +130,8 @@ class InMemoryClassroomRepository : ClassroomRepository {
 
     private fun membershipKey(classroomId: String, userId: String): String =
         "$classroomId::$userId"
+}
+
+internal fun NativeClassroom.requireExactAssignment(request:NativeClassroom) {
+    if(copy(createdAt=Instant.EPOCH)!=request.copy(createdAt=Instant.EPOCH)) throw org.companerodeescuela.api.errors.ApiException.Conflict("Classroom assignment belongs to a different operation or scope")
 }

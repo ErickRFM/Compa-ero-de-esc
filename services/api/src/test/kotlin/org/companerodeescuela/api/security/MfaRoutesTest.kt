@@ -10,6 +10,7 @@ import kotlin.test.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.companerodeescuela.api.auth.*
+import org.companerodeescuela.api.academic.groups.academicGroupRoutes
 import org.companerodeescuela.api.integrations.mock.MockIdentityProvider
 import org.companerodeescuela.api.plugins.configurePlugins
 import org.companerodeescuela.api.test.TestFixtures
@@ -42,7 +43,11 @@ class MfaRoutesTest {
         val f=Fixture()
         application {
             configurePlugins(f.settings,f.sessions,PlatformSessionAuthority(f.accounts,f.identity))
-            routing { mfaRoutes(f.settings,f.identity,f.sessions,f.accounts,if(missingKey) f.unavailable else f.mfa) }
+            routing {
+                mfaRoutes(f.settings,f.identity,f.sessions,f.accounts,if(missingKey) f.unavailable else f.mfa)
+                academicGroupRoutes(f.settings,
+                    org.companerodeescuela.api.academic.groups.AcademicGroupService(org.companerodeescuela.api.academic.groups.InMemoryAcademicGroupRepository(),f.clock,f.accounts,f.mfa))
+            }
         }
         block(f)
     }
@@ -73,6 +78,15 @@ class MfaRoutesTest {
         // Even a native account with the exact provider ID must not be selected by guessing a source.
         val external=f.session(org.companerodeescuela.api.integrations.mock.MockFixtures.STUDENT_ID,setOf(UserRole.STUDENT),source=SessionIdentitySource.INSTITUTIONAL)
         assertEquals(HttpStatusCode.Forbidden,get("/auth/mfa/status",external).status)
+    }
+    @Test fun `academic native routes reject matching institutional identities instead of selecting a native account by ID`()=scenario { f ->
+        val native=f.session("native-student",setOf(UserRole.STUDENT))
+        assertEquals(HttpStatusCode.OK,get("/academic/groups",native).status)
+        val external=f.session(org.companerodeescuela.api.integrations.mock.MockFixtures.STUDENT_ID,setOf(UserRole.STUDENT),source=SessionIdentitySource.INSTITUTIONAL)
+        assertEquals(HttpStatusCode.Forbidden,get("/academic/groups",external).status)
+        assertEquals(HttpStatusCode.Forbidden,get("/auth/mfa/status",external).status)
+        val legacy=f.session("legacy",setOf(UserRole.STUDENT),source=SessionIdentitySource.LEGACY)
+        assertEquals(HttpStatusCode.Unauthorized,get("/academic/groups",legacy).status)
     }
     @Test fun `verified pending applicant can enroll but cannot authorize administration or bypass verification`()=scenario { f ->
         val pending=f.session("pending",emptySet(),AccountStatus.PENDING_APPROVAL)

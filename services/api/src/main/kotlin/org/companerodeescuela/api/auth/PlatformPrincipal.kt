@@ -45,3 +45,10 @@ fun JWTPrincipal.requireAdministrative() {
 
 fun JWTPrincipal.hasAdministrativeScope(): Boolean =
     platformRoles().any { it.isAdministrative }
+
+val VERIFIED_SESSION_SOURCE=io.ktor.util.AttributeKey<SessionIdentitySource>("verified-session-source")
+fun ApplicationCall.verifiedSessionSource():SessionIdentitySource = attributes.getOrNull(VERIFIED_SESSION_SOURCE) ?: throw ApiException.Unauthorized()
+fun ApplicationCall.requireNativeActor(tokenService:AuthTokenService):org.companerodeescuela.shared.contracts.UserSummary {
+    if(verifiedSessionSource()!=SessionIdentitySource.NATIVE) throw ApiException.Forbidden("A native platform identity is required; institutional identities need an explicit adapter")
+    return requireActor(tokenService)
+}

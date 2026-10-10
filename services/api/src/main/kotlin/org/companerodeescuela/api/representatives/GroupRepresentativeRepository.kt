@@ -39,6 +39,7 @@ internal data class GroupRepresentativeDocument(
     @param:BsonProperty("revokedAtEpochSeconds") val revokedAtEpochSeconds: Long?,
     @param:BsonProperty("revokedBy") val revokedBy: String?,
     @param:BsonProperty("version") val version: Long,
+    @param:BsonProperty("groupScopeRevision") val groupScopeRevision:Long?=null,
 ) {
     fun toModel(): GroupRepresentativeAssignment = GroupRepresentativeAssignment(
         id = id,
@@ -56,7 +57,7 @@ internal data class GroupRepresentativeDocument(
         expiresAtEpochSeconds = expiresAtEpochSeconds,
         revokedAtEpochSeconds = revokedAtEpochSeconds,
         revokedBy = revokedBy,
-        version = version,
+        version = version,groupScopeRevision=groupScopeRevision ?: -1,
     )
 
     companion object {
@@ -77,7 +78,7 @@ internal data class GroupRepresentativeDocument(
                 expiresAtEpochSeconds = model.expiresAtEpochSeconds,
                 revokedAtEpochSeconds = model.revokedAtEpochSeconds,
                 revokedBy = model.revokedBy,
-                version = model.version,
+                version = model.version,groupScopeRevision=model.groupScopeRevision,
             )
     }
 }

@@ -122,7 +122,7 @@ class ExcuseServiceTest {
                 ),
             )
         }
-        val tutoring = TutorAssignmentService(assignments, groups, accounts = ScopedAcademicFixtures.accounts(TUTOR))
+        val tutoring = TutorAssignmentService(assignments, groups, accounts = ScopedAcademicFixtures.accounts(TUTOR,STUDENT,OTHER_STUDENT))
         val service = ExcuseService(
             repository = InMemoryExcuseRepository(),
             tutoring = tutoring,
@@ -135,8 +135,8 @@ class ExcuseServiceTest {
     private data class Setup(val service: ExcuseService)
 
     private companion object {
-        val STUDENT = UserSummary("student-1", "Ana", roles = setOf(UserRole.STUDENT))
-        val OTHER_STUDENT = UserSummary("student-2", "Luis", roles = setOf(UserRole.STUDENT))
+        val STUDENT = UserSummary("student-1", "Ana", roles = setOf(UserRole.STUDENT),institutionId=ScopedAcademicFixtures.INSTITUTION)
+        val OTHER_STUDENT = UserSummary("student-2", "Luis", roles = setOf(UserRole.STUDENT),institutionId=ScopedAcademicFixtures.INSTITUTION)
         val TUTOR = UserSummary(
             "teacher-tutor-1",
             "Mtra. Elena",

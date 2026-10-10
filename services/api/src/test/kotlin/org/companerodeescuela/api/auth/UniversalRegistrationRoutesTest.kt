@@ -69,6 +69,7 @@ class UniversalRegistrationRoutesTest {
         assertEquals(setOf("WORKSHOP_PARTICIPANT"), verified.user.roles.map { it.name }.toSet())
         assertFalse(verified.user.roles.any { it.isStaff || it == UserRole.STUDENT })
         assertNull(verified.user.institutionId)
+        assertEquals(HttpStatusCode.Unauthorized, get("/private-probe", verified).status)
     }
 
     @Test fun `public privileged profile and unknown requested institutions are rejected`() = scenario { _ ->

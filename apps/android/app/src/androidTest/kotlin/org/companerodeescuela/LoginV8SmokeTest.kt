@@ -11,6 +11,7 @@ import androidx.test.uiautomator.Until
 import androidx.test.uiautomator.UiScrollable
 import androidx.test.uiautomator.UiSelector
 import org.junit.Assert.assertTrue
+import org.companerodeescuela.feature.settings.AppLanguage
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -18,11 +19,11 @@ import org.junit.runner.RunWith
 class LoginV8SmokeTest {
     @Test
     fun registrationAccountTypeCanBeSelectedByItsLabel() {
-        ActivityScenario.launch(MainActivity::class.java).use {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { it.appearancePreferences.setLanguage(AppLanguage.SPANISH) }
             val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
             assertTrue(device.wait(Until.hasObject(By.textContains("universitaria,")), 10_000))
             findVisible(device, By.text("Crear cuenta")).click()
-            findVisible(device, By.text("Nombre"))
             findVisible(device, By.text("Alumno"))
             findVisible(device, By.text("Docente")).click()
             findVisible(device, By.textContains("requieren verificación"))
@@ -33,7 +34,8 @@ class LoginV8SmokeTest {
 
     @Test
     fun signedOutUserSeesInstitutionalLogin() {
-        ActivityScenario.launch(MainActivity::class.java).use {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { it.appearancePreferences.setLanguage(AppLanguage.SPANISH) }
             val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
 
             assertTrue(device.wait(Until.hasObject(By.textContains("Compañero")), 10_000))
@@ -44,7 +46,8 @@ class LoginV8SmokeTest {
 
     @Test
     fun firstAccessOpensInstitutionalIdentityValidation() {
-        ActivityScenario.launch(MainActivity::class.java).use {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { it.appearancePreferences.setLanguage(AppLanguage.SPANISH) }
             val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
 
             assertTrue(device.wait(Until.hasObject(By.textContains("universitaria,")), 10_000))

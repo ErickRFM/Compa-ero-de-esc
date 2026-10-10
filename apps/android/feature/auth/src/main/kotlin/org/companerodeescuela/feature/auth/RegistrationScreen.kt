@@ -11,6 +11,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,14 +30,14 @@ import org.companerodeescuela.shared.contracts.*
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun RegistrationScreen(state: SessionUiState, onRegister: (RegisterRequest) -> Unit, onBackToLogin: () -> Unit,
-    modifier: Modifier = Modifier, onReloadInstitutions: () -> Unit = {}) {
+    modifier: Modifier = Modifier, onReloadInstitutions: () -> Unit = {}, draft: AuthDraftViewModel = viewModel()) {
     var displayName by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var confirmation by remember { mutableStateOf("") }
+    var password by draft.password
+    var confirmation by draft.confirmation
     var accountType by rememberSaveable { mutableStateOf(RegistrationAccountType.STUDENT) }
     var institutionId by rememberSaveable { mutableStateOf<String?>(null) }
-    var identityReference by remember { mutableStateOf("") }
+    var identityReference by draft.identityReference
     var preferredGroup by rememberSaveable { mutableStateOf("") }
     var institutionMenu by remember { mutableStateOf(false) }
     val focus = LocalFocusManager.current
@@ -123,7 +124,7 @@ fun RegistrationScreen(state: SessionUiState, onRegister: (RegisterRequest) -> U
                 if (state.failure != null) Text(stringResource(registrationErrorResource(state.failure)), color = MaterialTheme.colorScheme.error)
                 AuthV8PrimaryAction(stringResource(R.string.auth_create_account), ::submit, canSubmit, state.submitting,
                     Modifier.padding(top = 6.dp).testTag("registration_submit"), stringResource(R.string.registration_submitting))
-                AuthV8SecondaryAction(stringResource(R.string.registration_back), onBackToLogin, !state.submitting)
+                AuthV8SecondaryAction(stringResource(R.string.registration_back), { draft.clearRegistration(); onBackToLogin() }, !state.submitting)
             }
         }
     }

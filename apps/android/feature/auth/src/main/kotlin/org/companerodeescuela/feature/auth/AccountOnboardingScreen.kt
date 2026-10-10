@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -17,8 +18,9 @@ import org.companerodeescuela.shared.contracts.VerificationDeliveryStatus
 /** Connected native account lifecycle, before any academic navigation is authorized. */
 @Composable
 fun AccountOnboardingScreen(state: SessionUiState, onVerify: (String) -> Unit, onResend: () -> Unit,
-    onRefresh: () -> Unit, onLogout: () -> Unit) {
-    var token by remember { mutableStateOf("") }
+    onRefresh: () -> Unit, onLogout: () -> Unit, draft: AuthDraftViewModel = viewModel()) {
+    var token by draft.verificationCode
+    LaunchedEffect(state.userId, state.accountStatus) { draft.bindVerificationAccount(state.userId, state.accountStatus) }
     val verification = state.accountStatus == AccountStatus.PENDING_VERIFICATION
     val approval = state.accountStatus == AccountStatus.PENDING_APPROVAL
     AuthV8Layout(themeAware = true) {
@@ -51,7 +53,7 @@ fun AccountOnboardingScreen(state: SessionUiState, onVerify: (String) -> Unit, o
                     Text(stringResource(if ((error as? org.companerodeescuela.core.common.result.AppError.Http)?.status == 400)
                         R.string.verification_invalid else registrationErrorResource(error)), color = MaterialTheme.colorScheme.error)
                 }
-                AuthV8SecondaryAction(stringResource(R.string.registration_logout), onLogout, !state.submitting)
+                AuthV8SecondaryAction(stringResource(R.string.registration_logout), { draft.clearAll(); onLogout() }, !state.submitting)
             }
         }
     }

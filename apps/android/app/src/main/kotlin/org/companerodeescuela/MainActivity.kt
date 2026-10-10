@@ -30,6 +30,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import org.companerodeescuela.feature.auth.AuthDraftViewModel
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
@@ -106,6 +108,7 @@ class MainActivity : AppCompatActivity() {
                         color = MaterialTheme.colorScheme.background,
                     ) {
                         val sessionViewModel: SessionViewModel = hiltViewModel()
+                        val authDraft: AuthDraftViewModel = viewModel()
                         val session by sessionViewModel.state.collectAsStateWithLifecycle()
                         SideEffect {
                             val v8Dark = session.authenticated && session.roles == setOf(org.companerodeescuela.shared.contracts.UserRole.STUDENT)
@@ -116,7 +119,9 @@ class MainActivity : AppCompatActivity() {
                         var activatingAccess by rememberSaveable { mutableStateOf(false) }
                         var loginExperienceName by rememberSaveable { mutableStateOf<String?>(null) }
 
-                        LaunchedEffect(session.authenticated, session.accountStatus, session.roles) {
+                        LaunchedEffect(session.checking, session.authenticated, session.userId, session.accountStatus, session.roles) {
+                            if (!session.checking && !session.authenticated) authDraft.clearAll()
+                            if (session.authenticated) authDraft.clearRegistration()
                             if (session.authenticated) {
                                 activatingAccess = false
                                 if (session.accountStatus == org.companerodeescuela.shared.contracts.AccountStatus.ACTIVE &&

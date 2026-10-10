@@ -36,6 +36,19 @@ class VerificationEmailTransportTest {
         try {assertEquals(VerificationDeliveryStatus.UNCONFIRMED,gateway(server).send("recipient@example.test","token","operation"))}
         finally {server.stop(0)}
     }
+    @Test fun `in-progress idempotency conflict remains unconfirmed`()=runTest {
+        val server=server {reply(it,409,"""{"name":"concurrent_idempotent_requests"}""")}
+        try {assertEquals(VerificationDeliveryStatus.UNCONFIRMED,gateway(server).send("recipient@example.test","token","operation"))}
+        finally {server.stop(0)}
+    }
+    @Test fun `retry rejection cannot erase an earlier ambiguous outcome`()=runTest {
+        val calls=AtomicInteger()
+        val server=server { exchange ->
+            if(calls.incrementAndGet()==1) reply(exchange,503,"{}") else reply(exchange,400,"""{"message":"rejected retry"}""")
+        }
+        try {assertEquals(VerificationDeliveryStatus.UNCONFIRMED,gateway(server).send("recipient@example.test","token","operation"))}
+        finally {server.stop(0)}
+    }
     private fun gateway(server:HttpServer)=ResendVerificationEmailGateway("test-key-for-loopback-only".toCharArray(),"sender@example.test",URI("http://127.0.0.1:${server.address.port}/emails"))
     private fun server(handler:(com.sun.net.httpserver.HttpExchange)->Unit)=HttpServer.create(InetSocketAddress("127.0.0.1",0),0).also{
         it.createContext("/emails"){exchange->try{handler(exchange)} finally{exchange.close()}};it.start()

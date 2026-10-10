@@ -37,9 +37,12 @@ class ResendVerificationEmailGateway(private val apiKey: CharArray, private val 
             put("subject", "Verifica tu correo en Compañero de Clase / Verify your email")
             put("text", "Pega este código en la aplicación / Paste this code in the app:\n\n$token\n\nCaduca en una hora / Expires in one hour. Si no creaste esta cuenta, ignora este correo / If you did not create this account, ignore this email.")
         }.toString().toByteArray(Charsets.UTF_8)
+        var unresolvedEarlierAttempt = false
         repeat(2) { attemptNumber ->
             val result = withContext(Dispatchers.IO) { attempt(payload, operationId) }
-            if (result.first || attemptNumber == 1) return result.second
+            if (result.second == VerificationDeliveryStatus.UNCONFIRMED) unresolvedEarlierAttempt = true
+            if (result.first || attemptNumber == 1) return if (unresolvedEarlierAttempt && result.second == VerificationDeliveryStatus.FAILED)
+                VerificationDeliveryStatus.UNCONFIRMED else result.second
             delay(250)
         }
         return VerificationDeliveryStatus.UNCONFIRMED
@@ -55,7 +58,11 @@ class ResendVerificationEmailGateway(private val apiKey: CharArray, private val 
             connection.setFixedLengthStreamingMode(payload.size)
             connection.outputStream.use { it.write(payload) }
             val code = connection.responseCode
-            if (code !in 200..299) return (code != 429 && code < 500) to VerificationDeliveryStatus.FAILED
+            if (code !in 200..299) {
+                // An in-progress idempotent request, throttle or server failure cannot establish non-delivery.
+                val uncertain = code == 409 || code == 429 || code >= 500
+                return !uncertain to if (uncertain) VerificationDeliveryStatus.UNCONFIRMED else VerificationDeliveryStatus.FAILED
+            }
             val body = connection.inputStream.use { input ->
                 val output = ByteArrayOutputStream(); val buffer = ByteArray(1024)
                 val deadline = System.nanoTime() + 10_000_000_000L

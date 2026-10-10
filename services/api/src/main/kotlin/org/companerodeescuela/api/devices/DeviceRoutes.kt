@@ -1,6 +1,6 @@
 package org.companerodeescuela.api.devices
 
-import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
@@ -9,12 +9,14 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.Serializable
 import org.companerodeescuela.api.auth.AuthTokenService
+import org.companerodeescuela.api.auth.SessionIdentitySource
 import org.companerodeescuela.api.auth.requirePlatformPrincipal
 import org.companerodeescuela.api.auth.subjectId
+import org.companerodeescuela.api.auth.verifiedSessionSource
 import org.companerodeescuela.api.config.ApiSettings
+import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.shared.contracts.ApiResponse
 
@@ -23,65 +25,41 @@ data class DeviceRegistrationRequest(
     val token: String,
     val platform: String = "android",
     val model: String? = null,
+    /** Stable random installation ID; old clients without one remain supported. */
+    val deviceId: String? = null,
 )
 
 interface DeviceTokenRepository {
-    suspend fun register(userId: String, token: String, platform: String, model: String?)
+    suspend fun register(userId: String, token: String, platform: String, model: String?, deviceId: String? = null)
     suspend fun unregister(userId: String, token: String): Boolean
     suspend fun listTokens(userIds: Set<String>): List<String>
+    /** Revoke a token after FCM confirms an UNREGISTERED/invalid destination. */
+    suspend fun deactivateInvalid(token: String): Boolean = false
 }
 
-class InMemoryDeviceTokenRepository : DeviceTokenRepository {
-    private val storage = ConcurrentHashMap<String, MutableSet<String>>()
-
-    override suspend fun register(userId: String, token: String, platform: String, model: String?) {
-        storage.computeIfAbsent(userId) { ConcurrentHashMap.newKeySet() }.add(token)
-    }
-
-    override suspend fun unregister(userId: String, token: String): Boolean {
-        return storage[userId]?.remove(token) ?: false
-    }
-
-    override suspend fun listTokens(userIds: Set<String>): List<String> {
-        return userIds.flatMap { storage[it].orEmpty() }
-    }
+/** The sender must use this namespaced owner key, never a raw JWT subject ID. */
+internal fun ApplicationCall.deviceOwnerId(): String {
+    val source = verifiedSessionSource()
+    if (source !in setOf(SessionIdentitySource.NATIVE, SessionIdentitySource.INSTITUTIONAL))
+        throw ApiException.Forbidden("A current scoped identity is required")
+    return "${source.name}:${requirePlatformPrincipal().subjectId()}"
 }
 
-fun Route.deviceRoutes(
-    settings: ApiSettings,
-    repository: DeviceTokenRepository,
-) {
+fun Route.deviceRoutes(settings: ApiSettings, repository: DeviceTokenRepository) {
     route("/devices") {
         if (!settings.hasAuthentication) return@route
-
         authenticate(AuthTokenService.PROVIDER_NAME) {
             post("/register") {
-                val principal = call.requirePlatformPrincipal()
+                val ownerId = call.deviceOwnerId()
                 val request = call.receive<DeviceRegistrationRequest>()
-                repository.register(
-                    userId = principal.subjectId(),
-                    token = request.token,
-                    platform = request.platform,
-                    model = request.model,
-                )
-                call.respond(
-                    ApiResponse(
-                        data = true,
-                        requestId = call.requestId(),
-                    ),
-                )
+                repository.register(ownerId, request.token, request.platform, request.model, request.deviceId)
+                call.respond(ApiResponse(data = true, requestId = call.requestId()))
             }
-
             delete("/register") {
-                val principal = call.requirePlatformPrincipal()
+                val ownerId = call.deviceOwnerId()
                 val request = call.receive<DeviceRegistrationRequest>()
-                val removed = repository.unregister(principal.subjectId(), request.token)
-                call.respond(
-                    ApiResponse(
-                        data = removed,
-                        requestId = call.requestId(),
-                    ),
-                )
+                val removed = repository.unregister(ownerId, request.token)
+                call.respond(ApiResponse(data = removed, requestId = call.requestId()))
             }
         }
     }

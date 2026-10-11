@@ -1,5 +1,7 @@
 # Security model
 
+> La contingencia QR docente V10.1 está disponible para pruebas, con evidencia REVIEW_REQUIRED y sin acreditar presencia física de forma automática. Consultar [auditoría QR](../audits/V10_1_F0_QR_EXECUTION_20261008.md).
+
 Historical foundation status (superseded by the dated implementation cut below): authentication was not built.
 This document describes what is enforced now and what must exist before any
 real user data exists.

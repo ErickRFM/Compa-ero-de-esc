@@ -156,6 +156,28 @@ fun Route.attendanceRoutes(
                 )
             }
 
+            post("/sessions/{sessionId}/qr-pack") {
+                val principal = call.requirePlatformPrincipal()
+                principal.requireStaff()
+                val sessionId = call.parameters["sessionId"]
+                    ?: throw ApiException.Validation("sessionId is required")
+                val serviceQr = qrService
+                    ?: throw ApiException.DependencyUnavailable(
+                        "Attendance QR signing is not configured",
+                    )
+                call.respond(
+                    ApiResponse(
+                        data = serviceQr.issuePack(
+                            actorId = principal.subjectId(),
+                            sessionId = sessionId,
+                            allowCrossOwner = principal.platformRoles().any { it==UserRole.ADMIN || it==UserRole.SUPER_ADMIN },
+                            nativeActor = nativeActor(call),
+                        ),
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
+
             post("/sessions/{sessionId}/attempts") {
                 val principal = call.requirePlatformPrincipal()
                 principal.requireRole(UserRole.STUDENT)

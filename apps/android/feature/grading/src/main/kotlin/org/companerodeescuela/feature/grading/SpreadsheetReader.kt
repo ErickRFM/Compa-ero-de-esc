@@ -2,6 +2,10 @@ package org.companerodeescuela.feature.grading
 
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.nio.ByteBuffer
+import java.nio.charset.CodingErrorAction
+import java.nio.charset.StandardCharsets
+import org.xml.sax.SAXException
 import javax.xml.XMLConstants
 import java.util.zip.ZipInputStream
 import javax.xml.parsers.DocumentBuilderFactory
@@ -212,17 +216,34 @@ object SpreadsheetReader {
         )
     }
 
-    private fun newDocument(bytes: ByteArray) =
-        DocumentBuilderFactory.newInstance().apply {
+    private fun newDocument(bytes: ByteArray): org.w3c.dom.Document {
+        // Android's built-in DOM parser does not implement the JAXP
+        // disallow-doctype-decl feature. Reject markup before parsing on *both*
+        // Android and the JVM; reject non-UTF-8 bytes to prevent bypasses.
+        val decoded = StandardCharsets.UTF_8.newDecoder()
+            .onMalformedInput(CodingErrorAction.REPORT)
+            .onUnmappableCharacter(CodingErrorAction.REPORT)
+            .decode(ByteBuffer.wrap(bytes)).toString()
+        require('\u0000' !in decoded && !Regex("<!\\s*(DOCTYPE|ENTITY)", RegexOption.IGNORE_CASE).containsMatchIn(decoded)) {
+            "El Excel contiene declaraciones XML no permitidas."
+        }
+        val factory = DocumentBuilderFactory.newInstance().apply {
             isNamespaceAware = false
-            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
-            setFeature("http://xml.org/sax/features/external-general-entities", false)
-            setFeature("http://xml.org/sax/features/external-parameter-entities", false)
-            setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
-            setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
-            isXIncludeAware = false
+            // Optional parser capabilities differ across JAXP and Android;
+            // pre-validation and the mandatory entity resolver provide the
+            // consistent fail-closed layer.
+            runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
+            runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
+            runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
+            runCatching { setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false) }
+            runCatching { setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true) }
+            runCatching { isXIncludeAware = false }
             isExpandEntityReferences = false
             runCatching { setAttribute("http://javax.xml.XMLConstants/property/accessExternalDTD", "") }
             runCatching { setAttribute("http://javax.xml.XMLConstants/property/accessExternalSchema", "") }
-        }.newDocumentBuilder().parse(ByteArrayInputStream(bytes))
+        }
+        val builder = factory.newDocumentBuilder()
+        builder.setEntityResolver { _, _ -> throw SAXException("External XML resources are not allowed") }
+        return builder.parse(ByteArrayInputStream(bytes))
+    }
 }

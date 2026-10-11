@@ -1,6 +1,11 @@
 package org.companerodeescuela
 
 import android.os.Bundle
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import org.companerodeescuela.notifications.PushRegistrationSchedule
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.key
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -90,6 +95,11 @@ class MainActivity : AppCompatActivity() {
         appearancePreferences.applySavedLanguage()
 
         setContent {
+            val notificationsPermissionLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.RequestPermission(),
+            ) { granted ->
+                if (granted) PushRegistrationSchedule.enqueue(this@MainActivity)
+            }
             val appearance by appearancePreferences.state.collectAsStateWithLifecycle()
             val systemDark = isSystemInDarkTheme()
             val darkTheme = when (appearance.themeMode) {
@@ -397,6 +407,13 @@ class MainActivity : AppCompatActivity() {
                                                     )
                                                 },
                                                 onSecurity = { navController.navigate(Destination.Mfa.route) },
+                                                onNotifications = if (BuildConfig.FIREBASE_CONFIGURED) {
+                                                    {
+                                                        if (Build.VERSION.SDK_INT >= 33) {
+                                                            notificationsPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                                        } else PushRegistrationSchedule.enqueue(this@MainActivity)
+                                                    }
+                                                } else null,
                                                 onTutorRequest = { navController.navigate(Destination.StaffApplication.route) },
                                                 onRepresentatives = if (org.companerodeescuela.shared.contracts.UserRole.STUDENT in session.roles) {
                                                     { navController.navigate(Destination.RepresentativeInvitations.route) { launchSingleTop = true } }

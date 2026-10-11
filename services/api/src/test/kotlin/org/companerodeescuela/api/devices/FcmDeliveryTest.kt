@@ -99,12 +99,30 @@ class FcmDeliveryTest {
         val service = PushOutboxService(tokens,outbox,PushGateway { _, _, _ ->
             sends++
             PushDeliveryResult.INVALID_TOKEN
-        },clock)
+        },clock, authorizeRecipient = { true })
         assertEquals(1,service.enqueueForOwner("event-1","NATIVE:student-a","Nuevo aviso","Tienes un aviso"))
         assertEquals(0,service.enqueueForOwner("event-1","NATIVE:student-a","Nuevo aviso","Tienes un aviso"))
         assertTrue(service.dispatchNext())
         assertEquals(1,sends)
         assertTrue(tokens.listTokens(setOf("NATIVE:student-a")).isEmpty())
+        assertFalse(service.dispatchNext())
+    }
+
+    @Test fun `revoked student identity cannot receive a queued device notification`() = runBlocking {
+        val devices = InMemoryDeviceTokenRepository()
+        val outbox = InMemoryPushOutboxRepository()
+        val token = "fcm_test_token_123456789"
+        devices.register("NATIVE:student-revoked",token,"android",null,"device-1")
+        var sends = 0
+        val service = PushOutboxService(devices,outbox,PushGateway { _, _, _ ->
+            sends++
+            PushDeliveryResult.ACCEPTED
+        },authorizeRecipient = { false })
+        assertEquals(1,service.enqueueForOwner("event-revoked","NATIVE:student-revoked","Aviso","Texto"))
+        assertTrue(service.dispatchNext())
+        assertEquals(0,sends)
+        // A suspended account is not sufficient reason to delete a valid FCM token.
+        assertEquals(listOf(token),devices.listTokens(setOf("NATIVE:student-revoked")))
         assertFalse(service.dispatchNext())
     }
 

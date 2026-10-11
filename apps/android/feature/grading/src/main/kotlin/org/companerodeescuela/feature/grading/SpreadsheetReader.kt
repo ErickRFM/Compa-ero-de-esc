@@ -1,6 +1,8 @@
 package org.companerodeescuela.feature.grading
 
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import javax.xml.XMLConstants
 import java.util.zip.ZipInputStream
 import javax.xml.parsers.DocumentBuilderFactory
 import org.companerodeescuela.shared.contracts.GradeImportPreview
@@ -8,23 +10,61 @@ import org.companerodeescuela.shared.contracts.GradeImportRow
 import org.w3c.dom.Element
 
 object SpreadsheetReader {
+    private const val MAX_INPUT_BYTES = 5 * 1024 * 1024
+    private const val MAX_ENTRY_BYTES = 4 * 1024 * 1024
+    private const val MAX_UNCOMPRESSED_BYTES = 12 * 1024 * 1024
+    private const val MAX_ZIP_ENTRIES = 128
+    private const val MAX_ROWS = 5_001 // header + at most 5,000 students
+    private const val MAX_COLUMNS = 100
+
     private val idAliases = setOf("matricula", "matrícula", "studentid", "student_id", "id", "no.control", "numero de control", "número de control")
     private val nameAliases = setOf("nombre", "alumno", "estudiante", "name")
 
-    fun read(fileName: String, bytes: ByteArray): GradeImportPreview =
-        when (fileName.substringAfterLast('.', "").lowercase()) {
+    fun read(fileName: String, bytes: ByteArray): GradeImportPreview {
+        require(bytes.isNotEmpty() && bytes.size <= MAX_INPUT_BYTES) {
+            "El archivo debe tener como máximo 5 MB."
+        }
+        return when (fileName.substringAfterLast('.', "").lowercase()) {
             "xlsx" -> readXlsx(bytes)
             "csv" -> readCsv(bytes.toString(Charsets.UTF_8))
             "xls" -> throw IllegalArgumentException("El formato .xls antiguo no es compatible. Guárdalo como .xlsx.")
             else -> throw IllegalArgumentException("Selecciona un archivo .xlsx o .csv.")
         }
+    }
 
     private fun readXlsx(bytes: ByteArray): GradeImportPreview {
         val entries = mutableMapOf<String, ByteArray>()
+        var entryCount = 0
+        var uncompressedBytes = 0
         ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
+            val buffer = ByteArray(8192)
             var entry = zip.nextEntry
             while (entry != null) {
-                if (!entry.isDirectory) entries[entry.name] = zip.readBytes()
+                entryCount++
+                require(entryCount <= MAX_ZIP_ENTRIES) { "El Excel contiene demasiados archivos internos." }
+                if (!entry.isDirectory) {
+                    // Count and limit *every* entry, including files we do not parse.
+                    // Never call ZipInputStream.readBytes(): compressed ZIP bombs are unbounded.
+                    var entryBytes = 0
+                    val wanted = entry.name == "xl/sharedStrings.xml" ||
+                        entry.name == "xl/worksheets/sheet1.xml"
+                    val output = if (wanted) ByteArrayOutputStream() else null
+                    while (true) {
+                        val count = zip.read(buffer)
+                        if (count == -1) break
+                        entryBytes += count
+                        uncompressedBytes += count
+                        require(entryBytes <= MAX_ENTRY_BYTES && uncompressedBytes <= MAX_UNCOMPRESSED_BYTES) {
+                            "El Excel contiene contenido comprimido demasiado grande."
+                        }
+                        output?.write(buffer, 0, count)
+                    }
+                    if (output != null) {
+                        require(entry.name !in entries) { "El Excel contiene entradas XML duplicadas." }
+                        entries[entry.name] = output.toByteArray()
+                    }
+                }
+                zip.closeEntry()
                 entry = zip.nextEntry
             }
         }
@@ -45,15 +85,18 @@ object SpreadsheetReader {
     private fun parseSheet(bytes: ByteArray, sharedStrings: List<String>): List<List<String>> {
         val doc = newDocument(bytes)
         val rows = doc.getElementsByTagName("row")
+        require(rows.length <= MAX_ROWS) { "El Excel supera el máximo de 5,000 alumnos." }
         return (0 until rows.length).map { rowIndex ->
             val row = rows.item(rowIndex) as Element
             val cells = row.getElementsByTagName("c")
+            require(cells.length <= MAX_COLUMNS) { "El Excel supera las 100 columnas permitidas." }
             val byColumn = mutableMapOf<Int, String>()
             var maxColumn = -1
             for (cellIndex in 0 until cells.length) {
                 val cell = cells.item(cellIndex) as Element
                 val reference = cell.getAttribute("r")
                 val column = columnIndex(reference.takeWhile { it.isLetter() })
+                require(column in 0 until MAX_COLUMNS) { "El Excel contiene columnas fuera de rango." }
                 maxColumn = maxOf(maxColumn, column)
                 val type = cell.getAttribute("t")
                 val raw = cell.getElementsByTagName("v").item(0)?.textContent
@@ -69,8 +112,12 @@ object SpreadsheetReader {
 
     private fun columnIndex(letters: String): Int {
         var value = 0
-        letters.uppercase().forEach { value = value * 26 + (it - 'A' + 1) }
-        return (value - 1).coerceAtLeast(0)
+        require(letters.isNotBlank() && letters.length <= 3) { "Referencia de celda inválida." }
+        letters.uppercase().forEach {
+            require(it in 'A'..'Z') { "Referencia de celda inválida." }
+            value = value * 26 + (it - 'A' + 1)
+        }
+        return value - 1
     }
 
     private fun readCsv(text: String): GradeImportPreview {
@@ -79,6 +126,7 @@ object SpreadsheetReader {
         val firstLine = clean.lineSequence().first()
         val delimiter = if (firstLine.count { it == ';' } > firstLine.count { it == ',' }) ';' else ','
         val rows = parseCsv(clean, delimiter).filter { row -> row.any(String::isNotBlank) }
+        require(rows.size <= MAX_ROWS) { "El CSV supera el máximo de 5,000 alumnos." }
         require(rows.isNotEmpty()) { "El CSV está vacío." }
         return toPreview(rows.first(), rows.drop(1))
     }
@@ -90,7 +138,12 @@ object SpreadsheetReader {
         var quoted = false
         var index = 0
         fun finishCell() { row += cell.toString().trim(); cell.setLength(0) }
-        fun finishRow() { finishCell(); rows += row.toList(); row.clear() }
+        fun finishRow() {
+            finishCell()
+            require(rows.size < MAX_ROWS) { "El CSV supera el máximo de 5,000 alumnos." }
+            rows += row.toList()
+            row.clear()
+        }
         while (index < text.length) {
             val char = text[index]
             when {
@@ -112,6 +165,9 @@ object SpreadsheetReader {
     }
 
     private fun toPreview(headers: List<String>, body: List<List<String>>): GradeImportPreview {
+        require(headers.size in 2..MAX_COLUMNS && body.size < MAX_ROWS) {
+            "La tabla supera los límites de filas o columnas."
+        }
         val normalized = headers.map { it.lowercase().trim() }
         require(normalized.none(String::isBlank)) { "El archivo contiene encabezados vacíos." }
         require(normalized.distinct().size == normalized.size) { "El archivo contiene encabezados duplicados." }
@@ -160,5 +216,13 @@ object SpreadsheetReader {
         DocumentBuilderFactory.newInstance().apply {
             isNamespaceAware = false
             setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            setFeature("http://xml.org/sax/features/external-general-entities", false)
+            setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+            setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+            setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
+            isXIncludeAware = false
+            isExpandEntityReferences = false
+            setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "")
+            setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "")
         }.newDocumentBuilder().parse(ByteArrayInputStream(bytes))
 }

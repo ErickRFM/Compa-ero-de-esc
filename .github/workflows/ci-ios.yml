@@ -1,0 +1,49 @@
+name: ci-ios
+on:
+  push:
+    branches: ["codex/ios-*"]
+  pull_request:
+    paths:
+      - "multiplatform/**"
+      - "iosApp/**"
+      - "shared/contracts/**"
+      - "codemagic.yaml"
+      - "infrastructure/scripts/build-ios-simulator.sh"
+      - ".github/workflows/ci-ios.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-ios-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  simulator:
+    name: iOS simulator compile, test and launch
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 26.0
+        run: sudo xcode-select -s /Applications/Xcode_26.0.app/Contents/Developer
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build and test the same simulator pipeline as Codemagic
+        run: bash infrastructure/scripts/build-ios-simulator.sh
+      - name: Upload simulator and verification evidence
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-evidence
+          path: |
+            build/ios/*.zip
+            build/ios/*.log
+            build/ios/*.txt
+            build/ios/*.json
+            build/ios/*.png
+            build/ios/TestResults.xcresult
+            multiplatform/shared/build/test-results/**/*.xml
+          retention-days: 7

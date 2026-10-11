@@ -60,10 +60,10 @@ android {
         versionName = "0.1.0"
 
         buildConfigField("boolean", "FIREBASE_CONFIGURED", firebaseConfigured.toString())
-        buildConfigField("String", "FIREBASE_APP_ID", "\\\"$firebaseAppId\\\"")
-        buildConfigField("String", "FIREBASE_PROJECT_ID", "\\\"$firebaseProjectId\\\"")
-        buildConfigField("String", "FIREBASE_SENDER_ID", "\\\"$firebaseSenderId\\\"")
-        buildConfigField("String", "FIREBASE_API_KEY", "\\\"$firebaseApiKey\\\"")
+        buildConfigField("String", "FIREBASE_APP_ID", "\"$firebaseAppId\"")
+        buildConfigField("String", "FIREBASE_PROJECT_ID", "\"$firebaseProjectId\"")
+        buildConfigField("String", "FIREBASE_SENDER_ID", "\"$firebaseSenderId\"")
+        buildConfigField("String", "FIREBASE_API_KEY", "\"$firebaseApiKey\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

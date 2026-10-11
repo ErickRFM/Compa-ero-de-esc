@@ -894,10 +894,10 @@ class AttendanceViewModel @Inject constructor(
                             return@launchTeacherRequest
                         }
                         // The roster is ancillary; a transient or malformed roster response
-                        // must not revoke a valid teacher pass or its signed QR.
+                        // must not revoke a valid teacher pass or its signed QR. Stop polling
+                        // until the user refreshes instead of retrying endlessly while offline.
                         _state.update { it.copy(roster = null, campusRosterError = error.userMessage) }
-                        delay(ROSTER_POLL_INTERVAL_MS)
-                        continue
+                        return@launchTeacherRequest
                     }
                 }
                 val occurrence = _state.value.occurrences.firstOrNull { it.id == _state.value.teacherSession?.occurrenceId }

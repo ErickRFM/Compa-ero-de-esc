@@ -31,10 +31,12 @@ accounts or database records were changed.
    returned before its offline fallback could run. It now restores only a
    recently cached, owner-and-class-scoped teacher pass when all failed
    dependencies are transient; a 401/403/404 never grants offline authority.
-5. **Roster isolation and bounded work:** a malformed or temporarily unavailable
-   roster response previously cleared the teacher's valid attendance session
-   and signed QR. Ancillary roster failures no longer revoke authorization,
-   and polling stops rather than retrying forever while offline.
+5. **Roster isolation and bounded work:** an invalid/unsupported optional
+   roster payload must not erase a verified teacher session; polling stops
+   instead of running unbounded retries. When the backend's roster/identity
+   authority returns 401/403/404/5xx or is unreachable, private teacher
+   data remains hidden until revalidated. Unit privacy tests protect that
+   fail-closed behavior.
 6. **Test coverage:** HTTP request ID sanitization, login error mapping, and
    class-isolated offline attendance flows have regression tests.
 

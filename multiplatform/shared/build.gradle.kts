@@ -18,7 +18,7 @@ kotlin {
             // Do not expand this list without compiling the Apple targets.
             kotlin.srcDir("../../shared/contracts/src/main/kotlin")
             kotlin.include("org/companerodeescuela/mobile/**")
-            listOf("AuthContracts", "ApiResponse", "ApiError", "UserSummary", "UserRole").forEach {
+            listOf("AuthContracts", "ApiResponse", "ApiError", "UserSummary", "UserRole", "AccountStatus", "RegistrationContracts").forEach {
                 kotlin.include("org/companerodeescuela/shared/contracts/$it.kt")
             }
             dependencies {

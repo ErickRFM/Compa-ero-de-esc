@@ -500,7 +500,14 @@ class AttendanceViewModel @Inject constructor(
             ensureActive()
             when (result) {
                 is Outcome.Success -> _state.update { it.copy(roster = result.value) }
-                is Outcome.Failure -> clearTeacherScope(result.error)
+                is Outcome.Failure -> {
+                    val error = result.error
+                    if (error is AppError.Http && error.status in setOf(401, 403, 404)) {
+                        clearTeacherScope(error)
+                    } else {
+                        _state.update { it.copy(roster = null, campusRosterError = error.userMessage) }
+                    }
+                }
             }
         }
     }
@@ -881,8 +888,16 @@ class AttendanceViewModel @Inject constructor(
                 when (result) {
                     is Outcome.Success -> _state.update { it.copy(roster = result.value) }
                     is Outcome.Failure -> {
-                        clearTeacherScope(result.error)
-                        return@launchTeacherRequest
+                        val error = result.error
+                        if (error is AppError.Http && error.status in setOf(401, 403, 404)) {
+                            clearTeacherScope(error)
+                            return@launchTeacherRequest
+                        }
+                        // The roster is ancillary; a transient or malformed roster response
+                        // must not revoke a valid teacher pass or its signed QR.
+                        _state.update { it.copy(roster = null, campusRosterError = error.userMessage) }
+                        delay(ROSTER_POLL_INTERVAL_MS)
+                        continue
                     }
                 }
                 val occurrence = _state.value.occurrences.firstOrNull { it.id == _state.value.teacherSession?.occurrenceId }

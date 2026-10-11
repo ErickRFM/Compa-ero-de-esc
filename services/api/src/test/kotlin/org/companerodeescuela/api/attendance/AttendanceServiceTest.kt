@@ -500,7 +500,8 @@ class AttendanceServiceTest {
             ),
             clock = clock,
         )
-        val qr = AttendanceQrService("q".repeat(48).toCharArray(), repository, clock)
+        val qr = AttendanceQrService("q".repeat(48).toCharArray(), repository, clock,
+            accessPolicy = AttendanceAccessPolicy(repository, ProviderAttendanceOccurrenceResolver(provider)))
         val services = service(repository = repository, clock = clock,
             schoolPresenceService = presence, qrService = qr)
         val session = services.openSession("T-0001", requestFor(teacherOccurrence()))
@@ -539,7 +540,8 @@ class AttendanceServiceTest {
             ),
             clock = clock,
         )
-        val qr = AttendanceQrService("q".repeat(48).toCharArray(), repository, clock)
+        val qr = AttendanceQrService("q".repeat(48).toCharArray(), repository, clock,
+            accessPolicy = AttendanceAccessPolicy(repository, ProviderAttendanceOccurrenceResolver(provider)))
         val services = service(repository = repository, clock = clock,
             schoolPresenceService = presence, qrService = qr)
         val session = services.openSession("T-0001", requestFor(teacherOccurrence()))
@@ -571,7 +573,8 @@ class AttendanceServiceTest {
             ),
             clock = clock,
         )
-        val qr = AttendanceQrService("q".repeat(48).toCharArray(), repository, clock)
+        val qr = AttendanceQrService("q".repeat(48).toCharArray(), repository, clock,
+            accessPolicy = AttendanceAccessPolicy(repository, ProviderAttendanceOccurrenceResolver(provider)))
         val services = service(repository = repository, clock = clock,
             schoolPresenceService = presence, qrService = qr)
         val session = services.openSession("T-0001", requestFor(teacherOccurrence()))

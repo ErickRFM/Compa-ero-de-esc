@@ -38,7 +38,7 @@ class MongoPushOutboxIntegrationTest {
         val workerB = MongoPushOutboxRepository(db)
         assertTrue(workerA.enqueue(event))
         assertFalse(workerB.enqueue(event))
-        val now = Instant.parse("2030-01-01T00:00:00Z")
+        val now = Instant.now().plusSeconds(1)
         val results = coroutineScope {
             (0 until 24).map { index ->
                 async { if (index % 2 == 0) workerA.claim(now) else workerB.claim(now) }
@@ -54,7 +54,7 @@ class MongoPushOutboxIntegrationTest {
     @Test fun `expired Mongo lease can be reclaimed but old worker cannot acknowledge it`() = withDatabase { db ->
         val repo = MongoPushOutboxRepository(db)
         assertTrue(repo.enqueue(item("b")))
-        val now = Instant.parse("2030-01-01T00:00:00Z")
+        val now = Instant.now().plusSeconds(1)
         val first = assertNotNull(repo.claim(now))
         assertNull(repo.claim(now.plusSeconds(89)))
         val next = assertNotNull(MongoPushOutboxRepository(db).claim(now.plusSeconds(91)))
@@ -71,7 +71,7 @@ class MongoPushOutboxIntegrationTest {
         val repo = MongoPushOutboxRepository(db)
         val task = item("c")
         assertTrue(repo.enqueue(task))
-        val now = Instant.parse("2030-01-01T00:00:00Z")
+        val now = Instant.now().plusSeconds(1)
         val claimed = assertNotNull(repo.claim(now))
         assertTrue(repo.finish(claimed, PushDeliveryResult.REJECTED, now))
         assertFalse(MongoPushOutboxRepository(db).enqueue(task))

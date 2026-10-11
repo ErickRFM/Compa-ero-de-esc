@@ -81,7 +81,7 @@ class NetworkPushTransport : PushHttpTransport {
         withContext(Dispatchers.IO) {
             require(url.scheme == "https" &&
                 ((url.host == "oauth2.googleapis.com" && url.path == "/token") ||
-                    (url.host == "fcm.googleapis.com" && url.path.matches(Regex("/v1/projects/[a-z][a-z0-9-]{3,99}/messages:send"))))
+                    (url.host == "fcm.googleapis.com" && url.path.matches(Regex("/v1/projects/[a-z][a-z0-9-]{3,99}/messages:send")))))
             val connection = url.toURL().openConnection() as HttpURLConnection
             try {
                 connection.requestMethod = "POST"

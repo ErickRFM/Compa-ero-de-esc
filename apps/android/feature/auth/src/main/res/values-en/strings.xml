@@ -47,7 +47,12 @@
 <string name="auth_error_network">We could not connect. Check your internet connection.</string>
 <string name="auth_error_storage">We could not store your session securely.</string>
 <string name="auth_error_response">We received a response we could not read.</string>
-<string name="auth_error_generic">We could not complete the operation. Please try again.</string>
+<string name="auth_error_request">The server rejected the request. Check the details and try again.</string>
+    <string name="auth_error_endpoint">The app could not find sign-in on the server. Check the service version.</string>
+    <string name="auth_error_timeout">The server took too long to respond. Please try again.</string>
+    <string name="auth_error_conflict">We could not sign in because of a data conflict. Please try again.</string>
+    <string name="auth_error_reference">Error reference: %1$s</string>
+    <string name="auth_error_generic">We could not complete the operation. Please try again.</string>
 <string name="registration_subtitle">Choose your profile and verify your email to continue.</string>
 <string name="registration_type">Account type</string>
 <string name="registration_data">Your details</string>

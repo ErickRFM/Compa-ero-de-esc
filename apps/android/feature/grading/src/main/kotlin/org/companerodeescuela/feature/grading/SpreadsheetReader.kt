@@ -222,7 +222,7 @@ object SpreadsheetReader {
             setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
             isXIncludeAware = false
             isExpandEntityReferences = false
-            setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "")
-            setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "")
+            runCatching { setAttribute("http://javax.xml.XMLConstants/property/accessExternalDTD", "") }
+            runCatching { setAttribute("http://javax.xml.XMLConstants/property/accessExternalSchema", "") }
         }.newDocumentBuilder().parse(ByteArrayInputStream(bytes))
 }

@@ -15,6 +15,8 @@ import org.companerodeescuela.api.security.MfaService
 import java.time.Clock
 import java.time.LocalTime
 import java.net.URI
+import kotlinx.coroutines.CancellationException
+import org.companerodeescuela.api.devices.PushOutboxService
 
 class AcademicEventService(
     private val repository: AcademicEventRepository,
@@ -24,6 +26,7 @@ class AcademicEventService(
     private val institutions:InstitutionRepository?=null,
     private val mfa:MfaService?=null,
     private val clock:Clock=Clock.systemUTC(),
+    private val notifications: PushOutboxService? = null,
 ) {
     private fun policy()=InstitutionScopePolicy(accounts ?: throw ApiException.DependencyUnavailable("Native accounts are unavailable"),clock)
     private fun id(value:String):String {
@@ -144,7 +147,10 @@ class AcademicEventService(
         if(existing!=null) {
             writer(actor,existing)
             if(existing.institutionId!=actual.institution) throw ApiException.Forbidden("Existing event institution is immutable")
-            if(existing.revision==request.expectedRevision+1 && existing.operationId==operation && existing.commandDigest==digest && existing.audit.lastOrNull()?.actorId==current.id) return existing
+            if(existing.revision==request.expectedRevision+1 && existing.operationId==operation && existing.commandDigest==digest && existing.audit.lastOrNull()?.actorId==current.id) {
+                enqueueStudentNotification(existing)
+                return existing
+            }
             if(id==null || existing.revision!=request.expectedRevision || existing.cancelled) throw ApiException.Conflict("Event revision or operation changed")
         } else if(id!=null || request.expectedRevision!=0L) throw ApiException.Conflict("Existing event revision is required")
         val audit=existing?.audit.orEmpty()
@@ -156,8 +162,29 @@ class AcademicEventService(
             institutionId=actual.institution,groupScopeRevision=actual.groupRevision,revision=request.expectedRevision+1,operationId=operation,commandDigest=digest,
             authorRoleGeneration=existing?.authorRoleGeneration ?: (current.roleGenerations[UserRole.TEACHER] ?: -1),cancelled=false,
             audit=audit+AcademicEventAuditEntry(current.id,operation,digest,request.expectedRevision,clock.instant().epochSecond))
-        return repository.saveScoped(candidate,request.expectedRevision) ?: throw ApiException.Conflict("Event changed concurrently")
+        val saved = repository.saveScoped(candidate,request.expectedRevision) ?: throw ApiException.Conflict("Event changed concurrently")
+        enqueueStudentNotification(saved)
+        return saved
     }
+    private suspend fun enqueueStudentNotification(event: AcademicEvent) {
+        if (event.target.scope != AcademicEventScope.STUDENT || event.cancelled) return
+        try {
+            // The target has already passed current-account, role and institution checks in scope().
+            // Keep private event content off lock screens; the authenticated feed has the full detail.
+            notifications?.enqueueForOwner(
+                eventId = "academic:${event.id}:${event.revision}",
+                owner = "NATIVE:${event.target.id}",
+                title = "Nuevo aviso académico",
+                body = "Tienes una actualización en Compañero de Clase.",
+            )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // The event has already committed: a push transport outage cannot roll it back.
+            // Client retries with the same operation can safely re-enqueue the deterministic ID.
+        }
+    }
+
     suspend fun cancelScoped(actor:UserSummary,id:String,request:AcademicOperationRequest):Boolean {
         val event=repository.findById(this.id(id)) ?: throw ApiException.NotFound("Event was not found")
         writer(actor,event);val operation=this.id(request.operationId);revision(request.expectedRevision)

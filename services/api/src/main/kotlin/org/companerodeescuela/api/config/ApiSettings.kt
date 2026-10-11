@@ -61,8 +61,11 @@ data class ApiSettings(
     val verificationEmailApiKey: CharArray? = null,
     val verificationEmailSender: String? = null,
     val mfaEncryptionKey: ByteArray? = null,
+    /** Private Firebase service-account JSON, decoded only at boot; never render or log. */
+    val firebaseServiceAccountJson: CharArray? = null,
 ) {
     val hasVerificationEmail: Boolean get() = verificationEmailApiKey != null && verificationEmailSender != null
+    val hasFirebasePush: Boolean get() = firebaseServiceAccountJson != null
 
     val hasAuthentication: Boolean
         get() = jwtSecret != null
@@ -93,7 +96,8 @@ data class ApiSettings(
             schoolWifiBssids == other.schoolWifiBssids &&
             attendanceGraceMinutes == other.attendanceGraceMinutes &&
             hasVerificationEmail == other.hasVerificationEmail && verificationEmailSender == other.verificationEmailSender &&
-            (mfaEncryptionKey != null) == (other.mfaEncryptionKey != null)
+            (mfaEncryptionKey != null) == (other.mfaEncryptionKey != null) &&
+            hasFirebasePush == other.hasFirebasePush
     }
 
     override fun hashCode(): Int {
@@ -116,6 +120,7 @@ data class ApiSettings(
         result = 31 * result + hasVerificationEmail.hashCode()
         result = 31 * result + (verificationEmailSender?.hashCode() ?: 0)
         result = 31 * result + (mfaEncryptionKey != null).hashCode()
+        result = 31 * result + hasFirebasePush.hashCode()
         return result
     }
 
@@ -136,6 +141,7 @@ data class ApiSettings(
             "attendanceQrSigningConfigured=$hasAttendanceQrSigning, " +
             "verificationEmailConfigured=$hasVerificationEmail, " +
             "mfaEncryptionConfigured=${mfaEncryptionKey != null}, " +
+            "firebasePushConfigured=$hasFirebasePush, " +
             "schoolPresenceConfigured=$hasSchoolPresenceVerification" +
             ")"
 }
@@ -191,6 +197,17 @@ class SettingsLoader(
             !Regex("^[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Za-z]{2,}$").matches(verificationEmailSender)))
             throw ConfigurationException("Invalid VERIFICATION_EMAIL_SENDER")
 
+        val firebaseJson = env("FIREBASE_SERVICE_ACCOUNT_JSON_B64")?.takeIf { it.isNotBlank() }?.let { encoded ->
+            if (encoded.length > 24_000 || !encoded.matches(Regex("[A-Za-z0-9+/]+={0,2}")))
+                throw ConfigurationException("Invalid Firebase credentials encoding")
+            val decoded = runCatching { Base64.getDecoder().decode(encoded) }.getOrNull()
+                ?: throw ConfigurationException("Invalid Firebase credentials encoding")
+            val json = runCatching { decoded.toString(Charsets.UTF_8) }.getOrElse {
+                throw ConfigurationException("Invalid Firebase credentials encoding")
+            }
+            org.companerodeescuela.api.devices.FirebaseServiceAccount.parse(json)
+            json
+        }
         val mfaKey = env("MFA_ENCRYPTION_KEY")?.let { encoded ->
             val decoded = runCatching { Base64.getUrlDecoder().decode(encoded) }.getOrNull()
             if (!Regex("[A-Za-z0-9_-]{43}").matches(encoded) || decoded?.size != 32 ||
@@ -234,6 +251,7 @@ class SettingsLoader(
             verificationEmailApiKey = verificationEmailKey?.toCharArray(),
             verificationEmailSender = verificationEmailSender,
             mfaEncryptionKey = mfaKey,
+            firebaseServiceAccountJson = firebaseJson?.toCharArray(),
         )
     }
 

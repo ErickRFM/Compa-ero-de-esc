@@ -99,7 +99,7 @@ class FcmDeliveryTest {
         val service = PushOutboxService(tokens,outbox,PushGateway { _, _, _ ->
             sends++
             PushDeliveryResult.INVALID_TOKEN
-        },clock, authorizeRecipient = { true })
+        },clock, authorizeRecipient = { true }, authorizeSession = { _, _ -> true })
         assertEquals(1,service.enqueueForOwner("event-1","NATIVE:student-a","Nuevo aviso","Tienes un aviso"))
         assertEquals(0,service.enqueueForOwner("event-1","NATIVE:student-a","Nuevo aviso","Tienes un aviso"))
         assertTrue(service.dispatchNext())
@@ -123,6 +123,23 @@ class FcmDeliveryTest {
         assertEquals(0,sends)
         // A suspended account is not sufficient reason to delete a valid FCM token.
         assertEquals(listOf(token),devices.listTokens(setOf("NATIVE:student-revoked")))
+        assertFalse(service.dispatchNext())
+    }
+
+    @Test fun `logged out session cannot receive push even if registration remains`() = runBlocking {
+        val devices = InMemoryDeviceTokenRepository()
+        val outbox = InMemoryPushOutboxRepository()
+        val token = "fcm_test_token_123456789"
+        devices.register("NATIVE:student-a", token, "android", null, "device-1", "session-revoked")
+        var sent = false
+        val service = PushOutboxService(devices, outbox, PushGateway { _, _, _ ->
+            sent = true
+            PushDeliveryResult.ACCEPTED
+        }, authorizeRecipient = { true }, authorizeSession = { _, _ -> false })
+        assertEquals("session-revoked", devices.sessionIdFor("NATIVE:student-a", token))
+        assertEquals(1, service.enqueueForOwner("event-logout", "NATIVE:student-a", "Aviso", "Texto"))
+        assertTrue(service.dispatchNext())
+        assertFalse(sent)
         assertFalse(service.dispatchNext())
     }
 

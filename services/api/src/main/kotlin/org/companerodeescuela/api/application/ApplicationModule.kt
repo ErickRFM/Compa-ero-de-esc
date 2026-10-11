@@ -100,6 +100,7 @@ fun Application.module(
         tutoringService = academicGraph.tutoringService,
         groupRepository = academicGraph.groupRepository,
         accounts=identityGraph.accounts,classrooms=classroomGraph.classroomService,institutions=identityGraph.institutions,mfa=identityGraph.mfa,
+        refreshSessions=identityGraph.refreshSessions,
     )
 
     // Only a fully configured, authenticated Mongo deployment starts the durable worker.

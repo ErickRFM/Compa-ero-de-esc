@@ -21,6 +21,9 @@ import org.companerodeescuela.api.excuses.InMemoryExcuseRepository
 import org.companerodeescuela.api.excuses.MongoExcuseRepository
 import org.companerodeescuela.api.tutoring.TutorAssignmentService
 import org.companerodeescuela.shared.contracts.UserRole
+import org.companerodeescuela.api.auth.RefreshSessionRepository
+import org.companerodeescuela.api.auth.SessionIdentitySource
+import java.time.Instant
 
 data class OperationsFeatureGraph(
     val eventService: AcademicEventService,
@@ -38,6 +41,7 @@ fun buildOperationsFeatureGraph(
     classrooms:org.companerodeescuela.api.classroom.ClassroomService?=null,
     institutions:org.companerodeescuela.api.institutions.InstitutionRepository?=null,
     mfa:org.companerodeescuela.api.security.MfaService?=null,
+    refreshSessions: RefreshSessionRepository? = null,
 ): OperationsFeatureGraph {
     val eventRepository = when {
         !settings.hasAuthentication -> InMemoryAcademicEventRepository()
@@ -76,6 +80,14 @@ fun buildOperationsFeatureGraph(
             val current = id?.let { accounts?.findById(it) }
             current?.permitsSession == true && current.emailVerifiedAt != null &&
                 UserRole.STUDENT in current.roles
+        },
+        authorizeSession = { owner, token ->
+            val sessionId = devices.sessionIdFor(owner, token)
+            val session = sessionId?.let { refreshSessions?.find(it) }
+            session != null && session.revokedAt == null &&
+                session.expiresAt.isAfter(Instant.now()) &&
+                session.identitySource == SessionIdentitySource.NATIVE &&
+                owner == "NATIVE:${session.user.id}"
         },
     )
 

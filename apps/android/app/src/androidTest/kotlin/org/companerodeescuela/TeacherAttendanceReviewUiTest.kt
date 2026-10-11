@@ -140,7 +140,7 @@ class TeacherAttendanceReviewUiTest {
         override fun observe(ownerId: String): Flow<List<LocalAttendanceRecord>> = flowOf(emptyList())
         override suspend fun enqueue(operationId: String, ownerId: String, sessionId: String, deviceTimestampEpochSeconds: Long,
             qrToken: String?, schoolNetwork: SchoolNetworkEvidence?): LocalAttendanceRecord = error("No student capture")
-        override suspend fun nextReady(nowEpochSeconds: Long): PendingAttendanceOperation? = null
+        override suspend fun nextReady(nowEpochSeconds: Long, ownerId: String): PendingAttendanceOperation? = null
         override suspend fun recordRetry(operationId: String, nextAttemptAtEpochSeconds: Long, errorCode: String) = Unit
         override suspend fun markAuthRequired(operationId: String) = Unit
         override suspend fun markRejected(operationId: String, reasonCode: AttendanceReasonCode) = Unit

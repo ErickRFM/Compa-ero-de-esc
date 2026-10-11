@@ -135,6 +135,12 @@ class AttendanceViewModel @Inject constructor(
     private fun teacherScopeFailed(error: AppError): Boolean =
         error !is AppError.Http || error.status in setOf(401, 403, 404) || error.status >= 500
 
+    /** An unreachable identity/roster authority hides private data; a malformed
+     * optional roster payload alone does not revoke a verified teacher session. */
+    private fun rosterAuthorityFailed(error: AppError): Boolean =
+        error is AppError.Network || error is AppError.Http &&
+            (error.status in setOf(401, 403, 404) || error.status >= 500)
+
     fun setClassroomContext(selection: TeacherClassContext?) {
         modeGeneration++
         studentPollingJob?.cancel()
@@ -500,7 +506,14 @@ class AttendanceViewModel @Inject constructor(
             ensureActive()
             when (result) {
                 is Outcome.Success -> _state.update { it.copy(roster = result.value) }
-                is Outcome.Failure -> clearTeacherScope(result.error)
+                is Outcome.Failure -> {
+                    val error = result.error
+                    if (rosterAuthorityFailed(error)) {
+                        clearTeacherScope(error)
+                    } else {
+                        _state.update { it.copy(roster = null, campusRosterError = error.userMessage) }
+                    }
+                }
             }
         }
     }
@@ -686,12 +699,55 @@ class AttendanceViewModel @Inject constructor(
             val week = repository.academicWeek(LocalDate.now().toString())
             val active = repository.activeTeacherSessions()
             ensureActive()
-            if (week is Outcome.Failure || active is Outcome.Failure) {
-                clearTeacherScope(if (week is Outcome.Failure) week.error else (active as Outcome.Failure).error)
+            val context = requestedClassroom
+            val failures = listOfNotNull(
+                (week as? Outcome.Failure)?.error,
+                (active as? Outcome.Failure)?.error,
+            )
+            if (failures.isNotEmpty()) {
+                // An offline QR is only a short-lived cached teacher session, never new authority.
+                // Any non-transient (especially 401/403/404) response invalidates the fallback.
+                val transient = failures.all { error ->
+                    error is AppError.Network || error is AppError.Http &&
+                        (error.status in setOf(408, 425, 429) || error.status in 500..599)
+                }
+                val ownerId = _state.value.userId
+                val restored = if (transient && ownerId != null) {
+                    repository.restoreTeacherSession(ownerId, context)
+                } else null
+                // A successful schedule response is authoritative even when sessions fail.
+                val allowedInWeek = week !is Outcome.Success || week.value.occurrences.any { occurrence ->
+                    restored != null && occurrence.id == restored.occurrenceId &&
+                        occurrence.courseId == restored.courseId &&
+                        occurrence.groupName == restored.groupName &&
+                        (context == null ||
+                            context.matches(occurrence.subjectName, occurrence.groupName))
+                }
+                if (restored == null || !allowedInWeek) {
+                    clearTeacherScope(failures.first())
+                    return@launchTeacherRequest
+                }
+                _state.update {
+                    it.copy(
+                        loading = false,
+                        occurrences = week.valueOrNull()?.occurrences.orEmpty().filter { occurrence ->
+                            context == null || context.matches(occurrence.subjectName, occurrence.groupName)
+                        },
+                        occurrencesLoaded = week is Outcome.Success,
+                        sessionsLoaded = false,
+                        activeSessions = listOf(restored),
+                        teacherSession = restored,
+                        offlineQrPrepared = true,
+                        qrVisualState = QrVisualState.LOADING,
+                        errorMessage = null,
+                    )
+                }
+                // Roster requests cannot authorize an offline pass; avoid clearing the
+                // restored QR on a transient roster outage. A refresh rechecks live state.
+                startQrRotation(restored.id)
                 return@launchTeacherRequest
             }
 
-            val context = requestedClassroom
             val matching = week.valueOrNull()?.occurrences.orEmpty().filter {
                 context == null || context.matches(it.subjectName, it.groupName)
             }
@@ -838,7 +894,14 @@ class AttendanceViewModel @Inject constructor(
                 when (result) {
                     is Outcome.Success -> _state.update { it.copy(roster = result.value) }
                     is Outcome.Failure -> {
-                        clearTeacherScope(result.error)
+                        val error = result.error
+                        if (rosterAuthorityFailed(error)) {
+                            clearTeacherScope(error)
+                            return@launchTeacherRequest
+                        }
+                        // A malformed/unsupported optional roster response must not destroy
+                        // a verified teacher pass. Stop polling until the next manual refresh.
+                        _state.update { it.copy(roster = null, campusRosterError = error.userMessage) }
                         return@launchTeacherRequest
                     }
                 }

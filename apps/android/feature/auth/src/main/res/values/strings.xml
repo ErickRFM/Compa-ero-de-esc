@@ -47,7 +47,12 @@
 <string name="auth_error_network">No pudimos conectar. Revisa tu conexión a internet.</string>
 <string name="auth_error_storage">No pudimos guardar tu sesión de forma segura.</string>
 <string name="auth_error_response">Recibimos una respuesta que no pudimos interpretar.</string>
-<string name="auth_error_generic">No pudimos completar la operación. Inténtalo de nuevo.</string>
+<string name="auth_error_request">Solicitud rechazada por el servidor. Comprueba los datos e inténtalo de nuevo.</string>
+    <string name="auth_error_endpoint">La app no encontró el acceso en el servidor. Verifica la versión del servicio.</string>
+    <string name="auth_error_timeout">El servidor tardó demasiado en responder. Inténtalo nuevamente.</string>
+    <string name="auth_error_conflict">No pudimos iniciar la sesión por un conflicto de datos. Inténtalo de nuevo.</string>
+    <string name="auth_error_reference">Referencia del error: %1$s</string>
+    <string name="auth_error_generic">No pudimos completar la operación. Inténtalo de nuevo.</string>
 <string name="registration_subtitle">Elige tu perfil y verifica tu correo para continuar.</string>
 <string name="registration_type">Tipo de cuenta</string>
 <string name="registration_data">Tus datos</string>

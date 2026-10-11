@@ -38,7 +38,12 @@ sealed interface AppError {
     }
 
     /** The server answered with a non-success status. */
-    data class Http(val status: Int, override val technicalDetail: String? = null) : AppError {
+    data class Http(
+        val status: Int,
+        override val technicalDetail: String? = null,
+        /** Opaque safe server correlation identifier, not a response body or credential. */
+        val requestId: String? = null,
+    ) : AppError {
         override val userMessage: String = when (status) {
             401 -> "Tu sesión expiró. Inicia sesión nuevamente."
             403 -> "No tienes permiso para ver esta información."

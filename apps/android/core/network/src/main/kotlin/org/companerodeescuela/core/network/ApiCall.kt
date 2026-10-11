@@ -38,9 +38,16 @@ suspend fun <T> apiCall(block: suspend () -> Outcome<T>): Outcome<T> = try {
     Outcome.Failure(AppError.Unknown(e.message))
 }
 
+/** Only preserve bounded printable server correlation IDs. */
+@PublishedApi
+internal fun HttpResponse.safeRequestId(): String? =
+    headers["X-Request-Id"]?.takeIf { value ->
+        value.length in 1..80 && value.all { (it.isLetterOrDigit() && it.code < 128) || it == '-' }
+    }
+
 private fun ResponseException.toAppError(): AppError {
     val detail = runCatching { response.status.description }.getOrNull()
-    return AppError.Http(status = response.status.value, technicalDetail = detail)
+    return AppError.Http(status = response.status.value, technicalDetail = detail, requestId = response.safeRequestId())
 }
 
 /** Longest error body kept for the log. Error bodies are never shown to users. */
@@ -55,6 +62,7 @@ suspend inline fun <reified T> HttpResponse.requireBody(): Outcome<T> =
             AppError.Http(
                 status = status.value,
                 technicalDetail = runCatching { bodyAsText() }.getOrNull()?.take(MAX_ERROR_BODY),
+                requestId = safeRequestId(),
             ),
         )
     }
@@ -62,7 +70,7 @@ suspend inline fun <reified T> HttpResponse.requireBody(): Outcome<T> =
 /** Convenience for endpoints whose success payload is empty. */
 suspend fun HttpResponse.requireUnit(): Outcome<Unit> =
     if (status.value in 200..299) Outcome.Success(Unit)
-    else Outcome.Failure(AppError.Http(status.value, status.description))
+    else Outcome.Failure(AppError.Http(status.value, status.description, safeRequestId()))
 
 /** True when the caller must re-authenticate. */
 fun AppError.isUnauthorized(): Boolean = this is AppError.Http && status == 401

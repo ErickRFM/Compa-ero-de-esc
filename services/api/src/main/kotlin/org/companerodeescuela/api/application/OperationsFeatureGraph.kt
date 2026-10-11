@@ -6,6 +6,7 @@ import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.database.MongoConnection
 import org.companerodeescuela.api.devices.DeviceTokenRepository
 import org.companerodeescuela.api.devices.InMemoryDeviceTokenRepository
+import org.companerodeescuela.api.devices.MongoDeviceTokenRepository
 import org.companerodeescuela.api.events.AcademicEventService
 import org.companerodeescuela.api.events.InMemoryAcademicEventRepository
 import org.companerodeescuela.api.events.MongoAcademicEventRepository
@@ -50,6 +51,11 @@ fun buildOperationsFeatureGraph(
             tutoring = tutoringService,
             groupRepository = groupRepository,
         ),
-        deviceTokenRepository = InMemoryDeviceTokenRepository(),
+        deviceTokenRepository = when {
+            !settings.hasAuthentication -> InMemoryDeviceTokenRepository()
+            settings.mongo.isConfigured -> MongoDeviceTokenRepository(mongoConnection.database())
+            settings.environment == Environment.LOCAL -> InMemoryDeviceTokenRepository()
+            else -> error("FCM device registration requires MongoDB outside local development")
+        },
     )
 }

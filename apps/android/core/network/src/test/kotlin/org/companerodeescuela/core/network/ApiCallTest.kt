@@ -220,6 +220,45 @@ class ApiCallTest {
         )
     }
 
+
+    @Test
+    fun `http errors retain only safe request ids for support`() = runTest {
+        val client = createApiClient(ApiEnvironment.Emulator, MockEngine {
+            respond(
+                content = """{"code":"VALIDATION_ERROR","message":"untrusted server message"}""",
+                status = HttpStatusCode.BadRequest,
+                headers = io.ktor.http.headers {
+                    append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    append("X-Request-Id", "trace-123-abc")
+                },
+            )
+        })
+        val error = assertIs<AppError.Http>(
+            assertIs<Outcome.Failure>(apiCall { client.get("auth/login").requireBody<ApiProbe>() }).error,
+        )
+        assertEquals(400, error.status)
+        assertEquals("trace-123-abc", error.requestId)
+        assertTrue(!error.userMessage.contains("untrusted"))
+    }
+
+    @Test
+    fun `unsafe response request ids are discarded`() = runTest {
+        val client = createApiClient(ApiEnvironment.Emulator, MockEngine {
+            respond(
+                content = "{}",
+                status = HttpStatusCode.BadRequest,
+                headers = io.ktor.http.headers {
+                    append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    append("X-Request-Id", "not safe: <script>")
+                },
+            )
+        })
+        val error = assertIs<AppError.Http>(
+            assertIs<Outcome.Failure>(apiCall { client.get("auth/login").requireBody<ApiProbe>() }).error,
+        )
+        assertEquals(null, error.requestId)
+    }
+
     @kotlinx.serialization.Serializable
     private data class ApiProbe(val unused: String = "")
 

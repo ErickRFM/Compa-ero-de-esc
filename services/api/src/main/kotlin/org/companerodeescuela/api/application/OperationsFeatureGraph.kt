@@ -20,6 +20,7 @@ import org.companerodeescuela.api.excuses.ExcuseService
 import org.companerodeescuela.api.excuses.InMemoryExcuseRepository
 import org.companerodeescuela.api.excuses.MongoExcuseRepository
 import org.companerodeescuela.api.tutoring.TutorAssignmentService
+import org.companerodeescuela.shared.contracts.UserRole
 
 data class OperationsFeatureGraph(
     val eventService: AcademicEventService,
@@ -66,7 +67,17 @@ fun buildOperationsFeatureGraph(
     val pushSender = settings.firebaseServiceAccountJson?.let {
         FcmHttpV1Gateway(FirebaseServiceAccount.parse(it.concatToString()))
     } ?: UnavailablePushGateway
-    val pushService = PushOutboxService(devices, outbox, pushSender)
+    val pushService = PushOutboxService(
+        devices = devices,
+        outbox = outbox,
+        sender = pushSender,
+        authorizeRecipient = { owner ->
+            val id = owner.takeIf { it.startsWith("NATIVE:") }?.removePrefix("NATIVE:")
+            val current = id?.let { accounts?.findById(it) }
+            current?.permitsSession == true && current.emailVerifiedAt != null &&
+                UserRole.STUDENT in current.roles
+        },
+    )
 
     return OperationsFeatureGraph(
         eventService = AcademicEventService(repository=eventRepository,accounts=accounts,groups=groupRepository,classrooms=classrooms,institutions=institutions,mfa=mfa,notifications=pushService),

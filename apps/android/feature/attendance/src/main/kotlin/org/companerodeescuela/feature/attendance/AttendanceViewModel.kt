@@ -686,6 +686,7 @@ class AttendanceViewModel @Inject constructor(
             val week = repository.academicWeek(LocalDate.now().toString())
             val active = repository.activeTeacherSessions()
             ensureActive()
+            val context = requestedClassroom
             val failures = listOfNotNull(
                 (week as? Outcome.Failure)?.error,
                 (active as? Outcome.Failure)?.error,
@@ -699,15 +700,15 @@ class AttendanceViewModel @Inject constructor(
                 }
                 val ownerId = _state.value.userId
                 val restored = if (transient && ownerId != null) {
-                    repository.restoreTeacherSession(ownerId, requestedClassroom)
+                    repository.restoreTeacherSession(ownerId, context)
                 } else null
                 // A successful schedule response is authoritative even when sessions fail.
                 val allowedInWeek = week !is Outcome.Success || week.value.occurrences.any { occurrence ->
                     restored != null && occurrence.id == restored.occurrenceId &&
                         occurrence.courseId == restored.courseId &&
                         occurrence.groupName == restored.groupName &&
-                        (requestedClassroom == null ||
-                            requestedClassroom!!.matches(occurrence.subjectName, occurrence.groupName))
+                        (context == null ||
+                            context.matches(occurrence.subjectName, occurrence.groupName))
                 }
                 if (restored == null || !allowedInWeek) {
                     clearTeacherScope(failures.first())
@@ -717,8 +718,7 @@ class AttendanceViewModel @Inject constructor(
                     it.copy(
                         loading = false,
                         occurrences = week.valueOrNull()?.occurrences.orEmpty().filter { occurrence ->
-                            requestedClassroom == null ||
-                                requestedClassroom!!.matches(occurrence.subjectName, occurrence.groupName)
+                            context == null || context.matches(occurrence.subjectName, occurrence.groupName)
                         },
                         occurrencesLoaded = week is Outcome.Success,
                         sessionsLoaded = false,
@@ -735,7 +735,6 @@ class AttendanceViewModel @Inject constructor(
                 return@launchTeacherRequest
             }
 
-            val context = requestedClassroom
             val matching = week.valueOrNull()?.occurrences.orEmpty().filter {
                 context == null || context.matches(it.subjectName, it.groupName)
             }

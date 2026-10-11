@@ -1,6 +1,10 @@
 package org.companerodeescuela.notifications
 
 import android.content.Context
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.app.NotificationManagerCompat
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -109,6 +113,11 @@ class PushTokenWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         if (!BuildConfig.FIREBASE_CONFIGURED) return Result.success()
+        // Never fetch/register an FCM destination until notifications are enabled.
+        if (Build.VERSION.SDK_INT >= 33 &&
+            applicationContext.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) return Result.success()
+        if (!NotificationManagerCompat.from(applicationContext).areNotificationsEnabled()) return Result.success()
         val token = try {
             FirebaseMessaging.getInstance().token.await()
         } catch (cancelled: kotlinx.coroutines.CancellationException) {

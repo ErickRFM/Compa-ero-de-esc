@@ -27,8 +27,16 @@ accounts or database records were changed.
    ASCII alphanumeric/hyphen IDs bounded to 80 characters and shows them as
    a safe support reference. HTTP response bodies, passwords, tokens and
    sensitive headers are not displayed.
-4. **Test coverage:** HTTP request ID sanitization and login error mapping
-   have regression tests.
+4. **Teacher session recovery (CI regression):** `refreshTeacher()` previously
+   returned before its offline fallback could run. It now restores only a
+   recently cached, owner-and-class-scoped teacher pass when all failed
+   dependencies are transient; a 401/403/404 never grants offline authority.
+5. **Roster isolation and bounded work:** a malformed or temporarily unavailable
+   roster response previously cleared the teacher's valid attendance session
+   and signed QR. Ancillary roster failures no longer revoke authorization,
+   and polling stops rather than retrying forever while offline.
+6. **Test coverage:** HTTP request ID sanitization, login error mapping, and
+   class-isolated offline attendance flows have regression tests.
 
 ## Still requiring live evidence
 

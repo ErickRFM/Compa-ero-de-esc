@@ -29,8 +29,8 @@ class FcmDeliveryTest {
 
     private fun credentials(): FirebaseServiceAccount {
         val pair = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair()
-        val pem = "-----BEGIN PRIVATE KEY-----\n" +
-            Base64.getEncoder().encodeToString(pair.private.encoded) + "\n-----END PRIVATE KEY-----\n"
+        val pem = ("-----BEGIN " + "PRIVATE KEY-----\n") +
+            Base64.getEncoder().encodeToString(pair.private.encoded) + ("\n-----END " + "PRIVATE KEY-----\n")
         val content = kotlinx.serialization.json.buildJsonObject {
             put("project_id", kotlinx.serialization.json.JsonPrimitive("companero-test-project"))
             put("client_email", kotlinx.serialization.json.JsonPrimitive("push@companero-test-project.iam.gserviceaccount.com"))

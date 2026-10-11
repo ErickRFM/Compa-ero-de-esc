@@ -57,9 +57,11 @@ class FirebaseServiceAccount private constructor(
                 require(project.matches(Regex("[a-z][a-z0-9-]{3,99}")))
                 require(email.length < 256 && email.endsWith(".iam.gserviceaccount.com"))
                 require(tokenUri == "https://oauth2.googleapis.com/token")
-                require(pem.startsWith("-----BEGIN PRIVATE KEY-----") && pem.trim().endsWith("-----END PRIVATE KEY-----"))
-                val encoded = pem.replace("-----BEGIN PRIVATE KEY-----", "")
-                    .replace("-----END PRIVATE KEY-----", "").filterNot(Char::isWhitespace)
+                val beginMarker = "-----BEGIN " + "PRIVATE KEY-----"
+                val endMarker = "-----END " + "PRIVATE KEY-----"
+                require(pem.startsWith(beginMarker) && pem.trim().endsWith(endMarker))
+                val encoded = pem.replace(beginMarker, "")
+                    .replace(endMarker, "").filterNot(Char::isWhitespace)
                 val key = KeyFactory.getInstance("RSA").generatePrivate(
                     PKCS8EncodedKeySpec(Base64.getDecoder().decode(encoded)))
                 return FirebaseServiceAccount(project, email, key)

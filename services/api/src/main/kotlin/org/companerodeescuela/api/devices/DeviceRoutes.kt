@@ -30,9 +30,11 @@ data class DeviceRegistrationRequest(
 )
 
 interface DeviceTokenRepository {
-    suspend fun register(userId: String, token: String, platform: String, model: String?, deviceId: String? = null)
+    suspend fun register(userId: String, token: String, platform: String, model: String?, deviceId: String? = null, sessionId: String? = null)
     suspend fun unregister(userId: String, token: String): Boolean
     suspend fun listTokens(userIds: Set<String>): List<String>
+    /** A legacy record without a session binding must never be sent push. */
+    suspend fun sessionIdFor(userId: String, token: String): String? = null
     /** Revoke a token after FCM confirms an UNREGISTERED/invalid destination. */
     suspend fun deactivateInvalid(token: String): Boolean = false
 }
@@ -52,7 +54,9 @@ fun Route.deviceRoutes(settings: ApiSettings, repository: DeviceTokenRepository)
             post("/register") {
                 val ownerId = call.deviceOwnerId()
                 val request = call.receive<DeviceRegistrationRequest>()
-                repository.register(ownerId, request.token, request.platform, request.model, request.deviceId)
+                val sessionId = call.requirePlatformPrincipal().payload.getClaim("session_id")
+                    .asString()?.takeIf(String::isNotBlank) ?: throw ApiException.Unauthorized()
+                repository.register(ownerId, request.token, request.platform, request.model, request.deviceId, sessionId)
                 call.respond(ApiResponse(data = true, requestId = call.requestId()))
             }
             delete("/register") {

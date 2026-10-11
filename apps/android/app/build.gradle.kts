@@ -25,6 +25,26 @@ fun validateApiBaseUrl(name: String, value: String, requireHttps: Boolean = fals
     }
 }
 
+// Firebase options are public project identifiers, never service-account credentials.
+// All four fields must be supplied as a set or FCM stays completely disabled.
+val firebaseAppId = providers.environmentVariable("COMPANERO_FIREBASE_APP_ID").orElse("").get()
+val firebaseProjectId = providers.environmentVariable("COMPANERO_FIREBASE_PROJECT_ID").orElse("").get()
+val firebaseSenderId = providers.environmentVariable("COMPANERO_FIREBASE_SENDER_ID").orElse("").get()
+val firebaseApiKey = providers.environmentVariable("COMPANERO_FIREBASE_API_KEY").orElse("").get()
+val firebaseValues = listOf(firebaseAppId, firebaseProjectId, firebaseSenderId, firebaseApiKey)
+val firebaseConfigured = firebaseValues.all(String::isNotBlank)
+require(firebaseValues.all(String::isBlank) || firebaseConfigured) {
+    "Firebase Android requires all four public project settings"
+}
+if (firebaseConfigured) {
+    require(firebaseAppId.matches(Regex("1:[0-9]{4,25}:android:[A-Za-z0-9]+")) &&
+        firebaseProjectId.matches(Regex("[a-z][a-z0-9-]{3,99}")) &&
+        firebaseSenderId.matches(Regex("[0-9]{4,25}")) &&
+        firebaseApiKey.matches(Regex("[A-Za-z0-9_-]{20,100}"))) {
+        "Invalid public Firebase Android project settings"
+    }
+}
+
 validateApiBaseUrl("COMPANERO_API_BASE_URL", debugApiBaseUrl)
 validateApiBaseUrl("COMPANERO_RELEASE_API_BASE_URL", releaseApiBaseUrl, requireHttps = true)
 
@@ -38,6 +58,12 @@ android {
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 1
         versionName = "0.1.0"
+
+        buildConfigField("boolean", "FIREBASE_CONFIGURED", firebaseConfigured.toString())
+        buildConfigField("String", "FIREBASE_APP_ID", "\\\"$firebaseAppId\\\"")
+        buildConfigField("String", "FIREBASE_PROJECT_ID", "\\\"$firebaseProjectId\\\"")
+        buildConfigField("String", "FIREBASE_SENDER_ID", "\\\"$firebaseSenderId\\\"")
+        buildConfigField("String", "FIREBASE_API_KEY", "\\\"$firebaseApiKey\\\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -112,6 +138,9 @@ dependencies {
     implementation(project(":apps:android:feature:grading"))
     implementation(project(":apps:android:feature:tutoring"))
 
+    implementation("com.google.firebase:firebase-messaging:24.1.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
+    implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.activity.compose)

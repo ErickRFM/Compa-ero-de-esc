@@ -135,6 +135,12 @@ class AttendanceViewModel @Inject constructor(
     private fun teacherScopeFailed(error: AppError): Boolean =
         error !is AppError.Http || error.status in setOf(401, 403, 404) || error.status >= 500
 
+    /** An unreachable identity/roster authority hides private data; a malformed
+     * optional roster payload alone does not revoke a verified teacher session. */
+    private fun rosterAuthorityFailed(error: AppError): Boolean =
+        error is AppError.Network || error is AppError.Http &&
+            (error.status in setOf(401, 403, 404) || error.status >= 500)
+
     fun setClassroomContext(selection: TeacherClassContext?) {
         modeGeneration++
         studentPollingJob?.cancel()
@@ -502,7 +508,7 @@ class AttendanceViewModel @Inject constructor(
                 is Outcome.Success -> _state.update { it.copy(roster = result.value) }
                 is Outcome.Failure -> {
                     val error = result.error
-                    if (error is AppError.Http && error.status in setOf(401, 403, 404)) {
+                    if (rosterAuthorityFailed(error)) {
                         clearTeacherScope(error)
                     } else {
                         _state.update { it.copy(roster = null, campusRosterError = error.userMessage) }
@@ -889,13 +895,12 @@ class AttendanceViewModel @Inject constructor(
                     is Outcome.Success -> _state.update { it.copy(roster = result.value) }
                     is Outcome.Failure -> {
                         val error = result.error
-                        if (error is AppError.Http && error.status in setOf(401, 403, 404)) {
+                        if (rosterAuthorityFailed(error)) {
                             clearTeacherScope(error)
                             return@launchTeacherRequest
                         }
-                        // The roster is ancillary; a transient or malformed roster response
-                        // must not revoke a valid teacher pass or its signed QR. Stop polling
-                        // until the user refreshes instead of retrying endlessly while offline.
+                        // A malformed/unsupported optional roster response must not destroy
+                        // a verified teacher pass. Stop polling until the next manual refresh.
                         _state.update { it.copy(roster = null, campusRosterError = error.userMessage) }
                         return@launchTeacherRequest
                     }

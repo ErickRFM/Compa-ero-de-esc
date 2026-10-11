@@ -143,21 +143,45 @@ class AttendanceStudentService(
             )
         }
 
-        schoolPresenceService?.let { presence ->
-            presence.requireActive(studentId,nativeActor)
-            val network = request.schoolNetwork
-                ?: throw ApiException.Forbidden(
-                    "Reconnect to the school Wi-Fi before confirming attendance",
-                )
-            presence.verifyNetworkForAttendance(network)
+        // A pre-signed classroom QR can preserve evidence through an outage, but
+        // it is never independent proof of campus presence or a VERIFIED check-in.
+        val presence = schoolPresenceService
+        val hasLiveCampusEvidence = if (presence == null) true else {
+            val campusActive = presence.activeFor(studentId, nativeActor) != null
+            campusActive && request.schoolNetwork?.let { network ->
+                runCatching { presence.verifyNetworkForAttendance(network) }.isSuccess
+            } == true
         }
-
-        val evidence = classifyEvidence(
-            request = request,
-            sessionId = session.id,
-            lateSyncEligible = lateSyncEligible,
-            receivedAtEpochSeconds = now.epochSecond,
-        )
+        val offlineQrFallback = presence != null && !hasLiveCampusEvidence
+        if (offlineQrFallback) {
+            val signed = qrService?.verify(
+                token = request.qrToken?.trim().orEmpty(),
+                expectedSessionId = session.id,
+                receivedAtEpochSeconds = now.epochSecond,
+            )
+            val capturedWithinQrWindow = when (signed) {
+                is QrEvidenceResult.Valid ->
+                    request.deviceTimestampEpochSeconds in signed.issuedAtEpochSeconds..signed.expiresAtEpochSeconds
+                is QrEvidenceResult.Expired ->
+                    request.deviceTimestampEpochSeconds in signed.issuedAtEpochSeconds..signed.expiresAtEpochSeconds
+                else -> false
+            }
+            if (!capturedWithinQrWindow || !attemptWasInsideWindow ||
+                now.epochSecond > effectiveClose + LATE_SYNC_REVIEW_WINDOW_SECONDS
+            ) {
+                throw ApiException.Forbidden("Offline attendance requires a valid signed classroom QR captured during the session")
+            }
+        }
+        val evidence = if (offlineQrFallback) {
+            AttendanceStatus.REVIEW_REQUIRED to AttendanceReasonCode.OFFLINE_NETWORK_QR_REVIEW
+        } else {
+            classifyEvidence(
+                request = request,
+                sessionId = session.id,
+                lateSyncEligible = lateSyncEligible,
+                receivedAtEpochSeconds = now.epochSecond,
+            )
+        }
 
         val candidate = AttendanceRecordResponse(
             id = session.id + ":" + studentId,

@@ -5,7 +5,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 mkdir -p build/ios
 xcodebuild -version | tee build/ios/xcode-version.txt
 java -version
-if ! xcodebuild -version | head -n 1 | grep -Eq '^Xcode 26[.]0([.]|$)'; then
+if ! grep -Eq '^Xcode 26[.]0([.]|$)' build/ios/xcode-version.txt; then
   echo "Expected Xcode 26.0.x for Kotlin 2.2.21. Select the pinned image."
   exit 1
 fi

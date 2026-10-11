@@ -48,7 +48,7 @@ interface AttendanceLocalStore {
         schoolNetwork: SchoolNetworkEvidence? = null,
     ): LocalAttendanceRecord
 
-    suspend fun nextReady(nowEpochSeconds: Long): PendingAttendanceOperation?
+    suspend fun nextReady(nowEpochSeconds: Long, ownerId: String): PendingAttendanceOperation?
 
     suspend fun recordRetry(
         operationId: String,
@@ -122,8 +122,8 @@ internal class RoomAttendanceLocalStore(
         return local.toDomain()
     }
 
-    override suspend fun nextReady(nowEpochSeconds: Long): PendingAttendanceOperation? =
-        dao.nextReady(nowEpochSeconds)?.let { entity ->
+    override suspend fun nextReady(nowEpochSeconds: Long, ownerId: String): PendingAttendanceOperation? =
+        dao.nextReady(nowEpochSeconds, ownerId)?.let { entity ->
             PendingAttendanceOperation(
                 operationId = entity.operationId,
                 ownerId = entity.ownerId,

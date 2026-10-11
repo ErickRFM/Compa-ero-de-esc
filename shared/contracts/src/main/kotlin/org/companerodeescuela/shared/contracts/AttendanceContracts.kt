@@ -50,6 +50,9 @@ enum class AttendanceReasonCode {
     @SerialName("offline_late_sync")
     OFFLINE_LATE_SYNC,
 
+    @SerialName("offline_network_qr_review")
+    OFFLINE_NETWORK_QR_REVIEW,
+
     @SerialName("not_enrolled")
     NOT_ENROLLED,
 

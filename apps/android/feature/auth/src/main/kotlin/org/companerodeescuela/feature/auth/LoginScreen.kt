@@ -98,6 +98,10 @@ fun LoginScreen(
                 state.errorMessage?.let {
                     Text(stringResource(loginErrorResource(state.failure)), color = errorColor, fontSize = 13.sp, lineHeight = 18.sp,
                         modifier = Modifier.fillMaxWidth().padding(top = 10.dp).semantics { liveRegion = LiveRegionMode.Assertive })
+                    (state.failure as? AppError.Http)?.requestId?.let { requestId ->
+                        Text(stringResource(R.string.auth_error_reference, requestId), color = muted, fontSize = 11.sp,
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp).testTag("login_error_reference"))
+                    }
                 }
                 AuthV8PrimaryAction(stringResource(R.string.auth_submit), ::submit, canSubmit, state.submitting,
                     Modifier.padding(top = 20.dp).testTag("login_submit"), submittingText = stringResource(R.string.auth_submitting))
@@ -129,10 +133,14 @@ private val CredentialIssue.stringResource: Int get() = when (this) {
     CredentialIssue.PASSWORD_INVALID -> R.string.auth_password_invalid
 }
 
-private fun loginErrorResource(error: AppError?): Int = when (error) {
+internal fun loginErrorResource(error: AppError?): Int = when (error) {
     is AppError.Http -> when (error.status) {
+        400, 422 -> R.string.auth_error_request
         401 -> R.string.auth_error_credentials
         403 -> R.string.auth_error_forbidden
+        404 -> R.string.auth_error_endpoint
+        408, 504 -> R.string.auth_error_timeout
+        409 -> R.string.auth_error_conflict
         429 -> R.string.auth_error_attempts
         in 500..599 -> R.string.auth_error_unavailable
         else -> R.string.auth_error_generic

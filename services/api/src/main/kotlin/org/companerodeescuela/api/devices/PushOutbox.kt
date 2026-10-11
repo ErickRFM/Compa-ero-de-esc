@@ -10,7 +10,6 @@ import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
 import com.mongodb.client.model.ReturnDocument
 import com.mongodb.client.model.Sorts
-import com.mongodb.client.model.UpdateOptions
 import com.mongodb.client.model.Updates
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import java.security.MessageDigest
@@ -21,6 +20,7 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.bson.Document
@@ -205,7 +205,14 @@ class PushOutboxService(
     /** Caller owns cancellation via the application's lifecycle. */
     suspend fun runLoop() {
         while (kotlinx.coroutines.currentCoroutineContext().isActive) {
-            if (!dispatchNext()) delay(5_000)
+            try {
+                if (!dispatchNext()) delay(5_000)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Mongo/network outages must not kill the worker permanently.
+                delay(10_000)
+            }
         }
     }
 }

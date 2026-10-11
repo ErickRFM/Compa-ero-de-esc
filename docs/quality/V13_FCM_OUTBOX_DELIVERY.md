@@ -17,6 +17,8 @@ Configure `FIREBASE_SERVICE_ACCOUNT_JSON_B64` as a **secret** containing standar
 - A document's `SENDING` lease has a UUID and 90-second expiry. A competing worker can reclaim expired work but only the current lease holder can acknowledge.
 - Each attempt has bounded backoff (first 30 seconds; capped at six hours); after seven attempts it is retained as `DEAD`. Completed/dead rows expire from Mongo after 30 days. Review `lastResult` and database metrics for health.
 - FCM responses that explicitly contain `google.firebase.fcm.v1.FcmError: UNREGISTERED` deactivate the device registration; unrelated 404/401/403 errors **do not** invalidate user devices.
+- Each FCM device registration is linked to the signed JWT's `session_id` at the API boundary. Legacy unbound registrations are *not deliverable* until the device registers again with a current session.
+- Before every send, the backend rechecks both the current native student account and its non-revoked, unexpired refresh session. A locally logged-out session must also revoke its server session when online; offline logout cleanup requires Android SDK integration before production rollout.
 - Before a push is sent, the current device registry is queried again. Stale work targeting a device no longer owned by the account is dropped.
 - This is **at-least-once**, not exactly-once. A provider accepts a message before a process crash but Mongo is not yet acknowledged, so redelivery is possible. The app should de-duplicate message presentation with a stable event ID in the future.
 - The currently supported push alert uses a **generic title/body** so lock-screen previews cannot reveal a student's academic/medical/tutoring details. Full content stays behind normal API permissions.

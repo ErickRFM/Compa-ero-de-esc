@@ -30,13 +30,16 @@ class MongoDeviceTokenRepository(
     private val indexMutex = Mutex()
     private var indexesReady = false
 
-    override suspend fun register(userId: String, token: String, platform: String, model: String?, deviceId: String?) {
+    override suspend fun register(userId: String, token: String, platform: String, model: String?, deviceId: String?, sessionId: String?) {
+        if (sessionId != null && (sessionId.isBlank() || sessionId.length > 128 || sessionId.any(Char::isISOControl)))
+            throw ApiException.Validation("Invalid session binding")
         val device = validateDevice(userId, token, platform, model, deviceId)
         ensureIndexes()
         val now = clock.instant()
         val document = Document("_id", device.key)
             .append("ownerId", userId)
             .append("deviceId", device.id)
+            .append("sessionId", sessionId)
             .append("platform", platform)
             .append("model", model)
             .append("token", token)
@@ -70,6 +73,13 @@ class MongoDeviceTokenRepository(
             .toList().mapNotNull { it.getString("token") }.distinct()
     }
 
+    override suspend fun sessionIdFor(userId: String, token: String): String? {
+        if (userId.isBlank() || token.isBlank()) return null
+        ensureIndexes()
+        return collection.find(and(eq("ownerId", userId), eq("tokenHash", tokenDigest(token))))
+            .toList().firstOrNull()?.getString("sessionId")?.takeIf(String::isNotBlank)
+    }
+
     override suspend fun deactivateInvalid(token: String): Boolean {
         if (token.isBlank()) return false
         ensureIndexes()
@@ -90,11 +100,11 @@ class MongoDeviceTokenRepository(
 class InMemoryDeviceTokenRepository : DeviceTokenRepository {
     private val mutex = Mutex()
     private val devices = linkedMapOf<String, DeviceEntry>()
-    override suspend fun register(userId: String, token: String, platform: String, model: String?, deviceId: String?) {
+    override suspend fun register(userId: String, token: String, platform: String, model: String?, deviceId: String?, sessionId: String?) {
         val device = validateDevice(userId, token, platform, model, deviceId)
         mutex.withLock {
             devices.entries.removeAll { it.value.hash == device.hash && it.key != device.key }
-            devices[device.key] = DeviceEntry(userId, token, device.hash)
+            devices[device.key] = DeviceEntry(userId, token, device.hash, sessionId)
         }
     }
     override suspend fun unregister(userId: String, token: String): Boolean = mutex.withLock {
@@ -112,7 +122,10 @@ class InMemoryDeviceTokenRepository : DeviceTokenRepository {
         devices.entries.removeAll { it.value.hash == hash }
         before != devices.size
     }
-    private data class DeviceEntry(val owner: String, val token: String, val hash: String)
+    override suspend fun sessionIdFor(userId: String, token: String): String? = mutex.withLock {
+        devices.values.firstOrNull { it.owner == userId && it.hash == tokenDigest(token) }?.sessionId
+    }
+    private data class DeviceEntry(val owner: String, val token: String, val hash: String, val sessionId: String?)
 }
 
 private data class DeviceIdentity(val key: String, val id: String, val hash: String)

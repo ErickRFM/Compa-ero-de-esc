@@ -2,6 +2,11 @@ package org.companerodeescuela.api.application
 
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import io.ktor.server.routing.routing
 import org.companerodeescuela.api.academic.groups.academicGroupRoutes
 import org.companerodeescuela.api.academic.academicRoutes
@@ -95,9 +100,18 @@ fun Application.module(
         tutoringService = academicGraph.tutoringService,
         groupRepository = academicGraph.groupRepository,
         accounts=identityGraph.accounts,classrooms=classroomGraph.classroomService,institutions=identityGraph.institutions,mfa=identityGraph.mfa,
+        refreshSessions=identityGraph.refreshSessions,
     )
 
+    // Only a fully configured, authenticated Mongo deployment starts the durable worker.
+    // A local/test instance never sends live Firebase notifications.
+    val pushWorker = if (settings.hasFirebasePush && settings.hasAuthentication && settings.mongo.isConfigured) {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).also { scope ->
+            scope.launch { operationsGraph.pushService.runLoop() }
+        }
+    } else null
     monitor.subscribe(ApplicationStopped) {
+        pushWorker?.cancel()
         providerRegistry.close()
         mongoConnection.close()
     }

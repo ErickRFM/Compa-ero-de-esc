@@ -34,6 +34,16 @@ class DeviceTokenRegistryTest {
         assertTrue(repo.listTokens(setOf("NATIVE:bob")).isEmpty())
     }
 
+    @Test fun `session binding rotates with a device and remains owner scoped`()=runBlocking {
+        val repo=InMemoryDeviceTokenRepository()
+        val token=fcmToken("SESSION")
+        repo.register("NATIVE:alice",token,"android",null,"phone-1","session-a")
+        assertEquals("session-a",repo.sessionIdFor("NATIVE:alice",token))
+        assertEquals(null,repo.sessionIdFor("NATIVE:bob",token))
+        repo.register("NATIVE:alice",token,"android",null,"phone-1","session-b")
+        assertEquals("session-b",repo.sessionIdFor("NATIVE:alice",token))
+    }
+
     @Test fun `invalid device identifiers and malformed push tokens fail closed`()=runBlocking {
         val repo=InMemoryDeviceTokenRepository()
         assertFailsWith<ApiException.Validation> {
@@ -68,6 +78,17 @@ class MongoDeviceTokenRegistryIntegrationTest {
         assertFalse(alice.unregister("NATIVE:bob",fresh))
         assertTrue(alice.unregister("NATIVE:alice",fresh))
         assertTrue(MongoDeviceTokenRepository(db).listTokens(setOf("NATIVE:alice")).isEmpty())
+    }
+
+    @Test fun `Mongo registrations retain only current owner and refresh session binding`()=database { db ->
+        val repo=MongoDeviceTokenRepository(db)
+        val token=fcmToken("BOUND")
+        repo.register("NATIVE:alice",token,"android",null,"phone-1","session-1")
+        assertEquals("session-1",MongoDeviceTokenRepository(db).sessionIdFor("NATIVE:alice",token))
+        assertEquals(null,repo.sessionIdFor("NATIVE:bob",token))
+        repo.register("NATIVE:bob",token,"android",null,"phone-2","session-2")
+        assertEquals(null,repo.sessionIdFor("NATIVE:alice",token))
+        assertEquals("session-2",repo.sessionIdFor("NATIVE:bob",token))
     }
 
     @Test fun `Mongo registry cannot deliver a transferred token to the old account`()=database { db ->

@@ -51,6 +51,7 @@ fun ProfileScreen(
     onIntegrations: () -> Unit = {},
     onLogout: () -> Unit,
     onSecurity: (() -> Unit)? = null,
+    onNotifications: (() -> Unit)? = null,
     onTutorRequest: (() -> Unit)? = null,
     onRepresentatives: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -178,6 +179,14 @@ fun ProfileScreen(
                     detail = "Tema, texto, contraste y movimiento.",
                     onClick = onAppearance,
                 )
+                onNotifications?.let { action ->
+                    GroupDivider()
+                    ProfileRow(
+                        title = "Notificaciones",
+                        detail = "Activar avisos académicos en este dispositivo.",
+                        onClick = action,
+                    )
+                }
                 GroupDivider()
                 ProfileRow(
                     title = "Acerca de Compañero",

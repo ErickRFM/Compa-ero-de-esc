@@ -174,6 +174,8 @@ class PushOutboxService(
     private val outbox: PushOutboxRepository,
     private val sender: PushGateway,
     private val clock: Clock = Clock.systemUTC(),
+    /** Revalidate current account status immediately before delivery; fail closed. */
+    private val authorizeRecipient: suspend (String) -> Boolean = { false },
 ) {
     suspend fun enqueueForOwner(eventId: String, owner: String, title: String, body: String): Int {
         if (eventId.length !in 1..256 || owner.length !in 2..512 ||
@@ -191,8 +193,18 @@ class PushOutboxService(
     /** One leased destination only; never exposes secrets or provider responses to clients. */
     suspend fun dispatchNext(): Boolean {
         val item = outbox.claim(clock.instant()) ?: return false
+        val permitted = try {
+            authorizeRecipient(item.owner)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Temporary identity provider failure: do not send or permanently drop.
+            val ack = outbox.finish(item, PushDeliveryResult.RETRYABLE, clock.instant())
+            return ack
+        }
         val current = devices.listTokens(setOf(item.owner))
-        val result = if (item.token !in current) PushDeliveryResult.INVALID_TOKEN
+        val result = if (!permitted) PushDeliveryResult.REJECTED
+            else if (item.token !in current) PushDeliveryResult.INVALID_TOKEN
             else try { sender.send(item.token, item.title, item.body) }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { PushDeliveryResult.RETRYABLE }

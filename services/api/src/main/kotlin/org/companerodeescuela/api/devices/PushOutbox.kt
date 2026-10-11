@@ -3,6 +3,7 @@ package org.companerodeescuela.api.devices
 import com.mongodb.MongoWriteException
 import com.mongodb.client.model.Filters.and
 import com.mongodb.client.model.Filters.eq
+import com.mongodb.client.model.Filters.gt
 import com.mongodb.client.model.Filters.lte
 import com.mongodb.client.model.Filters.or
 import com.mongodb.client.model.FindOneAndUpdateOptions
@@ -83,10 +84,10 @@ class MongoPushOutboxRepository(database: MongoDatabase) : PushOutboxRepository 
         ensureIndexes()
         val leaseId = UUID.randomUUID().toString()
         val due = Date.from(now)
-        val filter = or(
+        val filter = and(gt("expiresAt", due), or(
             and(eq("status", "PENDING"), lte("nextAttemptAt", due)),
             and(eq("status", "SENDING"), lte("leaseUntil", due)),
-        )
+        ))
         val updated = collection.findOneAndUpdate(filter,
             Updates.combine(
                 Updates.set("status", "SENDING"),

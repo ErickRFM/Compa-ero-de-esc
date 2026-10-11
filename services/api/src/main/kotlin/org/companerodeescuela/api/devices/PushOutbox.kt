@@ -177,6 +177,8 @@ class PushOutboxService(
     private val clock: Clock = Clock.systemUTC(),
     /** Revalidate current account status immediately before delivery; fail closed. */
     private val authorizeRecipient: suspend (String) -> Boolean = { false },
+    /** A device must still belong to a non-revoked refresh session. */
+    private val authorizeSession: suspend (String, String) -> Boolean = { _, _ -> false },
 ) {
     suspend fun enqueueForOwner(eventId: String, owner: String, title: String, body: String): Int {
         if (eventId.length !in 1..256 || owner.length !in 2..512 ||
@@ -195,7 +197,7 @@ class PushOutboxService(
     suspend fun dispatchNext(): Boolean {
         val item = outbox.claim(clock.instant()) ?: return false
         val permitted = try {
-            authorizeRecipient(item.owner)
+            authorizeRecipient(item.owner) && authorizeSession(item.owner, item.token)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {

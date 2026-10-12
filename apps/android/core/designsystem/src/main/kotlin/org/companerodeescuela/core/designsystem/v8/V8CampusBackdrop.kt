@@ -25,10 +25,11 @@ import org.companerodeescuela.core.designsystem.R
  */
 @Composable
 fun V8CampusBackdrop(modifier: Modifier = Modifier, login: Boolean = false, backgroundColor: Color = V8RedColors.Background) {
-    fun veil(alpha: Float) = backgroundColor.copy(alpha = if (backgroundColor.luminance() > 0.5f) alpha.coerceAtLeast(0.87f) else alpha)
+    val resolvedBackground = if (androidx.compose.material3.MaterialTheme.colorScheme.background.luminance() > 0.5f) androidx.compose.material3.MaterialTheme.colorScheme.background else backgroundColor
+    fun veil(alpha: Float) = resolvedBackground.copy(alpha = if (resolvedBackground.luminance() > 0.5f) alpha.coerceAtLeast(0.87f) else alpha)
     val heroHeight = if (login) 680.dp else 355.dp
     val endY = with(LocalDensity.current) { heroHeight.toPx() }
-    Box(modifier = modifier.fillMaxSize().background(backgroundColor)) {
+    Box(modifier = modifier.fillMaxSize().background(resolvedBackground)) {
         Image(
             painter = painterResource(R.drawable.campus_red),
             contentDescription = null,
@@ -44,7 +45,7 @@ fun V8CampusBackdrop(modifier: Modifier = Modifier, login: Boolean = false, back
                         0.20f to veil(0.41176f),
                         0.50f to veil(0.65490f),
                         0.78f to veil(0.94902f),
-                        1.00f to backgroundColor,
+                        1.00f to resolvedBackground,
                     ),
                     startY = 0f,
                     endY = endY,

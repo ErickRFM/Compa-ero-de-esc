@@ -113,8 +113,8 @@ fun ChannelScreen(
                 if (selected.canPublish) item {
                     V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Comunica con tu grupo", color = V8RedColors.TextPrimary, style = MaterialTheme.typography.titleLarge)
-                            Text("Publica avisos y materiales. Los estudiantes responden con opciones predeterminadas.", color = V8RedColors.TextSecondary)
+                            Text("Comunica con tu grupo", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+                            Text("Publica avisos y materiales. Los estudiantes responden con opciones predeterminadas.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Button(onClick = { composerOpen = !composerOpen }, modifier = Modifier.fillMaxWidth()) {
                                 Text(if (composerOpen) "Cerrar redacción" else "Redactar aviso")
                             }
@@ -179,12 +179,12 @@ private fun ChannelHeader(
                 text = "Canal",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.SemiBold,
-                color = V8RedColors.TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 text = "Avisos y recursos de tus materias",
                 style = MaterialTheme.typography.bodySmall,
-                color = V8RedColors.TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         TextButton(
@@ -230,13 +230,13 @@ private fun ChannelIdentity(channel: ClassChannelSummary) {
         Text(
             text = channel.subjectName,
             style = MaterialTheme.typography.headlineLarge,
-            color = V8RedColors.TextPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.Bold,
         )
         Text(
             text = channel.groupName + " · " + channel.teacherDisplayName,
             style = MaterialTheme.typography.bodyMedium,
-            color = V8RedColors.TextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -263,13 +263,13 @@ private fun V8ChannelTab(
             Icon(
                 imageVector = if (label == "Recursos") Icons.Filled.AttachFile else Icons.Filled.Campaign,
                 contentDescription = null,
-                tint = if (selected) V8RedColors.Crimson else V8RedColors.TextSecondary,
+                tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
                 label,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                color = if (selected) V8RedColors.TextPrimary else V8RedColors.TextSecondary,
+                color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -299,19 +299,19 @@ private fun ChannelPostCard(
                         text = post.authorDisplayName,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
-                        color = V8RedColors.TextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = postTypeLabel(post.type),
                         style = MaterialTheme.typography.labelMedium,
-                        color = V8RedColors.Crimson,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
                 if (post.pinned) {
                     Icon(
                         imageVector = Icons.Filled.PushPin,
                         contentDescription = "Publicación fijada",
-                        tint = V8RedColors.Crimson,
+                        tint = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
@@ -321,14 +321,14 @@ private fun ChannelPostCard(
                     text = it,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = V8RedColors.TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
             post.body?.let {
                 Text(
                     text = it,
                     style = MaterialTheme.typography.bodyLarge,
-                    color = V8RedColors.TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -350,7 +350,7 @@ private fun ChannelPostCard(
                 Text(
                     text = "Respuesta rápida",
                     style = MaterialTheme.typography.labelLarge,
-                    color = V8RedColors.TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
@@ -388,7 +388,7 @@ private fun TeacherComposer(
                 text = "Publicar para el grupo",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = V8RedColors.TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
             )
             OutlinedTextField(
                 value = body,
@@ -441,7 +441,7 @@ private fun StudentChannelFooter() {
             Icon(
                 imageVector = Icons.Filled.Lock,
                 contentDescription = null,
-                tint = V8RedColors.TextSecondary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Column {
                 Text(
@@ -451,7 +451,7 @@ private fun StudentChannelFooter() {
                 Text(
                     text = "Puedes leer y usar respuestas rápidas, pero no enviar mensajes.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = V8RedColors.TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

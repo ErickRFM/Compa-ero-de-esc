@@ -478,22 +478,22 @@ private fun QrCenterCard(
                     val length = 20.dp.toPx(); val inset = 4.dp.toPx(); val stroke = 3.dp.toPx()
                     for (x in listOf(inset, size.width - inset)) for (y in listOf(inset, size.height - inset)) {
                         val sx = if (x == inset) 1 else -1; val sy = if (y == inset) 1 else -1
-                        drawLine(V8RedColors.Crimson, androidx.compose.ui.geometry.Offset(x,y), androidx.compose.ui.geometry.Offset(x + sx * length,y), stroke)
-                        drawLine(V8RedColors.Crimson, androidx.compose.ui.geometry.Offset(x,y), androidx.compose.ui.geometry.Offset(x,y + sy * length), stroke)
+                        drawLine(MaterialTheme.colorScheme.primary, androidx.compose.ui.geometry.Offset(x,y), androidx.compose.ui.geometry.Offset(x + sx * length,y), stroke)
+                        drawLine(MaterialTheme.colorScheme.primary, androidx.compose.ui.geometry.Offset(x,y), androidx.compose.ui.geometry.Offset(x,y + sy * length), stroke)
                     }
                 }), contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.QrCodeScanner, contentDescription = null, tint = V8RedColors.TextPrimary, modifier = Modifier.size(78.dp))
+                Icon(Icons.Filled.QrCodeScanner, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(78.dp))
             }
             Text(
                 "Escanea el código QR",
                 style = MaterialTheme.typography.titleLarge,
-                color = V8RedColors.TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold,
             )
             Text(
                 text = "Apunta la cámara al código de la escuela o de tu clase.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = V8RedColors.TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 8.dp),
             )
             BoxWithConstraints {
@@ -699,8 +699,8 @@ private fun TeacherAttendanceBody(
                 V8ScreenHeader {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("Asistencia", style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Bold, color = V8RedColors.TextPrimary)
-                        Text("Pase de lista · " + (active?.groupName ?: campus?.groupName ?: "Tus grupos"), color = V8RedColors.TextSecondary)
+                            fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        Text("Pase de lista · " + (active?.groupName ?: campus?.groupName ?: "Tus grupos"), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -727,14 +727,14 @@ private fun TeacherAttendanceBody(
                 }
             }
             if (filter == "Entrada escolar") {
-                item { Text("Entrada escolar", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary) }
+                item { Text("Entrada escolar", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface) }
                 if (campus == null) item { StatusNotice("Padrón no disponible", state.campusRosterError ?: "Selecciona una clase para consultar su padrón autorizado.") }
                 else items(campus.students, key = { "campus:" + it.studentId }) { student ->
                     V8GlassCard(Modifier.fillMaxWidth()) {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(student.studentId, color = V8RedColors.TextPrimary, style = MaterialTheme.typography.titleMedium)
+                            Text(student.studentId, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
                             Text(student.campusEntryAtEpochSeconds?.let { "Entrada registrada · " + java.time.Instant.ofEpochSecond(it).atZone(java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("HH:mm")) }
-                                ?: "Sin entrada registrada", color = V8RedColors.TextSecondary)
+                                ?: "Sin entrada registrada", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -754,7 +754,7 @@ private fun TeacherAttendanceBody(
                 }
             } else {
                 val shown = if (filter == "Por revisar") review else records
-                item { Text("Lista de estudiantes · ${shown.size}", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary) }
+                item { Text("Lista de estudiantes · ${shown.size}", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface) }
                 if (shown.isEmpty()) item { StatusNotice("Sin registros en este filtro", "El servidor aún no reporta registros para este filtro.") }
                 items(shown, key = AttendanceRecordResponse::id) { record ->
                     RosterRecord(record, state.actionInProgress, state.teacherReviewCompletion, state.errorMessage, onReview, onMark)
@@ -763,8 +763,8 @@ private fun TeacherAttendanceBody(
                     items(campus.students.filter { student -> records.none { it.studentId == student.studentId } }, key = { "missing:" + it.studentId }) { student ->
                         V8GlassCard(Modifier.fillMaxWidth()) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(student.studentId, Modifier.weight(1f), color = V8RedColors.TextPrimary)
-                                Text("Sin registro", color = V8RedColors.TextSecondary)
+                                Text(student.studentId, Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
+                                Text("Sin registro", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -773,9 +773,9 @@ private fun TeacherAttendanceBody(
             if (campus != null) item {
                 V8GlassCard(Modifier.fillMaxWidth()) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Entrada escolar · ${campus.groupName}", color = V8RedColors.TextPrimary, style = MaterialTheme.typography.titleMedium)
+                        Text("Entrada escolar · ${campus.groupName}", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
                         val validated = campus.students.count { it.campusEntryAtEpochSeconds != null }
-                        Text("$validated de ${campus.students.size} con entrada registrada", color = V8RedColors.TextSecondary)
+                        Text("$validated de ${campus.students.size} con entrada registrada", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         androidx.compose.material3.LinearProgressIndicator(
                             progress = { if (campus.students.isEmpty()) 0f else validated.toFloat() / campus.students.size },
                             modifier = Modifier.fillMaxWidth(), color = V8RedColors.Success)
@@ -815,7 +815,7 @@ private fun TeacherSessionCard(
             Text(
                 text = if (now < session.closesAtEpochSeconds) "PASE EN VIVO" else "PASE FINALIZADO",
                 style = MaterialTheme.typography.labelLarge,
-                color = V8RedColors.Crimson,
+                color = MaterialTheme.colorScheme.primary,
             )
             Text(
                 text = occurrence?.subjectName ?: "Grupo ${session.groupName}",
@@ -843,19 +843,19 @@ private fun TeacherSessionCard(
                             "El QR cambia automáticamente. Se requiere conexión para preparar la contingencia."
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = V8RedColors.TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 qrState == QrVisualState.UNAVAILABLE || !qrValid && qrToken != null -> {
                     Text(
                         text = "QR temporalmente no disponible",
                         style = MaterialTheme.typography.titleMedium,
-                    color = V8RedColors.TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
                         text = "Reconectando. Abre el pase con red para preparar QR de contingencia.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = V8RedColors.TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 else -> {
@@ -920,16 +920,16 @@ private fun RosterRecord(
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Column(Modifier.weight(1f)) {
-                    Text(record.studentId, style = MaterialTheme.typography.titleMedium, color = V8RedColors.TextPrimary)
-                    Text(java.time.Instant.ofEpochSecond(record.receivedAtEpochSeconds).atZone(java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("HH:mm")), color = V8RedColors.TextSecondary)
+                    Text(record.studentId, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                    Text(java.time.Instant.ofEpochSecond(record.receivedAtEpochSeconds).atZone(java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("HH:mm")), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text(attendanceDisplayLabel(record), style = MaterialTheme.typography.labelLarge, color = attendanceDisplayColor(record))
             }
             TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Ocultar revisión" else "Revisar registro") }
             if (expanded) {
-                Text("Evidencia original: " + attendanceStatusLabel(record.originalStatus ?: record.status) + " · " + (record.originalReasonCode ?: record.reasonCode).name.lowercase().replace('_', ' '), color = V8RedColors.TextSecondary)
+                Text("Evidencia original: " + attendanceStatusLabel(record.originalStatus ?: record.status) + " · " + (record.originalReasonCode ?: record.reasonCode).name.lowercase().replace('_', ' '), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 record.reviewHistory.lastOrNull()?.let { audit ->
-                    Text("Último ajuste: ${audit.reviewerId} · ${audit.note}", color = V8RedColors.TextSecondary)
+                    Text("Último ajuste: ${audit.reviewerId} · ${audit.note}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 FilledTonalButton(onClick = { decision = AttendanceDisposition.PRESENT }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Marcar presente") }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -947,7 +947,7 @@ private fun RosterRecord(
             Text("El servidor registrará tu identidad, fecha y motivo. La evidencia original se conserva.")
             OutlinedTextField(value = reason, onValueChange = { reason = it.take(500) }, enabled = !busy, label = { Text("Motivo") }, modifier = Modifier.fillMaxWidth())
             if (submittedVersion != null && !busy && errorMessage != null) {
-                Text(errorMessage, color = V8RedColors.Error)
+                Text(errorMessage, color = MaterialTheme.colorScheme.error)
             }
         } },
         confirmButton = { Button(onClick = {
@@ -978,7 +978,7 @@ private fun TeacherOccurrenceList(
     Text(
         text = if (todayOccurrences.isNotEmpty()) "Clases de hoy" else "Clases de la semana",
         style = MaterialTheme.typography.titleMedium,
-                    color = V8RedColors.TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
     )
 
     if (visible.isEmpty()) {
@@ -999,13 +999,13 @@ private fun TeacherOccurrenceList(
                 Text(
                     text = occurrence.subjectName,
                     style = MaterialTheme.typography.titleMedium,
-                    color = V8RedColors.TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     text = "${dateLabel(occurrence.date)} · ${occurrence.startsAt} – ${occurrence.endsAt}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = V8RedColors.TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     text = listOfNotNull(occurrence.classroomName, occurrence.buildingName)
@@ -1029,7 +1029,7 @@ private fun TeacherOccurrenceList(
                     Text(
                         teacherPassUnavailableMessage(availability),
                         style = MaterialTheme.typography.bodySmall,
-                        color = V8RedColors.TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -1054,20 +1054,20 @@ private fun AttendanceHeader(
                 end = CompaneroSpacing.hero + CompaneroSpacing.sm,
             ),
             style = MaterialTheme.typography.headlineLarge,
-            color = V8RedColors.TextPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.Bold,
         )
         Text(
             text = subtitle,
             style = MaterialTheme.typography.bodyMedium,
-            color = V8RedColors.TextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         TextButton(
             onClick = onRefresh,
             enabled = !loading,
             modifier = Modifier.align(Alignment.End),
         ) {
-            Text(if (loading) "…" else "Actualizar", color = V8RedColors.Crimson)
+            Text(if (loading) "…" else "Actualizar", color = MaterialTheme.colorScheme.primary)
         }
     }
 }

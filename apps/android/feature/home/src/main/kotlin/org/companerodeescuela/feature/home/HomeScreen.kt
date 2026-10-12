@@ -89,29 +89,29 @@ fun HomeScreen(
                     append("Hola")
                     if (firstName != null) {
                         append(", ")
-                        withStyle(SpanStyle(color = V8RedColors.Crimson)) { append(firstName) }
+                        withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append(firstName) }
                     }
                 },
                 modifier = Modifier.padding(top = 8.dp, end = 42.dp),
                 fontSize = 37.sp,
                 lineHeight = 43.sp,
-                color = V8RedColors.TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold,
             )
             Text(
                 text = "Un gran día para seguir construyendo tus metas. ✨",
                 fontSize = 16.sp,
                 lineHeight = 22.sp,
-                color = V8RedColors.TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(todayLabel(), color = V8RedColors.TextSecondary, style = MaterialTheme.typography.labelMedium)
+                Text(todayLabel(), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
                 TextButton(onClick = onOpenClassrooms) {
-                    Text("Mis clases  ›", color = V8RedColors.Crimson)
+                    Text("Mis clases  ›", color = MaterialTheme.colorScheme.primary)
                 }
             }
 
@@ -206,21 +206,21 @@ fun HomeScreen(
                     }
                 }
 
-                Text("Avisos", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary, fontWeight = FontWeight.Bold)
+                Text("Avisos", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                 V8GlassCard(modifier = Modifier.fillMaxWidth()) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
                             text = "Canal de tus clases",
                             style = MaterialTheme.typography.titleMedium,
-                            color = V8RedColors.TextPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
                             text = "Consulta avisos y materiales publicados por tus docentes.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = V8RedColors.TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         TextButton(onClick = onOpenChannel) {
-                            Text("Ver canales y avisos  ›", color = V8RedColors.Crimson)
+                            Text("Ver canales y avisos  ›", color = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
@@ -229,7 +229,7 @@ fun HomeScreen(
                     enabled = !state.loading,
                     modifier = Modifier.align(Alignment.End),
                 ) {
-                    Text(if (state.loading) "Actualizando…" else "Actualizar", color = V8RedColors.TextSecondary)
+                    Text(if (state.loading) "Actualizando…" else "Actualizar", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

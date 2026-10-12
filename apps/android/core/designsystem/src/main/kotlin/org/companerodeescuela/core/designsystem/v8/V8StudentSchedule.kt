@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -26,8 +27,8 @@ fun V8DaySelector(days: List<Pair<String, String>>, selectedIndex: Int, onSelect
                     .padding(vertical = 12.dp, horizontal = 3.dp),
                 horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
             ) {
-                Text(day.first, color = V8RedColors.TextPrimary, fontSize = 12.sp, maxLines = 1)
-                Text(day.second, color = if (selected) V8RedColors.Crimson else V8RedColors.TextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text(day.first, color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp, maxLines = 1)
+                Text(day.second, color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

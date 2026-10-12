@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
@@ -44,18 +45,18 @@ fun V8DashboardStat(
                 Icon(
                     imageVector = if (label.contains("clase", ignoreCase = true)) Icons.Filled.School else Icons.Filled.CheckCircle,
                     contentDescription = null,
-                    tint = V8RedColors.Crimson,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(26.dp),
                 )
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(label, fontSize = 12.sp, color = V8RedColors.TextSecondary)
-                    Text(value, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = V8RedColors.TextPrimary)
+                    Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(value, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
         } else {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(
-                modifier = Modifier.size(34.dp).background(V8RedColors.DeepCrimson.copy(alpha = .45f), CircleShape),
+                modifier = Modifier.size(34.dp).background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = .45f), CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -65,7 +66,7 @@ fun V8DashboardStat(
                         else -> Icons.Filled.CheckCircle
                     },
                     contentDescription = null,
-                    tint = V8RedColors.Crimson,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp),
                 )
             }
@@ -74,17 +75,17 @@ fun V8DashboardStat(
                 fontSize = if (value.length > 11) 15.sp else 24.sp,
                 lineHeight = if (value.length > 11) 18.sp else 27.sp,
                 fontWeight = FontWeight.Bold,
-                color = V8RedColors.TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(label, fontSize = 12.sp, color = V8RedColors.TextSecondary, maxLines = 2)
+            Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
             progress?.let {
                 LinearProgressIndicator(
                     progress = { it.coerceIn(0f, 1f) },
                     modifier = Modifier.fillMaxWidth().height(4.dp),
-                    color = V8RedColors.Crimson,
-                    trackColor = V8RedColors.Outline,
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.outline,
                 )
             }
         }
@@ -106,15 +107,15 @@ fun V8DailyClassRow(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column {
-                Text(classInfo.start, color = if (isNext) V8RedColors.Crimson else V8RedColors.TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                Text(classInfo.end, color = V8RedColors.TextSecondary, fontSize = 12.sp)
+                Text(classInfo.start, color = if (isNext) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text(classInfo.end, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
             }
-            Box(Modifier.size(width = 2.dp, height = 46.dp).background(if (isNext) V8RedColors.Crimson else V8RedColors.Outline))
+            Box(Modifier.size(width = 2.dp, height = 46.dp).background(if (isNext) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline))
             Column(modifier = Modifier.weight(1f)) {
-                Text(classInfo.title, color = V8RedColors.TextPrimary, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(classInfo.room, color = V8RedColors.TextSecondary, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(classInfo.title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(classInfo.room, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
-            if (isNext) Text("Siguiente", color = V8RedColors.Crimson, fontSize = 11.sp)
+            if (isNext) Text("Siguiente", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp)
         }
     }
 }

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,8 +27,8 @@ fun V8AttendanceEvidence(schoolNetworkVerified: Boolean?, locationVerified: Bool
 private fun EvidenceCard(title: String, status: String, verified: Boolean, modifier: Modifier) {
     V8GlassCard(modifier, contentPadding = androidx.compose.foundation.layout.PaddingValues(10.dp), cornerRadius = 14.dp) {
         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Text(title, color = V8RedColors.TextPrimary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-            Text(status, color = if (verified) V8RedColors.Success else V8RedColors.TextSecondary, fontSize = 10.sp)
+            Text(title, color = MaterialTheme.colorScheme.onSurface, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            Text(status, color = if (verified) V8RedColors.Success else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
         }
     }
 }

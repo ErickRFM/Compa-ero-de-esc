@@ -467,6 +467,8 @@ private fun QrCenterCard(
     onImage: () -> Unit,
     onPaste: () -> Unit,
 ) {
+    // DrawScope is not composable; capture the current theme color first.
+    val qrAccent = MaterialTheme.colorScheme.primary
     V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -478,8 +480,8 @@ private fun QrCenterCard(
                     val length = 20.dp.toPx(); val inset = 4.dp.toPx(); val stroke = 3.dp.toPx()
                     for (x in listOf(inset, size.width - inset)) for (y in listOf(inset, size.height - inset)) {
                         val sx = if (x == inset) 1 else -1; val sy = if (y == inset) 1 else -1
-                        drawLine(MaterialTheme.colorScheme.primary, androidx.compose.ui.geometry.Offset(x,y), androidx.compose.ui.geometry.Offset(x + sx * length,y), stroke)
-                        drawLine(MaterialTheme.colorScheme.primary, androidx.compose.ui.geometry.Offset(x,y), androidx.compose.ui.geometry.Offset(x,y + sy * length), stroke)
+                        drawLine(qrAccent, androidx.compose.ui.geometry.Offset(x,y), androidx.compose.ui.geometry.Offset(x + sx * length,y), stroke)
+                        drawLine(qrAccent, androidx.compose.ui.geometry.Offset(x,y), androidx.compose.ui.geometry.Offset(x,y + sy * length), stroke)
                     }
                 }), contentAlignment = Alignment.Center) {
                 Icon(Icons.Filled.QrCodeScanner, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(78.dp))

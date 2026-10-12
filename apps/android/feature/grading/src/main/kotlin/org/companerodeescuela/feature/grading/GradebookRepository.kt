@@ -4,6 +4,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.client.HttpClient
 import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import org.companerodeescuela.core.common.result.Outcome
@@ -12,6 +13,7 @@ import org.companerodeescuela.core.network.apiCall
 import org.companerodeescuela.core.network.requireBody
 import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.shared.contracts.ApiResponse
+import org.companerodeescuela.shared.contracts.GradeSyncCapability
 import org.companerodeescuela.shared.contracts.GradeSyncRequest
 import org.companerodeescuela.shared.contracts.GradeSyncResult
 
@@ -21,6 +23,14 @@ class GradebookRepository(
     private val refreshCoordinator: SessionRefreshCoordinator =
         SessionRefreshCoordinator(client, tokenStore),
 ) {
+    suspend fun capability(): Outcome<GradeSyncCapability> =
+        authorized { token ->
+            apiCall {
+                client.get("grading/capability") { bearerAuth(token) }
+                    .requireBody<ApiResponse<GradeSyncCapability>>()
+            }.map { it.data }
+        }
+
     suspend fun sync(request: GradeSyncRequest): Outcome<GradeSyncResult> =
         authorized { token ->
             apiCall {

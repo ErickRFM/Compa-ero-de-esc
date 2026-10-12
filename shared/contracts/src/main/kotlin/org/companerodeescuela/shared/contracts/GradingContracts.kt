@@ -30,6 +30,10 @@ data class GradeSyncRequest(
     val rows: List<GradeSyncRow>,
 )
 
+/** Capability is verified by the authenticated backend, never guessed in Android. */
+@Serializable
+data class GradeSyncCapability(val available: Boolean)
+
 @Serializable
 enum class GradeSyncStatus {
     @SerialName("synced") SYNCED,

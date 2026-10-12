@@ -22,3 +22,6 @@ object UnavailableGradeSyncGateway : GradeSyncGateway {
         )
     }
 }
+
+/** A registered non-placeholder gateway can attempt institutional grade publishing. */
+fun GradeSyncGateway.isConfiguredForPublishing(): Boolean = this !== UnavailableGradeSyncGateway

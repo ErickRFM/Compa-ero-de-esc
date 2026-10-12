@@ -51,6 +51,8 @@ class GradebookSubmissionTest {
                 val body = if (request.url.encodedPath == "/classrooms") {
                     classRequests++
                     """{"data":[{"id":"A","name":"Matemáticas","teacherId":"T1","teacherDisplayName":"Docente","canManage":true}]}"""
+                } else if (request.url.encodedPath == "/grading/capability") {
+                    """{"data":{"available":true}}"""
                 } else {
                     response.await()
                     """{"data":{"status":"unavailable","acceptedStudentIds":[],"rejectedStudentIds":[]}}"""

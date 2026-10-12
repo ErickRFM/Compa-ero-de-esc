@@ -284,27 +284,38 @@ fun GradebookScreen(
                 StatusNotice(title = "Resultado de evaluación", message = it)
             }
             Text(
-                "La integración institucional no está disponible en la configuración actual del servidor. Puedes importar y revisar; ningún intento equivale a publicar calificaciones.",
+                when {
+                    state.capabilityLoading -> "Comprobando si el servidor permite publicar calificaciones…"
+                    state.institutionalSyncAvailable -> "El servidor indica que dispone de un proveedor de calificaciones. El envío requiere confirmación institucional."
+                    else -> "La publicación institucional no está configurada. Puedes importar y revisar las notas, pero no enviarlas."
+                },
                 color = V8RedColors.TextSecondary,
                 style = MaterialTheme.typography.bodySmall,
             )
+            if (!state.capabilityLoading && !state.institutionalSyncAvailable) {
+                OutlinedButton(
+                    onClick = viewModel::refreshCapability,
+                    enabled = !state.submitting,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Comprobar conexión institucional") }
+            }
             Button(
                 onClick = { confirmSync = true },
-                enabled = !state.submitting && !state.loadingClassrooms && state.schemeComplete && state.preview?.rows?.isNotEmpty() == true && state.preview?.warnings?.isEmpty() == true &&
+                enabled = !state.submitting && !state.loadingClassrooms && !state.capabilityLoading && state.institutionalSyncAvailable && state.schemeComplete && state.preview?.rows?.isNotEmpty() == true && state.preview?.warnings?.isEmpty() == true &&
                     state.gradingPeriod.isNotBlank() &&
                     state.assignedClassrooms.any { it.id == state.classroomId },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 if (state.submitting) CircularProgressIndicator()
-                else Text("Intentar sincronización escolar")
+                else Text("Enviar a control escolar")
             }
         }
     }
     if (confirmSync) AlertDialog(
         onDismissRequest = { confirmSync = false },
-        title = { Text("Confirmar intento de envío") },
-        text = { Text("${state.assignedClassrooms.firstOrNull { it.id == state.classroomId }?.name.orEmpty()} · ${state.gradingPeriod}\n${state.preview?.rows?.size ?: 0} alumnos. El servidor debe confirmar el resultado; la integración institucional actual no está disponible.") },
-        confirmButton = { Button(onClick = { confirmSync = false; viewModel.sync() }) { Text("Intentar envío") } },
+        title = { Text("Confirmar publicación institucional") },
+        text = { Text("${state.assignedClassrooms.firstOrNull { it.id == state.classroomId }?.name.orEmpty()} · ${state.gradingPeriod}\n${state.preview?.rows?.size ?: 0} alumnos. El servidor deberá confirmar el resultado; no se considerará publicado antes de esa respuesta.") },
+        confirmButton = { Button(onClick = { confirmSync = false; viewModel.sync() }) { Text("Confirmar envío") } },
         dismissButton = { TextButton(onClick = { confirmSync = false }) { Text("Seguir revisando") } },
     )
 }

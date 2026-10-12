@@ -4,6 +4,7 @@ import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import org.companerodeescuela.api.auth.AuthTokenService
@@ -14,6 +15,7 @@ import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.shared.contracts.ApiResponse
+import org.companerodeescuela.shared.contracts.GradeSyncCapability
 import org.companerodeescuela.shared.contracts.GradeSyncRequest
 import org.companerodeescuela.shared.contracts.UserRole
 
@@ -30,6 +32,16 @@ fun Route.gradingRoutes(
         }
 
         authenticate(AuthTokenService.PROVIDER_NAME) {
+            get("/capability") {
+                val principal = call.requirePlatformPrincipal()
+                principal.requireRole(UserRole.TEACHER)
+                call.respond(
+                    ApiResponse(
+                        data = GradeSyncCapability(available = syncGateway.isConfiguredForPublishing()),
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
             post("/sync") {
                 val principal = call.requirePlatformPrincipal()
                 principal.requireRole(UserRole.TEACHER)

@@ -21,6 +21,7 @@ import org.companerodeescuela.core.network.SessionRefreshCoordinator
 import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.feature.auth.AuthRepository
 import org.companerodeescuela.feature.channel.ChannelRepository
+import org.companerodeescuela.feature.coordinator.CoordinatorRepository
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -36,6 +37,14 @@ object FeatureBindingsModule {
     @Singleton
     fun provideAdminRepository(client:HttpClient,tokenStore:SessionTokenStore,refreshCoordinator:SessionRefreshCoordinator):org.companerodeescuela.feature.admin.AdminRepository =
         org.companerodeescuela.feature.admin.AdminRepository(client,tokenStore,refreshCoordinator)
+
+    @Provides
+    @Singleton
+    fun provideCoordinatorRepository(
+        client: HttpClient,
+        tokenStore: SessionTokenStore,
+        refreshCoordinator: SessionRefreshCoordinator,
+    ): CoordinatorRepository = CoordinatorRepository(client, tokenStore, refreshCoordinator)
 
     @Provides
     @Singleton

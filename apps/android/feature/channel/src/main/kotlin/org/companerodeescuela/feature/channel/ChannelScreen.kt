@@ -261,7 +261,7 @@ private fun V8ChannelTab(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = if (label == "Avisos") Icons.Filled.Campaign else Icons.Filled.Forum,
+                imageVector = if (label == "Recursos") Icons.Filled.AttachFile else Icons.Filled.Campaign,
                 contentDescription = null,
                 tint = if (selected) V8RedColors.Crimson else V8RedColors.TextSecondary,
             )

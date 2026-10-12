@@ -2,6 +2,8 @@ package org.companerodeescuela.feature.admin
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -76,20 +78,13 @@ fun AdminHomeScreen(state:AdminUiState,onRefresh:()->Unit,onApprove:(String,Stri
                     }
                 }
             }
-            Text(stringResource(R.string.admin_users),style=MaterialTheme.typography.titleLarge)
-            if(overview.users.isEmpty()) Text(stringResource(R.string.admin_empty_users))
-            overview.users.forEach { user ->
-                V8GlassCard(Modifier.fillMaxWidth()) {
-                    Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                        Text(user.user.displayName,style=MaterialTheme.typography.titleMedium)
-                        Text(stringResource(statusResource(user.user.accountStatus)))
-                        if(user.user.accountStatus!=AccountStatus.REVOKED) FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                            TextButton({ onLifecycle(user.user.id,AccountStatus.SUSPENDED) },enabled=!state.loading && !state.working && user.user.accountStatus!=AccountStatus.SUSPENDED) { Text(stringResource(R.string.admin_suspend)) }
-                            TextButton({ onLifecycle(user.user.id,AccountStatus.REVOKED) },enabled=!state.loading && !state.working) { Text(stringResource(R.string.admin_revoke)) }
-                        }
-                    }
-                }
-            }
+            AdminUserDirectory(
+                users = overview.users,
+                ownerKey = state.ownerKey,
+                loading = state.loading,
+                working = state.working,
+                onLifecycle = onLifecycle,
+            )
             Text(stringResource(R.string.admin_assignments),style=MaterialTheme.typography.titleLarge)
             state.assignmentFailure?.let { AdminFailure(it) }
             if(state.assignments.isEmpty() && state.assignmentFailure==null) Text(stringResource(R.string.admin_empty_assignments))
@@ -122,6 +117,98 @@ fun AdminHomeScreen(state:AdminUiState,onRefresh:()->Unit,onApprove:(String,Stri
         ProtectedAdminDialog(operation,state.working,state.failure,onCancel,onAuthorize)
     }
 }
+
+/**
+ * Bounded, searchable in-memory directory. The server owns authorization and institutional scope;
+ * this component only filters the already-authorized users returned to the current administrator.
+ */
+@Composable
+private fun AdminUserDirectory(
+    users: List<AdminUserSummary>,
+    ownerKey: String?,
+    loading: Boolean,
+    working: Boolean,
+    onLifecycle: (String, AccountStatus) -> Unit,
+) {
+    var query by rememberSaveable(ownerKey) { mutableStateOf("") }
+    var filter by rememberSaveable(ownerKey) { mutableStateOf(AdminDirectoryFilter.ALL) }
+    var requestedPage by rememberSaveable(ownerKey) { mutableIntStateOf(0) }
+    val filtered = filterAdminDirectoryUsers(users, query, filter)
+    val pageCount = ((filtered.size + ADMIN_DIRECTORY_PAGE_SIZE - 1) / ADMIN_DIRECTORY_PAGE_SIZE).coerceAtLeast(1)
+    val page = requestedPage.coerceIn(0, pageCount - 1)
+    val visible = adminDirectoryPage(filtered, page, ADMIN_DIRECTORY_PAGE_SIZE)
+
+    Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
+        Text(stringResource(R.string.admin_users), style = MaterialTheme.typography.titleLarge)
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it.take(120); requestedPage = 0 },
+            label = { Text("Buscar por nombre o correo") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().testTag("admin_directory_search"),
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+        ) {
+            listOf(
+                AdminDirectoryFilter.ALL to "Todos",
+                AdminDirectoryFilter.ACTIVE to "Activos",
+                AdminDirectoryFilter.PENDING to "Pendientes",
+                AdminDirectoryFilter.SUSPENDED to "Suspendidos",
+                AdminDirectoryFilter.REVOKED to "Revocados",
+            ).forEach { (option, label) ->
+                FilterChip(
+                    selected = filter == option,
+                    onClick = { filter = option; requestedPage = 0 },
+                    label = { Text(label) },
+                )
+            }
+        }
+        Text(
+            text = "${filtered.size} usuarios encontrados · Página ${page + 1} de $pageCount",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        if (users.isEmpty()) Text(stringResource(R.string.admin_empty_users))
+        else if (filtered.isEmpty()) Text("No hay usuarios que coincidan con la búsqueda y el filtro.")
+        visible.forEach { user ->
+            V8GlassCard(Modifier.fillMaxWidth()) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(user.user.displayName, style = MaterialTheme.typography.titleMedium)
+                    user.user.email?.let { email ->
+                        Text(email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Text(stringResource(statusResource(user.user.accountStatus)))
+                    if (user.user.accountStatus != AccountStatus.REVOKED) {
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(
+                                onClick = { onLifecycle(user.user.id, AccountStatus.SUSPENDED) },
+                                enabled = !loading && !working && user.user.accountStatus != AccountStatus.SUSPENDED,
+                            ) { Text(stringResource(R.string.admin_suspend)) }
+                            TextButton(
+                                onClick = { onLifecycle(user.user.id, AccountStatus.REVOKED) },
+                                enabled = !loading && !working,
+                            ) { Text(stringResource(R.string.admin_revoke)) }
+                        }
+                    }
+                }
+            }
+        }
+        if (pageCount > 1) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = { requestedPage = page - 1 }, enabled = page > 0) { Text("Anterior") }
+                Text("${page + 1} / $pageCount", style = MaterialTheme.typography.labelLarge)
+                TextButton(onClick = { requestedPage = page + 1 }, enabled = page < pageCount - 1) { Text("Siguiente") }
+            }
+        }
+    }
+}
+
 @Composable private fun TutorApprovalDialog(groups:List<AcademicGroupSummary>,failure:AppError?,onDismiss:()->Unit,onConfirm:(Set<String>,Int?)->Unit) {
     var selected by remember { mutableStateOf(emptySet<String>()) }
     var validityDays by remember { mutableStateOf("") }

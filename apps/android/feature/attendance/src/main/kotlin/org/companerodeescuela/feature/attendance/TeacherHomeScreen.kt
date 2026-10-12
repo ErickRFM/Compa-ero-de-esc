@@ -87,7 +87,7 @@ fun TeacherHomeScreen(
                     Text(
                         text = "Inicio docente",
                         style = MaterialTheme.typography.headlineLarge,
-                        color = V8RedColors.TextPrimary,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold,
                     )
                     val greeting = displayName?.trim()?.takeIf { it.isNotEmpty() }
@@ -95,13 +95,13 @@ fun TeacherHomeScreen(
                         text = greeting?.let { "Hola, $it · Tus clases asignadas" }
                             ?: "Consulta tus clases asignadas y organiza la jornada.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = V8RedColors.TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
 
             if (state.mode == AttendanceMode.LOADING || state.loading && state.occurrences.isEmpty()) {
-                CircularProgressIndicator(color = V8RedColors.Crimson)
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             } else if (state.mode != AttendanceMode.TEACHER) {
                 StatusNotice(
                     title = "Acceso docente pendiente",
@@ -124,11 +124,11 @@ fun TeacherHomeScreen(
 
                 V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("Pase de lista", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary, fontWeight = FontWeight.Bold)
+                        Text("Pase de lista", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                         Text(
                             text = if (active != null) "EN VIVO · ${active.groupName}" else "Sin pase abierto",
                             style = MaterialTheme.typography.labelLarge,
-                            color = if (active != null) V8RedColors.Success else V8RedColors.TextSecondary,
+                            color = if (active != null) V8RedColors.Success else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
                             text = if (active != null) {
@@ -136,7 +136,7 @@ fun TeacherHomeScreen(
                                     ?: "Sesión de ${active.groupName}"
                             } else "Inicia el pase de una clase asignada",
                             style = MaterialTheme.typography.titleLarge,
-                            color = V8RedColors.TextPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
@@ -144,7 +144,7 @@ fun TeacherHomeScreen(
                                 "${active.scheduledStartsAt} – ${active.scheduledEndsAt} · " +
                                     (if (state.roster == null) "Actualizando registros…" else "${records.size} registros recibidos")
                             } else "El QR se genera desde el servidor y se renueva automáticamente.",
-                            color = V8RedColors.TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         V8RedPrimaryButton(
@@ -159,9 +159,9 @@ fun TeacherHomeScreen(
                 if (nextClass != null) {
                     V8GlassCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenSchedule)) {
                         Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
-                            Text("SIGUIENTE CLASE", color = V8RedColors.Crimson,
+                            Text("SIGUIENTE CLASE", color = MaterialTheme.colorScheme.primary,
                                 style = MaterialTheme.typography.labelLarge)
-                            Text(nextClass.subjectName, color = V8RedColors.TextPrimary,
+                            Text(nextClass.subjectName, color = MaterialTheme.colorScheme.onSurface,
                                 style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                             Text(
                                 listOfNotNull(
@@ -169,10 +169,10 @@ fun TeacherHomeScreen(
                                     nextClass.startsAt + " – " + nextClass.endsAt,
                                     nextClass.classroomName?.takeIf(String::isNotBlank),
                                 ).joinToString(" · "),
-                                color = V8RedColors.TextSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodyMedium,
                             )
-                            Text("Ver detalles en Mi horario", color = V8RedColors.TextSecondary,
+                            Text("Ver detalles en Mi horario", color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.labelSmall)
                         }
                     }
@@ -223,13 +223,13 @@ fun TeacherHomeScreen(
                     V8GlassCard(modifier = Modifier.fillMaxWidth()) {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("Entrada escolar · ${campus.groupName}",
-                                style = MaterialTheme.typography.titleMedium, color = V8RedColors.TextPrimary)
+                                style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                             Text("${campus.students.count { it.campusEntryAtEpochSeconds != null }} de ${campus.students.size} integrantes con ingreso registrado",
-                                style = MaterialTheme.typography.bodyMedium, color = V8RedColors.TextSecondary)
+                                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(
                                 "Consulta el padrón completo y los retardos en Asistencia.",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = V8RedColors.TextSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             V8RedPrimaryButton(
                                 text = "Abrir padrón",
@@ -243,7 +243,7 @@ fun TeacherHomeScreen(
                         message = state.campusRosterError!!)
                 }
 
-                Text("Accesos rápidos", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary)
+                Text("Accesos rápidos", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TeacherToolCard("Mis clases", "Grupos asignados", Icons.Filled.MenuBook, onOpenClassrooms, Modifier.weight(1f))
                     TeacherToolCard("Mi horario", "Agenda semanal", Icons.Filled.CalendarMonth, onOpenSchedule, Modifier.weight(1f))
@@ -253,7 +253,7 @@ fun TeacherHomeScreen(
                     TeacherToolCard("Evaluación", "Excel y calificaciones", Icons.Filled.BarChart, onOpenGrading, Modifier.weight(1f))
                 }
 
-                Text("Tu agenda", style = MaterialTheme.typography.titleLarge, color = V8RedColors.TextPrimary)
+                Text("Tu agenda", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
                 if (upcoming.isEmpty()) {
                     StatusNotice(
                         title = "Sin próximas clases asignadas",
@@ -295,8 +295,8 @@ private fun TeacherToolCard(
     V8GlassCard(modifier = modifier.heightIn(min = 76.dp).clickable(onClick = onClick)) {
         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
             V8IconTile(icon)
-            Text(title, color = V8RedColors.TextPrimary, style = MaterialTheme.typography.titleMedium)
-            Text(subtitle, color = V8RedColors.TextSecondary, style = MaterialTheme.typography.bodySmall)
+            Text(title, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleMedium)
+            Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

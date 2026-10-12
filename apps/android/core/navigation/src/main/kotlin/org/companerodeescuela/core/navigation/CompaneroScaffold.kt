@@ -1,6 +1,7 @@
 package org.companerodeescuela.core.navigation
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -13,7 +14,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.MaterialTheme
 import org.companerodeescuela.core.designsystem.v8.V8ColorScheme
-import org.companerodeescuela.core.designsystem.v8.v8EffectiveColorScheme
+import org.companerodeescuela.core.designsystem.v8.v8ResolvedColorScheme
 import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
 import org.companerodeescuela.core.designsystem.v8.LocalV8HeaderAction
 import org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled
@@ -62,7 +63,9 @@ fun CompaneroScaffold(
         else -> "Volver"
     }
 
-    val studentColors = v8EffectiveColorScheme(highContrast)
+    val parentColors = MaterialTheme.colorScheme
+    val lightTheme = parentColors.background.luminance() > 0.5f
+    val studentColors = v8ResolvedColorScheme(parentColors, highContrast)
     val studentGlass = startDestination == Destination.Home || startDestination == Destination.TeacherHome
     val headerAction: (@Composable () -> Unit)? =
         if (!onSecondaryScreen && topLevelDestinations.none { it.destination == Destination.Profile }) {
@@ -78,11 +81,11 @@ fun CompaneroScaffold(
     CompositionLocalProvider(
         LocalV8GlassEnabled provides studentGlass,
         LocalV8HeaderAction provides headerAction,
-        LocalContentColor provides if (studentGlass) V8ColorScheme.onSurface else LocalContentColor.current,
+        LocalContentColor provides if (studentGlass) studentColors.onSurface else LocalContentColor.current,
     ) {
     Box(Modifier.fillMaxSize()) {
     if (studentGlass) {
-        if (highContrast) Box(Modifier.matchParentSize().background(Color.Black))
+        if (lightTheme || highContrast) Box(Modifier.matchParentSize().background(studentColors.background))
         else V8CampusBackdrop(Modifier.matchParentSize())
     }
     Scaffold(

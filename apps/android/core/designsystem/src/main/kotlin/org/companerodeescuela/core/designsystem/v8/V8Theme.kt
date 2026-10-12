@@ -3,6 +3,7 @@ package org.companerodeescuela.core.designsystem.v8
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.runtime.staticCompositionLocalOf
 
 /** Enables the V8 finish for shared surfaces inside the student scaffold. */
@@ -41,3 +42,7 @@ fun v8EffectiveColorScheme(highContrast: Boolean): ColorScheme =
         outline = Color.White,
         outlineVariant = Color(0xFFEEEEEE),
     )
+
+/** Honor the user's existing light/system scheme; V8's matte brand palette is for dark mode. */
+fun v8ResolvedColorScheme(parent: ColorScheme, highContrast: Boolean): ColorScheme =
+    if (parent.background.luminance() > 0.5f) parent else v8EffectiveColorScheme(highContrast)

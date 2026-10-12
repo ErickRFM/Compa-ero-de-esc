@@ -3,6 +3,7 @@ package org.companerodeescuela.core.designsystem.v8
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 import androidx.compose.material3.AssistChip
@@ -34,15 +35,15 @@ fun V8GlassFilterChip(
         shape = RoundedCornerShape(12.dp),
         border = null,
         leadingIcon = if (selected && LocalCompaneroHighContrast.current) {
-            { Icon(Icons.Filled.Check, contentDescription = null, tint = V8RedColors.TextPrimary) }
+            { Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface) }
         } else {
             null
         },
         colors = FilterChipDefaults.filterChipColors(
             containerColor = Color.Transparent,
             selectedContainerColor = Color.Transparent,
-            labelColor = V8RedColors.TextSecondary,
-            selectedLabelColor = V8RedColors.TextPrimary,
+            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            selectedLabelColor = MaterialTheme.colorScheme.onSurface,
         ),
     )
 }
@@ -69,11 +70,11 @@ fun V8GlassAssistChip(
         border = null,
         colors = AssistChipDefaults.assistChipColors(
             containerColor = Color.Transparent,
-            labelColor = V8RedColors.TextPrimary,
-            leadingIconContentColor = V8RedColors.Crimson,
+            labelColor = MaterialTheme.colorScheme.onSurface,
+            leadingIconContentColor = MaterialTheme.colorScheme.primary,
             disabledContainerColor = Color.Transparent,
-            disabledLabelColor = V8RedColors.TextSecondary,
-            disabledLeadingIconContentColor = V8RedColors.TextSecondary,
+            disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            disabledLeadingIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         ),
     )
 }

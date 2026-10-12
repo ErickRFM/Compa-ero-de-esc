@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -18,12 +19,14 @@ import androidx.compose.ui.unit.sp
 
 /** Student-facing V8 brand identity shared by all five approved surfaces. */
 @Composable
-fun V8BrandHeader(modifier: Modifier = Modifier, stacked: Boolean = false, contentColor: androidx.compose.ui.graphics.Color = V8RedColors.TextPrimary, secondaryColor: androidx.compose.ui.graphics.Color = V8RedColors.TextSecondary, tagline: String = "ESTUDIA · CONECTA · AVANZA") {
+fun V8BrandHeader(modifier: Modifier = Modifier, stacked: Boolean = false, contentColor: androidx.compose.ui.graphics.Color? = null, secondaryColor: androidx.compose.ui.graphics.Color? = null, tagline: String = "ESTUDIA · CONECTA · AVANZA") {
+    val primary = contentColor ?: MaterialTheme.colorScheme.onSurface
+    val secondary = secondaryColor ?: MaterialTheme.colorScheme.onSurfaceVariant
     if (stacked) {
         Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             V8BrandMark(Modifier.size(54.dp))
-            Text("Compañero\nde Clase", color = contentColor, fontSize = 22.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold)
-            Text(tagline, color = secondaryColor, fontSize = 9.sp, letterSpacing = 2.sp)
+            Text("Compañero\nde Clase", color = primary, fontSize = 22.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold)
+            Text(tagline, color = secondary, fontSize = 9.sp, letterSpacing = 2.sp)
         }
         return
     }
@@ -31,13 +34,13 @@ fun V8BrandHeader(modifier: Modifier = Modifier, stacked: Boolean = false, conte
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             V8BrandMark(Modifier.size(36.dp))
             Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-                Text("Compañero", color = contentColor, fontSize = 18.sp, fontWeight = FontWeight.Bold, lineHeight = 19.sp)
-                Text("de Clase", color = contentColor, fontSize = 18.sp, fontWeight = FontWeight.Bold, lineHeight = 19.sp)
+                Text("Compañero", color = primary, fontSize = 18.sp, fontWeight = FontWeight.Bold, lineHeight = 19.sp)
+                Text("de Clase", color = primary, fontSize = 18.sp, fontWeight = FontWeight.Bold, lineHeight = 19.sp)
             }
         }
         Text(
             tagline,
-            color = secondaryColor,
+            color = secondary,
             fontSize = 9.sp,
             letterSpacing = 1.sp,
         )

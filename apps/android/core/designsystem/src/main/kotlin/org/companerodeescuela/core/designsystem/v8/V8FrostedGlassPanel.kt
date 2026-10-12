@@ -31,7 +31,7 @@ fun Modifier.v8GlassSurface(
     cornerRadius: Dp = V8RedDimensions.CardCorner,
     emphasized: Boolean = false,
     elevation: Dp = 6.dp,
-    themeAware: Boolean = false,
+    themeAware: Boolean = true,
 ): Modifier {
     val shape = RoundedCornerShape(cornerRadius)
     val highContrast = LocalCompaneroHighContrast.current
@@ -74,7 +74,7 @@ fun V8FrostedGlassPanel(
     cornerRadius: Dp = V8RedDimensions.CardCorner,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     emphasized: Boolean = false,
-    themeAware: Boolean = false,
+    themeAware: Boolean = true,
     content: @Composable BoxScope.() -> Unit,
 ) {
     CompositionLocalProvider(LocalContentColor provides if (themeAware) MaterialTheme.colorScheme.onSurface else V8RedColors.TextPrimary) {

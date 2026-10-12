@@ -18,6 +18,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -67,7 +68,7 @@ fun V8AcademicField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
-        leadingIcon = { Icon(icon, contentDescription = null, tint = V8RedColors.Crimson) },
+        leadingIcon = { Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
         trailingIcon = if (isPassword) {
             {
                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
@@ -87,17 +88,17 @@ fun V8AcademicField(
         enabled = enabled,
         shape = shape,
         colors = OutlinedTextFieldDefaults.colors(
-            focusedTextColor = V8RedColors.TextPrimary,
-            unfocusedTextColor = V8RedColors.TextPrimary,
-            focusedContainerColor = V8RedColors.Surface.copy(alpha = if (highContrast) 1f else 0.96f),
-            unfocusedContainerColor = V8RedColors.Surface.copy(alpha = if (highContrast) 1f else 0.92f),
-            disabledContainerColor = V8RedColors.Surface,
-            errorContainerColor = V8RedColors.Surface,
-            focusedBorderColor = V8RedColors.Crimson,
-            unfocusedBorderColor = if (highContrast) V8RedColors.TextPrimary else V8RedColors.TextSecondary.copy(alpha = 0.50f),
-            focusedLabelColor = V8RedColors.TextSecondary,
-            unfocusedLabelColor = V8RedColors.TextSecondary,
-            cursorColor = V8RedColors.Crimson,
+            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+            focusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = if (highContrast) 1f else 0.96f),
+            unfocusedContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = if (highContrast) 1f else 0.92f),
+            disabledContainerColor = MaterialTheme.colorScheme.surface,
+            errorContainerColor = MaterialTheme.colorScheme.surface,
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            unfocusedBorderColor = if (highContrast) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.50f),
+            focusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            cursorColor = MaterialTheme.colorScheme.primary,
         ),
         modifier = modifier.fillMaxWidth(),
     )
@@ -106,23 +107,24 @@ fun V8AcademicField(
 @Composable
 fun V8SectionTitle(title: String, modifier: Modifier = Modifier, action: String? = null, onAction: (() -> Unit)? = null) {
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(title, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = V8RedColors.TextPrimary)
+        Text(title, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurface)
         if (action != null && onAction != null) {
-            Text(action, color = V8RedColors.TextSecondary, modifier = Modifier.clickable(onClick = onAction))
+            Text(action, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.clickable(onClick = onAction))
         }
     }
 }
 
 @Composable
 fun V8HeroTitle(leading: String, accent: String, modifier: Modifier = Modifier) {
+    val brandAccent = MaterialTheme.colorScheme.primary
     Text(
         text = androidx.compose.ui.text.buildAnnotatedString {
             append(leading + " ")
-            pushStyle(androidx.compose.ui.text.SpanStyle(color = V8RedColors.Crimson))
+            pushStyle(androidx.compose.ui.text.SpanStyle(color = brandAccent))
             append(accent)
             pop()
         },
         modifier = modifier,
-        color = V8RedColors.TextPrimary, fontSize = 32.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onSurface, fontSize = 32.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold,
     )
 }

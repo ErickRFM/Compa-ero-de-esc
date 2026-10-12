@@ -99,19 +99,19 @@ fun GradebookScreen(
                 "Evaluación",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
-                color = V8RedColors.TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 "Organiza las actividades de tus materias y revisa las calificaciones antes de enviarlas.",
-                color = V8RedColors.TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium,
             )
 
             V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
                 Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
                     TeacherGradingSectionTitle(number = "01", title = "Materia y periodo")
-                    Text("Tus clases asignadas", style = MaterialTheme.typography.titleMedium, color = V8RedColors.TextPrimary)
-                    if (state.loadingClassrooms) CircularProgressIndicator(color = V8RedColors.Crimson)
+                    Text("Tus clases asignadas", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                    if (state.loadingClassrooms) CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     if (state.classroomLoadError != null) {
                         StatusNotice(title = "Sin datos de clases", message = state.classroomLoadError!!)
                     }
@@ -140,7 +140,7 @@ fun GradebookScreen(
                             Text(
                                 "Grupo " + selected.groupName.orEmpty() +
                                     (selected.room?.takeIf(String::isNotBlank)?.let { " · Aula $it" } ?: ""),
-                                color = V8RedColors.TextSecondary,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
@@ -167,23 +167,23 @@ fun GradebookScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
                     TeacherGradingSectionTitle(number = "02", title = "Esquema de evaluación")
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Ponderación acumulada", color = V8RedColors.TextSecondary)
+                        Text("Ponderación acumulada", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
                             formatWeight(state.totalWeight) + "% de 100%",
-                            color = if (state.schemeComplete) V8RedColors.Success else V8RedColors.TextPrimary,
+                            color = if (state.schemeComplete) V8RedColors.Success else MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
                     LinearProgressIndicator(
                         progress = { (state.totalWeight / 100.0).coerceIn(0.0, 1.0).toFloat() },
                         modifier = Modifier.fillMaxWidth(),
-                        color = V8RedColors.Crimson,
-                        trackColor = V8RedColors.Outline,
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.outline,
                     )
                     if (state.categories.isEmpty()) {
                         Text(
                             "Agrega proyectos, prácticas, exámenes o cualquier actividad evaluable.",
-                            color = V8RedColors.TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -194,7 +194,7 @@ fun GradebookScreen(
                             cornerRadius = 14.dp,
                         ) {
                             Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
-                                Text("Actividad " + (index + 1), color = V8RedColors.TextSecondary,
+                                Text("Actividad " + (index + 1), color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     style = MaterialTheme.typography.labelSmall)
                                 BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                                     if (maxWidth < 340.dp) {
@@ -222,7 +222,7 @@ fun GradebookScreen(
                         Text(
                             if (state.totalWeight > 100) "La ponderación supera el 100%."
                             else "Falta " + formatWeight(100.0 - state.totalWeight) + "% para completar el esquema.",
-                            color = V8RedColors.TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -234,7 +234,7 @@ fun GradebookScreen(
                     TeacherGradingSectionTitle(number = "03", title = "Importar y revisar")
                     Text(
                         "Usa un Excel o CSV con matrícula y columnas que coincidan con tus actividades.",
-                        color = V8RedColors.TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     OutlinedButton(
@@ -253,26 +253,26 @@ fun GradebookScreen(
                     state.preview?.let { preview ->
                         Text(
                             state.importedFileName.orEmpty(),
-                            color = V8RedColors.TextPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.titleSmall,
                         )
                         Text(
                             preview.rows.size.toString() + " alumnos · " + preview.columns.size + " columnas",
-                            color = V8RedColors.TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         if (preview.warnings.isNotEmpty()) {
-                            Text("${preview.warnings.size} incidencias:\n" + preview.warnings.joinToString("\n"), color = V8RedColors.Error)
+                            Text("${preview.warnings.size} incidencias:\n" + preview.warnings.joinToString("\n"), color = MaterialTheme.colorScheme.error)
                         }
                         Text(
                             "Columnas detectadas: " + preview.columns.joinToString(),
-                            color = V8RedColors.TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
                         )
                         preview.rows.take(20).forEach { student ->
                             Text(student.studentId + " · " + student.values.entries.joinToString { (column, value) -> "$column: ${value ?: "vacío"}" },
-                                color = V8RedColors.TextPrimary, style = MaterialTheme.typography.bodyMedium)
+                                color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium)
                         }
-                        if (preview.rows.size > 20) Text("Vista previa de 20 de ${preview.rows.size} alumnos.", color = V8RedColors.TextSecondary)
+                        if (preview.rows.size > 20) Text("Vista previa de 20 de ${preview.rows.size} alumnos.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -289,7 +289,7 @@ fun GradebookScreen(
                     state.institutionalSyncAvailable -> "El servidor indica que dispone de un proveedor de calificaciones. El envío requiere confirmación institucional."
                     else -> "La publicación institucional no está configurada. Puedes importar y revisar las notas, pero no enviarlas."
                 },
-                color = V8RedColors.TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
             if (!state.capabilityLoading && !state.institutionalSyncAvailable) {
@@ -323,8 +323,8 @@ fun GradebookScreen(
 @Composable
 private fun TeacherGradingSectionTitle(number: String, title: String) {
     Row(horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
-        Text(number, color = V8RedColors.Crimson, fontWeight = FontWeight.Bold)
-        Text(title, color = V8RedColors.TextPrimary, style = MaterialTheme.typography.titleLarge)
+        Text(number, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        Text(title, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
     }
 }
 
@@ -361,13 +361,13 @@ private fun formatWeight(value: Double): String =
 
 @Composable
 private fun teacherFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedTextColor = V8RedColors.TextPrimary,
-    unfocusedTextColor = V8RedColors.TextPrimary,
-    focusedLabelColor = V8RedColors.Crimson,
-    unfocusedLabelColor = V8RedColors.TextSecondary,
-    focusedBorderColor = V8RedColors.Crimson,
-    unfocusedBorderColor = V8RedColors.Outline,
-    cursorColor = V8RedColors.Crimson,
-    focusedContainerColor = V8RedColors.Surface,
-    unfocusedContainerColor = V8RedColors.Surface,
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    focusedLabelColor = MaterialTheme.colorScheme.primary,
+    unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+    cursorColor = MaterialTheme.colorScheme.primary,
+    focusedContainerColor = MaterialTheme.colorScheme.surface,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
 )

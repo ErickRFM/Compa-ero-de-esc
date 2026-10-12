@@ -1,6 +1,7 @@
 package org.companerodeescuela.feature.grading
 
 import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.MockEngineConfig
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.headersOf
@@ -25,7 +26,9 @@ class GradeCapabilityPreflightTest {
     @Test fun `unavailable capability disables publishing without blocking review`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         var publishRequests = 0
-        val client = createApiClient(ApiEnvironment("https://example.test/", "test"), MockEngine { request ->
+        val client = createApiClient(ApiEnvironment("https://example.test/", "test"), MockEngine(MockEngineConfig().apply {
+            dispatcher = StandardTestDispatcher(testScheduler)
+            addHandler { request ->
             val body = when (request.url.encodedPath) {
                 "/classrooms" -> """{"data":[{"id":"A","name":"Matemáticas","teacherId":"T1","teacherDisplayName":"Docente","canManage":true}]}"""
                 "/grading/capability" -> """{"data":{"available":false}}"""
@@ -35,7 +38,8 @@ class GradeCapabilityPreflightTest {
                 }
             }
             respond(body, headers = headersOf(HttpHeaders.ContentType, "application/json"))
-        })
+            }
+        }))
         val payload = Base64.getUrlEncoder().withoutPadding()
             .encodeToString("""{"sub":"T1","roles":["TEACHER"],"exp":4102444800}""".toByteArray())
         val store = object : SessionTokenStore {

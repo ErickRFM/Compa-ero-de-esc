@@ -137,4 +137,3 @@ fun CoordinatorHomeScreen(
         }
     }
 }
-

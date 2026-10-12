@@ -28,6 +28,7 @@ import org.companerodeescuela.api.health.HealthService
 import org.companerodeescuela.api.health.healthRoutes
 import org.companerodeescuela.api.grading.UnavailableGradeSyncGateway
 import org.companerodeescuela.api.grading.gradingRoutes
+import org.companerodeescuela.api.coordination.coordinationRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
 import org.companerodeescuela.api.plugins.configurePlugins
 import org.companerodeescuela.api.presence.schoolPresenceRoutes
@@ -153,6 +154,7 @@ fun Application.module(
             )
         }
         academicGroupRoutes(settings = settings, service = academicGraph.groupService)
+        coordinationRoutes(settings, academicGraph.groupRepository, identityGraph.accounts)
         tutoringRoutes(settings = settings, service = academicGraph.tutoringService)
         tutorCaseRoutes(settings = settings, service = academicGraph.caseService)
         groupRepresentativeRoutes(settings = settings, service = academicGraph.representativeService)

@@ -10,9 +10,13 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
@@ -20,6 +24,7 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.ui.component.CompaneroHeroSurface
 import org.companerodeescuela.core.ui.component.CompaneroSurface
 import org.companerodeescuela.core.ui.component.CompaneroSurfaceRole
+import org.companerodeescuela.core.ui.component.StatusNotice
 
 @Composable
 fun CoordinatorHomeScreen(
@@ -27,7 +32,9 @@ fun CoordinatorHomeScreen(
     onOpenAttendance: () -> Unit,
     onOpenChannel: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: CoordinatorHomeViewModel = hiltViewModel(),
 ) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -61,13 +68,27 @@ fun CoordinatorHomeScreen(
                     style = MaterialTheme.typography.labelLarge,
                     color = CompanionColors.crimsonContainer,
                 )
+                when {
+                    state.loading -> CircularProgressIndicator()
+                    state.overview != null -> {
+                        Text(
+                            text = "${state.overview!!.activeGroups} grupos activos",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = CompanionColors.onDarkSurface,
+                        )
+                        Text(
+                            text = "Dato consultado del servidor para tu institución y periodo vigente.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = CompanionColors.onDarkSurfaceVariant,
+                        )
+                    }
+                    else -> StatusNotice(
+                        title = "Sin estadísticas verificadas",
+                        message = state.errorMessage ?: "No se pudieron consultar los grupos institucionales.",
+                    )
+                }
                 Text(
-                    text = "Información institucional pendiente",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = CompanionColors.onDarkSurface,
-                )
-                Text(
-                    text = "La institución todavía no proporciona métricas verificadas de grupos, asistencia e incidencias para esta sesión. No mostramos cifras de ejemplo como si fueran reales.",
+                    text = "Asistencia docente e incidencias: indicadores pendientes de integración institucional.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = CompanionColors.onDarkSurfaceVariant,
                 )

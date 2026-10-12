@@ -3,7 +3,6 @@ package org.companerodeescuela.feature.coordinator
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,9 +13,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
@@ -60,23 +57,20 @@ fun CoordinatorHomeScreen(
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
                 Text(
-                    text = "RESUMEN DEL DÍA",
+                    text = "INDICADORES ACADÉMICOS",
                     style = MaterialTheme.typography.labelLarge,
                     color = CompanionColors.crimsonContainer,
                 )
                 Text(
-                    text = "Operación del programa",
+                    text = "Información institucional pendiente",
                     style = MaterialTheme.typography.titleLarge,
                     color = CompanionColors.onDarkSurface,
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
-                ) {
-                    Metric("Grupos activos", "12", Modifier.weight(1f))
-                    Metric("Asistencia docente", "95%", Modifier.weight(1f))
-                    Metric("Incidencias", "0", Modifier.weight(1f))
-                }
+                Text(
+                    text = "La institución todavía no proporciona métricas verificadas de grupos, asistencia e incidencias para esta sesión. No mostramos cifras de ejemplo como si fueran reales.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = CompanionColors.onDarkSurfaceVariant,
+                )
             }
         }
 
@@ -141,29 +135,5 @@ fun CoordinatorHomeScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun Metric(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.Start,
-        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
-    ) {
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleLarge,
-            color = CompanionColors.onDarkSurface,
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = CompanionColors.onDarkSurfaceVariant,
-        )
     }
 }

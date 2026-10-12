@@ -31,6 +31,8 @@ data class GradebookUiState(
     val preview: GradeImportPreview? = null,
     val importedFileName: String? = null,
     val submitting: Boolean = false,
+    val capabilityLoading: Boolean = true,
+    val institutionalSyncAvailable: Boolean = false,
     val errorMessage: String? = null,
     val successMessage: String? = null,
 ) {
@@ -62,7 +64,28 @@ class GradebookViewModel @Inject constructor(
         }
     }
 
-    init { refreshClassrooms() }
+    init {
+        refreshClassrooms()
+        refreshCapability()
+    }
+
+    fun refreshCapability() {
+        if (_state.value.submitting) return
+        _state.update {
+            it.copy(capabilityLoading = true, institutionalSyncAvailable = false)
+        }
+        viewModelScope.launch {
+            when (val result = repository.capability()) {
+                is Outcome.Success -> _state.update {
+                    it.copy(capabilityLoading = false, institutionalSyncAvailable = result.value.available)
+                }
+                is Outcome.Failure -> _state.update {
+                    // Unknown readiness must never be rendered as an enabled publish action.
+                    it.copy(capabilityLoading = false, institutionalSyncAvailable = false)
+                }
+            }
+        }
+    }
 
     fun refreshClassrooms() {
         if (_state.value.submitting) return
@@ -171,6 +194,12 @@ class GradebookViewModel @Inject constructor(
     fun sync() {
         val current = _state.value
         if (current.submitting || current.loadingClassrooms) return
+        if (current.capabilityLoading || !current.institutionalSyncAvailable) {
+            _state.update {
+                it.copy(errorMessage = "La publicación institucional no está configurada. Puedes importar y revisar, pero no enviar calificaciones.")
+            }
+            return
+        }
         if (!current.schemeComplete) {
             _state.update { it.copy(errorMessage = "La ponderación debe sumar exactamente 100%.") }
             return

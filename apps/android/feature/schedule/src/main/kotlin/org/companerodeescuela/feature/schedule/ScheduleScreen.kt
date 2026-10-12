@@ -53,6 +53,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -104,8 +105,8 @@ fun ScheduleScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val importProcessor = remember(context) { ScheduleImportProcessor(context) }
-    var mode by remember { mutableStateOf(AgendaMode.WEEK) }
-    var subjectFilter by remember { mutableStateOf<String?>(null) }
+    var mode by rememberSaveable { mutableStateOf(AgendaMode.WEEK) }
+    var subjectFilter by rememberSaveable { mutableStateOf<String?>(null) }
     var showEditor by remember { mutableStateOf(false) }
     var editingEntry by remember { mutableStateOf<ScheduleEntry?>(null) }
     var editingImportIndex by remember { mutableStateOf<Int?>(null) }
@@ -137,11 +138,10 @@ fun ScheduleScreen(
         return
     }
 
-    var selectedDay by remember(state.entries) {
+    // La preferencia del usuario no debe reiniciarse por cada refresh de la agenda.
+    var selectedDay by rememberSaveable {
         val today = LocalDate.now().dayOfWeek.name
-        mutableStateOf(
-            today.takeIf { it in academicDaysV8 } ?: "MONDAY",
-        )
+        mutableStateOf(today.takeIf { it in academicDaysV8 } ?: "MONDAY")
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -173,11 +173,12 @@ fun ScheduleScreen(
 
         val monday = LocalDate.now().minusDays((LocalDate.now().dayOfWeek.value - 1).toLong())
         val displayedDays = weeklyAgendaDays(state.entries)
+        val visibleSelectedDay = resolveScheduleDay(selectedDay, displayedDays)
         V8DaySelector(
             days = displayedDays.map { day ->
                 dayShortLabelV8(day) to monday.plusDays(java.time.DayOfWeek.valueOf(day).value.toLong() - 1).dayOfMonth.toString()
             },
-            selectedIndex = displayedDays.indexOf(selectedDay).coerceAtLeast(0),
+            selectedIndex = displayedDays.indexOf(visibleSelectedDay).coerceAtLeast(0),
             onSelect = { index ->
                 selectedDay = displayedDays[index]
                 mode = AgendaMode.DAY
@@ -231,13 +232,14 @@ fun ScheduleScreen(
                 },
             )
         } else {
+            val effectiveFilter = subjectFilter?.takeIf { selected -> state.entries.any { it.subjectName == selected } }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                item { V8GlassFilterChip(selected = subjectFilter == null, onClick = { subjectFilter = null }, label = { Text("Todas") }) }
+                item { V8GlassFilterChip(selected = effectiveFilter == null, onClick = { subjectFilter = null }, label = { Text("Todas") }) }
                 items(state.entries.map { it.subjectName }.distinct().sorted()) { name ->
-                    V8GlassFilterChip(selected = subjectFilter == name, onClick = { subjectFilter = name }, label = { Text(name) })
+                    V8GlassFilterChip(selected = effectiveFilter == name, onClick = { subjectFilter = name }, label = { Text(name) })
                 }
             }
-            val visibleEntries = state.entries.filter { subjectFilter == null || it.subjectName == subjectFilter }
+            val visibleEntries = state.entries.filter { effectiveFilter == null || it.subjectName == effectiveFilter }
             val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
             AnimatedContent(
                 targetState = mode,
@@ -260,7 +262,7 @@ fun ScheduleScreen(
                 when (currentMode) {
                     AgendaMode.DAY -> DayAgenda(
                         entries = visibleEntries,
-                        selectedDay = selectedDay,
+                        selectedDay = visibleSelectedDay,
                         onSelectedDay = { selectedDay = it },
                         onEdit = {
                             editingEntry = it

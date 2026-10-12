@@ -128,20 +128,33 @@ fun ChannelScreen(
                 }
                 if (!selected.canPublish) item {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        listOf("Avisos", "Chat").forEachIndexed { index, label ->
+                        listOf("Publicaciones", "Recursos").forEachIndexed { index, label ->
                             V8ChannelTab(label, selectedTab == index, { selectedTab = index }, Modifier.weight(1f))
                         }
                     }
                 }
-                if (state.posts.isEmpty()) item {
+                // El canal es unidireccional: Recursos filtra adjuntos, no simula un chat libre.
+                val visiblePosts = channelPostsForTab(
+                    posts = state.posts,
+                    tab = if (!selected.canPublish && selectedTab == 1) ChannelFeedTab.RESOURCES else ChannelFeedTab.POSTS,
+                )
+                if (visiblePosts.isEmpty()) item {
                     StatusNotice(
-                        title = if (state.loading) "Cargando publicaciones…" else "Sin publicaciones",
-                        message = if (selected.canPublish) "Comparte el primer aviso o recurso con este grupo."
-                            else "Tu docente todavía no ha publicado información para esta materia.",
+                        title = when {
+                            state.loading -> "Cargando publicaciones…"
+                            state.posts.isNotEmpty() -> "Sin recursos compartidos"
+                            else -> "Sin publicaciones"
+                        },
+                        message = when {
+                            state.loading -> "Consultando información de esta clase."
+                            state.posts.isNotEmpty() -> "No hay documentos ni enlaces en las publicaciones de este canal."
+                            selected.canPublish -> "Comparte el primer aviso o recurso con este grupo."
+                            else -> "Tu docente todavía no ha publicado información para esta materia."
+                        },
                     )
                 }
-                items(state.posts, key = ChannelPost::id) { post ->
-                    ChannelPostCard(post, !selected.canPublish && selectedTab == 1, state.actionInProgress, viewModel::acknowledge)
+                items(visiblePosts, key = ChannelPost::id) { post ->
+                    ChannelPostCard(post, !selected.canPublish, state.actionInProgress, viewModel::acknowledge)
                 }
                 item {
                     if (!selected.canPublish) StudentChannelFooter()

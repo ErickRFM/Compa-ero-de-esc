@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,12 +24,17 @@ import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -67,6 +73,8 @@ fun CompaneroBottomBar(
     }
     val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
     val glass = LocalV8GlassEnabled.current
+    val largeText = LocalDensity.current.fontScale >= 1.5f
+    val itemHeight = if (largeText) 74.dp else 60.dp
 
     Surface(
         modifier = modifier
@@ -84,7 +92,7 @@ fun CompaneroBottomBar(
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp)
+                .height(itemHeight + 12.dp)
                 .padding(horizontal = CompaneroSpacing.xxs, vertical = 6.dp),
         ) {
             val itemWidth = maxWidth / destinations.size.coerceAtLeast(1)
@@ -105,7 +113,7 @@ fun CompaneroBottomBar(
                     modifier = Modifier
                         .offset(x = pillOffset)
                         .width(itemWidth)
-                        .height(52.dp)
+                        .height(itemHeight)
                         .then(
                             if (glass) {
                                 Modifier.v8GlassSurface(
@@ -135,7 +143,7 @@ fun CompaneroBottomBar(
                     Box(
                         modifier = Modifier
                             .width(itemWidth)
-                            .height(52.dp)
+                            .height(itemHeight)
                             .clip(MaterialTheme.shapes.extraLarge)
                             .semantics(mergeDescendants = true) {
                                 role = Role.Tab
@@ -147,9 +155,10 @@ fun CompaneroBottomBar(
                             },
                         contentAlignment = Alignment.Center,
                     ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(
                             modifier = Modifier
-                                .size(if (isQr) 48.dp else 40.dp)
+                                .size(if (isQr) 38.dp else 34.dp)
                                 .clip(CircleShape)
                                 .background(if (isQr) V8RedColors.DeepCrimson else Color.Transparent)
                                 .graphicsLayer {
@@ -181,6 +190,19 @@ fun CompaneroBottomBar(
                                     else -> V8RedColors.TextSecondary
                                 },
                             )
+                        }
+                        Text(
+                            text = when (topLevel) {
+                                TopLevelDestination.AdminHome -> "Admin"
+                                TopLevelDestination.CoordinatorHome -> "Gestión"
+                                else -> topLevel.label
+                            },
+                            fontSize = if (largeText) 11.sp else 10.sp,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = if (isSelected) V8RedColors.TextPrimary else V8RedColors.TextSecondary,
+                        )
                         }
                     }
                 }

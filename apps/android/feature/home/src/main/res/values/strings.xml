@@ -52,4 +52,14 @@
 <string name="admin_error_generic">No pudimos completar la operación.</string>
 <string name="admin_validity_days">Días de vigencia (opcional)</string>
 <string name="admin_validity_description">Vacío: hasta el final de cada periodo. El plazo elegido queda limitado por sus fechas.</string>
+<string name="admin_directory_search">Buscar por nombre o correo</string>
+<string name="admin_directory_filter_all">Todos</string>
+<string name="admin_directory_filter_active">Activos</string>
+<string name="admin_directory_filter_pending">Pendientes</string>
+<string name="admin_directory_filter_suspended">Suspendidos</string>
+<string name="admin_directory_filter_revoked">Revocados</string>
+<string name="admin_directory_count">%1$d usuarios encontrados · Página %2$d de %3$d</string>
+<string name="admin_directory_no_results">No hay usuarios que coincidan con la búsqueda y el filtro.</string>
+<string name="admin_directory_previous">Anterior</string>
+<string name="admin_directory_next">Siguiente</string>
 </resources>

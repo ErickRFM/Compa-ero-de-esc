@@ -143,7 +143,7 @@ private fun AdminUserDirectory(
         OutlinedTextField(
             value = query,
             onValueChange = { query = it.take(120); requestedPage = 0 },
-            label = { Text("Buscar por nombre o correo") },
+            label = { Text(stringResource(R.string.admin_directory_search)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth().testTag("admin_directory_search"),
         )
@@ -152,26 +152,26 @@ private fun AdminUserDirectory(
             horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
         ) {
             listOf(
-                AdminDirectoryFilter.ALL to "Todos",
-                AdminDirectoryFilter.ACTIVE to "Activos",
-                AdminDirectoryFilter.PENDING to "Pendientes",
-                AdminDirectoryFilter.SUSPENDED to "Suspendidos",
-                AdminDirectoryFilter.REVOKED to "Revocados",
+                AdminDirectoryFilter.ALL to R.string.admin_directory_filter_all,
+                AdminDirectoryFilter.ACTIVE to R.string.admin_directory_filter_active,
+                AdminDirectoryFilter.PENDING to R.string.admin_directory_filter_pending,
+                AdminDirectoryFilter.SUSPENDED to R.string.admin_directory_filter_suspended,
+                AdminDirectoryFilter.REVOKED to R.string.admin_directory_filter_revoked,
             ).forEach { (option, label) ->
                 FilterChip(
                     selected = filter == option,
                     onClick = { filter = option; requestedPage = 0 },
-                    label = { Text(label) },
+                    label = { Text(stringResource(label)) },
                 )
             }
         }
         Text(
-            text = "${filtered.size} usuarios encontrados · Página ${page + 1} de $pageCount",
+            text = stringResource(R.string.admin_directory_count, filtered.size, page + 1, pageCount),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall,
         )
         if (users.isEmpty()) Text(stringResource(R.string.admin_empty_users))
-        else if (filtered.isEmpty()) Text("No hay usuarios que coincidan con la búsqueda y el filtro.")
+        else if (filtered.isEmpty()) Text(stringResource(R.string.admin_directory_no_results))
         visible.forEach { user ->
             V8GlassCard(Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -201,9 +201,9 @@ private fun AdminUserDirectory(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = { requestedPage = page - 1 }, enabled = page > 0) { Text("Anterior") }
+                TextButton(onClick = { requestedPage = page - 1 }, enabled = page > 0) { Text(stringResource(R.string.admin_directory_previous)) }
                 Text("${page + 1} / $pageCount", style = MaterialTheme.typography.labelLarge)
-                TextButton(onClick = { requestedPage = page + 1 }, enabled = page < pageCount - 1) { Text("Siguiente") }
+                TextButton(onClick = { requestedPage = page + 1 }, enabled = page < pageCount - 1) { Text(stringResource(R.string.admin_directory_next)) }
             }
         }
     }

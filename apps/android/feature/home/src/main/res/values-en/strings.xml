@@ -52,4 +52,14 @@
 <string name="admin_error_generic">Could not complete the operation.</string>
 <string name="admin_validity_days">Validity in days (optional)</string>
 <string name="admin_validity_description">Empty: until each period ends. The chosen duration is bounded by its dates.</string>
+<string name="admin_directory_search">Search by name or email</string>
+<string name="admin_directory_filter_all">All</string>
+<string name="admin_directory_filter_active">Active</string>
+<string name="admin_directory_filter_pending">Pending</string>
+<string name="admin_directory_filter_suspended">Suspended</string>
+<string name="admin_directory_filter_revoked">Revoked</string>
+<string name="admin_directory_count">%1$d users found · Page %2$d of %3$d</string>
+<string name="admin_directory_no_results">No accounts match the search and filter.</string>
+<string name="admin_directory_previous">Previous</string>
+<string name="admin_directory_next">Next</string>
 </resources>

@@ -1,6 +1,8 @@
 package org.companerodeescuela.core.designsystem.v8
 
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.ColorScheme
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.staticCompositionLocalOf
 
 /** Enables the V8 finish for shared surfaces inside the student scaffold. */
@@ -24,3 +26,18 @@ val V8ColorScheme = darkColorScheme(
     outlineVariant = V8RedColors.Outline.copy(alpha = 0.5f),
     error = V8RedColors.Error,
 )
+
+/** V14: high contrast must change actual screen surfaces, not only the outlines. */
+fun v8EffectiveColorScheme(highContrast: Boolean): ColorScheme =
+    if (!highContrast) V8ColorScheme else V8ColorScheme.copy(
+        background = Color.Black,
+        onBackground = Color.White,
+        surface = Color(0xFF0F0E13),
+        onSurface = Color.White,
+        surfaceContainerLow = Color.Black,
+        surfaceContainer = Color(0xFF0F0E13),
+        surfaceVariant = Color(0xFF18171E),
+        onSurfaceVariant = Color.White,
+        outline = Color.White,
+        outlineVariant = Color(0xFFEEEEEE),
+    )

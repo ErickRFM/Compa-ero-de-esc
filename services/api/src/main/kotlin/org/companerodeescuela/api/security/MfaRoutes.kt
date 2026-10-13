@@ -15,6 +15,7 @@ import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.integrations.identity.IdentityProvider
 import org.companerodeescuela.api.plugins.requestId
+import org.companerodeescuela.api.plugins.clientAddress
 import org.companerodeescuela.shared.contracts.*
 
 fun Route.mfaRoutes(settings:ApiSettings,identity:IdentityProvider,sessions:RefreshSessionRepository,accounts:PlatformAccountRepository,mfa:MfaService) {
@@ -35,7 +36,7 @@ fun Route.mfaRoutes(settings:ApiSettings,identity:IdentityProvider,sessions:Refr
         if(credentialOperation!=null) {
             // Account counter is independent of source address; rotating addresses cannot evade it.
             val retry=credentialLimiter.acquire(actor.id+":"+credentialOperation,"mfa")
-                ?: addressLimiter.acquire("mfa-credentials",request.local.remoteAddress)
+                ?: addressLimiter.acquire("mfa-credentials",clientAddress())
             if(retry!=null) { response.header(HttpHeaders.RetryAfter,retry.toString());throw ApiException.RateLimited() }
         }
         return actor

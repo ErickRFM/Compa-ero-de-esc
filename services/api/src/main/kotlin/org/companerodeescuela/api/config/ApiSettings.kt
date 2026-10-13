@@ -37,6 +37,9 @@ data class MongoSettings(
 data class ApiSettings(
     val serviceName: String,
     val environment: Environment,
+    val trustedProxy: Boolean = false,
+    val loginProgressiveDelayBaseSeconds: Long = 1,
+    val loginProgressiveDelayMaxSeconds: Long = 30,
     val host: String,
     val port: Int,
     val version: String,
@@ -81,6 +84,9 @@ data class ApiSettings(
         if (other !is ApiSettings) return false
         return serviceName == other.serviceName &&
             environment == other.environment &&
+            trustedProxy == other.trustedProxy &&
+            loginProgressiveDelayBaseSeconds == other.loginProgressiveDelayBaseSeconds &&
+            loginProgressiveDelayMaxSeconds == other.loginProgressiveDelayMaxSeconds &&
             host == other.host &&
             port == other.port &&
             version == other.version &&
@@ -103,6 +109,9 @@ data class ApiSettings(
     override fun hashCode(): Int {
         var result = serviceName.hashCode()
         result = 31 * result + environment.hashCode()
+        result = 31 * result + trustedProxy.hashCode()
+        result = 31 * result + loginProgressiveDelayBaseSeconds.hashCode()
+        result = 31 * result + loginProgressiveDelayMaxSeconds.hashCode()
         result = 31 * result + host.hashCode()
         result = 31 * result + port
         result = 31 * result + version.hashCode()
@@ -131,6 +140,9 @@ data class ApiSettings(
         "ApiSettings(" +
             "serviceName=$serviceName, " +
             "environment=$environment, " +
+            "trustedProxy=$trustedProxy, " +
+            "loginProgressiveDelayBaseSeconds=$loginProgressiveDelayBaseSeconds, " +
+            "loginProgressiveDelayMaxSeconds=$loginProgressiveDelayMaxSeconds, " +
             "host=$host, " +
             "port=$port, " +
             "version=$version, " +
@@ -157,6 +169,22 @@ class SettingsLoader(
 ) {
     fun load(): ApiSettings {
         val environment = Environment.parse(env("APP_ENV"))
+
+        val trustedProxy = when (env("TRUSTED_PROXY")?.trim()?.lowercase()) {
+            null, "false" -> false
+            "true" -> true
+            else -> throw ConfigurationException("TRUSTED_PROXY must be true or false")
+        }
+        fun progressiveDelaySeconds(name: String, default: Long): Long {
+            val raw = env(name) ?: return default
+            return raw.trim().toLongOrNull()?.takeIf { it in 1..30 }
+                ?: throw ConfigurationException("$name must be between 1 and 30 seconds")
+        }
+        val loginProgressiveDelayBaseSeconds = progressiveDelaySeconds("LOGIN_PROGRESSIVE_DELAY_BASE_SECONDS", 1)
+        val loginProgressiveDelayMaxSeconds = progressiveDelaySeconds("LOGIN_PROGRESSIVE_DELAY_MAX_SECONDS", 30)
+        if (loginProgressiveDelayMaxSeconds < loginProgressiveDelayBaseSeconds) {
+            throw ConfigurationException("LOGIN_PROGRESSIVE_DELAY_MAX_SECONDS must be at least LOGIN_PROGRESSIVE_DELAY_BASE_SECONDS")
+        }
 
         val host = env("API_HOST")?.trim().orEmpty().ifEmpty { DEFAULT_HOST }
         val portText = env("API_PORT")?.trim()
@@ -223,6 +251,9 @@ class SettingsLoader(
         return ApiSettings(
             serviceName = DEFAULT_SERVICE_NAME,
             environment = environment,
+            trustedProxy = trustedProxy,
+            loginProgressiveDelayBaseSeconds = loginProgressiveDelayBaseSeconds,
+            loginProgressiveDelayMaxSeconds = loginProgressiveDelayMaxSeconds,
             host = host,
             port = portText!!.trim().toInt(),
             version = env("APP_VERSION")?.trim().orEmpty().ifEmpty { UNKNOWN_VERSION },

@@ -1,6 +1,7 @@
 package org.companerodeescuela.api.auth
 
 import java.time.Clock
+import kotlinx.coroutines.delay
 import org.companerodeescuela.api.institutions.InstitutionRepository
 import org.companerodeescuela.api.institutions.InMemoryInstitutionRepository
 import org.companerodeescuela.api.mail.VerificationEmailGateway
@@ -20,6 +21,7 @@ import io.ktor.server.routing.route
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.integrations.identity.IdentityProvider
+import org.companerodeescuela.api.plugins.clientAddress
 import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.LoginRequest
@@ -36,7 +38,7 @@ import org.companerodeescuela.shared.contracts.RegisterRequest
 fun Route.authRoutes(
     settings: ApiSettings,
     identityProvider: IdentityProvider,
-    loginAttemptLimiter: LoginAttemptLimiter = LoginAttemptLimiter(),
+    loginAttemptLimiter: LoginAttemptLimiter? = null,
     sessions: RefreshSessionRepository = InMemoryRefreshSessionRepository(),
     accounts: PlatformAccountRepository = InMemoryPlatformAccountRepository(),
     institutions: InstitutionRepository = InMemoryInstitutionRepository(),
@@ -48,6 +50,10 @@ fun Route.authRoutes(
     val registrationLimiter = LoginAttemptLimiter()
     val registrationAddressLimiter = LoginAttemptLimiter(maxAttempts = 20)
     val verificationLimiter = LoginAttemptLimiter(maxAttempts = 8)
+    val loginLimiter = loginAttemptLimiter ?: LoginAttemptLimiter(
+        progressiveDelayBase = java.time.Duration.ofSeconds(settings.loginProgressiveDelayBaseSeconds),
+        progressiveDelayMaximum = java.time.Duration.ofSeconds(settings.loginProgressiveDelayMaxSeconds),
+    )
 
     route("/auth") {
         post("/login") {
@@ -63,14 +69,19 @@ fun Route.authRoutes(
                     throw ApiException.Validation("Invalid login request")
                 }
 
-            val clientAddress = call.request.local.remoteAddress
-            loginAttemptLimiter.acquire(request.username, clientAddress)?.let { retryAfter ->
-                call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
-                throw ApiException.RateLimited()
+            val clientAddress = call.clientAddress()
+            val result = try {
+                service.login(request)
+            } catch (error: ApiException.Unauthorized) {
+                val failure = loginLimiter.recordLoginFailure(request.username.trim(), clientAddress)
+                if (!failure.progressiveDelay.isZero) delay(failure.progressiveDelay.toMillis())
+                failure.retryAfterSeconds?.let { retryAfter ->
+                    call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
+                    throw ApiException.RateLimited()
+                }
+                throw error
             }
-
-            val result = service.login(request)
-            loginAttemptLimiter.reset(request.username, clientAddress)
+            loginLimiter.resetLogin(request.username.trim(), clientAddress)
 
             call.respond(
                 status = HttpStatusCode.OK,
@@ -87,13 +98,14 @@ fun Route.authRoutes(
             } ?: throw ApiException.DependencyUnavailable(
                 "Authentication is not configured",
             )
-            registrationAddressLimiter.acquire("registration", call.request.local.remoteAddress)?.let { retryAfter ->
+            val clientAddress = call.clientAddress()
+            registrationAddressLimiter.acquireAddress(clientAddress)?.let { retryAfter ->
                 call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
                 throw ApiException.RateLimited()
             }
             val request = runCatching { call.boundedAuthRequest(RegisterRequest.serializer()) }
                 .getOrElse { throw ApiException.Validation("Invalid registration request") }
-            registrationLimiter.acquire(request.email, call.request.local.remoteAddress)?.let { retryAfter ->
+            registrationLimiter.acquire(request.email, clientAddress)?.let { retryAfter ->
                 call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
                 throw ApiException.RateLimited()
             }
@@ -153,7 +165,7 @@ fun Route.authRoutes(
                         throw ApiException.Forbidden("A native account is required for email verification")
                     }
                     val user = tokenService.userFrom(call.principal<JWTPrincipal>()?.payload ?: throw ApiException.Unauthorized())
-                    verificationLimiter.acquire(user.id, call.request.local.remoteAddress)?.let { retryAfter ->
+                    verificationLimiter.acquire(user.id, call.clientAddress())?.let { retryAfter ->
                         call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
                         throw ApiException.RateLimited()
                     }

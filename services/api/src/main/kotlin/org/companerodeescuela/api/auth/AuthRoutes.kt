@@ -11,7 +11,6 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
-import io.ktor.server.request.receive
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -69,7 +68,7 @@ fun Route.authRoutes(
                     "Authentication is not configured",
                 )
 
-            val request = runCatching { call.receive<LoginRequest>() }
+            val request = runCatching { call.boundedBody(LoginRequest.serializer(), AUTH_BODY_MAX_BYTES) }
                 .getOrElse {
                     throw ApiException.Validation("Invalid login request")
                 }
@@ -108,7 +107,7 @@ fun Route.authRoutes(
                 call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
                 throw ApiException.RateLimited()
             }
-            val request = runCatching { call.boundedAuthRequest(RegisterRequest.serializer()) }
+            val request = runCatching { call.boundedBody(RegisterRequest.serializer(), AUTH_BODY_MAX_BYTES) }
                 .getOrElse { throw ApiException.Validation("Invalid registration request") }
             registrationLimiter.acquire(request.email, clientAddress)?.let { retryAfter ->
                 call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
@@ -136,7 +135,7 @@ fun Route.authRoutes(
                 )
             }
                 ?: throw ApiException.DependencyUnavailable("Authentication is not configured")
-            val request = runCatching { call.receive<RefreshSessionRequest>() }
+            val request = runCatching { call.boundedBody(RefreshSessionRequest.serializer(), AUTH_BODY_MAX_BYTES) }
                 .getOrElse { throw ApiException.Unauthorized() }
             call.respond(
                 ApiResponse(
@@ -159,7 +158,7 @@ fun Route.authRoutes(
                 )
             }
                 ?: throw ApiException.DependencyUnavailable("Authentication is not configured")
-            val request = runCatching { call.receive<RefreshSessionRequest>() }
+            val request = runCatching { call.boundedBody(RefreshSessionRequest.serializer(), AUTH_BODY_MAX_BYTES) }
                 .getOrElse { throw ApiException.Unauthorized() }
             service.logout(request)
             call.respond(HttpStatusCode.NoContent)
@@ -190,7 +189,7 @@ fun Route.authRoutes(
                         call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
                         throw ApiException.RateLimited()
                     }
-                    val request = runCatching { call.boundedAuthRequest(VerifyEmailRequest.serializer()) }
+                    val request = runCatching { call.boundedBody(VerifyEmailRequest.serializer(), AUTH_BODY_MAX_BYTES) }
                         .getOrElse { throw ApiException.Validation("Invalid email verification request") }
                     val service = AuthService(identityProvider, tokenService, sessions, accounts = accounts,
                         institutions = institutions, verification = verification)

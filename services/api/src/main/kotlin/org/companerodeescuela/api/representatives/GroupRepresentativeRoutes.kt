@@ -1,11 +1,12 @@
 package org.companerodeescuela.api.representatives
 
+import org.companerodeescuela.api.auth.boundedBody
+
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
-import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -51,7 +52,7 @@ fun Route.groupRepresentativeRoutes(
                 val principal = call.requirePrincipal()
                 val groupId = call.requireGroupId()
                 val groupName = call.parameters["groupName"] ?: "Grupo $groupId"
-                val request = call.receive<AppointRepresentativeRequest>()
+                val request = call.boundedBody(AppointRepresentativeRequest.serializer())
                 val created = service.appointRepresentative(
                     actor = AuthTokenService(settings).userFrom(principal.payload),
                     groupId = groupId,

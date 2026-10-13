@@ -175,6 +175,25 @@ class AuthRoutesTest {
         assertEquals(HttpStatusCode.TooManyRequests, lastStatus)
     }
 
+    @Test
+    fun `one megabyte login body is rejected before deserialization`() = testApplication {
+        val settings = authenticatedSettings()
+        val sessions = InMemoryRefreshSessionRepository()
+        val identity = MockIdentityProvider()
+        application {
+            configurePlugins(settings, refreshSessions = sessions,
+                sessionAuthority = PlatformSessionAuthority(InMemoryPlatformAccountRepository(), identity))
+            routing { authRoutes(settings, identity, sessions = sessions) }
+        }
+
+        val response = client.post("/auth/login") {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody("""{"username":"ana.lopez","password":"wrong","extra":"${"x".repeat(1_048_576)}"}""")
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+    }
+
     private fun authenticatedSettings(): ApiSettings = TestFixtures.settings().copy(
         jwtSecret = "0123456789abcdef0123456789abcdef".toCharArray(),
     )

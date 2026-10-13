@@ -8,6 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class LoginAttemptLimiterTest {
 
@@ -76,6 +77,19 @@ class LoginAttemptLimiterTest {
         assertEquals(listOf(1L, 2L, 4L, 8L, 16L, 30L, 30L), delays)
         assertEquals(30L, limiter.recordLoginFailure("ana", "10.0.0.2").progressiveDelay.seconds)
         assertEquals(1L, limiter.recordLoginFailure("luis", "10.0.0.2").progressiveDelay.seconds)
+    }
+
+    @Test
+    fun `sprayed usernames cannot grow limiter maps beyond their cap`() {
+        val limiter = LoginAttemptLimiter()
+        repeat(4_097) { index ->
+            limiter.recordLoginFailure("student-$index", "10.0.0.1")
+        }
+
+        val buckets = LoginAttemptLimiter::class.java.getDeclaredField("buckets").apply { isAccessible = true }
+        val accountFailures = LoginAttemptLimiter::class.java.getDeclaredField("accountFailures").apply { isAccessible = true }
+        assertTrue((buckets.get(limiter) as Map<*, *>).size <= 4_096)
+        assertTrue((accountFailures.get(limiter) as Map<*, *>).size <= 4_096)
     }
 
     private class MutableClock(

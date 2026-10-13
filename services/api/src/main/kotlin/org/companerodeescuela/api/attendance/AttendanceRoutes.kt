@@ -1,7 +1,8 @@
 package org.companerodeescuela.api.attendance
 
+import org.companerodeescuela.api.auth.boundedBody
+
 import io.ktor.server.auth.authenticate
-import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -78,7 +79,7 @@ fun Route.attendanceRoutes(
                     ApiResponse(
                         data = studentService.inspectQr(
                             studentId = principal.subjectId(),
-                            request = call.receive<AttendanceQrInspectionRequest>(),
+                            request = call.boundedBody(AttendanceQrInspectionRequest.serializer()),
                             nativeActor = nativeActor(call),
                         ),
                         requestId = call.requestId(),
@@ -126,7 +127,7 @@ fun Route.attendanceRoutes(
                     ApiResponse(
                         data = sessionService.openSession(
                             teacherId = principal.subjectId(),
-                            request = call.receive<CreateAttendanceSessionRequest>(),
+                            request = call.boundedBody(CreateAttendanceSessionRequest.serializer()),
                             nativeActor = nativeActor(call),
                         ),
                         requestId = call.requestId(),
@@ -188,7 +189,7 @@ fun Route.attendanceRoutes(
                         data = studentService.register(
                             studentId = principal.subjectId(),
                             sessionId = sessionId,
-                            request = call.receive<AttendanceAttemptRequest>(),
+                            request = call.boundedBody(AttendanceAttemptRequest.serializer()),
                             nativeActor = nativeActor(call),
                         ),
                         requestId = call.requestId(),
@@ -219,7 +220,7 @@ fun Route.attendanceRoutes(
                         data = studentService.confirmClassCall(
                             studentId = principal.subjectId(),
                             sessionId = sessionId,
-                            request = call.receive<ClassCallConfirmationRequest>(),
+                            request = call.boundedBody(ClassCallConfirmationRequest.serializer()),
                             nativeActor = nativeActor(call),
                         ),
                         requestId = call.requestId(),
@@ -273,7 +274,7 @@ fun Route.attendanceRoutes(
                         data = reviewService.review(
                             reviewerId = principal.subjectId(),
                             recordId = recordId,
-                            request = call.receive<ReviewAttendanceRequest>(),
+                            request = call.boundedBody(ReviewAttendanceRequest.serializer()),
                             allowCrossOwner = principal.platformRoles().any { it==UserRole.ADMIN || it==UserRole.SUPER_ADMIN },
                             nativeActor = nativeActor(call),
                         ),

@@ -28,10 +28,14 @@ import kotlinx.serialization.json.Json
 import org.companerodeescuela.api.auth.AuthTokenService
 import org.companerodeescuela.api.auth.RefreshSessionRepository
 import org.companerodeescuela.api.auth.PlatformSessionAuthority
+import org.companerodeescuela.api.auth.authenticationDependency
 import org.companerodeescuela.api.config.ApiSettings
+import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.errors.toApiError
 import org.companerodeescuela.shared.contracts.AccountStatus
+import org.companerodeescuela.shared.contracts.UserRole
+import org.companerodeescuela.shared.contracts.UserSummary
 import org.companerodeescuela.shared.contracts.ApiError
 import org.companerodeescuela.shared.contracts.ApiErrorCode
 import org.slf4j.event.Level
@@ -58,6 +62,7 @@ const val REQUEST_ID_HEADER: String = "X-Request-Id"
 private val QUIET_PATHS = setOf("/health", "/ready", "/version")
 
 private const val NO_REQUEST_ID = "no-request-id"
+private val REQUEST_ID_PATTERN = Regex("[A-Za-z0-9._-]{1,64}")
 private val AUTHORITY_UNAVAILABLE = AttributeKey<Boolean>("liveIdentityAuthorityUnavailable")
 
 /**
@@ -95,7 +100,7 @@ fun Application.configurePlugins(
     install(CallId) {
         header(REQUEST_ID_HEADER)
         generate { java.util.UUID.randomUUID().toString() }
-        verify { it.isNotBlank() }
+        verify { REQUEST_ID_PATTERN.matches(it) }
     }
 
     install(CallLogging) {
@@ -122,59 +127,65 @@ fun Application.configurePlugins(
         allowHeader(HttpHeaders.ContentType)
         allowHeader(HttpHeaders.Authorization)
         allowHeader(REQUEST_ID_HEADER)
-        if (!settings.environment.isProduction) {
+        if (settings.environment in setOf(Environment.LOCAL, Environment.DEVELOPMENT)) {
             allowHost("localhost", schemes = listOf("http"))
             allowHost("127.0.0.1", schemes = listOf("http"))
         }
     }
 
+    val authLogger = log
+    val configuredRefreshSessions = refreshSessions
+    val configuredSessionAuthority = sessionAuthority
     install(Authentication) {
         settings.jwtSecret?.let {
             val tokenService = AuthTokenService(settings)
-            jwt(AuthTokenService.PROVIDER_NAME) {
-                realm = AuthTokenService.REALM
-                verifier(tokenService.verifier)
-                validate { credential ->
-                    try {
-                        val sessionId = tokenService.sessionIdFrom(credential.payload)
-                        val session = sessionId?.let { refreshSessions?.find(it) }
-                        if (session != null && sessionAuthority?.permits(credential.payload, session, tokenService) == true &&
-                            (tokenService.userFrom(credential.payload).accountStatus == AccountStatus.ACTIVE ||
-                                request.path() in setOf("/auth/me", "/auth/verification/resend", "/auth/verification/confirm") ||
-                                (tokenService.userFrom(credential.payload).accountStatus == AccountStatus.PENDING_APPROVAL &&
-                                    request.path() in setOf("/auth/mfa/status", "/auth/mfa/enrollment", "/auth/mfa/confirmation", "/auth/staff-applications")))) {
-                            val user = tokenService.userFrom(credential.payload)
-                            // A basic workshop account has no academic access, even on coarse authenticated routes.
-                            if (user.roles == setOf(org.companerodeescuela.shared.contracts.UserRole.WORKSHOP_PARTICIPANT) &&
-                                !request.path().startsWith("/auth/") && request.path() != "/workshops" &&
-                                !request.path().startsWith("/workshops/")) null
-                            else {
-                                attributes.put(org.companerodeescuela.api.auth.VERIFIED_SESSION_SOURCE,session.identitySource)
-                                JWTPrincipal(credential.payload)
+            fun registerJwtProvider(providerName: String, accepts: (UserSummary) -> Boolean) {
+                jwt(providerName) {
+                    realm = AuthTokenService.REALM
+                    verifier(tokenService.verifier)
+                    validate { credential ->
+                        try {
+                            val sessionId = tokenService.sessionIdFrom(credential.payload)
+                            val session = sessionId?.let {
+                                authenticationDependency { requireNotNull(configuredRefreshSessions).find(it) }
                             }
-                        } else null
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (_: Exception) {
-                        // Ktor otherwise treats storage/provider exceptions as an authentication rejection.
-                        // Preserve transient failure without logging credentials, identifiers or vendor payloads.
-                        attributes.put(AUTHORITY_UNAVAILABLE, true)
-                        null
+                            val user = tokenService.userFrom(credential.payload)
+                            if (session != null && accepts(user) &&
+                                requireNotNull(configuredSessionAuthority).permits(credential.payload, session, tokenService)) {
+                                attributes.put(org.companerodeescuela.api.auth.VERIFIED_SESSION_SOURCE, session.identitySource)
+                                JWTPrincipal(credential.payload)
+                            } else null
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (error: ApiException.DependencyUnavailable) {
+                            authLogger.warn("JWT authority unavailable type={} requestId={}", error::class.java.simpleName, requestId())
+                            attributes.put(AUTHORITY_UNAVAILABLE, true)
+                            null
+                        } catch (error: Exception) {
+                            authLogger.warn("JWT validation failed type={} requestId={}", error::class.java.simpleName, requestId())
+                            null
+                        }
+                    }
+                    challenge { scheme, challengeRealm ->
+                        val unavailable = call.attributes.getOrNull(AUTHORITY_UNAVAILABLE) == true
+                        if (!unavailable) call.response.header(HttpHeaders.WWWAuthenticate, "$scheme realm=\"$challengeRealm\"")
+                        call.respond(
+                            if (unavailable) HttpStatusCode.ServiceUnavailable else HttpStatusCode.Unauthorized,
+                            ApiError(
+                                code = if (unavailable) ApiErrorCode.DEPENDENCY_UNAVAILABLE else ApiErrorCode.UNAUTHORIZED,
+                                message = if (unavailable) "Identity authority is temporarily unavailable" else "Authentication is required",
+                                requestId = call.requestId(),
+                            ),
+                        )
                     }
                 }
-                challenge { scheme, challengeRealm ->
-                    val unavailable = call.attributes.getOrNull(AUTHORITY_UNAVAILABLE) == true
-                    if (!unavailable) call.response.header(HttpHeaders.WWWAuthenticate, "$scheme realm=\"$challengeRealm\"")
-                    call.respond(
-                        if (unavailable) HttpStatusCode.ServiceUnavailable else HttpStatusCode.Unauthorized,
-                        ApiError(
-                            code = if (unavailable) ApiErrorCode.DEPENDENCY_UNAVAILABLE else ApiErrorCode.UNAUTHORIZED,
-                            message = if (unavailable) "Identity authority is temporarily unavailable" else "Authentication is required",
-                            requestId = call.requestId(),
-                        ),
-                    )
-                }
             }
+            registerJwtProvider(AuthTokenService.PROVIDER_NAME) {
+                it.accountStatus == AccountStatus.ACTIVE && it.roles != setOf(UserRole.WORKSHOP_PARTICIPANT)
+            }
+            registerJwtProvider(AuthTokenService.ACTIVE_PROVIDER_NAME) { it.accountStatus == AccountStatus.ACTIVE }
+            registerJwtProvider(AuthTokenService.PENDING_VERIFICATION_PROVIDER_NAME) { it.accountStatus == AccountStatus.PENDING_VERIFICATION }
+            registerJwtProvider(AuthTokenService.PENDING_APPROVAL_PROVIDER_NAME) { it.accountStatus == AccountStatus.PENDING_APPROVAL }
         }
     }
 
@@ -190,7 +201,7 @@ fun Application.configurePlugins(
             )
         }
         exception<Throwable> { call, cause ->
-            appLogger.error("Unhandled exception for request ${call.requestId()}", cause)
+            appLogger.error("Unhandled exception type={} requestId={}", cause::class.java.simpleName, call.requestId())
             call.respond(
                 status = HttpStatusCode.InternalServerError,
                 message = ApiError(

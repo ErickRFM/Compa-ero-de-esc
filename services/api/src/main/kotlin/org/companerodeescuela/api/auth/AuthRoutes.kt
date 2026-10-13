@@ -9,6 +9,7 @@ import org.companerodeescuela.api.mail.UnavailableVerificationEmailGateway
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
+import io.ktor.server.auth.AuthenticationStrategy
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
 import io.ktor.server.response.header
@@ -171,7 +172,12 @@ fun Route.authRoutes(
                 )
             }
         } else {
-            authenticate(AuthTokenService.PROVIDER_NAME) {
+            authenticate(
+                AuthTokenService.ACTIVE_PROVIDER_NAME,
+                AuthTokenService.PENDING_VERIFICATION_PROVIDER_NAME,
+                AuthTokenService.PENDING_APPROVAL_PROVIDER_NAME,
+                strategy = AuthenticationStrategy.FirstSuccessful,
+            ) {
                 post("/verification/resend") {
                     if (call.verifiedSessionSource() != SessionIdentitySource.NATIVE) {
                         throw ApiException.Forbidden("A native account is required for email verification")

@@ -4,6 +4,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.HttpHeaders
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
+import io.ktor.server.auth.AuthenticationStrategy
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
 import io.ktor.server.response.header
@@ -29,7 +30,11 @@ fun Route.accountAdministrationRoutes(settings:ApiSettings,identity:IdentityProv
         if(mutation) limiter.acquire(current.id,"native-administration")?.let { retry -> response.header(HttpHeaders.RetryAfter,retry.toString());throw ApiException.RateLimited() }
         return current
     }
-    authenticate(AuthTokenService.PROVIDER_NAME) {
+    authenticate(
+        AuthTokenService.ACTIVE_PROVIDER_NAME,
+        AuthTokenService.PENDING_APPROVAL_PROVIDER_NAME,
+        strategy = AuthenticationStrategy.FirstSuccessful,
+    ) {
         route("/auth/staff-applications") {
             get {
                 val actor=call.actor()
@@ -41,6 +46,8 @@ fun Route.accountAdministrationRoutes(settings:ApiSettings,identity:IdentityProv
                 call.respond(HttpStatusCode.Created,ApiResponse(service.requestTutor(actor,request),call.requestId()))
             }
         }
+    }
+    authenticate(AuthTokenService.PROVIDER_NAME) {
         route("/admin/accounts") {
             get { call.respond(ApiResponse(service.overview(call.actor()),call.requestId())) }
             get("/academic-directory") { call.respond(ApiResponse(service.academicDirectory(call.actor()),call.requestId())) }

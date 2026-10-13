@@ -1,7 +1,7 @@
 package org.companerodeescuela.api.excuses
 
 import org.companerodeescuela.api.auth.boundedBody
-
+import org.companerodeescuela.api.runCatchingCancellable
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.respond
@@ -40,7 +40,7 @@ fun Route.excuseRoutes(
 
             post {
                 val actor = call.requireNativeActor(tokenService)
-                val request = runCatching { call.boundedBody(SubmitExcuseRequest.serializer()) }
+                val request = runCatchingCancellable { call.boundedBody(SubmitExcuseRequest.serializer()) }
                     .getOrElse { throw ApiException.Validation("Invalid excuse request") }
                 call.respond(
                     status = HttpStatusCode.Created,
@@ -56,7 +56,7 @@ fun Route.excuseRoutes(
                 val excuseId = call.parameters["excuseId"]
                     ?.takeIf(String::isNotBlank)
                     ?: throw ApiException.Validation("excuseId is required")
-                val request = runCatching { call.boundedBody(ReviewExcuseRequest.serializer()) }
+                val request = runCatchingCancellable { call.boundedBody(ReviewExcuseRequest.serializer()) }
                     .getOrElse { throw ApiException.Validation("Invalid excuse review request") }
                 call.respond(
                     ApiResponse(

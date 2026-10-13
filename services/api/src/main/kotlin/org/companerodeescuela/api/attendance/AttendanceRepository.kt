@@ -41,6 +41,7 @@ interface AttendanceRepository {
     suspend fun recordsForSession(sessionId: String): List<AttendanceRecordResponse>
     suspend fun replaceRecord(record: AttendanceRecordResponse)
     suspend fun findRecord(id: String): AttendanceRecordResponse?
+    suspend fun findStudentSessionRecord(sessionId: String, studentId: String): AttendanceRecordResponse?
     suspend fun recordQrNonceUse(
         sessionId: String,
         nonce: String,
@@ -110,6 +111,14 @@ class InMemoryAttendanceRepository : AttendanceRepository {
                 return@withLock AttemptWriteResult.Existing(existingByRecord)
             }
 
+            val existingByStudentSession = records.values.firstOrNull {
+                it.sessionId == record.sessionId && it.studentId == record.studentId
+            }
+            if (existingByStudentSession != null) {
+                operationToRecord[record.operationId] = existingByStudentSession.id
+                return@withLock AttemptWriteResult.Existing(existingByStudentSession)
+            }
+
             records[record.id] = record
             operationToRecord[record.operationId] = record.id
             AttemptWriteResult.Created(record)
@@ -161,6 +170,9 @@ class InMemoryAttendanceRepository : AttendanceRepository {
 
     override suspend fun findRecord(id: String): AttendanceRecordResponse? =
         mutex.withLock { records[id] }
+
+    override suspend fun findStudentSessionRecord(sessionId: String, studentId: String): AttendanceRecordResponse? =
+        mutex.withLock { records.values.firstOrNull { it.sessionId == sessionId && it.studentId == studentId } }
 
     override suspend fun recordQrNonceUse(
         sessionId: String,

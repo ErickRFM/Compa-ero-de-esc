@@ -4,8 +4,15 @@ import com.mongodb.MongoWriteException
 import com.mongodb.client.model.Filters.and
 import com.mongodb.client.model.Filters.eq
 import com.mongodb.client.model.Filters.gt
+import com.mongodb.client.model.Filters.lt
+import com.mongodb.client.model.Filters.or
+import com.mongodb.client.model.Filters.exists
+import com.mongodb.client.model.Filters.elemMatch
+import com.mongodb.client.model.FindOneAndReplaceOptions
+import com.mongodb.client.model.FindOneAndUpdateOptions
 import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
+import com.mongodb.client.model.ReturnDocument
 import com.mongodb.client.model.ReplaceOptions
 import com.mongodb.client.model.UpdateOptions
 import com.mongodb.client.model.Updates
@@ -37,6 +44,8 @@ class MongoAttendanceRepository(
         database.getCollection(RECORDS_COLLECTION)
     private val qrNonceUses: MongoCollection<Document> =
         database.getCollection(QR_NONCE_USES_COLLECTION)
+    private val attemptReservations: MongoCollection<Document> =
+        database.getCollection(ATTEMPT_RESERVATIONS_COLLECTION)
     private val indexMutex = Mutex()
 
     @Volatile
@@ -136,6 +145,133 @@ class MongoAttendanceRepository(
         }
     }
 
+    override suspend fun reserveAttempt(
+        sessionId: String,
+        studentId: String,
+        operationId: String,
+        requestFingerprint: String,
+        maxAttempts: Int,
+    ): AttemptReservationResult {
+        ensureIndexes()
+        val ownerFilter = and(eq("sessionId", sessionId), eq("studentId", studentId))
+        try {
+            attemptReservations.updateOne(
+                ownerFilter,
+                Updates.combine(
+                    Updates.setOnInsert("sessionId", sessionId),
+                    Updates.setOnInsert("studentId", studentId),
+                    Updates.setOnInsert("attemptCount", 0),
+                    Updates.setOnInsert("operationIds", emptyList<Document>()),
+                ),
+                UpdateOptions().upsert(true),
+            )
+        } catch (error: MongoWriteException) {
+            if (error.error.code != 11000) throw error
+        }
+
+        val currentOperations = Document("\$ifNull", listOf("\$operationIds", emptyList<Document>()))
+        val matchingOperations = Document(
+            "\$filter",
+            Document("input", currentOperations).append(
+                "as",
+                "attempt",
+            ).append(
+                "cond",
+                Document(
+                    "\$and",
+                    listOf(
+                        Document("\$eq", listOf("\$\$attempt.operationId", operationId)),
+                        Document("\$eq", listOf("\$\$attempt.fingerprint", requestFingerprint)),
+                    ),
+                ),
+            ),
+        )
+        val alreadyReserved = Document("\$gt", listOf(Document("\$size", matchingOperations), 0))
+        val operationEntry = Document("operationId", operationId).append("fingerprint", requestFingerprint)
+        val updatePipeline = listOf(
+            Document(
+                "\$set",
+                Document(
+                    "operationIds",
+                    Document(
+                        "\$cond",
+                        listOf(
+                            alreadyReserved,
+                            currentOperations,
+                            Document("\$concatArrays", listOf(currentOperations, listOf(operationEntry))),
+                        ),
+                    ),
+                ).append(
+                    "attemptCount",
+                    Document(
+                        "\$cond",
+                        listOf(
+                            alreadyReserved,
+                            Document("\$ifNull", listOf("\$attemptCount", 0)),
+                            Document("\$add", listOf(Document("\$ifNull", listOf("\$attemptCount", 0)), 1)),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        return try {
+            val reserved = attemptReservations.findOneAndUpdate(
+                and(
+                    ownerFilter,
+                    or(
+                        elemMatch(
+                            "operationIds",
+                            and(eq("operationId", operationId), eq("fingerprint", requestFingerprint)),
+                        ),
+                        lt("attemptCount", maxAttempts),
+                    ),
+                ),
+                updatePipeline,
+                FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
+            )
+            if (reserved != null) {
+                AttemptReservationResult.ACCEPTED
+            } else {
+                val operationOwner = attemptReservations.find(eq("operationIds.operationId", operationId)).firstOrNull()
+                if (operationOwner != null &&
+                    (operationOwner.getString("sessionId") != sessionId || operationOwner.getString("studentId") != studentId ||
+                        operationOwner.getList("operationIds", Document::class.java)
+                            .none { it.getString("operationId") == operationId && it.getString("fingerprint") == requestFingerprint })
+                ) {
+                    AttemptReservationResult.OPERATION_CONFLICT
+                } else {
+                    AttemptReservationResult.LIMIT_REACHED
+                }
+            }
+        } catch (error: MongoWriteException) {
+            if (error.error.code != 11000) throw error
+            val operationOwner = attemptReservations.find(eq("operationIds.operationId", operationId)).firstOrNull()
+            if (operationOwner != null &&
+                operationOwner.getString("sessionId") == sessionId && operationOwner.getString("studentId") == studentId &&
+                operationOwner.getList("operationIds", Document::class.java)
+                    .any { it.getString("operationId") == operationId && it.getString("fingerprint") == requestFingerprint }
+            ) {
+                AttemptReservationResult.ACCEPTED
+            } else {
+                AttemptReservationResult.OPERATION_CONFLICT
+            }
+        }
+    }
+
+    override suspend fun replaceRejectedRecord(record: AttendanceRecordResponse): AttendanceRecordResponse {
+        ensureIndexes()
+        val replaced = records.findOneAndReplace(
+            and(
+                eq("_id", record.id),
+                eq("status", AttendanceStatus.REJECTED.name),
+                or(exists("reviewedBy", false), eq("reviewedBy", null)),
+            ),
+            record.toDocument(),
+            FindOneAndReplaceOptions().returnDocument(ReturnDocument.AFTER),
+        )?.toRecord()
+        return replaced ?: records.find(eq("_id", record.id)).firstOrNull()?.toRecord() ?: record
+    }
+
     override suspend fun recordsForSession(sessionId: String): List<AttendanceRecordResponse> {
         ensureIndexes()
         return records.find(eq("sessionId", sessionId)).toList().map { it.toRecord() }
@@ -210,6 +346,14 @@ class MongoAttendanceRepository(
             qrNonceUses.createIndex(
                 Indexes.ascending("expiresAt"),
                 IndexOptions().expireAfter(0, TimeUnit.SECONDS).name("ttl_attendance_qr_nonce_use"),
+            )
+            attemptReservations.createIndex(
+                Indexes.ascending("sessionId", "studentId"),
+                IndexOptions().unique(true).name("uq_attendance_attempt_student_session"),
+            )
+            attemptReservations.createIndex(
+                Indexes.ascending("operationIds.operationId"),
+                IndexOptions().unique(true).name("uq_attendance_attempt_operation"),
             )
             indexesReady = true
         }
@@ -299,5 +443,6 @@ class MongoAttendanceRepository(
         const val SESSIONS_COLLECTION = "attendance_sessions"
         const val RECORDS_COLLECTION = "attendance_records"
         const val QR_NONCE_USES_COLLECTION = "attendance_qr_nonce_uses"
+        const val ATTEMPT_RESERVATIONS_COLLECTION = "attendance_attempt_reservations"
     }
 }

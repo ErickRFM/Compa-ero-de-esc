@@ -9,6 +9,9 @@ import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.config.Environment
@@ -19,6 +22,7 @@ import org.companerodeescuela.api.academic.AcademicOccurrenceProjection
 import org.companerodeescuela.api.integrations.academic.mapper.AcademicMappers
 import org.companerodeescuela.api.integrations.mock.MockAcademicProvider
 import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
+import org.companerodeescuela.shared.contracts.AttendanceDisposition
 import org.companerodeescuela.shared.contracts.AttendanceReasonCode
 import org.companerodeescuela.shared.contracts.AttendanceStatus
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
@@ -65,6 +69,121 @@ class AttendanceQrClassificationTest {
             )
         }
         assertEquals(emptyList(), setup.repository.recordsForSession(setup.sessionId))
+    }
+
+    @Test
+    fun `a valid QR retry replaces an initial rejected attempt`() = runTest {
+        val setup = setup()
+        val invalid = setup.attendance.register(
+            studentId = "2020-10455",
+            sessionId = setup.sessionId,
+            request = AttendanceAttemptRequest(
+                "op-invalid-first",
+                setup.clock.instant().epochSecond,
+                "malformed-token",
+            ),
+        )
+        val qr = setup.qr.issue("T-0001", setup.sessionId)
+
+        val retried = setup.attendance.register(
+            studentId = "2020-10455",
+            sessionId = setup.sessionId,
+            request = AttendanceAttemptRequest("op-valid-retry", setup.clock.instant().epochSecond, qr.token),
+        )
+
+        assertEquals(AttendanceStatus.REJECTED, invalid.status)
+        assertEquals(AttendanceStatus.REVIEW_REQUIRED, retried.status)
+        assertEquals(AttendanceReasonCode.QR_VALID, retried.reasonCode)
+    }
+
+    @Test
+    fun `operation id cannot be replayed with changed attendance evidence`() = runTest {
+        val setup = setup()
+        val timestamp = setup.clock.instant().epochSecond
+        setup.attendance.register(
+            "2020-10455",
+            setup.sessionId,
+            AttendanceAttemptRequest("op-payload-bound", timestamp, "bad"),
+        )
+        val qr = setup.qr.issue("T-0001", setup.sessionId)
+
+        assertFailsWith<ApiException.Domain> {
+            setup.attendance.register(
+                "2020-10455",
+                setup.sessionId,
+                AttendanceAttemptRequest("op-payload-bound", timestamp, qr.token),
+            )
+        }
+    }
+
+    @Test
+    fun `parallel valid retries replace a rejected record only once`() = runTest {
+        val setup = setup()
+        setup.attendance.register(
+            "2020-10455",
+            setup.sessionId,
+            AttendanceAttemptRequest("op-invalid-concurrent", setup.clock.instant().epochSecond, "bad"),
+        )
+        val qr = setup.qr.issue("T-0001", setup.sessionId)
+
+        val retries = (1..2).map { index ->
+            async {
+                setup.attendance.register(
+                    "2020-10455",
+                    setup.sessionId,
+                    AttendanceAttemptRequest("op-valid-concurrent-$index", setup.clock.instant().epochSecond, qr.token),
+                )
+            }
+        }.awaitAll()
+
+        assertEquals(AttendanceStatus.REVIEW_REQUIRED, setup.repository.findRecord(setup.sessionId + ":2020-10455")?.status)
+        assertEquals(1, setup.repository.recordsForSession(setup.sessionId).size)
+        assertTrue(retries.all { it.status == AttendanceStatus.REVIEW_REQUIRED })
+    }
+
+    @Test
+    fun `teacher reviewed rejected record is not overwritten by a valid retry`() = runTest {
+        val setup = setup()
+        val rejected = setup.attendance.register(
+            "2020-10455",
+            setup.sessionId,
+            AttendanceAttemptRequest("op-reviewed-first", setup.clock.instant().epochSecond, "bad"),
+        )
+        val reviewed = rejected.copy(
+            reviewedBy = "T-0001",
+            disposition = AttendanceDisposition.ABSENT,
+        )
+        setup.repository.replaceRecord(reviewed)
+        val qr = setup.qr.issue("T-0001", setup.sessionId)
+
+        val retry = setup.attendance.register(
+            "2020-10455",
+            setup.sessionId,
+            AttendanceAttemptRequest("op-reviewed-retry", setup.clock.instant().epochSecond, qr.token),
+        )
+
+        assertEquals(reviewed, retry)
+        assertEquals(reviewed, setup.repository.findRecord(reviewed.id))
+    }
+
+    @Test
+    fun `student session attempts are capped at ten`() = runTest {
+        val setup = setup()
+        repeat(10) { index ->
+            setup.attendance.register(
+                "2020-10455",
+                setup.sessionId,
+                AttendanceAttemptRequest("op-attempt-$index", setup.clock.instant().epochSecond, "bad-$index"),
+            )
+        }
+
+        assertFailsWith<ApiException.RateLimited> {
+            setup.attendance.register(
+                "2020-10455",
+                setup.sessionId,
+                AttendanceAttemptRequest("op-attempt-over-limit", setup.clock.instant().epochSecond, "bad-final"),
+            )
+        }
     }
 
     @Test

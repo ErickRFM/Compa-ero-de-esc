@@ -8,7 +8,12 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlinx.coroutines.test.runTest
+import org.companerodeescuela.api.errors.ApiException
+import org.companerodeescuela.api.integrations.academic.AcademicProvider
+import org.companerodeescuela.api.integrations.academic.dto.ExternalAcademicLoad
+import org.companerodeescuela.api.integrations.academic.dto.ExternalStudent
 import org.companerodeescuela.api.academic.AcademicOccurrenceProjection
 import org.companerodeescuela.api.integrations.academic.mapper.AcademicMappers
 import org.companerodeescuela.api.integrations.mock.MockAcademicProvider
@@ -35,6 +40,25 @@ class AttendanceQrClassificationTest {
             request = AttendanceAttemptRequest(
                 operationId = "op-qr",
                 deviceTimestampEpochSeconds = setup.clock.instant().epochSecond,
+                qrToken = qr.token,
+            ),
+        )
+
+        assertEquals(AttendanceStatus.REVIEW_REQUIRED, record.status)
+        assertEquals(AttendanceReasonCode.QR_VALID, record.reasonCode)
+    }
+
+    @Test
+    fun `server time accepts a current signed QR regardless of forged client time`() = runTest {
+        val setup = setup()
+        val qr = setup.qr.issue("T-0001", setup.sessionId)
+
+        val record = setup.attendance.register(
+            studentId = "2020-10455",
+            sessionId = setup.sessionId,
+            request = AttendanceAttemptRequest(
+                operationId = "op-forged-current-time",
+                deviceTimestampEpochSeconds = setup.clock.instant().plusSeconds(600).epochSecond,
                 qrToken = qr.token,
             ),
         )
@@ -86,28 +110,88 @@ class AttendanceQrClassificationTest {
         assertEquals(AttendanceReasonCode.OFFLINE_LATE_SYNC, record.reasonCode)
     }
 
-    private suspend fun setup(durationMinutes: Int = 6): Setup {
+    @Test
+    fun `forged client capture time cannot extend the server late sync window`() = runTest {
+        val setup = setup(durationMinutes = 1)
+        val qr = setup.qr.issue("T-0001", setup.sessionId)
+        val forgedCapture = setup.clock.instant().plusSeconds(10).epochSecond
+        setup.clock.advance(Duration.ofHours(3))
+
+        assertFailsWith<ApiException.Domain> {
+            setup.attendance.register(
+                studentId = "2020-10455",
+                sessionId = setup.sessionId,
+                request = AttendanceAttemptRequest("op-forged-late", forgedCapture, qr.token),
+            )
+        }
+    }
+
+    @Test
+    fun `fourth distinct student using the same QR nonce is explicitly marked for review`() = runTest {
+        val setup = setup(academicProvider = MultiStudentAcademicProvider())
+        val qr = setup.qr.issue("T-0001", setup.sessionId)
+        val students = listOf("student-a", "student-b", "student-c", "student-d")
+
+        val records = students.mapIndexed { index, studentId ->
+            setup.attendance.register(
+                studentId = studentId,
+                sessionId = setup.sessionId,
+                request = AttendanceAttemptRequest(
+                    "op-nonce-$index",
+                    setup.clock.instant().epochSecond,
+                    qr.token,
+                ),
+            )
+        }
+
+        assertEquals(AttendanceStatus.REVIEW_REQUIRED, records.last().status)
+        assertEquals(AttendanceReasonCode.DUPLICATE, records.last().reasonCode)
+    }
+
+    @Test
+    fun `late synced students share nonce reuse tracking through the review window`() = runTest {
+        val setup = setup(durationMinutes = 1, academicProvider = MultiStudentAcademicProvider())
+        val qr = setup.qr.issue("T-0001", setup.sessionId)
+        val capturedAt = setup.clock.instant().plusSeconds(10).epochSecond
+        setup.clock.advance(Duration.ofMinutes(2))
+
+        val records = listOf("student-a", "student-b", "student-c", "student-d").mapIndexed { index, studentId ->
+            setup.attendance.register(
+                studentId = studentId,
+                sessionId = setup.sessionId,
+                request = AttendanceAttemptRequest("op-late-nonce-$index", capturedAt, qr.token),
+            )
+        }
+
+        assertEquals(AttendanceStatus.REVIEW_REQUIRED, records.last().status)
+        assertEquals(AttendanceReasonCode.DUPLICATE, records.last().reasonCode)
+    }
+
+    private suspend fun setup(
+        durationMinutes: Int = 6,
+        academicProvider: AcademicProvider = provider,
+    ): Setup {
         val repository = InMemoryAttendanceRepository()
         val clock = MutableClock(initial)
         val qr = AttendanceQrService(
             secret = "q".repeat(48).toCharArray(),
             repository = repository,
-            accessPolicy = AttendanceAccessPolicy(repository, ProviderAttendanceOccurrenceResolver(provider)),
+            accessPolicy = AttendanceAccessPolicy(repository, ProviderAttendanceOccurrenceResolver(academicProvider)),
             clock = clock,
         )
         val sessionService = AttendanceSessionService(
             repository = repository,
-            occurrenceResolver = ProviderAttendanceOccurrenceResolver(provider),
+            occurrenceResolver = ProviderAttendanceOccurrenceResolver(academicProvider),
             clock = clock,
             newId = { "session-1" },
         )
         val attendance = AttendanceStudentService(
             repository = repository,
-            enrollmentResolver = AttendanceEnrollmentResolver(provider),
+            enrollmentResolver = AttendanceEnrollmentResolver(academicProvider),
             qrService = qr,
             clock = clock,
         )
-        val occurrence = teacherOccurrence()
+        val occurrence = teacherOccurrence(academicProvider)
         val session = sessionService.openSession(
             teacherId = "T-0001",
             request = CreateAttendanceSessionRequest(
@@ -119,11 +203,11 @@ class AttendanceQrClassificationTest {
         return Setup(attendance, qr, clock, session.id)
     }
 
-    private suspend fun teacherOccurrence(): ClassOccurrence {
-        val courses = provider.listCourses().associateBy { it.externalId }
+    private suspend fun teacherOccurrence(academicProvider: AcademicProvider = provider): ClassOccurrence {
+        val courses = academicProvider.listCourses().associateBy { it.externalId }
         val schedule = AcademicMappers.toSchedule(
             ownerId = PersonId("T-0001"),
-            slots = provider.getSchedule("T-0001", occurrenceDate),
+            slots = academicProvider.getSchedule("T-0001", occurrenceDate),
             coursesById = courses,
         )
         return AcademicOccurrenceProjection.project(schedule, occurrenceDate).first()
@@ -135,6 +219,22 @@ class AttendanceQrClassificationTest {
         val clock: MutableClock,
         val sessionId: String,
     )
+
+    private class MultiStudentAcademicProvider : AcademicProvider {
+        private val delegate = MockAcademicProvider()
+        override val id: String = "multi-student-test"
+        override val displayName: String = "Multi-student test provider"
+
+        override suspend fun getStudent(externalId: String): ExternalStudent? =
+            delegate.getStudent("2020-10455")?.copy(externalId = externalId)
+
+        override suspend fun getAcademicLoad(externalId: String): ExternalAcademicLoad =
+            delegate.getAcademicLoad("2020-10455").let { it.copy(student = it.student.copy(externalId = externalId)) }
+
+        override suspend fun listCourses() = delegate.listCourses()
+        override suspend fun getSchedule(externalId: String, weekOf: LocalDate?) = delegate.getSchedule(externalId, weekOf)
+        override suspend fun listTeachers() = delegate.listTeachers()
+    }
 
     private class MutableClock(
         private var now: Instant,

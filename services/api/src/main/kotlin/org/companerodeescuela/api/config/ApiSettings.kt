@@ -63,7 +63,14 @@ data class ApiSettings(
     val mfaEncryptionKey: ByteArray? = null,
     /** Private Firebase service-account JSON, decoded only at boot; never render or log. */
     val firebaseServiceAccountJson: CharArray? = null,
+    val lateSyncReviewWindowSeconds: Long = DEFAULT_LATE_SYNC_REVIEW_WINDOW_SECONDS,
+    val attendanceQrNonceReuseThreshold: Int = DEFAULT_ATTENDANCE_QR_NONCE_REUSE_THRESHOLD,
 ) {
+    companion object {
+        const val DEFAULT_LATE_SYNC_REVIEW_WINDOW_SECONDS = 7_200L
+        const val DEFAULT_ATTENDANCE_QR_NONCE_REUSE_THRESHOLD = 3
+    }
+
     val hasVerificationEmail: Boolean get() = verificationEmailApiKey != null && verificationEmailSender != null
     val hasFirebasePush: Boolean get() = firebaseServiceAccountJson != null
 
@@ -95,6 +102,8 @@ data class ApiSettings(
             schoolWifiSsids == other.schoolWifiSsids &&
             schoolWifiBssids == other.schoolWifiBssids &&
             attendanceGraceMinutes == other.attendanceGraceMinutes &&
+            lateSyncReviewWindowSeconds == other.lateSyncReviewWindowSeconds &&
+            attendanceQrNonceReuseThreshold == other.attendanceQrNonceReuseThreshold &&
             hasVerificationEmail == other.hasVerificationEmail && verificationEmailSender == other.verificationEmailSender &&
             (mfaEncryptionKey != null) == (other.mfaEncryptionKey != null) &&
             hasFirebasePush == other.hasFirebasePush
@@ -117,6 +126,8 @@ data class ApiSettings(
         result = 31 * result + schoolWifiSsids.hashCode()
         result = 31 * result + schoolWifiBssids.hashCode()
         result = 31 * result + attendanceGraceMinutes
+        result = 31 * result + lateSyncReviewWindowSeconds.hashCode()
+        result = 31 * result + attendanceQrNonceReuseThreshold
         result = 31 * result + hasVerificationEmail.hashCode()
         result = 31 * result + (verificationEmailSender?.hashCode() ?: 0)
         result = 31 * result + (mfaEncryptionKey != null).hashCode()
@@ -139,6 +150,8 @@ data class ApiSettings(
             "mongoDatabase=${mongo.databaseName}, " +
             "authenticationConfigured=$hasAuthentication, " +
             "attendanceQrSigningConfigured=$hasAttendanceQrSigning, " +
+            "lateSyncReviewWindowSeconds=$lateSyncReviewWindowSeconds, " +
+            "attendanceQrNonceReuseThreshold=$attendanceQrNonceReuseThreshold, " +
             "verificationEmailConfigured=$hasVerificationEmail, " +
             "mfaEncryptionConfigured=${mfaEncryptionKey != null}, " +
             "firebasePushConfigured=$hasFirebasePush, " +
@@ -175,6 +188,18 @@ class SettingsLoader(
         if (attendanceGraceMinutes !in 0..15) {
             throw ConfigurationException("ATTENDANCE_GRACE_MINUTES must be between 0 and 15")
         }
+        val lateSyncReviewWindowSeconds = boundedLongSetting(
+            "LATE_SYNC_REVIEW_WINDOW_SECONDS",
+            env("LATE_SYNC_REVIEW_WINDOW_SECONDS"),
+            ApiSettings.DEFAULT_LATE_SYNC_REVIEW_WINDOW_SECONDS,
+            1L..24L * 60L * 60L,
+        )
+        val attendanceQrNonceReuseThreshold = boundedIntSetting(
+            "ATTENDANCE_QR_NONCE_REUSE_THRESHOLD",
+            env("ATTENDANCE_QR_NONCE_REUSE_THRESHOLD"),
+            ApiSettings.DEFAULT_ATTENDANCE_QR_NONCE_REUSE_THRESHOLD,
+            1..1_000,
+        )
 
         val results = listOf(
             Validators.port(ENV_API_PORT, portText),
@@ -252,7 +277,25 @@ class SettingsLoader(
             verificationEmailSender = verificationEmailSender,
             mfaEncryptionKey = mfaKey,
             firebaseServiceAccountJson = firebaseJson?.toCharArray(),
+            lateSyncReviewWindowSeconds = lateSyncReviewWindowSeconds,
+            attendanceQrNonceReuseThreshold = attendanceQrNonceReuseThreshold,
         )
+    }
+
+    private fun boundedLongSetting(name: String, raw: String?, default: Long, range: LongRange): Long {
+        if (raw == null) return default
+        val value = raw.trim().toLongOrNull()
+            ?: throw ConfigurationException("$name must be an integer between ${range.first} and ${range.last}")
+        if (value !in range) throw ConfigurationException("$name must be an integer between ${range.first} and ${range.last}")
+        return value
+    }
+
+    private fun boundedIntSetting(name: String, raw: String?, default: Int, range: IntRange): Int {
+        if (raw == null) return default
+        val value = raw.trim().toIntOrNull()
+            ?: throw ConfigurationException("$name must be an integer between ${range.first} and ${range.last}")
+        if (value !in range) throw ConfigurationException("$name must be an integer between ${range.first} and ${range.last}")
+        return value
     }
 
     private fun parseCsv(raw: String?): Set<String> =

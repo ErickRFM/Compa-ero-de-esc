@@ -16,11 +16,13 @@ sealed interface QrEvidenceResult {
     data class Valid(
         val issuedAtEpochSeconds: Long,
         val expiresAtEpochSeconds: Long,
+        val nonce: String,
     ) : QrEvidenceResult
 
     data class Expired(
         val issuedAtEpochSeconds: Long,
         val expiresAtEpochSeconds: Long,
+        val nonce: String,
     ) : QrEvidenceResult
 
     data object WrongSession : QrEvidenceResult
@@ -112,6 +114,9 @@ class AttendanceQrService(
 
         val issuedAt = parts[3].toLongOrNull() ?: return QrEvidenceResult.Invalid
         val expiresAt = parts[4].toLongOrNull() ?: return QrEvidenceResult.Invalid
+        val nonceBytes = runCatching { decoder.decode(parts[2]) }.getOrNull() ?: return QrEvidenceResult.Invalid
+        val nonce = parts[2].takeIf { nonceBytes.size == NONCE_BYTES && encoder.encodeToString(nonceBytes) == it }
+            ?: return QrEvidenceResult.Invalid
         if (
             expiresAt <= issuedAt ||
             expiresAt - issuedAt > TOKEN_TTL.seconds ||
@@ -137,9 +142,9 @@ class AttendanceQrService(
         }
 
         return if (receivedAtEpochSeconds >= expiresAt) {
-            QrEvidenceResult.Expired(issuedAt, expiresAt)
+            QrEvidenceResult.Expired(issuedAt, expiresAt, nonce)
         } else {
-            QrEvidenceResult.Valid(issuedAt, expiresAt)
+            QrEvidenceResult.Valid(issuedAt, expiresAt, nonce)
         }
     }
 

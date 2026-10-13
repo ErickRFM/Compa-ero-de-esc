@@ -3,6 +3,7 @@ package org.companerodeescuela.api.attendance
 import io.ktor.http.HttpStatusCode
 import java.time.Clock
 import org.companerodeescuela.api.errors.ApiException
+import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.presence.SchoolPresenceService
 import org.companerodeescuela.shared.contracts.ApiErrorCode
 import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
@@ -23,7 +24,14 @@ class AttendanceStudentService(
     private val schoolPresenceService: SchoolPresenceService? = null,
     private val clock: Clock = Clock.systemUTC(),
     private val nativeProjection:org.companerodeescuela.api.academic.NativeAcademicProjection?=null,
+    private val lateSyncReviewWindowSeconds: Long = ApiSettings.DEFAULT_LATE_SYNC_REVIEW_WINDOW_SECONDS,
+    private val qrNonceReuseStudentThreshold: Int = ApiSettings.DEFAULT_ATTENDANCE_QR_NONCE_REUSE_THRESHOLD,
 ) {
+    init {
+        require(lateSyncReviewWindowSeconds in 1L..24L * 60L * 60L)
+        require(qrNonceReuseStudentThreshold in 1..1_000)
+    }
+
     suspend fun activeFor(studentId: String,nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null): List<AttendanceSessionResponse> {
         schoolPresenceService?.requireActive(studentId,nativeActor)
         val enrolled = enrollmentResolver.courseGroupsFor(studentId,nativeActor)
@@ -125,7 +133,7 @@ class AttendanceStudentService(
         val lateSyncEligible =
             !currentlyOpen &&
                 attemptWasInsideWindow &&
-                now.epochSecond <= effectiveClose + LATE_SYNC_REVIEW_WINDOW_SECONDS
+                now.epochSecond <= effectiveClose + lateSyncReviewWindowSeconds
 
         if (!currentlyOpen && !lateSyncEligible) {
             throw ApiException.Domain(
@@ -153,6 +161,7 @@ class AttendanceStudentService(
             } == true
         }
         val offlineQrFallback = presence != null && !hasLiveCampusEvidence
+        var offlineQrNonce: String? = null
         if (offlineQrFallback) {
             val signed = qrService?.verify(
                 token = request.qrToken?.trim().orEmpty(),
@@ -167,19 +176,37 @@ class AttendanceStudentService(
                 else -> false
             }
             if (!capturedWithinQrWindow || !attemptWasInsideWindow ||
-                now.epochSecond > effectiveClose + LATE_SYNC_REVIEW_WINDOW_SECONDS
+                now.epochSecond > effectiveClose + lateSyncReviewWindowSeconds
             ) {
                 throw ApiException.Forbidden("Offline attendance requires a valid signed classroom QR captured during the session")
             }
+            offlineQrNonce = when (signed) {
+                is QrEvidenceResult.Valid -> signed.nonce
+                is QrEvidenceResult.Expired -> signed.nonce
+                else -> null
+            }
         }
         val evidence = if (offlineQrFallback) {
-            AttendanceStatus.REVIEW_REQUIRED to AttendanceReasonCode.OFFLINE_NETWORK_QR_REVIEW
+            ClassifiedEvidence(
+                AttendanceStatus.REVIEW_REQUIRED,
+                AttendanceReasonCode.OFFLINE_NETWORK_QR_REVIEW,
+                offlineQrNonce,
+            )
         } else {
             classifyEvidence(
                 request = request,
                 sessionId = session.id,
                 lateSyncEligible = lateSyncEligible,
                 receivedAtEpochSeconds = now.epochSecond,
+            )
+        }
+        val nonceUseCount = evidence.qrNonce?.let { nonce ->
+            repository.recordQrNonceUse(
+                sessionId = session.id,
+                nonce = nonce,
+                studentId = studentId,
+                expiresAtEpochSeconds = effectiveClose + lateSyncReviewWindowSeconds,
+                nowEpochSeconds = now.epochSecond,
             )
         }
 
@@ -189,8 +216,10 @@ class AttendanceStudentService(
             sessionId = session.id,
             occurrenceId = session.occurrenceId,
             studentId = studentId,
-            status = evidence.first,
-            reasonCode = evidence.second,
+            status = evidence.status,
+            reasonCode = if (nonceUseCount != null && nonceUseCount > qrNonceReuseStudentThreshold) {
+                AttendanceReasonCode.DUPLICATE
+            } else evidence.reasonCode,
             attemptedAtEpochSeconds = request.deviceTimestampEpochSeconds,
             receivedAtEpochSeconds = now.epochSecond,
         )
@@ -297,13 +326,13 @@ class AttendanceStudentService(
         sessionId: String,
         lateSyncEligible: Boolean,
         receivedAtEpochSeconds: Long,
-    ): Pair<AttendanceStatus, AttendanceReasonCode> {
+    ): ClassifiedEvidence {
         val qrToken = request.qrToken?.trim()?.takeIf(String::isNotEmpty)
         if (qrToken == null) {
             return if (lateSyncEligible) {
-                AttendanceStatus.REVIEW_REQUIRED to AttendanceReasonCode.OFFLINE_LATE_SYNC
+                ClassifiedEvidence(AttendanceStatus.REVIEW_REQUIRED, AttendanceReasonCode.OFFLINE_LATE_SYNC)
             } else {
-                AttendanceStatus.LIKELY to AttendanceReasonCode.IDENTITY_SESSION_TIME
+                ClassifiedEvidence(AttendanceStatus.LIKELY, AttendanceReasonCode.IDENTITY_SESSION_TIME)
             }
         }
 
@@ -319,39 +348,42 @@ class AttendanceStudentService(
             )
         ) {
             is QrEvidenceResult.Valid -> {
-                if (
-                    request.deviceTimestampEpochSeconds in
-                    qr.issuedAtEpochSeconds..qr.expiresAtEpochSeconds
-                ) {
-                    if (lateSyncEligible) {
-                        AttendanceStatus.REVIEW_REQUIRED to AttendanceReasonCode.OFFLINE_LATE_SYNC
+                if (lateSyncEligible) {
+                    if (request.deviceTimestampEpochSeconds in qr.issuedAtEpochSeconds..qr.expiresAtEpochSeconds) {
+                        ClassifiedEvidence(AttendanceStatus.REVIEW_REQUIRED, AttendanceReasonCode.OFFLINE_LATE_SYNC, qr.nonce)
                     } else {
-                        AttendanceStatus.REVIEW_REQUIRED to AttendanceReasonCode.QR_VALID
+                        ClassifiedEvidence(AttendanceStatus.REJECTED, AttendanceReasonCode.QR_EXPIRED)
                     }
                 } else {
-                    AttendanceStatus.REJECTED to AttendanceReasonCode.QR_EXPIRED
+                    ClassifiedEvidence(AttendanceStatus.REVIEW_REQUIRED, AttendanceReasonCode.QR_VALID, qr.nonce)
                 }
             }
             is QrEvidenceResult.Expired -> {
                 if (
+                    lateSyncEligible &&
                     request.deviceTimestampEpochSeconds in
                     qr.issuedAtEpochSeconds..qr.expiresAtEpochSeconds
                 ) {
-                    AttendanceStatus.REVIEW_REQUIRED to AttendanceReasonCode.OFFLINE_LATE_SYNC
+                    ClassifiedEvidence(AttendanceStatus.REVIEW_REQUIRED, AttendanceReasonCode.OFFLINE_LATE_SYNC, qr.nonce)
                 } else {
-                    AttendanceStatus.REJECTED to AttendanceReasonCode.QR_EXPIRED
+                    ClassifiedEvidence(AttendanceStatus.REJECTED, AttendanceReasonCode.QR_EXPIRED)
                 }
             }
             QrEvidenceResult.WrongSession ->
-                AttendanceStatus.REJECTED to AttendanceReasonCode.WRONG_SESSION
+                ClassifiedEvidence(AttendanceStatus.REJECTED, AttendanceReasonCode.WRONG_SESSION)
             QrEvidenceResult.Invalid ->
-                AttendanceStatus.REJECTED to AttendanceReasonCode.QR_INVALID
+                ClassifiedEvidence(AttendanceStatus.REJECTED, AttendanceReasonCode.QR_INVALID)
         }
     }
+
+    private data class ClassifiedEvidence(
+        val status: AttendanceStatus,
+        val reasonCode: AttendanceReasonCode,
+        val qrNonce: String? = null,
+    )
 
     private companion object {
         const val MAX_OPERATION_ID_LENGTH = 128
         const val MAX_QR_TOKEN_LENGTH = 2_048
-        const val LATE_SYNC_REVIEW_WINDOW_SECONDS = 24L * 60L * 60L
     }
 }

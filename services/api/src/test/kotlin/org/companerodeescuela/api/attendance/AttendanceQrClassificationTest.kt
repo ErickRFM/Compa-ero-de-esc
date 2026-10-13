@@ -11,6 +11,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlinx.coroutines.test.runTest
 import org.companerodeescuela.api.errors.ApiException
+import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.integrations.academic.AcademicProvider
 import org.companerodeescuela.api.integrations.academic.dto.ExternalAcademicLoad
 import org.companerodeescuela.api.integrations.academic.dto.ExternalStudent
@@ -46,6 +47,24 @@ class AttendanceQrClassificationTest {
 
         assertEquals(AttendanceStatus.REVIEW_REQUIRED, record.status)
         assertEquals(AttendanceReasonCode.QR_VALID, record.reasonCode)
+    }
+
+    @Test
+    fun `non local environment without presence service rejects attendance without QR`() = runTest {
+        val setup = setup(environment = Environment.STAGING)
+
+        assertFailsWith<ApiException.Forbidden> {
+            setup.attendance.register(
+                studentId = "2020-10455",
+                sessionId = setup.sessionId,
+                request = AttendanceAttemptRequest(
+                    operationId = "op-no-campus-or-qr",
+                    deviceTimestampEpochSeconds = setup.clock.instant().epochSecond,
+                    qrToken = null,
+                ),
+            )
+        }
+        assertEquals(emptyList(), setup.repository.recordsForSession(setup.sessionId))
     }
 
     @Test
@@ -170,6 +189,7 @@ class AttendanceQrClassificationTest {
     private suspend fun setup(
         durationMinutes: Int = 6,
         academicProvider: AcademicProvider = provider,
+        environment: Environment = Environment.LOCAL,
     ): Setup {
         val repository = InMemoryAttendanceRepository()
         val clock = MutableClock(initial)
@@ -190,6 +210,7 @@ class AttendanceQrClassificationTest {
             enrollmentResolver = AttendanceEnrollmentResolver(academicProvider),
             qrService = qr,
             clock = clock,
+            environment = environment,
         )
         val occurrence = teacherOccurrence(academicProvider)
         val session = sessionService.openSession(
@@ -200,7 +221,7 @@ class AttendanceQrClassificationTest {
                 durationMinutes = durationMinutes,
             ),
         )
-        return Setup(attendance, qr, clock, session.id)
+        return Setup(attendance, qr, clock, session.id, repository)
     }
 
     private suspend fun teacherOccurrence(academicProvider: AcademicProvider = provider): ClassOccurrence {
@@ -218,6 +239,7 @@ class AttendanceQrClassificationTest {
         val qr: AttendanceQrService,
         val clock: MutableClock,
         val sessionId: String,
+        val repository: InMemoryAttendanceRepository,
     )
 
     private class MultiStudentAcademicProvider : AcademicProvider {

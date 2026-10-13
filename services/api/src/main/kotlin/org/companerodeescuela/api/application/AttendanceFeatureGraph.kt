@@ -65,6 +65,7 @@ fun buildAttendanceFeatureGraph(
             nativeProjection=nativeProjection,
             lateSyncReviewWindowSeconds = settings.lateSyncReviewWindowSeconds,
             qrNonceReuseStudentThreshold = settings.attendanceQrNonceReuseThreshold,
+            environment = settings.environment,
         ),
         reviewService = AttendanceReviewService(
             repository = repository,

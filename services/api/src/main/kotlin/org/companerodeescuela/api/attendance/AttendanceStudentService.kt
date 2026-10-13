@@ -4,6 +4,7 @@ import io.ktor.http.HttpStatusCode
 import java.time.Clock
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.config.ApiSettings
+import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.presence.SchoolPresenceService
 import org.companerodeescuela.shared.contracts.ApiErrorCode
 import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
@@ -26,6 +27,7 @@ class AttendanceStudentService(
     private val nativeProjection:org.companerodeescuela.api.academic.NativeAcademicProjection?=null,
     private val lateSyncReviewWindowSeconds: Long = ApiSettings.DEFAULT_LATE_SYNC_REVIEW_WINDOW_SECONDS,
     private val qrNonceReuseStudentThreshold: Int = ApiSettings.DEFAULT_ATTENDANCE_QR_NONCE_REUSE_THRESHOLD,
+    private val environment: Environment = Environment.LOCAL,
 ) {
     init {
         require(lateSyncReviewWindowSeconds in 1L..24L * 60L * 60L)
@@ -149,6 +151,13 @@ class AttendanceStudentService(
                 code = ApiErrorCode.ATTENDANCE_NOT_ENROLLED,
                 message = "You are not enrolled in this class",
             )
+        }
+
+        if (
+            schoolPresenceService == null && environment != Environment.LOCAL &&
+            request.qrToken.isNullOrBlank()
+        ) {
+            throw ApiException.Forbidden("Attendance requires a signed classroom QR when campus presence is unavailable")
         }
 
         // A pre-signed classroom QR can preserve evidence through an outage, but

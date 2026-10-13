@@ -19,6 +19,7 @@ RUN useradd --system --create-home --uid 10001 appuser
 COPY --from=build /workspace/services/api/build/install/api/ /app/
 
 ENV API_HOST=0.0.0.0
+ENV APP_ENV=production
 EXPOSE 8080
 
 USER appuser

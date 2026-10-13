@@ -44,13 +44,13 @@ import org.companerodeescuela.api.tutoring.tutorCaseRoutes
  * whole graph can be rebuilt in tests with fakes and no environment variables.
  *
  * @param providerRegistry selects which institutional providers are active.
- *   It defaults to the mock registry so a developer can boot the API with no
- *   external credentials. Production wiring must pass an explicit registry.
+ *   It defaults to the environment-scoped mock registry for local development.
+ *   Production cannot start until a real registry is explicitly supplied.
  */
 fun Application.module(
     settings: ApiSettings,
     mongoConnection: MongoConnection,
-    providerRegistry: ProviderRegistry = ProviderRegistry.mocks(),
+    providerRegistry: ProviderRegistry = ProviderRegistry.mocks(settings.environment),
 ) {
     ProviderRegistry.requireEnvironmentSatisfied(providerRegistry, settings.environment)
 

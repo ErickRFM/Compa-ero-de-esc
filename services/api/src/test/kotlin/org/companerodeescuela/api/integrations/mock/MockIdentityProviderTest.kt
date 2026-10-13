@@ -4,6 +4,8 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.integrations.identity.InstitutionalCredentials
 import org.companerodeescuela.shared.contracts.UserRole
 
@@ -38,4 +40,28 @@ class MockIdentityProviderTest {
         )
         assertEquals(null, account)
     }
+
+    @Test
+    fun demoAndQaCredentialsAuthenticateOnlyInLocal() = runTest {
+        val constructor = MockIdentityProvider::class.java.declaredConstructors.firstOrNull {
+            it.parameterTypes.contentEquals(arrayOf(Environment::class.java))
+        }
+        assertNotNull(constructor, "mock identity must receive the active environment")
+        val credentials = listOf(
+            InstitutionalCredentials(MockIdentityProvider.MOCK_USERNAME, MockIdentityProvider.MOCK_PASSWORD),
+            InstitutionalCredentials(MockIdentityProvider.MOCK_TEACHER_USERNAME, MockIdentityProvider.MOCK_TEACHER_PASSWORD),
+            InstitutionalCredentials(MockIdentityProvider.QA_STUDENT_USERNAME, MockIdentityProvider.QA_PASSWORD),
+            InstitutionalCredentials(MockIdentityProvider.QA_TEACHER_USERNAME, MockIdentityProvider.QA_PASSWORD),
+            InstitutionalCredentials(MockIdentityProvider.QA_SUPERVISOR_USERNAME, MockIdentityProvider.QA_PASSWORD),
+            InstitutionalCredentials(MockIdentityProvider.QA_ADMIN_USERNAME, MockIdentityProvider.QA_PASSWORD),
+        )
+
+        credentials.forEach { credential ->
+            assertNotNull(constructor.newInstance(Environment.LOCAL).let { (it as MockIdentityProvider).authenticate(credential) })
+            listOf(Environment.DEVELOPMENT, Environment.STAGING, Environment.PRODUCTION).forEach { environment ->
+                assertNull((constructor.newInstance(environment) as MockIdentityProvider).authenticate(credential))
+            }
+        }
+    }
+
 }

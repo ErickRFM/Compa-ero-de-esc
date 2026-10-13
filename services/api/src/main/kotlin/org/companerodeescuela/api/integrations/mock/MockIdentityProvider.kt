@@ -6,6 +6,7 @@ import org.companerodeescuela.api.integrations.identity.AuthenticatedAccount
 import org.companerodeescuela.api.integrations.identity.IdentityProvider
 import org.companerodeescuela.api.integrations.identity.InstitutionalCredentials
 import org.companerodeescuela.api.integrations.identity.InstitutionalIdentityState
+import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.integrations.lms.ExternalAssignment
 import org.companerodeescuela.api.integrations.lms.ExternalLearningModule
 import org.companerodeescuela.api.integrations.lms.LearningProvider
@@ -18,12 +19,12 @@ import org.companerodeescuela.shared.contracts.UserRole
  * provider itself is rejected outside local development by ProviderRegistry,
  * so QA credentials can never become a production authentication path.
  */
-class MockIdentityProvider : IdentityProvider, MockIntegrationProvider {
+class MockIdentityProvider(private val environment: Environment = Environment.LOCAL) : IdentityProvider, MockIntegrationProvider {
     override val id: String = "mock-identity"
     override val displayName: String = "Mock identity source (development only)"
 
     override suspend fun authenticate(credentials: InstitutionalCredentials): AuthenticatedAccount? =
-        accountFor(credentials.username, credentials.password)
+        if (environment == Environment.LOCAL) accountFor(credentials.username, credentials.password) else null
 
     override suspend fun currentState(externalId: String): InstitutionalIdentityState? =
         ALL_ACCOUNTS.firstOrNull { it.externalId == externalId }?.let {

@@ -18,14 +18,9 @@ enum class Environment {
         get() = this == PRODUCTION
 
     companion object {
-        /**
-         * Parses [raw] into an [Environment], defaulting to [LOCAL] when the
-         * value is absent and failing fast when the value is present but
-         * unknown. A typo in `APP_ENV` must never silently downgrade the
-         * runtime to a non-production profile in a real deployment.
-         */
+        /** Parses [raw] into an [Environment], failing fast when it is absent or unknown. */
         fun parse(raw: String?): Environment = when (raw?.trim()?.lowercase()) {
-            null, "" -> LOCAL
+            null, "" -> throw ConfigurationException("APP_ENV is required: local, development, staging, or production")
             "local" -> LOCAL
             "dev", "development" -> DEVELOPMENT
             "staging", "stage" -> STAGING

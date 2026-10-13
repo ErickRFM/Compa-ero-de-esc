@@ -6,7 +6,7 @@ import org.companerodeescuela.api.config.*
 
 class MfaConfigurationTest {
     private fun load(key:String?=null):ApiSettings {
-        val values=mapOf("API_PORT" to "8080","MONGODB_DATABASE" to "v12_test", "MFA_ENCRYPTION_KEY" to key)
+        val values=mapOf("APP_ENV" to "local", "API_PORT" to "8080","MONGODB_DATABASE" to "v12_test", "MFA_ENCRYPTION_KEY" to key)
         return SettingsLoader { values[it] }.load()
     }
     @Test fun `optional absent key disables MFA while configured canonical AES256 key is decoded privately`() {

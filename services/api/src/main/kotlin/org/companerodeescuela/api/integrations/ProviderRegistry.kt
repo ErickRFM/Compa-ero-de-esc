@@ -53,14 +53,15 @@ class ProviderRegistry private constructor(
         private val log = LoggerFactory.getLogger(ProviderRegistry::class.java)
 
         /**
-         * Development wiring: every provider is mocked.
+         * Non-production wiring: every provider is mocked. Identity demo and QA
+         * credentials remain available only in LOCAL.
          *
          * This is the default so `.\gradlew :services:api:run` works on a fresh
          * clone with no external credentials.
          */
-        fun mocks(): ProviderRegistry = ProviderRegistry(
+        fun mocks(environment: Environment = Environment.LOCAL): ProviderRegistry = ProviderRegistry(
             academic = MockAcademicProvider(),
-            identity = MockIdentityProvider(),
+            identity = MockIdentityProvider(environment),
             learning = MockLearningProvider(),
             library = MockLibraryProvider(),
             events = MockEventsProvider(),
@@ -78,7 +79,7 @@ class ProviderRegistry private constructor(
             registry: ProviderRegistry,
             environment: Environment,
         ) {
-            if (environment.isProduction || environment == Environment.STAGING) {
+            if (environment !in setOf(Environment.LOCAL, Environment.DEVELOPMENT)) {
                 val mocks = registry.mockProviders()
                 check(mocks.isEmpty()) {
                     "Refusing to start in $environment with mock providers active: " +

@@ -115,4 +115,14 @@ class ProviderRegistryTest {
             assertContains(error.message!!, "mock-academic")
         }
     }
+
+    @Test
+    fun developmentMockRegistryDoesNotExposeQaLogin() = runTest {
+        val identity = ProviderRegistry.mocks(Environment.DEVELOPMENT).identity
+        val account = identity.authenticate(
+            InstitutionalCredentials(MockIdentityProvider.QA_ADMIN_USERNAME, MockIdentityProvider.QA_PASSWORD),
+        )
+
+        assertNull(account)
+    }
 }

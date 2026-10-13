@@ -1,5 +1,6 @@
 package org.companerodeescuela.api.health
 
+import org.companerodeescuela.api.runCatchingCancellable
 import java.time.Clock
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.database.MongoConnection
@@ -70,7 +71,7 @@ class HealthService(
                 detail = "not_configured",
             )
         }
-        val reachable = runCatching { mongoConnection.ping() }.getOrDefault(false)
+        val reachable = runCatchingCancellable { mongoConnection.ping() }.getOrDefault(false)
         return if (reachable) {
             DependencyStatus(name = MONGODB_DEPENDENCY, status = ServiceStatus.UP)
         } else {

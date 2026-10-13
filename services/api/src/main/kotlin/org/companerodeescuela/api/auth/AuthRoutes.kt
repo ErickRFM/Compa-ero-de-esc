@@ -1,5 +1,6 @@
 package org.companerodeescuela.api.auth
 
+import org.companerodeescuela.api.runCatchingCancellable
 import java.time.Clock
 import org.companerodeescuela.api.institutions.InstitutionRepository
 import org.companerodeescuela.api.institutions.InMemoryInstitutionRepository
@@ -58,7 +59,7 @@ fun Route.authRoutes(
                     "Authentication is not configured",
                 )
 
-            val request = runCatching { call.receive<LoginRequest>() }
+            val request = runCatchingCancellable { call.receive<LoginRequest>() }
                 .getOrElse {
                     throw ApiException.Validation("Invalid login request")
                 }
@@ -91,7 +92,7 @@ fun Route.authRoutes(
                 call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
                 throw ApiException.RateLimited()
             }
-            val request = runCatching { call.boundedAuthRequest(RegisterRequest.serializer()) }
+            val request = runCatchingCancellable { call.boundedAuthRequest(RegisterRequest.serializer()) }
                 .getOrElse { throw ApiException.Validation("Invalid registration request") }
             registrationLimiter.acquire(request.email, call.request.local.remoteAddress)?.let { retryAfter ->
                 call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
@@ -111,7 +112,7 @@ fun Route.authRoutes(
                 AuthService(identityProvider, it, sessions, accounts = accounts, institutions = institutions, verification = verification)
             }
                 ?: throw ApiException.DependencyUnavailable("Authentication is not configured")
-            val request = runCatching { call.receive<RefreshSessionRequest>() }
+            val request = runCatchingCancellable { call.receive<RefreshSessionRequest>() }
                 .getOrElse { throw ApiException.Unauthorized() }
             call.respond(
                 ApiResponse(
@@ -126,7 +127,7 @@ fun Route.authRoutes(
                 AuthService(identityProvider, it, sessions, accounts = accounts, institutions = institutions, verification = verification)
             }
                 ?: throw ApiException.DependencyUnavailable("Authentication is not configured")
-            val request = runCatching { call.receive<RefreshSessionRequest>() }
+            val request = runCatchingCancellable { call.receive<RefreshSessionRequest>() }
                 .getOrElse { throw ApiException.Unauthorized() }
             service.logout(request)
             call.respond(HttpStatusCode.NoContent)
@@ -157,7 +158,7 @@ fun Route.authRoutes(
                         call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
                         throw ApiException.RateLimited()
                     }
-                    val request = runCatching { call.boundedAuthRequest(VerifyEmailRequest.serializer()) }
+                    val request = runCatchingCancellable { call.boundedAuthRequest(VerifyEmailRequest.serializer()) }
                         .getOrElse { throw ApiException.Validation("Invalid email verification request") }
                     val service = AuthService(identityProvider, tokenService, sessions, accounts = accounts,
                         institutions = institutions, verification = verification)

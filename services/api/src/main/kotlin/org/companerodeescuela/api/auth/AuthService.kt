@@ -110,12 +110,14 @@ class AuthService(
 
         val localAccount = authenticationDependency { accounts.findByIdentifier(username) }
         if (localAccount != null) {
-            if (!localAccount.permitsSession || !passwordHasher.verify(request.password, localAccount.passwordHash)) {
+            val passwordMatches = passwordHasher.verify(request.password, localAccount.passwordHash)
+            if (!localAccount.permitsSession || !passwordMatches) {
                 throw ApiException.Unauthorized("Invalid username or password")
             }
             return createSession(localAccount.toUserSummary(), SessionIdentitySource.NATIVE)
         }
 
+        passwordHasher.verify(request.password, DUMMY_PASSWORD_HASH)
         val institutional = authenticationDependency { identityProvider.authenticate(
             InstitutionalCredentials(
                 username = username,
@@ -223,6 +225,8 @@ class AuthService(
         .encodeToString(MessageDigest.getInstance("SHA-256").digest(token.toByteArray()))
 
     private companion object {
+        const val DUMMY_PASSWORD = "not-a-real-companero-account-password"
+        val DUMMY_PASSWORD_HASH: String by lazy { PasswordHasher().hash(DUMMY_PASSWORD) }
         val REFRESH_TOKEN_TTL: Duration = Duration.ofDays(30)
         const val REFRESH_TOKEN_BYTES = 32
         val EMAIL_REGEX = Regex("^[A-Za-z0-9._%+\\-]+@[A-Za-z0-9\\-]+(?:\\.[A-Za-z0-9\\-]+)+$")

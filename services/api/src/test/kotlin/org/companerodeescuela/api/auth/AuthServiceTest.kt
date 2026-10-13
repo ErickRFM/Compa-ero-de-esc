@@ -67,6 +67,17 @@ class AuthServiceTest {
     }
 
     @Test
+    fun `unknown local account performs dummy password verification before provider fallback`() = runTest {
+        val hasher = CountingPasswordHasher()
+
+        service(passwordHasher = hasher).login(
+            LoginRequest(MockIdentityProvider.MOCK_USERNAME, MockIdentityProvider.MOCK_PASSWORD),
+        )
+
+        assertEquals(1, hasher.verifyCalls)
+    }
+
+    @Test
     fun `login rejects oversized and control character usernames`() = runTest {
         val service = service()
 
@@ -263,6 +274,7 @@ class AuthServiceTest {
         clock: Clock = Clock.fixed(BASE_TIME, ZoneOffset.UTC),
         identityProvider: org.companerodeescuela.api.integrations.identity.IdentityProvider =
             MockIdentityProvider(),
+        passwordHasher: PasswordHasher = PasswordHasher(),
     ): AuthService = AuthService(
         identityProvider = identityProvider,
         tokenService = AuthTokenService(
@@ -281,8 +293,17 @@ class AuthServiceTest {
             clock = clock,
         ),
         sessions = sessions,
+        passwordHasher = passwordHasher,
         clock = clock,
     )
+
+    private class CountingPasswordHasher : PasswordHasher() {
+        var verifyCalls = 0
+        override fun verify(password: String, encoded: String): Boolean {
+            verifyCalls++
+            return super.verify(password, encoded)
+        }
+    }
 
     private companion object {
         val BASE_TIME: Instant = Instant.parse("2026-10-02T12:00:00Z")

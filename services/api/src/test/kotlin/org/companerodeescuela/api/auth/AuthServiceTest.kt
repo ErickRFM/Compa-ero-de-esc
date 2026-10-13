@@ -4,6 +4,9 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.Duration
+import java.util.Base64
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.PBEKeySpec
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlinx.coroutines.async
@@ -75,6 +78,20 @@ class AuthServiceTest {
         )
 
         assertEquals(1, hasher.verifyCalls)
+    }
+
+    @Test
+    fun `successful login upgrades a legacy password hash`() = runTest {
+        val accounts = InMemoryPlatformAccountRepository()
+        val password = "Correct horse battery staple"
+        val oldHash = legacyHash(password, 210_000)
+        val account = PlatformAccount("local-1", "Ana Lopez", "ana@example.test", oldHash, setOf(UserRole.STUDENT))
+        assertEquals(true, accounts.create(account))
+
+        val response = service(accounts = accounts).login(LoginRequest(account.email, password))
+
+        assertEquals(account.id, response.user.id)
+        assertEquals(600_000, requireNotNull(accounts.findById(account.id)).passwordHash.split(":")[1].toInt())
     }
 
     @Test
@@ -275,6 +292,7 @@ class AuthServiceTest {
         identityProvider: org.companerodeescuela.api.integrations.identity.IdentityProvider =
             MockIdentityProvider(),
         passwordHasher: PasswordHasher = PasswordHasher(),
+        accounts: PlatformAccountRepository = InMemoryPlatformAccountRepository(),
     ): AuthService = AuthService(
         identityProvider = identityProvider,
         tokenService = AuthTokenService(
@@ -293,9 +311,22 @@ class AuthServiceTest {
             clock = clock,
         ),
         sessions = sessions,
+        accounts = accounts,
         passwordHasher = passwordHasher,
         clock = clock,
     )
+
+    private fun legacyHash(password: String, iterations: Int): String {
+        val salt = ByteArray(16) { it.toByte() }
+        val spec = PBEKeySpec(password.toCharArray(), salt, iterations, 256)
+        val digest = try {
+            SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
+        } finally {
+            spec.clearPassword()
+        }
+        val encoder = Base64.getUrlEncoder().withoutPadding()
+        return listOf("pbkdf2-sha256", iterations.toString(), encoder.encodeToString(salt), encoder.encodeToString(digest)).joinToString(":")
+    }
 
     private class CountingPasswordHasher : PasswordHasher() {
         var verifyCalls = 0

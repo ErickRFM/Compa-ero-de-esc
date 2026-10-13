@@ -80,7 +80,7 @@ class AuthService(
             id = UUID.randomUUID().toString(),
             displayName = displayName,
             email = email,
-            passwordHash = passwordHasher.hash(request.password),
+            passwordHash = passwordHasher.hashAsync(request.password),
             roles = emptySet(),
             accountStatus = AccountStatus.PENDING_VERIFICATION,
             registrationIntent = RegistrationIntent(request.accountType, institutionPreference, reference, groupPreference),
@@ -110,14 +110,17 @@ class AuthService(
 
         val localAccount = authenticationDependency { accounts.findByIdentifier(username) }
         if (localAccount != null) {
-            val passwordMatches = passwordHasher.verify(request.password, localAccount.passwordHash)
-            if (!localAccount.permitsSession || !passwordMatches) {
+            val verification = passwordHasher.verifyAndUpgradeAsync(request.password, localAccount.passwordHash)
+            if (!localAccount.permitsSession || !verification.verified) {
                 throw ApiException.Unauthorized("Invalid username or password")
+            }
+            verification.upgradedHash?.let {
+                authenticationDependency { accounts.updatePasswordHash(localAccount.id, localAccount.passwordHash, it) }
             }
             return createSession(localAccount.toUserSummary(), SessionIdentitySource.NATIVE)
         }
 
-        passwordHasher.verify(request.password, DUMMY_PASSWORD_HASH)
+        passwordHasher.verifyAsync(request.password, DUMMY_PASSWORD_HASH)
         val institutional = authenticationDependency { identityProvider.authenticate(
             InstitutionalCredentials(
                 username = username,
@@ -225,8 +228,7 @@ class AuthService(
         .encodeToString(MessageDigest.getInstance("SHA-256").digest(token.toByteArray()))
 
     private companion object {
-        const val DUMMY_PASSWORD = "not-a-real-companero-account-password"
-        val DUMMY_PASSWORD_HASH: String by lazy { PasswordHasher().hash(DUMMY_PASSWORD) }
+        const val DUMMY_PASSWORD_HASH = "pbkdf2-sha256:600000:AAECAwQFBgcICQoLDA0ODw:yq8_JTOd2RABK-PjQsVxm5wklWj_j4ZQ2eTaDf-qxDI"
         val REFRESH_TOKEN_TTL: Duration = Duration.ofDays(30)
         const val REFRESH_TOKEN_BYTES = 32
         val EMAIL_REGEX = Regex("^[A-Za-z0-9._%+\\-]+@[A-Za-z0-9\\-]+(?:\\.[A-Za-z0-9\\-]+)+$")

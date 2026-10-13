@@ -91,11 +91,13 @@ class AuthServiceTest {
     @Test
     fun `replayed refresh token revokes the complete session family`() = runTest {
         val sessions = InMemoryRefreshSessionRepository()
-        val service = service(sessions = sessions)
+        val clock = MutableClock(BASE_TIME)
+        val service = service(sessions = sessions, clock = clock)
         val login = service.login(
             LoginRequest(MockIdentityProvider.MOCK_USERNAME, MockIdentityProvider.MOCK_PASSWORD),
         )
         val rotated = service.refresh(RefreshSessionRequest(login.sessionId, login.refreshToken))
+        clock.advance(Duration.ofSeconds(61))
 
         assertFailsWith<ApiException.Unauthorized> {
             service.refresh(RefreshSessionRequest(login.sessionId, login.refreshToken))
@@ -103,6 +105,67 @@ class AuthServiceTest {
         assertFailsWith<ApiException.Unauthorized> {
             service.refresh(RefreshSessionRequest(rotated.sessionId, rotated.refreshToken))
         }
+    }
+
+    @Test
+    fun `refresh session has a ninety day absolute lifetime`() = runTest {
+        val clock = MutableClock(BASE_TIME)
+        val sessions = InMemoryRefreshSessionRepository()
+        val service = service(sessions = sessions, clock = clock)
+        val login = service.login(LoginRequest(MockIdentityProvider.MOCK_USERNAME, MockIdentityProvider.MOCK_PASSWORD))
+        var latest = login
+        repeat(3) {
+            clock.advance(Duration.ofDays(29))
+            latest = service.refresh(RefreshSessionRequest(latest.sessionId, latest.refreshToken))
+        }
+        clock.advance(Duration.ofDays(2))
+        latest = service.refresh(RefreshSessionRequest(latest.sessionId, latest.refreshToken))
+        assertEquals(BASE_TIME.plus(Duration.ofDays(90)), sessions.find(latest.sessionId)?.expiresAt)
+
+        clock.advance(Duration.ofDays(1))
+        assertFailsWith<ApiException.Unauthorized> {
+            service.refresh(RefreshSessionRequest(latest.sessionId, latest.refreshToken))
+        }
+    }
+
+    @Test
+    fun `unknown refresh hash is rejected before refreshing external authority`() = runTest {
+        val identity = CountingIdentityProvider()
+        val service = service(identityProvider = identity)
+        val login = service.login(LoginRequest(MockIdentityProvider.MOCK_USERNAME, MockIdentityProvider.MOCK_PASSWORD))
+        val callsAfterLogin = identity.currentStateCalls
+
+        assertFailsWith<ApiException.Unauthorized> {
+            service.refresh(RefreshSessionRequest(login.sessionId, "unrecognized-token"))
+        }
+
+        assertEquals(callsAfterLogin, identity.currentStateCalls)
+    }
+
+    @Test
+    fun `refresh history retains only the latest five hashes`() = runTest {
+        val sessions = InMemoryRefreshSessionRepository()
+        val service = service(sessions = sessions)
+        var response = service.login(LoginRequest(MockIdentityProvider.MOCK_USERNAME, MockIdentityProvider.MOCK_PASSWORD))
+        repeat(8) {
+            response = service.refresh(RefreshSessionRequest(response.sessionId, response.refreshToken))
+        }
+
+        assertEquals(5, sessions.find(response.sessionId)?.previousTokenHashes?.size)
+    }
+
+    @Test
+    fun `retry with immediately previous refresh token inside grace does not revoke family`() = runTest {
+        val sessions = InMemoryRefreshSessionRepository()
+        val service = service(sessions = sessions)
+        val login = service.login(LoginRequest(MockIdentityProvider.MOCK_USERNAME, MockIdentityProvider.MOCK_PASSWORD))
+        service.refresh(RefreshSessionRequest(login.sessionId, login.refreshToken))
+
+        val retried = service.refresh(RefreshSessionRequest(login.sessionId, login.refreshToken))
+        val next = service.refresh(RefreshSessionRequest(retried.sessionId, retried.refreshToken))
+
+        assertNotEquals(login.refreshToken, retried.refreshToken)
+        assertNotEquals(retried.refreshToken, next.refreshToken)
     }
 
     @Test
@@ -164,7 +227,7 @@ class AuthServiceTest {
     }
 
     @Test
-    fun `concurrent use of one refresh token grants at most one rotation and revokes replay`() = runTest {
+    fun `concurrent retry of immediately previous token stays inside grace window`() = runTest {
         val sessions = InMemoryRefreshSessionRepository()
         val service = service(sessions = sessions)
         val login = service.login(
@@ -179,11 +242,8 @@ class AuthServiceTest {
             ).map { it.await() }
         }
 
-        assertEquals(1, outcomes.count(Result<*>::isSuccess))
-        assertEquals(1, outcomes.count(Result<*>::isFailure))
-        assertFailsWith<ApiException.Unauthorized> {
-            service.refresh(RefreshSessionRequest(login.sessionId, login.refreshToken))
-        }
+        assertEquals(2, outcomes.count(Result<*>::isSuccess))
+        assertEquals(0, outcomes.count(Result<*>::isFailure))
     }
 
     private fun service(
@@ -214,6 +274,21 @@ class AuthServiceTest {
 
     private companion object {
         val BASE_TIME: Instant = Instant.parse("2026-10-02T12:00:00Z")
+    }
+
+    private class MutableClock(private var value: Instant) : Clock() {
+        override fun getZone() = ZoneOffset.UTC
+        override fun withZone(zone: java.time.ZoneId): Clock = this
+        override fun instant(): Instant = value
+        fun advance(duration: Duration) { value = value.plus(duration) }
+    }
+
+    private class CountingIdentityProvider : org.companerodeescuela.api.integrations.identity.IdentityProvider by MockIdentityProvider() {
+        var currentStateCalls = 0
+        override suspend fun currentState(externalId: String): org.companerodeescuela.api.integrations.identity.InstitutionalIdentityState {
+            currentStateCalls++
+            return requireNotNull(MockIdentityProvider().currentState(externalId))
+        }
     }
 
     private class RoleChangingIdentityProvider :

@@ -32,6 +32,8 @@ class SettingsLoaderTest {
         assertFalse(settings.trustedProxy)
         assertEquals(1L, settings.loginProgressiveDelayBaseSeconds)
         assertEquals(30L, settings.loginProgressiveDelayMaxSeconds)
+        assertEquals(60L, settings.refreshRotationGraceSeconds)
+        assertEquals(90L, settings.maximumRefreshSessionAgeDays)
     }
 
     @Test
@@ -53,6 +55,23 @@ class SettingsLoaderTest {
         assertContains(assertFailsWith<ConfigurationException> {
             loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c", "LOGIN_PROGRESSIVE_DELAY_BASE_SECONDS" to "10", "LOGIN_PROGRESSIVE_DELAY_MAX_SECONDS" to "2").load()
         }.message!!, "must be at least")
+    }
+
+    @Test
+    fun refreshSessionWindowsAreBoundedAndFailFast() {
+        val configured = loader(
+            "API_PORT" to "8080", "MONGODB_DATABASE" to "c",
+            "REFRESH_ROTATION_GRACE_SECONDS" to "45", "MAX_REFRESH_SESSION_AGE_DAYS" to "120",
+        ).load()
+        assertEquals(45L, configured.refreshRotationGraceSeconds)
+        assertEquals(120L, configured.maximumRefreshSessionAgeDays)
+
+        assertContains(assertFailsWith<ConfigurationException> {
+            loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c", "REFRESH_ROTATION_GRACE_SECONDS" to "0").load()
+        }.message!!, "REFRESH_ROTATION_GRACE_SECONDS")
+        assertContains(assertFailsWith<ConfigurationException> {
+            loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c", "MAX_REFRESH_SESSION_AGE_DAYS" to "bad").load()
+        }.message!!, "MAX_REFRESH_SESSION_AGE_DAYS")
     }
 
     @Test

@@ -50,6 +50,7 @@ fun Route.authRoutes(
     val registrationLimiter = LoginAttemptLimiter()
     val registrationAddressLimiter = LoginAttemptLimiter(maxAttempts = 20)
     val verificationLimiter = LoginAttemptLimiter(maxAttempts = 8)
+    val refreshLogoutLimiter = LoginAttemptLimiter(maxAttempts = 30, window = java.time.Duration.ofMinutes(5))
     val loginLimiter = loginAttemptLimiter ?: LoginAttemptLimiter(
         progressiveDelayBase = java.time.Duration.ofSeconds(settings.loginProgressiveDelayBaseSeconds),
         progressiveDelayMaximum = java.time.Duration.ofSeconds(settings.loginProgressiveDelayMaxSeconds),
@@ -58,7 +59,11 @@ fun Route.authRoutes(
     route("/auth") {
         post("/login") {
             val service = tokenService?.let {
-                AuthService(identityProvider, it, sessions, accounts = accounts, institutions = institutions, verification = verification)
+                AuthService(
+                    identityProvider, it, sessions, accounts = accounts, institutions = institutions, verification = verification,
+                    refreshRotationGrace = java.time.Duration.ofSeconds(settings.refreshRotationGraceSeconds),
+                    maximumRefreshSessionAge = java.time.Duration.ofDays(settings.maximumRefreshSessionAgeDays),
+                )
             }
                 ?: throw ApiException.DependencyUnavailable(
                     "Authentication is not configured",
@@ -119,8 +124,16 @@ fun Route.authRoutes(
         }
 
         post("/refresh") {
+            refreshLogoutLimiter.acquireAddress(call.clientAddress())?.let { retryAfter ->
+                call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
+                throw ApiException.RateLimited()
+            }
             val service = tokenService?.let {
-                AuthService(identityProvider, it, sessions, accounts = accounts, institutions = institutions, verification = verification)
+                AuthService(
+                    identityProvider, it, sessions, accounts = accounts, institutions = institutions, verification = verification,
+                    refreshRotationGrace = java.time.Duration.ofSeconds(settings.refreshRotationGraceSeconds),
+                    maximumRefreshSessionAge = java.time.Duration.ofDays(settings.maximumRefreshSessionAgeDays),
+                )
             }
                 ?: throw ApiException.DependencyUnavailable("Authentication is not configured")
             val request = runCatching { call.receive<RefreshSessionRequest>() }
@@ -134,8 +147,16 @@ fun Route.authRoutes(
         }
 
         post("/logout") {
+            refreshLogoutLimiter.acquireAddress(call.clientAddress())?.let { retryAfter ->
+                call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
+                throw ApiException.RateLimited()
+            }
             val service = tokenService?.let {
-                AuthService(identityProvider, it, sessions, accounts = accounts, institutions = institutions, verification = verification)
+                AuthService(
+                    identityProvider, it, sessions, accounts = accounts, institutions = institutions, verification = verification,
+                    refreshRotationGrace = java.time.Duration.ofSeconds(settings.refreshRotationGraceSeconds),
+                    maximumRefreshSessionAge = java.time.Duration.ofDays(settings.maximumRefreshSessionAgeDays),
+                )
             }
                 ?: throw ApiException.DependencyUnavailable("Authentication is not configured")
             val request = runCatching { call.receive<RefreshSessionRequest>() }

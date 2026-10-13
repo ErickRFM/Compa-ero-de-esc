@@ -40,6 +40,8 @@ data class ApiSettings(
     val trustedProxy: Boolean = false,
     val loginProgressiveDelayBaseSeconds: Long = 1,
     val loginProgressiveDelayMaxSeconds: Long = 30,
+    val refreshRotationGraceSeconds: Long = 60,
+    val maximumRefreshSessionAgeDays: Long = 90,
     val host: String,
     val port: Int,
     val version: String,
@@ -87,6 +89,8 @@ data class ApiSettings(
             trustedProxy == other.trustedProxy &&
             loginProgressiveDelayBaseSeconds == other.loginProgressiveDelayBaseSeconds &&
             loginProgressiveDelayMaxSeconds == other.loginProgressiveDelayMaxSeconds &&
+            refreshRotationGraceSeconds == other.refreshRotationGraceSeconds &&
+            maximumRefreshSessionAgeDays == other.maximumRefreshSessionAgeDays &&
             host == other.host &&
             port == other.port &&
             version == other.version &&
@@ -112,6 +116,8 @@ data class ApiSettings(
         result = 31 * result + trustedProxy.hashCode()
         result = 31 * result + loginProgressiveDelayBaseSeconds.hashCode()
         result = 31 * result + loginProgressiveDelayMaxSeconds.hashCode()
+        result = 31 * result + refreshRotationGraceSeconds.hashCode()
+        result = 31 * result + maximumRefreshSessionAgeDays.hashCode()
         result = 31 * result + host.hashCode()
         result = 31 * result + port
         result = 31 * result + version.hashCode()
@@ -143,6 +149,8 @@ data class ApiSettings(
             "trustedProxy=$trustedProxy, " +
             "loginProgressiveDelayBaseSeconds=$loginProgressiveDelayBaseSeconds, " +
             "loginProgressiveDelayMaxSeconds=$loginProgressiveDelayMaxSeconds, " +
+            "refreshRotationGraceSeconds=$refreshRotationGraceSeconds, " +
+            "maximumRefreshSessionAgeDays=$maximumRefreshSessionAgeDays, " +
             "host=$host, " +
             "port=$port, " +
             "version=$version, " +
@@ -185,6 +193,13 @@ class SettingsLoader(
         if (loginProgressiveDelayMaxSeconds < loginProgressiveDelayBaseSeconds) {
             throw ConfigurationException("LOGIN_PROGRESSIVE_DELAY_MAX_SECONDS must be at least LOGIN_PROGRESSIVE_DELAY_BASE_SECONDS")
         }
+        fun boundedLong(name: String, default: Long, range: LongRange): Long {
+            val raw = env(name) ?: return default
+            return raw.trim().toLongOrNull()?.takeIf { it in range }
+                ?: throw ConfigurationException("$name must be between ${range.first} and ${range.last}")
+        }
+        val refreshRotationGraceSeconds = boundedLong("REFRESH_ROTATION_GRACE_SECONDS", 60, 1L..300L)
+        val maximumRefreshSessionAgeDays = boundedLong("MAX_REFRESH_SESSION_AGE_DAYS", 90, 1L..3650L)
 
         val host = env("API_HOST")?.trim().orEmpty().ifEmpty { DEFAULT_HOST }
         val portText = env("API_PORT")?.trim()
@@ -254,6 +269,8 @@ class SettingsLoader(
             trustedProxy = trustedProxy,
             loginProgressiveDelayBaseSeconds = loginProgressiveDelayBaseSeconds,
             loginProgressiveDelayMaxSeconds = loginProgressiveDelayMaxSeconds,
+            refreshRotationGraceSeconds = refreshRotationGraceSeconds,
+            maximumRefreshSessionAgeDays = maximumRefreshSessionAgeDays,
             host = host,
             port = portText!!.trim().toInt(),
             version = env("APP_VERSION")?.trim().orEmpty().ifEmpty { UNKNOWN_VERSION },

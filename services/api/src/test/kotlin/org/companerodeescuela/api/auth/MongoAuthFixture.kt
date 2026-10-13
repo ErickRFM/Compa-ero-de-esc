@@ -78,6 +78,7 @@ internal class MongoAuthFixture(var document: Document) {
                 if (expected.isDocument) expected.asDocument().all { (operator, value) ->
                     when (operator) {
                         "$" + "gt" -> actual?.isDateTime == true && actual.asDateTime().value > value.asDateTime().value
+                        "$" + "gte" -> actual?.isDateTime == true && actual.asDateTime().value >= value.asDateTime().value
                         "$" + "ne" -> !equal(actual, value)
                         "$" + "exists" -> (actual != null) == value.asBoolean().value
                         else -> error("Unsupported filter operator: $operator")
@@ -98,7 +99,17 @@ internal class MongoAuthFixture(var document: Document) {
             for ((key, value) in fields) when (operator) {
                 "$" + "set" -> document[key] = value
                 "$" + "inc" -> document[key] = (document[key] as? Number)?.toLong()?.plus((value as Number).toLong()) ?: value
-                "$" + "push" -> document[key] = (document.getList(key, Document::class.java).orEmpty() + value)
+                "$" + "push" -> {
+                    val current = (document[key] as? List<*>)?.filterNotNull().orEmpty()
+                    if (value is Document && value.containsKey("$" + "each")) {
+                        val each = value.getList("$" + "each", String::class.java).orEmpty()
+                        val all = current + each
+                        val slice = value.getInteger("$" + "slice")
+                        document[key] = if (slice != null && slice < 0) all.takeLast(-slice) else all
+                    } else {
+                        document[key] = current + value
+                    }
+                }
                 "$" + "addToSet" -> document[key] = (document.getList(key, String::class.java).orEmpty() + value.toString()).distinct()
                 else -> error("Unsupported update operator: $operator")
             }

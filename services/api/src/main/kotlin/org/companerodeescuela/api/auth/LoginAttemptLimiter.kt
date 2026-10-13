@@ -85,7 +85,7 @@ class LoginAttemptLimiter(
         val addressRetry = acquireAddress(clientAddress)
         val accountAddressRetry = acquire(username, clientAddress)
         val now = clock.instant()
-        val accountKey = key(username, clientAddress)
+        val accountKey = username.trim().lowercase()
         val current = accountFailures[accountKey]
         val attempts = if (current == null || Duration.between(current.startedAt, now) >= window) {
             1
@@ -111,7 +111,7 @@ class LoginAttemptLimiter(
     fun resetLogin(username: String, clientAddress: String) {
         resetAddress(clientAddress)
         reset(username, clientAddress)
-        accountFailures.remove(key(username, clientAddress))
+        accountFailures.remove(username.trim().lowercase())
     }
 
     private fun key(username: String, clientAddress: String): String =

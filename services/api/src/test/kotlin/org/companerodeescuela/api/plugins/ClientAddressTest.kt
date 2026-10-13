@@ -9,7 +9,10 @@ import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
+import org.companerodeescuela.api.auth.LoginAttemptLimiter
 import org.companerodeescuela.api.test.TestFixtures
 
 class ClientAddressTest {
@@ -43,5 +46,9 @@ class ClientAddressTest {
 
         assertEquals("198.51.100.10", first)
         assertEquals("203.0.113.20", second)
+        val limiter = LoginAttemptLimiter(maxAttempts = 1)
+        assertNull(limiter.acquireAddress(first))
+        assertNotNull(limiter.acquireAddress(first))
+        assertNull(limiter.acquireAddress(second))
     }
 }

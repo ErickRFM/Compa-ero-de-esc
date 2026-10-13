@@ -62,7 +62,7 @@ class LoginAttemptLimiterTest {
     }
 
     @Test
-    fun `login failures use a capped progressive delay per client and account`() {
+    fun `login failures use a capped progressive delay per account across client addresses`() {
         val limiter = LoginAttemptLimiter(
             maxAttempts = 20,
             progressiveDelayBase = Duration.ofSeconds(1),
@@ -74,7 +74,8 @@ class LoginAttemptLimiterTest {
         }
 
         assertEquals(listOf(1L, 2L, 4L, 8L, 16L, 30L, 30L), delays)
-        assertEquals(1L, limiter.recordLoginFailure("ana", "10.0.0.2").progressiveDelay.seconds)
+        assertEquals(30L, limiter.recordLoginFailure("ana", "10.0.0.2").progressiveDelay.seconds)
+        assertEquals(1L, limiter.recordLoginFailure("luis", "10.0.0.2").progressiveDelay.seconds)
     }
 
     private class MutableClock(

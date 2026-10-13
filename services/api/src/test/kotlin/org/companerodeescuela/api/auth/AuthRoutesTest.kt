@@ -125,6 +125,34 @@ class AuthRoutesTest {
         assertEquals(HttpStatusCode.OK, valid.status)
     }
 
+    @Test
+    fun `failed attempts from another client cannot lock out a correct login`() = testApplication {
+        val settings = authenticatedSettings().copy(trustedProxy = true)
+        val sessions = InMemoryRefreshSessionRepository()
+        val identity = MockIdentityProvider()
+        application {
+            configurePlugins(settings, refreshSessions = sessions,
+                sessionAuthority = PlatformSessionAuthority(InMemoryPlatformAccountRepository(), identity))
+            routing {
+                authRoutes(settings, identity, loginAttemptLimiter = LoginAttemptLimiter(maxAttempts = 1), sessions = sessions)
+            }
+        }
+
+        val denied = client.post("/auth/login") {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            header("X-Forwarded-For", "198.51.100.10")
+            setBody("""{"username":"ana.lopez","password":"wrong"}""")
+        }
+        assertEquals(HttpStatusCode.Unauthorized, denied.status)
+
+        val valid = client.post("/auth/login") {
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            header("X-Forwarded-For", "203.0.113.20")
+            setBody("""{"username":"ana.lopez","password":"development-only"}""")
+        }
+        assertEquals(HttpStatusCode.OK, valid.status)
+    }
+
     private fun authenticatedSettings(): ApiSettings = TestFixtures.settings().copy(
         jwtSecret = "0123456789abcdef0123456789abcdef".toCharArray(),
     )

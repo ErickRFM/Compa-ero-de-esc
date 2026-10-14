@@ -100,7 +100,9 @@ class MongoAttendanceRepository(
         limit: Int,
     ): List<AttendanceSessionResponse> {
         ensureIndexes()
-        if (courseGroups.isEmpty()) return emptyList()
+        if (courseGroups.isEmpty()) {
+            return emptyList()
+        }
 
         val filters = mutableListOf(
             eq("status", AttendanceSessionStatus.OPEN.name),
@@ -111,10 +113,14 @@ class MongoAttendanceRepository(
             }.toTypedArray()),
         )
         if (unscopedInstitutionalOnly) {
-            filters += ne("identitySource", org.companerodeescuela.shared.contracts.AttendanceIdentitySource.NATIVE.name)
+            filters += ne(
+                "identitySource",
+                org.companerodeescuela.shared.contracts.AttendanceIdentitySource.NATIVE.name,
+            )
             filters += eq("groupId", null)
         }
-        return sessions.find(and(filters))
+        return sessions
+            .find(and(filters))
             .limit(limit.coerceIn(1, MAX_OPEN_SESSION_RESULTS))
             .toList()
             .map { it.toSession() }

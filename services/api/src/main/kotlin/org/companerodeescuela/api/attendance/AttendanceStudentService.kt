@@ -10,6 +10,7 @@ import org.companerodeescuela.api.presence.SchoolPresenceService
 import org.companerodeescuela.api.runCatchingCancellable
 import org.companerodeescuela.shared.contracts.ApiErrorCode
 import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
+import org.companerodeescuela.shared.contracts.AttendanceIdentitySource
 import org.companerodeescuela.shared.contracts.ClassCallConfirmationRequest
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse
@@ -42,26 +43,33 @@ class AttendanceStudentService(
         val now = clock.instant().epochSecond
 
         val institutionId = nativeActor?.institutionId
-        val candidates = repository.findOpenSessions(
-            courseGroups = enrolled,
-            institutionId = institutionId,
-            afterEpochSeconds = now,
-            unscopedInstitutionalOnly = nativeActor == null,
-            limit = MAX_OPEN_SESSION_RESULTS,
-        )
+        val candidates =
+            repository.findOpenSessions(
+                courseGroups = enrolled,
+                institutionId = institutionId,
+                afterEpochSeconds = now,
+                unscopedInstitutionalOnly = nativeActor == null,
+                limit = MAX_OPEN_SESSION_RESULTS,
+            )
         val activeSessions = mutableListOf<AttendanceSessionResponse>()
         for (session in candidates) {
             if (session.closesAtEpochSeconds <= now) continue
             if (nativeActor == null) {
-                if (session.identitySource == org.companerodeescuela.shared.contracts.AttendanceIdentitySource.NATIVE ||
-                    session.institutionId != null || session.groupId != null) continue
+                if (
+                    session.identitySource == AttendanceIdentitySource.NATIVE
+                    || session.institutionId != null
+                    || session.groupId != null
+                ) {
+                    continue
+                }
                 activeSessions += session
                 continue
             }
             if (nativeActor.id != studentId) continue
             try {
-                (nativeProjection ?: throw ApiException.DependencyUnavailable("Native academic authority is unavailable"))
-                    .requireSession(nativeActor, session)
+                val projection =
+                    nativeProjection ?: throw ApiException.DependencyUnavailable("Native academic authority is unavailable")
+                projection.requireSession(nativeActor, session)
                 activeSessions += session
             } catch (_: ApiException.Forbidden) {
                 // A stale or out-of-scope native session is not visible to this student.

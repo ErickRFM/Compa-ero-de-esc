@@ -39,10 +39,17 @@ class PlatformSessionAuthority(
 
     suspend fun currentUser(session: RefreshSession): UserSummary? = try {
         // Validate the persisted snapshot before resolving or replacing live authority.
-        if (!session.user.active || !session.user.accountStatus.permitsSession ||
-            session.user.authRevision < 0 || session.generation < 0) null
-        else cachedUser(session) ?: resolveCurrentUser(session)?.also { liveUser ->
-            cacheUser(session, liveUser)
+        if (
+            !session.user.active
+                || !session.user.accountStatus.permitsSession
+                || session.user.authRevision < 0
+                || session.generation < 0
+        ) {
+            null
+        } else {
+            cachedUser(session) ?: resolveCurrentUser(session)?.also { liveUser ->
+                cacheUser(session, liveUser)
+            }
         }
     } catch (cancelled: CancellationException) {
         throw cancelled
@@ -54,16 +61,21 @@ class PlatformSessionAuthority(
         throw ApiException.DependencyUnavailable("Identity authority is temporarily unavailable")
     }
 
-    private suspend fun resolveCurrentUser(session: RefreshSession): UserSummary? = when (session.identitySource) {
+    private suspend fun resolveCurrentUser(session: RefreshSession): UserSummary? =
+        when (session.identitySource) {
             SessionIdentitySource.LEGACY -> null // Unknown source requires fresh credentials, not inference.
-            SessionIdentitySource.NATIVE -> accounts.findById(session.user.id)?.let {
-                if (it.authRevision != session.user.authRevision) null else it.toUserSummary()
-            }
-            SessionIdentitySource.INSTITUTIONAL -> identityProvider.currentState(session.user.id)?.let {
-                if (it.externalId != session.user.id) null else session.user.copy(roles = it.roles, active = it.active)
-            }
-        }?.takeIf { it.id == session.user.id && it.active && it.accountStatus.permitsSession &&
-            (it.roles.isNotEmpty() || it.accountStatus != AccountStatus.ACTIVE) }
+            SessionIdentitySource.NATIVE ->
+                accounts.findById(session.user.id)?.let {
+                    if (it.authRevision != session.user.authRevision) null else it.toUserSummary()
+                }
+            SessionIdentitySource.INSTITUTIONAL ->
+                identityProvider.currentState(session.user.id)?.let {
+                    if (it.externalId != session.user.id) null else session.user.copy(roles = it.roles, active = it.active)
+                }
+        }?.takeIf {
+            it.id == session.user.id && it.active && it.accountStatus.permitsSession
+                && (it.roles.isNotEmpty() || it.accountStatus != AccountStatus.ACTIVE)
+        }
 
     private fun cachedUser(session: RefreshSession): UserSummary? {
         if (currentUserCacheTtlMillis == 0) return null
@@ -81,7 +93,10 @@ class PlatformSessionAuthority(
         return null
     }
 
-    private fun cacheUser(session: RefreshSession, user: UserSummary) {
+    private fun cacheUser(
+        session: RefreshSession,
+        user: UserSummary,
+    ) {
         if (currentUserCacheTtlMillis == 0) return
         val now = monotonicNanos()
         val entry = CachedUser(

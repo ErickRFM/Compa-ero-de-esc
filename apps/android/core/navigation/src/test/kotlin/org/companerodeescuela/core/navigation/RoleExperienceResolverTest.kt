@@ -6,6 +6,24 @@ import kotlin.test.assertEquals
 
 class RoleExperienceResolverTest {
     @Test
+    fun `guest profile has profile-only navigation`() {
+        val config = RoleExperienceResolver.resolve(setOf(UserRole.GUEST))
+
+        assertEquals(AppExperience.GUEST, config.experience)
+        assertEquals(Destination.Profile, config.startDestination)
+        assertEquals(listOf(TopLevelDestination.Profile), config.topLevelDestinations)
+    }
+
+    @Test
+    fun `workshop participant is routed through the restricted guest experience`() {
+        val config = RoleExperienceResolver.resolve(setOf(UserRole.WORKSHOP_PARTICIPANT))
+
+        assertEquals(AppExperience.GUEST, config.experience)
+        assertEquals(Destination.Profile, config.startDestination)
+        assertEquals(listOf(TopLevelDestination.Profile), config.topLevelDestinations)
+    }
+
+    @Test
     fun `student gets student shell`() {
         val config = RoleExperienceResolver.resolve(setOf(UserRole.STUDENT))
 

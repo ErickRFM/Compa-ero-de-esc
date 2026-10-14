@@ -6,7 +6,7 @@ import java.util.Base64
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 
-class PasswordHasher(
+open class PasswordHasher(
     private val random: SecureRandom = SecureRandom(),
 ) {
     fun hash(password: String): String {
@@ -20,7 +20,7 @@ class PasswordHasher(
         ).joinToString(":")
     }
 
-    fun verify(password: String, encoded: String): Boolean {
+    open fun verify(password: String, encoded: String): Boolean {
         val parts = encoded.split(":")
         if (parts.size != 4 || parts[0] != PREFIX) return false
         val iterations = parts[1].toIntOrNull() ?: return false

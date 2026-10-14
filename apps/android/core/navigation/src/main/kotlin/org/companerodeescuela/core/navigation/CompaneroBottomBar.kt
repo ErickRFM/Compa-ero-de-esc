@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.core.navigation
 
 import androidx.compose.animation.core.animateDpAsState
@@ -17,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Home
@@ -24,26 +27,26 @@ import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavHostController
@@ -66,34 +69,36 @@ fun CompaneroBottomBar(
     modifier: Modifier = Modifier,
     destinations: List<TopLevelDestination> = TopLevelDestination.entries,
 ) {
-    val selectedIndex = destinations.indexOfFirst { topLevel ->
-        currentDestination
-            ?.hierarchy
-            ?.any { it.route == topLevel.destination.route } == true
-    }
+    val selectedIndex =
+        destinations.indexOfFirst { topLevel ->
+            currentDestination
+                ?.hierarchy
+                ?.any { it.route == topLevel.destination.route } == true
+        }
     val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
     val glass = LocalV8GlassEnabled.current
     val largeText = LocalDensity.current.fontScale >= 1.5f
     val itemHeight = if (largeText) 74.dp else 60.dp
 
     Surface(
-        modifier = modifier
-            .navigationBarsPadding()
-            .padding(
-                horizontal = CompaneroSpacing.sm,
-                vertical = CompaneroSpacing.xxs,
-            )
-            .then(if (glass) Modifier.v8GlassSurface(cornerRadius = 28.dp) else Modifier),
+        modifier =
+            modifier
+                .navigationBarsPadding()
+                .padding(
+                    horizontal = CompaneroSpacing.sm,
+                    vertical = CompaneroSpacing.xxs,
+                ).then(if (glass) Modifier.v8GlassSurface(cornerRadius = 28.dp) else Modifier),
         shape = MaterialTheme.shapes.extraLarge,
         color = if (glass) Color.Transparent else V8RedColors.Background,
         tonalElevation = if (glass) 0.dp else CompaneroElevation.raised,
         shadowElevation = if (glass) 0.dp else CompaneroElevation.immersive,
     ) {
         BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(itemHeight + 12.dp)
-                .padding(horizontal = CompaneroSpacing.xxs, vertical = 6.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(itemHeight + 12.dp)
+                    .padding(horizontal = CompaneroSpacing.xxs, vertical = 6.dp),
         ) {
             val itemWidth = maxWidth / destinations.size.coerceAtLeast(1)
 
@@ -101,32 +106,34 @@ fun CompaneroBottomBar(
                 val targetOffset = itemWidth * selectedIndex
                 val pillOffset by animateDpAsState(
                     targetValue = targetOffset,
-                    animationSpec = if (reducedMotion) {
-                        CompaneroMotion.fast()
-                    } else {
-                        CompaneroMotion.snappySpring()
-                    },
+                    animationSpec =
+                        if (reducedMotion) {
+                            CompaneroMotion.fast()
+                        } else {
+                            CompaneroMotion.snappySpring()
+                        },
                     label = "navPillOffset",
                 )
 
                 Box(
-                    modifier = Modifier
-                        .offset(x = pillOffset)
-                        .width(itemWidth)
-                        .height(itemHeight)
-                        .then(
-                            if (glass) {
-                                Modifier.v8GlassSurface(
-                                    cornerRadius = 20.dp,
-                                    emphasized = true,
-                                    elevation = 0.dp,
-                                )
-                            } else {
-                                Modifier
-                                    .clip(MaterialTheme.shapes.extraLarge)
-                                    .background(V8RedColors.DeepCrimson.copy(alpha = 0.30f))
-                            },
-                        ),
+                    modifier =
+                        Modifier
+                            .offset(x = pillOffset)
+                            .width(itemWidth)
+                            .height(itemHeight)
+                            .then(
+                                if (glass) {
+                                    Modifier.v8GlassSurface(
+                                        cornerRadius = 20.dp,
+                                        emphasized = true,
+                                        elevation = 0.dp,
+                                    )
+                                } else {
+                                    Modifier
+                                        .clip(MaterialTheme.shapes.extraLarge)
+                                        .background(V8RedColors.DeepCrimson.copy(alpha = 0.30f))
+                                },
+                            ),
                 )
             }
 
@@ -141,68 +148,76 @@ fun CompaneroBottomBar(
                     )
 
                     Box(
-                        modifier = Modifier
-                            .width(itemWidth)
-                            .height(itemHeight)
-                            .clip(MaterialTheme.shapes.extraLarge)
-                            .semantics(mergeDescendants = true) {
-                                role = Role.Tab
-                                selected = isSelected
-                                contentDescription = topLevel.label
-                            }
-                            .clickable {
-                                navController.navigateToTopLevel(topLevel.destination)
-                            },
+                        modifier =
+                            Modifier
+                                .width(itemWidth)
+                                .height(itemHeight)
+                                .clip(MaterialTheme.shapes.extraLarge)
+                                .semantics(mergeDescendants = true) {
+                                    role = Role.Tab
+                                    selected = isSelected
+                                    contentDescription = topLevel.label
+                                }.clickable {
+                                    navController.navigateToTopLevel(topLevel.destination)
+                                },
                         contentAlignment = Alignment.Center,
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(
-                            modifier = Modifier
-                                .size(if (isQr) 38.dp else 34.dp)
-                                .clip(CircleShape)
-                                .background(if (isQr) V8RedColors.DeepCrimson else Color.Transparent)
-                                .graphicsLayer {
-                                    scaleX = scale
-                                    scaleY = scale
-                                },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = when (topLevel) {
-                                    TopLevelDestination.Home,
-                                    TopLevelDestination.TeacherHome,
-                                    TopLevelDestination.TutorHome,
-                                    TopLevelDestination.CoordinatorHome,
-                                    TopLevelDestination.AdminHome -> Icons.Filled.Home
-                                    TopLevelDestination.Schedule -> Icons.Filled.DateRange
-                                    TopLevelDestination.Classrooms,
-                                    TopLevelDestination.TutorGroups -> Icons.Filled.School
-                                    TopLevelDestination.Channel,
-                                    TopLevelDestination.TutorRequests -> Icons.Filled.Forum
-                                    TopLevelDestination.Attendance -> Icons.Filled.QrCodeScanner
-                                    TopLevelDestination.Profile -> Icons.Filled.PersonOutline
-                                },
-                                contentDescription = null,
-                                modifier = Modifier.size(if (isQr) 24.dp else 22.dp),
-                                tint = when {
-                                    isQr -> Color.White
-                                    isSelected -> V8RedColors.Crimson
-                                    else -> V8RedColors.TextSecondary
-                                },
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .size(if (isQr) 38.dp else 34.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isQr) V8RedColors.DeepCrimson else Color.Transparent)
+                                        .graphicsLayer {
+                                            scaleX = scale
+                                            scaleY = scale
+                                        },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector =
+                                        when (topLevel) {
+                                            TopLevelDestination.Home,
+                                            TopLevelDestination.TeacherHome,
+                                            TopLevelDestination.TutorHome,
+                                            TopLevelDestination.CoordinatorHome,
+                                            TopLevelDestination.AdminHome,
+                                            -> Icons.Filled.Home
+                                            TopLevelDestination.Schedule -> Icons.Filled.DateRange
+                                            TopLevelDestination.Classrooms,
+                                            TopLevelDestination.TutorGroups,
+                                            -> Icons.Filled.School
+                                            TopLevelDestination.Grading -> Icons.Filled.Assessment
+                                            TopLevelDestination.Channel,
+                                            TopLevelDestination.TutorRequests,
+                                            -> Icons.Filled.Forum
+                                            TopLevelDestination.Attendance -> Icons.Filled.QrCodeScanner
+                                            TopLevelDestination.Profile -> Icons.Filled.PersonOutline
+                                        },
+                                    contentDescription = null,
+                                    modifier = Modifier.size(if (isQr) 24.dp else 22.dp),
+                                    tint =
+                                        when {
+                                            isQr -> Color.White
+                                            isSelected -> V8RedColors.Crimson
+                                            else -> V8RedColors.TextSecondary
+                                        },
+                                )
+                            }
+                            Text(
+                                text =
+                                    when (topLevel) {
+                                        TopLevelDestination.AdminHome -> "Admin"
+                                        TopLevelDestination.CoordinatorHome -> "Gestión"
+                                        else -> topLevel.label
+                                    },
+                                fontSize = if (largeText) 11.sp else 10.sp,
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = if (isSelected) V8RedColors.TextPrimary else V8RedColors.TextSecondary,
                             )
-                        }
-                        Text(
-                            text = when (topLevel) {
-                                TopLevelDestination.AdminHome -> "Admin"
-                                TopLevelDestination.CoordinatorHome -> "Gestión"
-                                else -> topLevel.label
-                            },
-                            fontSize = if (largeText) 11.sp else 10.sp,
-                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = if (isSelected) V8RedColors.TextPrimary else V8RedColors.TextSecondary,
-                        )
                         }
                     }
                 }

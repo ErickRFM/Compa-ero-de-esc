@@ -100,6 +100,26 @@ class GradebookServiceTest {
             )
         }
 
+    @Test
+    fun `tutor cannot use the student grade endpoint without student role`() =
+        runTest {
+            val (service, _) = fixture()
+            val tutor =
+                PlatformAccount(
+                    id = "tutor-a",
+                    displayName = "Tutor",
+                    email = "tutor@example.test",
+                    passwordHash = "hash",
+                    roles = setOf(UserRole.TUTOR),
+                    institutionId = "campus-a",
+                    emailVerifiedAt = Instant.parse("2026-10-13T12:00:00Z"),
+                ).toUserSummary()
+
+            assertFailsWith<ApiException.Forbidden> {
+                service.studentView(tutor, "class-a", "Parcial 1")
+            }
+        }
+
     private suspend fun fixture(): Pair<GradebookService, PlatformAccount> {
         val now = Instant.parse("2026-10-13T12:00:00Z")
         val accounts = InMemoryPlatformAccountRepository()

@@ -1,18 +1,16 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela
 
-import android.os.Bundle
 import android.Manifest
 import android.os.Build
+import android.os.Bundle
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import org.companerodeescuela.notifications.PushRegistrationSchedule
-import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.runtime.key
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.SystemBarStyle
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,19 +26,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import org.companerodeescuela.feature.auth.AuthDraftViewModel
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
 import org.companerodeescuela.core.attendance.AttendanceSyncScheduler
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
 import org.companerodeescuela.core.motion.ProvideCompaneroMotionPreferences
@@ -49,37 +48,40 @@ import org.companerodeescuela.core.navigation.CompaneroScaffold
 import org.companerodeescuela.core.navigation.Destination
 import org.companerodeescuela.core.navigation.RoleExperienceResolver
 import org.companerodeescuela.feature.admin.AdminHomeScreen
-import org.companerodeescuela.feature.auth.MfaScreen
-import org.companerodeescuela.feature.auth.StaffApplicationScreen
 import org.companerodeescuela.feature.attendance.AttendanceMode
 import org.companerodeescuela.feature.attendance.AttendanceScreen
 import org.companerodeescuela.feature.attendance.TeacherHomeScreen
-import org.companerodeescuela.feature.auth.LoginScreen
 import org.companerodeescuela.feature.auth.AccountOnboardingScreen
+import org.companerodeescuela.feature.auth.AuthDraftViewModel
+import org.companerodeescuela.feature.auth.LoginScreen
+import org.companerodeescuela.feature.auth.MfaScreen
 import org.companerodeescuela.feature.auth.RegistrationScreen
 import org.companerodeescuela.feature.auth.SessionViewModel
+import org.companerodeescuela.feature.auth.StaffApplicationScreen
 import org.companerodeescuela.feature.channel.ChannelScreen
 import org.companerodeescuela.feature.classroom.ClassroomScreen
 import org.companerodeescuela.feature.coordinator.CoordinatorHomeScreen
 import org.companerodeescuela.feature.designsystem.DesignSystemCatalogScreen
-import org.companerodeescuela.feature.home.HomeScreen
 import org.companerodeescuela.feature.grading.GradebookScreen
-import org.companerodeescuela.shared.contracts.TeacherClassContext
+import org.companerodeescuela.feature.grading.StudentGradesScreen
+import org.companerodeescuela.feature.home.HomeScreen
 import org.companerodeescuela.feature.profile.ActiveExperiencePreferences
 import org.companerodeescuela.feature.profile.ProfileScreen
 import org.companerodeescuela.feature.schedule.ScheduleScreen
-import org.companerodeescuela.feature.tutoring.TutorHomeScreen
-import org.companerodeescuela.feature.tutoring.TutorGroupsScreen
-import org.companerodeescuela.feature.tutoring.TutorRequestsScreen
-import org.companerodeescuela.feature.tutoring.StudentRepresentativesScreen
 import org.companerodeescuela.feature.settings.AppThemeMode
 import org.companerodeescuela.feature.settings.AppearancePreferences
 import org.companerodeescuela.feature.settings.AppearanceSettingsScreen
 import org.companerodeescuela.feature.settings.IntegrationSettingsScreen
+import org.companerodeescuela.feature.tutoring.StudentRepresentativesScreen
+import org.companerodeescuela.feature.tutoring.TutorGroupsScreen
+import org.companerodeescuela.feature.tutoring.TutorHomeScreen
+import org.companerodeescuela.feature.tutoring.TutorRequestsScreen
+import org.companerodeescuela.notifications.PushRegistrationSchedule
+import org.companerodeescuela.shared.contracts.TeacherClassContext
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
-
     @Inject
     lateinit var attendanceSyncScheduler: AttendanceSyncScheduler
 
@@ -95,18 +97,20 @@ class MainActivity : AppCompatActivity() {
         appearancePreferences.applySavedLanguage()
 
         setContent {
-            val notificationsPermissionLauncher = rememberLauncherForActivityResult(
-                ActivityResultContracts.RequestPermission(),
-            ) { granted ->
-                if (granted) PushRegistrationSchedule.enqueue(this@MainActivity)
-            }
+            val notificationsPermissionLauncher =
+                rememberLauncherForActivityResult(
+                    ActivityResultContracts.RequestPermission(),
+                ) { granted ->
+                    if (granted) PushRegistrationSchedule.enqueue(this@MainActivity)
+                }
             val appearance by appearancePreferences.state.collectAsStateWithLifecycle()
             val systemDark = isSystemInDarkTheme()
-            val darkTheme = when (appearance.themeMode) {
-                AppThemeMode.SYSTEM -> systemDark
-                AppThemeMode.LIGHT -> false
-                AppThemeMode.DARK -> true
-            }
+            val darkTheme =
+                when (appearance.themeMode) {
+                    AppThemeMode.SYSTEM -> systemDark
+                    AppThemeMode.LIGHT -> false
+                    AppThemeMode.DARK -> true
+                }
 
             CompaneroTheme(
                 darkTheme = darkTheme,
@@ -124,9 +128,14 @@ class MainActivity : AppCompatActivity() {
                         val authDraft: AuthDraftViewModel = viewModel()
                         val session by sessionViewModel.state.collectAsStateWithLifecycle()
                         SideEffect {
-                            val v8Dark = session.authenticated && session.roles == setOf(org.companerodeescuela.shared.contracts.UserRole.STUDENT)
-                            val style = if (v8Dark || darkTheme) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
-                                else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+                            val v8Dark =
+                                session.authenticated && session.roles == setOf(org.companerodeescuela.shared.contracts.UserRole.STUDENT)
+                            val style =
+                                if (v8Dark || darkTheme) {
+                                    SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                                } else {
+                                    SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+                                }
                             enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
                         }
                         var activatingAccess by rememberSaveable { mutableStateOf(false) }
@@ -138,7 +147,10 @@ class MainActivity : AppCompatActivity() {
                             if (session.authenticated) {
                                 activatingAccess = false
                                 if (session.accountStatus == org.companerodeescuela.shared.contracts.AccountStatus.ACTIVE &&
-                                    org.companerodeescuela.shared.contracts.UserRole.STUDENT in session.roles) attendanceSyncScheduler.schedule()
+                                    org.companerodeescuela.shared.contracts.UserRole.STUDENT in session.roles
+                                ) {
+                                    attendanceSyncScheduler.schedule()
+                                }
                             }
                         }
 
@@ -166,19 +178,29 @@ class MainActivity : AppCompatActivity() {
                                             loginExperienceName = experience.name
                                             sessionViewModel.login(username, password)
                                         },
-                                        onCreateAccount = { loginExperienceName = null; activatingAccess = true; sessionViewModel.loadRegistrationInstitutions() },
+                                        onCreateAccount = {
+                                            loginExperienceName = null
+                                            activatingAccess = true
+                                            sessionViewModel.loadRegistrationInstitutions()
+                                        },
                                     )
                                 }
                             }
                             session.accountStatus != org.companerodeescuela.shared.contracts.AccountStatus.ACTIVE ||
                                 session.roles == setOf(org.companerodeescuela.shared.contracts.UserRole.WORKSHOP_PARTICIPANT) -> {
-                                AccountOnboardingScreen(session, sessionViewModel::verifyEmail, sessionViewModel::resendVerification,
-                                    sessionViewModel::refreshIdentity, sessionViewModel::logout)
+                                AccountOnboardingScreen(
+                                    session,
+                                    sessionViewModel::verifyEmail,
+                                    sessionViewModel::resendVerification,
+                                    sessionViewModel::refreshIdentity,
+                                    sessionViewModel::logout,
+                                )
                             }
                             else -> {
-                                val availableExperiences = remember(session.roles) {
-                                    RoleExperienceResolver.available(session.roles)
-                                }
+                                val availableExperiences =
+                                    remember(session.roles) {
+                                        RoleExperienceResolver.available(session.roles)
+                                    }
                                 val userId = session.userId
                                 var preferredExperience by remember(userId, session.roles) {
                                     mutableStateOf(
@@ -206,7 +228,10 @@ class MainActivity : AppCompatActivity() {
                                 ) {
                                     ExperiencePickerScreen(
                                         experiences = availableExperiences,
-                                        selectionUnavailable = loginExperienceName != null && AppExperience.entries.firstOrNull { it.name == loginExperienceName } !in availableExperiences,
+                                        selectionUnavailable =
+                                            loginExperienceName != null &&
+                                                AppExperience.entries.firstOrNull { it.name == loginExperienceName } !in
+                                                availableExperiences,
                                         onSelect = { selected ->
                                             activeExperiencePreferences.write(userId, selected)
                                             loginExperienceName = null
@@ -214,17 +239,23 @@ class MainActivity : AppCompatActivity() {
                                         },
                                     )
                                 } else {
-                                    val roleConfig = remember(session.roles, preferredExperience) {
-                                        RoleExperienceResolver.resolve(
-                                            roles = session.roles,
-                                            preferredExperience = preferredExperience,
-                                        )
-                                    }
+                                    val roleConfig =
+                                        remember(session.roles, preferredExperience) {
+                                            RoleExperienceResolver.resolve(
+                                                roles = session.roles,
+                                                preferredExperience = preferredExperience,
+                                            )
+                                        }
                                     val navController = key(userId, roleConfig.experience, session.roles) { rememberNavController() }
                                     SideEffect {
-                                        val isDark = roleConfig.startDestination in setOf(Destination.Home, Destination.TeacherHome) || darkTheme
-                                        val style = if (isDark) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
-                                            else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+                                        val isDark =
+                                            roleConfig.startDestination in setOf(Destination.Home, Destination.TeacherHome) || darkTheme
+                                        val style =
+                                            if (isDark) {
+                                                SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                                            } else {
+                                                SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+                                            }
                                         enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
                                     }
 
@@ -352,35 +383,61 @@ class MainActivity : AppCompatActivity() {
                                                 teacherUserId = session.userId,
                                                 onOpenAttendance = { classroom ->
                                                     navController.navigate(Destination.Attendance.route) { launchSingleTop = true }
-                                                    navController.currentBackStackEntry?.savedStateHandle?.set(TeacherClassContext.STATE_KEY, TeacherClassContext.from(classroom))
+                                                    navController.currentBackStackEntry?.savedStateHandle?.set(
+                                                        TeacherClassContext.STATE_KEY,
+                                                        TeacherClassContext.from(classroom),
+                                                    )
                                                 },
                                                 onOpenChannel = { classroom ->
                                                     navController.navigate(Destination.Channel.route) { launchSingleTop = true }
-                                                    navController.currentBackStackEntry?.savedStateHandle?.set(TeacherClassContext.STATE_KEY, classroom?.let(TeacherClassContext::from))
+                                                    navController.currentBackStackEntry?.savedStateHandle?.set(
+                                                        TeacherClassContext.STATE_KEY,
+                                                        classroom?.let(TeacherClassContext::from),
+                                                    )
                                                 },
                                                 onOpenGrading = { classroom ->
                                                     navController.navigate(Destination.Grading.route) { launchSingleTop = true }
-                                                    navController.currentBackStackEntry?.savedStateHandle?.set(TeacherClassContext.STATE_KEY, TeacherClassContext.from(classroom))
+                                                    navController.currentBackStackEntry?.savedStateHandle?.set(
+                                                        TeacherClassContext.STATE_KEY,
+                                                        TeacherClassContext.from(classroom),
+                                                    )
                                                 },
                                             )
                                         }
                                         composable(Destination.Grading.route) { entry ->
-                                            val selection by entry.savedStateHandle.getStateFlow<TeacherClassContext?>(TeacherClassContext.STATE_KEY, null).collectAsStateWithLifecycle()
-                                            GradebookScreen(requestedClassroom = selection)
+                                            val selection by entry.savedStateHandle
+                                                .getStateFlow<TeacherClassContext?>(
+                                                    TeacherClassContext.STATE_KEY,
+                                                    null,
+                                                ).collectAsStateWithLifecycle()
+                                            if (roleConfig.experience == AppExperience.STUDENT) {
+                                                StudentGradesScreen()
+                                            } else {
+                                                GradebookScreen(requestedClassroom = selection)
+                                            }
                                         }
                                         composable(Destination.Channel.route) { entry ->
-                                            val selection by entry.savedStateHandle.getStateFlow<TeacherClassContext?>(TeacherClassContext.STATE_KEY, null).collectAsStateWithLifecycle()
+                                            val selection by entry.savedStateHandle
+                                                .getStateFlow<TeacherClassContext?>(
+                                                    TeacherClassContext.STATE_KEY,
+                                                    null,
+                                                ).collectAsStateWithLifecycle()
                                             ChannelScreen(requestedClassroom = selection)
                                         }
                                         composable(Destination.Attendance.route) { entry ->
-                                            val selection by entry.savedStateHandle.getStateFlow<TeacherClassContext?>(TeacherClassContext.STATE_KEY, null).collectAsStateWithLifecycle()
+                                            val selection by entry.savedStateHandle
+                                                .getStateFlow<TeacherClassContext?>(
+                                                    TeacherClassContext.STATE_KEY,
+                                                    null,
+                                                ).collectAsStateWithLifecycle()
                                             AttendanceScreen(
                                                 requestedClassroom = selection,
-                                                requestedMode = when (roleConfig.experience) {
-                                                    AppExperience.STUDENT -> AttendanceMode.STUDENT
-                                                    AppExperience.TEACHER -> AttendanceMode.TEACHER
-                                                    else -> null
-                                                },
+                                                requestedMode =
+                                                    when (roleConfig.experience) {
+                                                        AppExperience.STUDENT -> AttendanceMode.STUDENT
+                                                        AppExperience.TEACHER -> AttendanceMode.TEACHER
+                                                        else -> null
+                                                    },
                                             )
                                         }
                                         composable(Destination.RoleUnavailable.route) {
@@ -407,18 +464,38 @@ class MainActivity : AppCompatActivity() {
                                                     )
                                                 },
                                                 onSecurity = { navController.navigate(Destination.Mfa.route) },
-                                                onNotifications = if (BuildConfig.FIREBASE_CONFIGURED) {
-                                                    {
-                                                        if (Build.VERSION.SDK_INT >= 33) {
-                                                            notificationsPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                                        } else PushRegistrationSchedule.enqueue(this@MainActivity)
-                                                    }
-                                                } else null,
+                                                onNotifications =
+                                                    if (BuildConfig.FIREBASE_CONFIGURED) {
+                                                        {
+                                                            if (Build.VERSION.SDK_INT >= 33) {
+                                                                notificationsPermissionLauncher.launch(
+                                                                    Manifest.permission.POST_NOTIFICATIONS,
+                                                                )
+                                                            } else {
+                                                                PushRegistrationSchedule.enqueue(this@MainActivity)
+                                                            }
+                                                        }
+                                                    } else {
+                                                        null
+                                                    },
                                                 onTutorRequest = { navController.navigate(Destination.StaffApplication.route) },
-                                                onRepresentatives = if (org.companerodeescuela.shared.contracts.UserRole.STUDENT in session.roles) {
-                                                    { navController.navigate(Destination.RepresentativeInvitations.route) { launchSingleTop = true } }
-                                                } else null,
-                                                onLogout = { loginExperienceName = null; sessionViewModel.logout() },
+                                                onRepresentatives =
+                                                    if (org.companerodeescuela.shared.contracts.UserRole.STUDENT in
+                                                        session.roles
+                                                    ) {
+                                                        {
+                                                            navController.navigate(Destination.RepresentativeInvitations.route) {
+                                                                launchSingleTop =
+                                                                    true
+                                                            }
+                                                        }
+                                                    } else {
+                                                        null
+                                                    },
+                                                onLogout = {
+                                                    loginExperienceName = null
+                                                    sessionViewModel.logout()
+                                                },
                                             )
                                         }
                                         composable(Destination.Mfa.route) {
@@ -444,15 +521,16 @@ class MainActivity : AppCompatActivity() {
                                                 onTextScale = appearancePreferences::setTextScale,
                                                 onReducedMotion = appearancePreferences::setReducedMotion,
                                                 onHighContrast = appearancePreferences::setHighContrast,
-                                                onOpenDebugCatalog = if (BuildConfig.DEBUG) {
-                                                    {
-                                                        navController.navigate(
-                                                            Destination.DesignSystemCatalog.route,
-                                                        )
-                                                    }
-                                                } else {
-                                                    null
-                                                },
+                                                onOpenDebugCatalog =
+                                                    if (BuildConfig.DEBUG) {
+                                                        {
+                                                            navController.navigate(
+                                                                Destination.DesignSystemCatalog.route,
+                                                            )
+                                                        }
+                                                    } else {
+                                                        null
+                                                    },
                                             )
                                         }
                                         if (BuildConfig.DEBUG) {
@@ -471,22 +549,23 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
-
 @androidx.compose.runtime.Composable
 private fun RoleUnavailableScreen(experience: AppExperience) {
-    val title = when (experience) {
-        AppExperience.COORDINATOR -> "Coordinación"
-        AppExperience.ADMIN -> "Administración"
-        AppExperience.SUPER_ADMIN -> "Administración general"
-        AppExperience.UNSUPPORTED -> "Acceso no disponible"
-        AppExperience.STUDENT -> "Estudiante"
-        AppExperience.TEACHER -> "Docente"
-        AppExperience.TUTOR -> "Tutor académico"
-    }
+    val title =
+        when (experience) {
+            AppExperience.COORDINATOR -> "Coordinación"
+            AppExperience.ADMIN -> "Administración"
+            AppExperience.SUPER_ADMIN -> "Administración general"
+            AppExperience.UNSUPPORTED -> "Acceso no disponible"
+            AppExperience.STUDENT -> "Estudiante"
+            AppExperience.TEACHER -> "Docente"
+            AppExperience.TUTOR -> "Tutor académico"
+        }
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.page),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.page),
         verticalArrangement = Arrangement.Center,
     ) {
         org.companerodeescuela.core.designsystem.v8.V8ScreenHeader {
@@ -496,18 +575,18 @@ private fun RoleUnavailableScreen(experience: AppExperience) {
             )
         }
         Text(
-            text = if (experience == AppExperience.UNSUPPORTED) {
-                "Tu cuenta está creada, pero todavía no tiene un rol operativo habilitado."
-            } else {
-                "Tu perfil está activo. Las herramientas para este rol se integrarán en el workspace V6 sin enviarte a pantallas de alumno."
-            },
+            text =
+                if (experience == AppExperience.UNSUPPORTED) {
+                    "Tu cuenta está creada, pero todavía no tiene un rol operativo habilitado."
+                } else {
+                    "Tu perfil está activo. Las herramientas para este rol se integrarán en el workspace V6 sin enviarte a pantallas de alumno."
+                },
             modifier = Modifier.padding(top = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.sm),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
-
 
 @androidx.compose.runtime.Composable
 private fun ExperiencePickerScreen(
@@ -516,9 +595,10 @@ private fun ExperiencePickerScreen(
     onSelect: (AppExperience) -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.page),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.page),
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
@@ -526,20 +606,25 @@ private fun ExperiencePickerScreen(
             style = MaterialTheme.typography.headlineMedium,
         )
         Text(
-            text = stringResource(if (selectionUnavailable) R.string.login_experience_unavailable else R.string.login_experience_picker_description),
-            modifier = Modifier.padding(
-                top = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.xs,
-                bottom = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.md,
-            ),
+            text =
+                stringResource(
+                    if (selectionUnavailable) R.string.login_experience_unavailable else R.string.login_experience_picker_description,
+                ),
+            modifier =
+                Modifier.padding(
+                    top = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.xs,
+                    bottom = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.md,
+                ),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         experiences.forEach { experience ->
             Button(
                 onClick = { onSelect(experience) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.xs),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.xs),
             ) {
                 Text(experienceLabel(experience))
             }
@@ -548,12 +633,15 @@ private fun ExperiencePickerScreen(
 }
 
 @androidx.compose.runtime.Composable
-private fun experienceLabel(experience: AppExperience): String = stringResource(when (experience) {
-    AppExperience.STUDENT -> R.string.login_continue_student
-    AppExperience.TEACHER -> R.string.login_continue_teacher
-    AppExperience.TUTOR -> R.string.login_continue_tutor
-    AppExperience.COORDINATOR -> R.string.login_continue_coordinator
-    AppExperience.ADMIN -> R.string.login_continue_admin
-    AppExperience.SUPER_ADMIN -> R.string.login_continue_super_admin
-    AppExperience.UNSUPPORTED -> R.string.login_continue
-})
+private fun experienceLabel(experience: AppExperience): String =
+    stringResource(
+        when (experience) {
+            AppExperience.STUDENT -> R.string.login_continue_student
+            AppExperience.TEACHER -> R.string.login_continue_teacher
+            AppExperience.TUTOR -> R.string.login_continue_tutor
+            AppExperience.COORDINATOR -> R.string.login_continue_coordinator
+            AppExperience.ADMIN -> R.string.login_continue_admin
+            AppExperience.SUPER_ADMIN -> R.string.login_continue_super_admin
+            AppExperience.UNSUPPORTED -> R.string.login_continue
+        },
+    )

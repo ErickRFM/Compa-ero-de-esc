@@ -46,6 +46,7 @@ enum class TopLevelDestination(
     AdminHome(Destination.AdminHome, "Administración"),
     Schedule(Destination.Schedule, "Horario"),
     Classrooms(Destination.Classrooms, "Clases"),
+    Grading(Destination.Grading, "Calificaciones"),
     Channel(Destination.Channel, "Canal"),
     Attendance(Destination.Attendance, "Asistencia"),
     Profile(Destination.Profile, "Perfil"),

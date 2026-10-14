@@ -1,8 +1,8 @@
 package org.companerodeescuela.core.navigation
 
+import org.companerodeescuela.shared.contracts.UserRole
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import org.companerodeescuela.shared.contracts.UserRole
 
 class RoleExperienceResolverTest {
     @Test
@@ -17,6 +17,7 @@ class RoleExperienceResolverTest {
                 TopLevelDestination.Schedule,
                 TopLevelDestination.Attendance,
                 TopLevelDestination.Classrooms,
+                TopLevelDestination.Grading,
                 TopLevelDestination.Profile,
             ),
             config.topLevelDestinations,
@@ -99,12 +100,13 @@ class RoleExperienceResolverTest {
 
         assertEquals(AppExperience.SUPER_ADMIN, superAdmin.experience)
         assertEquals(Destination.AdminHome, superAdmin.startDestination)
-        val expected = listOf(
-            TopLevelDestination.AdminHome,
-            TopLevelDestination.Schedule,
-            TopLevelDestination.Classrooms,
-            TopLevelDestination.Channel,
-        )
+        val expected =
+            listOf(
+                TopLevelDestination.AdminHome,
+                TopLevelDestination.Schedule,
+                TopLevelDestination.Classrooms,
+                TopLevelDestination.Channel,
+            )
         assertEquals(expected, admin.topLevelDestinations)
         assertEquals(expected, superAdmin.topLevelDestinations)
     }
@@ -119,19 +121,21 @@ class RoleExperienceResolverTest {
         )
         assertEquals(
             AppExperience.TEACHER,
-            RoleExperienceResolver.resolve(
-                roles,
-                preferredExperience = AppExperience.TEACHER,
-            ).experience,
+            RoleExperienceResolver
+                .resolve(
+                    roles,
+                    preferredExperience = AppExperience.TEACHER,
+                ).experience,
         )
     }
 
     @Test
     fun `ungranted preferred experience is ignored`() {
-        val config = RoleExperienceResolver.resolve(
-            roles = setOf(UserRole.STUDENT),
-            preferredExperience = AppExperience.ADMIN,
-        )
+        val config =
+            RoleExperienceResolver.resolve(
+                roles = setOf(UserRole.STUDENT),
+                preferredExperience = AppExperience.ADMIN,
+            )
 
         assertEquals(AppExperience.STUDENT, config.experience)
     }

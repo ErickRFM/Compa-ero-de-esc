@@ -123,9 +123,9 @@ class RoleExperienceResolverTest {
             AppExperience.TEACHER,
             RoleExperienceResolver
                 .resolve(
-                roles,
-                preferredExperience = AppExperience.TEACHER,
-            ).experience,
+                    roles,
+                    preferredExperience = AppExperience.TEACHER,
+                ).experience,
         )
     }
 

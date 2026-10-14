@@ -79,6 +79,43 @@ class AttendanceRepositoryTest {
         assertEquals(1L, repository.recordQrNonceUse("session-1", "nonce", "student-c", 200, 100))
     }
 
+    @Test
+    fun `open attendance query filters by enrollment pairs and institution`() = runTest {
+        val repository = InMemoryAttendanceRepository()
+        val enrolled = session("s-enrolled").copy(
+            occurrenceId = "occ-enrolled",
+            courseId = "math",
+            groupName = "9A",
+            institutionId = "school-a",
+        )
+        val otherGroup = session("s-group").copy(
+            occurrenceId = "occ-group",
+            courseId = "math",
+            groupName = "9B",
+            institutionId = "school-a",
+        )
+        val otherInstitution = session("s-school").copy(
+            occurrenceId = "occ-school",
+            courseId = "math",
+            groupName = "9A",
+            institutionId = "school-b",
+        )
+        repository.createSession(enrolled)
+        repository.createSession(otherGroup)
+        repository.createSession(otherInstitution)
+
+        assertEquals(
+            listOf(enrolled),
+            repository.findOpenSessions(
+                setOf("math" to "9A"),
+                institutionId = "school-a",
+                afterEpochSeconds = 1,
+                unscopedInstitutionalOnly = true,
+                limit = 100,
+            ),
+        )
+    }
+
     private fun session(id: String) = AttendanceSessionResponse(
         id = id,
         occurrenceId = "occ-1",

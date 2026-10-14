@@ -18,18 +18,23 @@ import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.GradeSyncCapability
 import org.companerodeescuela.shared.contracts.GradeSyncRequest
+import org.companerodeescuela.shared.contracts.GradebookDraftRequest
+import org.companerodeescuela.shared.contracts.GradebookPublishRequest
 import org.companerodeescuela.shared.contracts.UserRole
 
 fun Route.gradingRoutes(
     settings: ApiSettings,
     syncGateway: GradeSyncGateway,
     syncAuthorization: ClassroomGradeSyncAuthorization,
+    gradebookService: GradebookService,
 ) {
     route("/grading") {
         if (!settings.hasAuthentication) {
             post("/sync") {
                 throw ApiException.DependencyUnavailable("Authentication is not configured")
             }
+            post("/draft") { throw ApiException.DependencyUnavailable("Authentication is not configured") }
+            post("/publish") { throw ApiException.DependencyUnavailable("Authentication is not configured") }
             return@route
         }
 
@@ -78,6 +83,54 @@ fun Route.gradingRoutes(
                         requestId = call.requestId(),
                     ),
                 )
+            }
+            post("/draft") {
+                val principal = call.requirePlatformPrincipal()
+                principal.requireRole(UserRole.TEACHER)
+                val request = call.boundedBody(GradebookDraftRequest.serializer())
+                call.respond(
+                    ApiResponse(
+                        data = gradebookService.saveDraft(call.requireActor(tokenService), request),
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
+            post("/publish") {
+                val principal = call.requirePlatformPrincipal()
+                principal.requireRole(UserRole.TEACHER)
+                val request = call.boundedBody(GradebookPublishRequest.serializer())
+                if (request.expectedRevision < 1) throw ApiException.Validation("expectedRevision must be positive")
+                call.respond(
+                    ApiResponse(
+                        data =
+                            gradebookService.publish(
+                                call.requireActor(tokenService),
+                                request.classroomId,
+                                request.gradingPeriod,
+                                request.expectedRevision,
+                            ),
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
+            get("/classrooms/{classroomId}") {
+                val principal = call.requirePlatformPrincipal()
+                principal.requireRole(UserRole.TEACHER)
+                val classroomId = call.parameters["classroomId"] ?: throw ApiException.Validation("classroomId is required")
+                val period =
+                    call.request.queryParameters["gradingPeriod"]
+                        ?: throw ApiException.Validation("gradingPeriod is required")
+                call.respond(
+                    ApiResponse(gradebookService.teacherView(call.requireActor(tokenService), classroomId, period), call.requestId()),
+                )
+            }
+            get("/students/{classroomId}") {
+                val actor = call.requireActor(tokenService)
+                val classroomId = call.parameters["classroomId"] ?: throw ApiException.Validation("classroomId is required")
+                val period =
+                    call.request.queryParameters["gradingPeriod"]
+                        ?: throw ApiException.Validation("gradingPeriod is required")
+                call.respond(ApiResponse(gradebookService.studentView(actor, classroomId, period), call.requestId()))
             }
         }
     }

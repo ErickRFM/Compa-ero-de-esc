@@ -1,12 +1,13 @@
 package org.companerodeescuela.feature.grading
 
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
 import io.ktor.client.HttpClient
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.network.SessionRefreshCoordinator
 import org.companerodeescuela.core.network.apiCall
@@ -16,6 +17,9 @@ import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.GradeSyncCapability
 import org.companerodeescuela.shared.contracts.GradeSyncRequest
 import org.companerodeescuela.shared.contracts.GradeSyncResult
+import org.companerodeescuela.shared.contracts.GradebookDraftRequest
+import org.companerodeescuela.shared.contracts.GradebookPublishRequest
+import org.companerodeescuela.shared.contracts.GradebookSnapshot
 
 class GradebookRepository(
     private val client: HttpClient,
@@ -26,7 +30,8 @@ class GradebookRepository(
     suspend fun capability(): Outcome<GradeSyncCapability> =
         authorized { token ->
             apiCall {
-                client.get("grading/capability") { bearerAuth(token) }
+                client
+                    .get("grading/capability") { bearerAuth(token) }
                     .requireBody<ApiResponse<GradeSyncCapability>>()
             }.map { it.data }
         }
@@ -34,19 +39,59 @@ class GradebookRepository(
     suspend fun sync(request: GradeSyncRequest): Outcome<GradeSyncResult> =
         authorized { token ->
             apiCall {
-                client.post("grading/sync") {
-                    bearerAuth(token)
-                    contentType(ContentType.Application.Json)
-                    setBody(request)
-                }.requireBody<ApiResponse<GradeSyncResult>>()
+                client
+                    .post("grading/sync") {
+                        bearerAuth(token)
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }.requireBody<ApiResponse<GradeSyncResult>>()
+            }.map { it.data }
+        }
+
+    suspend fun gradebook(
+        classroomId: String,
+        gradingPeriod: String,
+    ): Outcome<GradebookSnapshot?> =
+        authorized { token ->
+            apiCall {
+                client
+                    .get("grading/classrooms/$classroomId") {
+                        bearerAuth(token)
+                        parameter("gradingPeriod", gradingPeriod)
+                    }.requireBody<ApiResponse<GradebookSnapshot?>>()
+            }.map { it.data }
+        }
+
+    suspend fun saveDraft(request: GradebookDraftRequest): Outcome<GradebookSnapshot> =
+        authorized { token ->
+            apiCall {
+                client
+                    .post("grading/draft") {
+                        bearerAuth(token)
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }.requireBody<ApiResponse<GradebookSnapshot>>()
+            }.map { it.data }
+        }
+
+    suspend fun publish(request: GradebookPublishRequest): Outcome<GradebookSnapshot> =
+        authorized { token ->
+            apiCall {
+                client
+                    .post("grading/publish") {
+                        bearerAuth(token)
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }.requireBody<ApiResponse<GradebookSnapshot>>()
             }.map { it.data }
         }
 
     private suspend fun <T> authorized(block: suspend (String) -> Outcome<T>): Outcome<T> {
-        val token = when (val result = refreshCoordinator.currentAccessToken()) {
-            is Outcome.Success -> result.value
-            is Outcome.Failure -> return result
-        }
+        val token =
+            when (val result = refreshCoordinator.currentAccessToken()) {
+                is Outcome.Success -> result.value
+                is Outcome.Failure -> return result
+            }
         return refreshCoordinator.execute(token, block)
     }
 }

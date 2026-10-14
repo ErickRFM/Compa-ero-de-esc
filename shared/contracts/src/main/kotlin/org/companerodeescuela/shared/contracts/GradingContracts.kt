@@ -48,3 +48,66 @@ data class GradeSyncResult(
     val rejectedStudentIds: List<String> = emptyList(),
     val providerReference: String? = null,
 )
+
+@Serializable
+enum class GradebookStatus {
+    @SerialName("draft")
+    DRAFT,
+
+    @SerialName("published")
+    PUBLISHED,
+}
+
+@Serializable
+data class GradebookCategory(
+    val id: String,
+    val name: String,
+    val weightPercent: Double,
+)
+
+@Serializable
+data class GradebookRow(
+    val studentId: String,
+    val scores: Map<String, Double?>,
+)
+
+@Serializable
+data class GradebookDraftRequest(
+    val classroomId: String,
+    val gradingPeriod: String,
+    val expectedRevision: Long? = null,
+    val categories: List<GradebookCategory>,
+    val rows: List<GradebookRow>,
+)
+
+@Serializable
+data class GradebookRevision(
+    val revision: Long,
+    val status: GradebookStatus,
+    val changedBy: String,
+    val changedAtEpochSeconds: Long,
+    val categories: List<GradebookCategory> = emptyList(),
+    val rows: List<GradebookRow> = emptyList(),
+)
+
+@Serializable
+data class GradebookSnapshot(
+    val classroomId: String,
+    val academicPeriodId: String,
+    val gradingPeriod: String,
+    val teacherId: String,
+    val revision: Long,
+    val status: GradebookStatus,
+    val categories: List<GradebookCategory>,
+    val rows: List<GradebookRow>,
+    val updatedAtEpochSeconds: Long,
+    val publishedAtEpochSeconds: Long? = null,
+    val history: List<GradebookRevision> = emptyList(),
+)
+
+@Serializable
+data class GradebookPublishRequest(
+    val classroomId: String,
+    val gradingPeriod: String,
+    val expectedRevision: Long,
+)

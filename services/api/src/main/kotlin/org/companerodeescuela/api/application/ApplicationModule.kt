@@ -99,6 +99,7 @@ fun Application.module(
             accounts = identityGraph.accounts,
             mfa = identityGraph.mfa,
         )
+    val gradingGraph = buildGradingFeatureGraph(settings, mongoConnection, classroomGraph.classroomService)
     val scheduleManagement =
         org.companerodeescuela.api.academic.AcademicScheduleManagementService(
             academicGraph.scheduleOverrides,
@@ -220,6 +221,7 @@ fun Application.module(
             settings = settings,
             syncGateway = UnavailableGradeSyncGateway,
             syncAuthorization = ClassroomGradeSyncAuthorization(classroomGraph.classroomService),
+            gradebookService = gradingGraph.gradebookService,
         )
     }
 }

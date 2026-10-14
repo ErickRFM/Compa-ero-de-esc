@@ -79,6 +79,14 @@ class MongoPlatformAccountRepository(
         }
     }
 
+    override suspend fun updatePasswordHash(accountId: String, expectedHash: String, newHash: String): Boolean {
+        ensureIndexes()
+        return accounts.updateOne(
+            and(eq("_id", accountId), eq("passwordHash", expectedHash)),
+            Updates.set("passwordHash", newHash),
+        ).matchedCount > 0
+    }
+
     override suspend fun issueEmailVerification(accountId: String, expectedRevision: Long, hash: String, now: Instant, expiresAt: Instant): Boolean {
         val current = findById(accountId) ?: return false
         val updated = current.withEmailChallenge(expectedRevision, hash, now, expiresAt) ?: return false

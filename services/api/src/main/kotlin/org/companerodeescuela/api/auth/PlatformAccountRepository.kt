@@ -46,6 +46,7 @@ interface PlatformAccountRepository {
     suspend fun findByIdentifier(identifier: String): PlatformAccount?
     suspend fun findById(id: String): PlatformAccount?
     suspend fun create(account: PlatformAccount): Boolean
+    suspend fun updatePasswordHash(accountId: String, expectedHash: String, newHash: String): Boolean = false
     suspend fun listAccounts(): List<PlatformAccount> = emptyList()
     suspend fun submitStaffApplication(accountId:String, expectedRevision:Long, application:org.companerodeescuela.shared.contracts.StaffApplication):PlatformAccount? = null
 
@@ -81,6 +82,13 @@ class InMemoryPlatformAccountRepository : PlatformAccountRepository {
         val normalized = account.email.trim().lowercase()
         if (account.id in accounts || accounts.values.any { it.email == normalized }) return@withLock false
         accounts[account.id] = account.copy(email = normalized, roles = account.roles.toSet())
+        true
+    }
+
+    override suspend fun updatePasswordHash(accountId: String, expectedHash: String, newHash: String): Boolean = mutex.withLock {
+        val current = accounts[accountId] ?: return@withLock false
+        if (current.passwordHash != expectedHash) return@withLock false
+        accounts[accountId] = current.copy(passwordHash = newHash)
         true
     }
 

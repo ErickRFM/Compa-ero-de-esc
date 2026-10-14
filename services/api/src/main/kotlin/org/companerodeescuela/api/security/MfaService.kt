@@ -82,8 +82,8 @@ class MfaService(private val accounts: PlatformAccountRepository,private val rep
         if(it.emailVerifiedAt==null || it.emailVerifiedAt>clock.instant() || it.accountStatus !in setOf(AccountStatus.ACTIVE,AccountStatus.PENDING_APPROVAL)) throw ApiException.Forbidden("Verified email is required")
     }
     private fun configuredCipher():MfaSecretCipher=cipher ?: throw ApiException.DependencyUnavailable("MFA encryption is not configured")
-    private fun reauthenticate(actor:PlatformAccount,password:String) {
-        if(password.length !in 8..256 || password.any(Char::isISOControl) || !hasher.verify(password,actor.passwordHash)) throw ApiException.Forbidden("Reauthentication is required")
+    private suspend fun reauthenticate(actor:PlatformAccount,password:String) {
+        if(password.length !in 8..256 || password.any(Char::isISOControl) || !hasher.verifyAsync(password,actor.passwordHash)) throw ApiException.Forbidden("Reauthentication is required")
     }
     private fun permitsIntent(actor:PlatformAccount,action:StepUpAction):Boolean {
         if(action==StepUpAction.PRIVILEGED_INVITE_ACCEPT) return true

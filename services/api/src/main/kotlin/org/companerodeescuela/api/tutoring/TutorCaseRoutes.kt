@@ -1,8 +1,9 @@
 package org.companerodeescuela.api.tutoring
 
+import org.companerodeescuela.api.auth.boundedBody
+
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
-import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -35,7 +36,7 @@ fun Route.tutorCaseRoutes(settings: ApiSettings, service: TutorCaseService) {
             }
             post {
                 val actor = call.requireNativeActor(tokens)
-                val request = call.receive<CreateTutorCaseRequest>()
+                val request = call.boundedBody(CreateTutorCaseRequest.serializer())
                 call.respond(HttpStatusCode.Created,
                     ApiResponse(data = service.create(actor, request), requestId = call.requestId()))
             }
@@ -47,7 +48,7 @@ fun Route.tutorCaseRoutes(settings: ApiSettings, service: TutorCaseService) {
             post("/{caseId}/notes") {
                 val actor = call.requireNativeActor(tokens)
                 val caseId = call.parameters["caseId"] ?: throw ApiException.Validation("caseId is required")
-                val request = call.receive<AddTutorCaseNoteRequest>()
+                val request = call.boundedBody(AddTutorCaseNoteRequest.serializer())
                 call.respond(HttpStatusCode.Created,
                     ApiResponse(data = service.addNote(actor, caseId, request), requestId = call.requestId()))
             }

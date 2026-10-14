@@ -97,6 +97,9 @@ class AuthService(
         createSession(verification.verify(userId, token).toUserSummary(), SessionIdentitySource.NATIVE)
 
     suspend fun login(request: LoginRequest): LoginResponse {
+        if (request.username.length > 128 || request.username.any(Char::isISOControl)) {
+            throw ApiException.Validation("Username must be at most 128 characters and contain no control characters")
+        }
         val username = request.username.trim()
         if (username.isBlank()) {
             throw ApiException.Validation("Username is required")

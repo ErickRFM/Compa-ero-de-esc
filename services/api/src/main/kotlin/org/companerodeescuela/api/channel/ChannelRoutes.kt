@@ -1,7 +1,8 @@
 package org.companerodeescuela.api.channel
 
+import org.companerodeescuela.api.auth.boundedBody
+
 import io.ktor.server.auth.authenticate
-import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
@@ -76,7 +77,7 @@ fun Route.channelRoutes(
                             roles = principal.platformRoles(),
                             actor=call.requireActor(tokens),identitySource=call.verifiedSessionSource(),
                             channelId = channelId,
-                            request = call.receive<CreateChannelPostRequest>(),
+                            request = call.boundedBody(CreateChannelPostRequest.serializer()),
                         ),
                         requestId = call.requestId(),
                     ),
@@ -95,7 +96,7 @@ fun Route.channelRoutes(
                             actor=call.requireActor(tokens),identitySource=call.verifiedSessionSource(),
                             channelId = channelId,
                             postId = postId,
-                            request = call.receive<UpdateChannelPostRequest>(),
+                            request = call.boundedBody(UpdateChannelPostRequest.serializer()),
                         ),
                         requestId = call.requestId(),
                     ),
@@ -132,7 +133,7 @@ fun Route.channelRoutes(
                             actor=call.requireActor(tokens),identitySource=call.verifiedSessionSource(),
                             channelId = channelId,
                             postId = postId,
-                            request = call.receive<ChannelAcknowledgementRequest>(),
+                            request = call.boundedBody(ChannelAcknowledgementRequest.serializer()),
                         ),
                         requestId = call.requestId(),
                     ),

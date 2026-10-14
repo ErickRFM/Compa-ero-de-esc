@@ -1,7 +1,8 @@
 package org.companerodeescuela.api.grading
 
+import org.companerodeescuela.api.auth.boundedBody
+
 import io.ktor.server.auth.authenticate
-import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -45,7 +46,7 @@ fun Route.gradingRoutes(
             post("/sync") {
                 val principal = call.requirePlatformPrincipal()
                 principal.requireRole(UserRole.TEACHER)
-                val request = call.receive<GradeSyncRequest>()
+                val request = call.boundedBody(GradeSyncRequest.serializer())
                 if (request.classroomId.isBlank()) throw ApiException.Validation("classroomId is required")
                 if (request.gradingPeriod.isBlank()) throw ApiException.Validation("gradingPeriod is required")
                 if (request.rows.isEmpty()) throw ApiException.Validation("At least one grade is required")

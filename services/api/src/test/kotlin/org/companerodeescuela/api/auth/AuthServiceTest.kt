@@ -67,6 +67,18 @@ class AuthServiceTest {
     }
 
     @Test
+    fun `login rejects oversized and control character usernames`() = runTest {
+        val service = service()
+
+        assertFailsWith<ApiException.Validation> {
+            service.login(LoginRequest("u".repeat(10_000), "password"))
+        }
+        assertFailsWith<ApiException.Validation> {
+            service.login(LoginRequest("ana\nlopez", "password"))
+        }
+    }
+
+    @Test
     fun `login stores only hash of opaque refresh token and refresh rotates it`() = runTest {
         val sessions = InMemoryRefreshSessionRepository()
         val service = service(sessions = sessions)

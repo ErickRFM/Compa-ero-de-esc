@@ -60,6 +60,6 @@ fun Route.mfaRoutes(settings:ApiSettings,identity:IdentityProvider,sessions:Refr
     }
 }
 private suspend fun <T> ApplicationCall.mfaRequest(serializer:DeserializationStrategy<T>):T = try {
-    boundedAuthRequest(serializer)
+    boundedBody(serializer, AUTH_BODY_MAX_BYTES)
 } catch(cancelled:CancellationException) { throw cancelled }
 catch(_:Exception) { throw ApiException.Validation("Invalid MFA request") }

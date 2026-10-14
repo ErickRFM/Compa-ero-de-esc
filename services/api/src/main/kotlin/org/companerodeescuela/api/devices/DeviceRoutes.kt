@@ -1,9 +1,10 @@
 package org.companerodeescuela.api.devices
 
+import org.companerodeescuela.api.auth.boundedBody
+
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.auth.authenticate
-import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
@@ -53,7 +54,7 @@ fun Route.deviceRoutes(settings: ApiSettings, repository: DeviceTokenRepository)
         authenticate(AuthTokenService.PROVIDER_NAME) {
             post("/register") {
                 val ownerId = call.deviceOwnerId()
-                val request = call.receive<DeviceRegistrationRequest>()
+                val request = call.boundedBody(DeviceRegistrationRequest.serializer())
                 val sessionId = call.requirePlatformPrincipal().payload.getClaim("session_id")
                     .asString()?.takeIf(String::isNotBlank) ?: throw ApiException.Unauthorized()
                 repository.register(ownerId, request.token, request.platform, request.model, request.deviceId, sessionId)
@@ -61,7 +62,7 @@ fun Route.deviceRoutes(settings: ApiSettings, repository: DeviceTokenRepository)
             }
             delete("/register") {
                 val ownerId = call.deviceOwnerId()
-                val request = call.receive<DeviceRegistrationRequest>()
+                val request = call.boundedBody(DeviceRegistrationRequest.serializer())
                 val removed = repository.unregister(ownerId, request.token)
                 call.respond(ApiResponse(data = removed, requestId = call.requestId()))
             }

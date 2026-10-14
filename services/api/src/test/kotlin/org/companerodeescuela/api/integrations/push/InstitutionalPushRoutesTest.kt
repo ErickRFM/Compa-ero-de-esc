@@ -4,6 +4,7 @@ import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
@@ -44,7 +45,7 @@ class InstitutionalPushRoutesTest {
             val service = InstitutionalPushService(store, Clock.fixed(now, ZoneOffset.UTC))
             application {
                 install(ContentNegotiation) { json(ApiJson) }
-                routing { institutionalPushRoutes(auth, service) }
+                routing { institutionalPushRoutes(auth, service, store) }
             }
             val body =
                 """{"schemaVersion":1,"eventId":"evt-route","entityType":"schedule","externalId":"class-01","sourceVersion":1,"occurredAtEpochSeconds":${now.epochSecond},"operation":"upsert","payload":{"subject":"Math"}}"""
@@ -72,7 +73,7 @@ class InstitutionalPushRoutesTest {
             val auth = InstitutionalPushAuthenticator(store, store, Clock.fixed(now, ZoneOffset.UTC))
             application {
                 install(ContentNegotiation) { json(ApiJson) }
-                routing { institutionalPushRoutes(auth, InstitutionalPushService(store)) }
+                routing { institutionalPushRoutes(auth, InstitutionalPushService(store), store) }
             }
             val response =
                 client.post(InstitutionalPushAuthenticator.EVENTS_PATH) {
@@ -81,6 +82,26 @@ class InstitutionalPushRoutesTest {
                 }
 
             assertEquals(HttpStatusCode.Unauthorized, response.status)
+            assertEquals(0, store.events.size)
+        }
+
+    @Test
+    fun `rate limited client is rejected before reading the request body`() =
+        testApplication {
+            val store = TestPushStore().apply { retryAfterSeconds = 30 }
+            val auth = InstitutionalPushAuthenticator(store, store, Clock.fixed(now, ZoneOffset.UTC))
+            application {
+                install(ContentNegotiation) { json(ApiJson) }
+                routing { institutionalPushRoutes(auth, InstitutionalPushService(store), store) }
+            }
+            val response =
+                client.post(InstitutionalPushAuthenticator.EVENTS_PATH) {
+                    contentType(ContentType.Application.Json)
+                    setBody("not-json")
+                }
+
+            assertEquals(HttpStatusCode.TooManyRequests, response.status)
+            assertEquals("30", response.headers[HttpHeaders.RetryAfter])
             assertEquals(0, store.events.size)
         }
 
@@ -105,10 +126,12 @@ class InstitutionalPushRoutesTest {
     private class TestPushStore :
         IntegrationCredentialRepository,
         IntegrationNonceRepository,
-        InstitutionalEventRepository {
+        InstitutionalEventRepository,
+        InstitutionalPushRateLimiter {
         val credentials = mutableMapOf<String, IntegrationCredential>()
         val nonces = mutableSetOf<Pair<String, String>>()
         val events = mutableMapOf<Pair<String, String>, InstitutionalEventRecord>()
+        var retryAfterSeconds: Long? = null
 
         override suspend fun findCredential(keyId: String): IntegrationCredential? = credentials[keyId]
 
@@ -133,5 +156,7 @@ class InstitutionalPushRoutesTest {
                     InstitutionalEventAcceptance.ACCEPTED
                 }
             }
+
+        override suspend fun acquire(clientAddress: String): Long? = retryAfterSeconds
     }
 }

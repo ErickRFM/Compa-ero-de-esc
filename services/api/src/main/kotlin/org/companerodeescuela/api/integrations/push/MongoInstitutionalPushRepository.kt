@@ -1,19 +1,22 @@
 package org.companerodeescuela.api.integrations.push
 
-import com.mongodb.MongoWriteException
+import com.mongodb.client.model.FindOneAndUpdateOptions
 import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
+import com.mongodb.client.model.ReturnDocument
 import com.mongodb.client.model.ReplaceOptions
 import com.mongodb.client.model.Sorts
+import com.mongodb.client.model.Updates
 import com.mongodb.kotlin.client.coroutine.MongoCollection
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
+import org.bson.Document
+import java.security.MessageDigest
+import java.time.Instant
+import java.util.Date
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import org.bson.Document
-import java.time.Instant
-import java.util.Date
 
 /** Mongo persistence for credentials, replay nonces, and immutable inbound receipts. */
 class MongoInstitutionalPushRepository(
@@ -22,10 +25,12 @@ class MongoInstitutionalPushRepository(
     private val now: () -> Instant = Instant::now,
 ) : IntegrationCredentialRepository,
     IntegrationNonceRepository,
-    InstitutionalEventRepository {
+    InstitutionalEventRepository,
+    InstitutionalPushRateLimiter {
     private val credentials: MongoCollection<Document> = database.getCollection(CREDENTIALS_COLLECTION)
     private val nonces: MongoCollection<Document> = database.getCollection(NONCES_COLLECTION)
     private val events: MongoCollection<Document> = database.getCollection(EVENTS_COLLECTION)
+    private val rateLimits: MongoCollection<Document> = database.getCollection(RATE_LIMITS_COLLECTION)
     private val indexMutex = kotlinx.coroutines.sync.Mutex()
 
     @Volatile private var indexesReady = false
@@ -62,9 +67,41 @@ class MongoInstitutionalPushRepository(
                     .append("expiresAt", Date.from(expiresAt)),
             )
             true
-        } catch (error: MongoWriteException) {
+        } catch (error: com.mongodb.MongoWriteException) {
             if (error.error.code == DUPLICATE_KEY_CODE) false else throw error
         }
+    }
+
+    override suspend fun acquire(clientAddress: String): Long? {
+        ensureIndexes()
+        val current = now()
+        val windowStart = current.epochSecond / RATE_LIMIT_WINDOW_SECONDS * RATE_LIMIT_WINDOW_SECONDS
+        val bucketId = "${sha256(clientAddress)}:$windowStart"
+        val expiresAt = Date.from(Instant.ofEpochSecond(windowStart + RATE_LIMIT_RETENTION_SECONDS))
+        val filter = Document("_id", bucketId)
+        val update =
+            Updates.combine(
+                Updates.inc("count", 1),
+                Updates.setOnInsert("expiresAt", expiresAt),
+            )
+        val updated =
+            try {
+                rateLimits.findOneAndUpdate(
+                    filter,
+                    update,
+                    FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER),
+                )
+            } catch (error: com.mongodb.MongoWriteException) {
+                if (error.error.code != DUPLICATE_KEY_CODE) throw error
+                rateLimits.findOneAndUpdate(
+                    filter,
+                    update,
+                    FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
+                ) ?: throw error
+            } ?: return RATE_LIMIT_WINDOW_SECONDS
+        val count = updated.getInteger("count", 0)
+        if (count <= MAX_REQUESTS_PER_WINDOW) return null
+        return (windowStart + RATE_LIMIT_WINDOW_SECONDS - current.epochSecond).coerceAtLeast(1)
     }
 
     override suspend fun accept(record: InstitutionalEventRecord): InstitutionalEventAcceptance {
@@ -115,7 +152,7 @@ class MongoInstitutionalPushRepository(
         return try {
             events.insertOne(document)
             InstitutionalEventAcceptance.ACCEPTED
-        } catch (error: MongoWriteException) {
+        } catch (error: com.mongodb.MongoWriteException) {
             if (error.error.code != DUPLICATE_KEY_CODE) throw error
             val priorById = events.find(eventIdentity).firstOrNull()
             if (priorById != null) {
@@ -186,6 +223,10 @@ class MongoInstitutionalPushRepository(
                 Indexes.ascending("tenantId", "entityType", "externalId", "sourceVersion"),
                 IndexOptions().unique(true),
             )
+            rateLimits.createIndex(
+                Indexes.ascending("expiresAt"),
+                IndexOptions().expireAfter(0L, java.util.concurrent.TimeUnit.SECONDS),
+            )
             indexesReady = true
         }
     }
@@ -194,7 +235,16 @@ class MongoInstitutionalPushRepository(
         const val CREDENTIALS_COLLECTION = "institutional_integration_credentials"
         const val NONCES_COLLECTION = "institutional_integration_nonces"
         const val EVENTS_COLLECTION = "institutional_integration_events"
+        const val RATE_LIMITS_COLLECTION = "institutional_integration_rate_limits"
+        const val MAX_REQUESTS_PER_WINDOW = 120
+        const val RATE_LIMIT_WINDOW_SECONDS = 60L
+        const val RATE_LIMIT_RETENTION_SECONDS = 120L
         const val DUPLICATE_KEY_CODE = 11000
         const val CREDENTIAL_VERSION = 1
+    }
+
+    private fun sha256(value: String): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
+        return digest.joinToString("") { "%02x".format(it) }
     }
 }

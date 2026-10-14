@@ -1,15 +1,18 @@
 package org.companerodeescuela.api.integrations.push
 
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.request.contentType
 import io.ktor.server.request.path
 import io.ktor.server.request.receiveChannel
+import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.utils.io.readAvailable
+import org.companerodeescuela.api.plugins.clientAddress
 import org.companerodeescuela.shared.contracts.InstitutionalPushReceipt
 
 const val INTEGRATION_KEY_ID_HEADER = "X-Integration-Key-Id"
@@ -20,11 +23,18 @@ const val INTEGRATION_SIGNATURE_HEADER = "X-Integration-Signature"
 fun Route.institutionalPushRoutes(
     authenticator: InstitutionalPushAuthenticator?,
     service: InstitutionalPushService?,
+    rateLimiter: InstitutionalPushRateLimiter?,
 ) {
     route("/integration/v1") {
         post("/events") {
-            if (authenticator == null || service == null) {
+            if (authenticator == null || service == null || rateLimiter == null) {
                 call.respond(HttpStatusCode.ServiceUnavailable)
+                return@post
+            }
+            val retryAfterSeconds = rateLimiter.acquire(call.clientAddress())
+            if (retryAfterSeconds != null) {
+                call.response.header(HttpHeaders.RetryAfter, retryAfterSeconds.toString())
+                call.respond(HttpStatusCode.TooManyRequests)
                 return@post
             }
             if (!call.request.contentType().match(ContentType.Application.Json)) {

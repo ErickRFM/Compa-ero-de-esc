@@ -61,6 +61,14 @@ class MongoInstitutionalPushRepositoryTest {
                         }.awaitAll()
                 }
             assertEquals(1, accepted.count { it })
+            val withinRateLimit =
+                coroutineScope {
+                    (1..120)
+                        .map { async { repository.acquire("127.0.0.1") } }
+                        .awaitAll()
+                }
+            assertEquals(0, withinRateLimit.count { it != null })
+            assertTrue(repository.acquire("127.0.0.1") != null)
 
             val event =
                 InstitutionalPushEvent(

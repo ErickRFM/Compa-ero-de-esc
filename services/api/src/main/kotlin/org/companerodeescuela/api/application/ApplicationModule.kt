@@ -204,7 +204,11 @@ fun Application.module(
             administrationService,
         )
         institutionRoutes(identityGraph.institutions)
-        institutionalPushRoutes(institutionalPushAuthenticator, institutionalPushService)
+        institutionalPushRoutes(
+            institutionalPushAuthenticator,
+            institutionalPushService,
+            institutionalPushRepository,
+        )
         academicRoutes(
             settings = settings,
             academicProvider = providerRegistry.academic,

@@ -2,6 +2,7 @@ package org.companerodeescuela.api.auth
 
 import java.time.Instant
 import java.util.Date
+import java.time.Duration
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -39,6 +40,55 @@ class MongoRefreshReplayTest {
         assertNull(repository.rotate("session-1", "unknown", "next", user, now, now.plusSeconds(3600)))
         assertNull(storage.document.getDate("revokedAt"))
         assertEquals("T2", repository.rotate("session-1", "T1", "T2", user, now, now.plusSeconds(3600))?.tokenHash)
+    }
+
+    @Test
+    fun `immediately previous token can rotate again within grace`() = runTest {
+        val session = RefreshSession(
+            "session-1", "T1", user, now.minusSeconds(60), now.plusSeconds(3600), generation = 1,
+            previousTokenHashes = linkedSetOf("T0"), immediatelyPreviousTokenHash = "T0",
+            lastRotatedAt = now.minusSeconds(30), identitySource = SessionIdentitySource.NATIVE,
+        )
+        val storage = MongoAuthFixture(RefreshSessionDocumentCodec.encode(session))
+        val repository = MongoRefreshSessionRepository(storage.database)
+
+        val rotated = repository.rotate("session-1", "T0", "T2", user, now, now.plusSeconds(3600), Duration.ofSeconds(60))
+
+        assertEquals("T2", rotated?.tokenHash)
+        assertEquals("T1", rotated?.immediatelyPreviousTokenHash)
+        assertNull(storage.document.getDate("revokedAt"))
+    }
+
+    @Test
+    fun `immediately previous token outside grace revokes the family`() = runTest {
+        val session = RefreshSession(
+            "session-1", "T1", user, now.minusSeconds(60), now.plusSeconds(3600), generation = 1,
+            previousTokenHashes = linkedSetOf("T0"), immediatelyPreviousTokenHash = "T0",
+            lastRotatedAt = now.minusSeconds(61), identitySource = SessionIdentitySource.NATIVE,
+        )
+        val storage = MongoAuthFixture(RefreshSessionDocumentCodec.encode(session))
+        val repository = MongoRefreshSessionRepository(storage.database)
+
+        assertNull(repository.rotate("session-1", "T0", "T2", user, now, now.plusSeconds(3600), Duration.ofSeconds(60)))
+
+        assertEquals(Date.from(now), storage.document.getDate("revokedAt"))
+    }
+
+    @Test
+    fun `mongo token history is sliced to the newest five hashes`() = runTest {
+        val session = RefreshSession(
+            "session-1", "T8", user, now.minusSeconds(60), now.plusSeconds(3600), generation = 8,
+            previousTokenHashes = linkedSetOf("T3", "T4", "T5", "T6", "T7"),
+            immediatelyPreviousTokenHash = "T7", lastRotatedAt = now.minusSeconds(5),
+            identitySource = SessionIdentitySource.NATIVE,
+        )
+        val storage = MongoAuthFixture(RefreshSessionDocumentCodec.encode(session))
+        val repository = MongoRefreshSessionRepository(storage.database)
+
+        val rotated = repository.rotate("session-1", "T8", "T9", user, now, now.plusSeconds(3600))
+
+        assertEquals(listOf("T4", "T5", "T6", "T7", "T8"), storage.document.getList("previousTokenHashes", String::class.java))
+        assertEquals(5, rotated?.previousTokenHashes?.size)
     }
 
     @Test

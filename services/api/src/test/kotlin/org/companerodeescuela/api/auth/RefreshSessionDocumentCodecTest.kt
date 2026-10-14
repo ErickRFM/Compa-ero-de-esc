@@ -27,6 +27,8 @@ class RefreshSessionDocumentCodecTest {
             generation = 2,
             identitySource = SessionIdentitySource.NATIVE,
             previousTokenHashes = setOf("old-hash-1", "old-hash-2"),
+            immediatelyPreviousTokenHash = "old-hash-2",
+            lastRotatedAt = Instant.parse("2026-10-01T12:00:00Z"),
         )
 
         val document = RefreshSessionDocumentCodec.encode(session)

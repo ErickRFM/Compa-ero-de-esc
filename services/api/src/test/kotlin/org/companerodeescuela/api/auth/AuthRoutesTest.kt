@@ -153,6 +153,28 @@ class AuthRoutesTest {
         assertEquals(HttpStatusCode.OK, valid.status)
     }
 
+    @Test
+    fun `refresh and logout are rate limited by client address`() = testApplication {
+        val settings = authenticatedSettings()
+        val sessions = InMemoryRefreshSessionRepository()
+        val identity = MockIdentityProvider()
+        application {
+            configurePlugins(settings, refreshSessions = sessions,
+                sessionAuthority = PlatformSessionAuthority(InMemoryPlatformAccountRepository(), identity))
+            routing { authRoutes(settings, identity, sessions = sessions) }
+        }
+
+        var lastStatus = HttpStatusCode.OK
+        repeat(31) {
+            lastStatus = client.post("/auth/refresh") {
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                setBody("{}")
+            }.status
+        }
+
+        assertEquals(HttpStatusCode.TooManyRequests, lastStatus)
+    }
+
     private fun authenticatedSettings(): ApiSettings = TestFixtures.settings().copy(
         jwtSecret = "0123456789abcdef0123456789abcdef".toCharArray(),
     )

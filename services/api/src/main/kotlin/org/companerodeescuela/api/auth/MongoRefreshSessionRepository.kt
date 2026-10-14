@@ -3,11 +3,13 @@ package org.companerodeescuela.api.auth
 import com.mongodb.client.model.Filters.and
 import com.mongodb.client.model.Filters.eq
 import com.mongodb.client.model.Filters.gt
+import com.mongodb.client.model.Filters.gte
 import com.mongodb.client.model.Filters.ne
 import com.mongodb.client.model.FindOneAndUpdateOptions
 import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
 import com.mongodb.client.model.ReturnDocument
+import com.mongodb.client.model.PushOptions
 import com.mongodb.client.model.Updates
 import com.mongodb.kotlin.client.coroutine.MongoCollection
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
@@ -50,6 +52,7 @@ class MongoRefreshSessionRepository(
         user: UserSummary,
         now: Instant,
         expiresAt: Instant,
+        rotationGrace: java.time.Duration,
     ): RefreshSession? {
         ensureIndexes()
         val filter = and(
@@ -58,19 +61,37 @@ class MongoRefreshSessionRepository(
             eq("revokedAt", null),
             gt("expiresAt", Date.from(now)),
         )
-        val update = Updates.combine(
-            Updates.set("tokenHash", nextTokenHash),
-            Updates.set("user", RefreshSessionDocumentCodec.encodeUser(user)),
-            Updates.set("lastRotatedAt", Date.from(now)),
-            Updates.set("expiresAt", Date.from(expiresAt)),
-            Updates.addToSet("previousTokenHashes", currentTokenHash),
-            Updates.inc("generation", 1L),
-        )
+        val update = rotationUpdate(currentTokenHash, nextTokenHash, user, now, expiresAt)
         sessions.findOneAndUpdate(
             filter,
             update,
             FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
         )?.let { return RefreshSessionDocumentCodec.decode(it) }
+
+        val cutoff = Date.from(now.minus(rotationGrace))
+        for (attempt in 0 until 3) {
+            val active = sessions.find(and(
+                eq("_id", sessionId),
+                eq("revokedAt", null),
+                gt("expiresAt", Date.from(now)),
+            )).firstOrNull()?.let(RefreshSessionDocumentCodec::decode) ?: return null
+            val withinGrace = active.immediatelyPreviousTokenHash == currentTokenHash &&
+                active.lastRotatedAt?.let { rotatedAt -> !now.isAfter(rotatedAt.plus(rotationGrace)) } == true
+            if (!withinGrace) break
+
+            sessions.findOneAndUpdate(
+                and(
+                    eq("_id", sessionId),
+                    eq("tokenHash", active.tokenHash),
+                    eq("immediatelyPreviousTokenHash", currentTokenHash),
+                    gte("lastRotatedAt", cutoff),
+                    eq("revokedAt", null),
+                    gt("expiresAt", Date.from(now)),
+                ),
+                rotationUpdate(active.tokenHash, nextTokenHash, user, now, expiresAt),
+                FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
+            )?.let { return RefreshSessionDocumentCodec.decode(it) }
+        }
 
         revokeOnReplay(sessionId, currentTokenHash, now)
         return null
@@ -106,6 +127,22 @@ class MongoRefreshSessionRepository(
         )
     }
 
+    private fun rotationUpdate(
+        previousHash: String,
+        nextTokenHash: String,
+        user: UserSummary,
+        now: Instant,
+        expiresAt: Instant,
+    ) = Updates.combine(
+        Updates.set("tokenHash", nextTokenHash),
+        Updates.set("user", RefreshSessionDocumentCodec.encodeUser(user)),
+        Updates.set("lastRotatedAt", Date.from(now)),
+        Updates.set("immediatelyPreviousTokenHash", previousHash),
+        Updates.set("expiresAt", Date.from(expiresAt)),
+        Updates.pushEach("previousTokenHashes", listOf(previousHash), PushOptions().slice(-5)),
+        Updates.inc("generation", 1L),
+    )
+
     private suspend fun ensureIndexes() {
         if (indexesReady) return
         indexMutex.withLock {
@@ -133,6 +170,8 @@ internal object RefreshSessionDocumentCodec {
         .append("generation", session.generation)
         .append("identitySource", session.identitySource.name)
         .append("previousTokenHashes", session.previousTokenHashes.toList())
+        .append("immediatelyPreviousTokenHash", session.immediatelyPreviousTokenHash)
+        .append("lastRotatedAt", session.lastRotatedAt?.let(Date::from))
         .append("revokedAt", session.revokedAt?.let(Date::from))
 
     fun decode(document: Document): RefreshSession {
@@ -149,6 +188,9 @@ internal object RefreshSessionDocumentCodec {
             previousTokenHashes = document.getList("previousTokenHashes", String::class.java)
                 .orEmpty()
                 .toSet(),
+            immediatelyPreviousTokenHash = document.getString("immediatelyPreviousTokenHash")
+                ?: document.getList("previousTokenHashes", String::class.java)?.lastOrNull(),
+            lastRotatedAt = document.getDate("lastRotatedAt")?.toInstant(),
             revokedAt = document.getDate("revokedAt")?.toInstant(),
         )
     }

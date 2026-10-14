@@ -1,6 +1,7 @@
 package org.companerodeescuela.api.auth
 
 import java.time.Instant
+import java.time.Duration
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.companerodeescuela.shared.contracts.UserSummary
@@ -15,6 +16,8 @@ data class RefreshSession(
     val expiresAt: Instant,
     val generation: Long = 0,
     val previousTokenHashes: Set<String> = emptySet(),
+    val immediatelyPreviousTokenHash: String? = null,
+    val lastRotatedAt: Instant? = null,
     val revokedAt: Instant? = null,
     val identitySource: SessionIdentitySource = SessionIdentitySource.LEGACY,
 )
@@ -31,6 +34,7 @@ interface RefreshSessionRepository {
         user: UserSummary,
         now: Instant,
         expiresAt: Instant,
+        rotationGrace: Duration = Duration.ofSeconds(60),
     ): RefreshSession?
 
     suspend fun revoke(sessionId: String, presentedTokenHash: String, now: Instant): Boolean
@@ -58,21 +62,28 @@ class InMemoryRefreshSessionRepository : RefreshSessionRepository {
         user: UserSummary,
         now: Instant,
         expiresAt: Instant,
+        rotationGrace: Duration,
     ): RefreshSession? = mutex.withLock {
         val current = sessions[sessionId] ?: return@withLock null
         if (current.revokedAt != null || current.expiresAt <= now) return@withLock null
-        if (current.tokenHash != currentTokenHash) {
+        val isCurrentToken = current.tokenHash == currentTokenHash
+        val isGraceRetry = current.immediatelyPreviousTokenHash == currentTokenHash &&
+            current.lastRotatedAt?.plus(rotationGrace)?.let { !now.isAfter(it) } == true
+        if (!isCurrentToken && !isGraceRetry) {
             if (currentTokenHash in current.previousTokenHashes) {
                 sessions[sessionId] = current.copy(revokedAt = now)
             }
             return@withLock null
         }
 
+        val previousHashes = (current.previousTokenHashes + current.tokenHash).toList().takeLast(MAX_PREVIOUS_TOKEN_HASHES).toSet()
         current.copy(
             tokenHash = nextTokenHash,
             user = user,
             generation = current.generation + 1,
-            previousTokenHashes = current.previousTokenHashes + currentTokenHash,
+            previousTokenHashes = previousHashes,
+            immediatelyPreviousTokenHash = current.tokenHash,
+            lastRotatedAt = now,
             expiresAt = expiresAt,
         ).also { sessions[sessionId] = it }
     }
@@ -92,5 +103,9 @@ class InMemoryRefreshSessionRepository : RefreshSessionRepository {
         }
         sessions[sessionId] = current.copy(revokedAt = now)
         true
+    }
+
+    private companion object {
+        const val MAX_PREVIOUS_TOKEN_HASHES = 5
     }
 }

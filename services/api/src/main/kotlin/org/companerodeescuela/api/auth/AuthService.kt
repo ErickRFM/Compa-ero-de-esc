@@ -37,7 +37,14 @@ class AuthService(
     private val random: SecureRandom = SecureRandom(),
     private val institutions: InstitutionRepository = InMemoryInstitutionRepository(),
     private val verification: AccountVerificationService = AccountVerificationService(accounts, UnavailableVerificationEmailGateway),
+    private val refreshRotationGrace: Duration = Duration.ofSeconds(60),
+    private val maximumRefreshSessionAge: Duration = Duration.ofDays(90),
 ) {
+    init {
+        require(!refreshRotationGrace.isNegative && !refreshRotationGrace.isZero)
+        require(!maximumRefreshSessionAge.isNegative && !maximumRefreshSessionAge.isZero)
+    }
+
     private val authority = PlatformSessionAuthority(accounts, identityProvider, clock)
     suspend fun register(request: RegisterRequest): LoginResponse {
         val displayName = request.displayName.trim()
@@ -131,19 +138,34 @@ class AuthService(
         }
         val now = clock.instant()
         val session = authenticationDependency { sessions.find(request.sessionId) }
-            ?.takeIf { it.revokedAt == null && it.expiresAt > now }
+            ?.takeIf {
+                it.revokedAt == null && it.expiresAt > now && now.isBefore(it.createdAt.plus(maximumRefreshSessionAge))
+            }
             ?: throw ApiException.Unauthorized()
+
+        val presentedHash = hashRefreshToken(request.refreshToken)
+        val currentHashMatches = MessageDigest.isEqual(
+            session.tokenHash.toByteArray(Charsets.UTF_8),
+            presentedHash.toByteArray(Charsets.UTF_8),
+        )
+        val previousHashInGrace = session.immediatelyPreviousTokenHash == presentedHash &&
+            session.lastRotatedAt?.plus(refreshRotationGrace)?.let { !now.isAfter(it) } == true
+        if (!currentHashMatches && !previousHashInGrace) {
+            authenticationDependency { sessions.revoke(session.id, presentedHash, now) }
+            throw ApiException.Unauthorized()
+        }
 
         val updatedUser = authority.currentUser(session) ?: throw ApiException.Unauthorized()
 
         val nextRefreshToken = newRefreshToken()
         val rotated = authenticationDependency { sessions.rotate(
             sessionId = session.id,
-            currentTokenHash = hashRefreshToken(request.refreshToken),
+            currentTokenHash = presentedHash,
             nextTokenHash = hashRefreshToken(nextRefreshToken),
             user = updatedUser,
             now = now,
-            expiresAt = now.plus(REFRESH_TOKEN_TTL),
+            expiresAt = minOf(now.plus(REFRESH_TOKEN_TTL), session.createdAt.plus(maximumRefreshSessionAge)),
+            rotationGrace = refreshRotationGrace,
         ) } ?: throw ApiException.Unauthorized()
 
         return response(rotated, nextRefreshToken)
@@ -167,7 +189,7 @@ class AuthService(
             tokenHash = hashRefreshToken(refreshToken),
             user = user,
             createdAt = now,
-            expiresAt = now.plus(REFRESH_TOKEN_TTL),
+            expiresAt = minOf(now.plus(REFRESH_TOKEN_TTL), now.plus(maximumRefreshSessionAge)),
             identitySource = source,
         )
         val currentUser = authority.currentUser(pending) ?: throw ApiException.Unauthorized()

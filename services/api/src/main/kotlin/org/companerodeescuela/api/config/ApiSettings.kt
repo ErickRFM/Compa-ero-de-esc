@@ -70,6 +70,8 @@ data class ApiSettings(
     val verificationEmailApiKey: CharArray? = null,
     val verificationEmailSender: String? = null,
     val mfaEncryptionKey: ByteArray? = null,
+    /** Separate AES-256 key for institutional HMAC credential encryption at rest. */
+    val institutionIntegrationEncryptionKey: ByteArray? = null,
     /** Private Firebase service-account JSON, decoded only at boot; never render or log. */
     val firebaseServiceAccountJson: CharArray? = null,
     val lateSyncReviewWindowSeconds: Long = DEFAULT_LATE_SYNC_REVIEW_WINDOW_SECONDS,
@@ -121,6 +123,7 @@ data class ApiSettings(
             attendanceQrNonceReuseThreshold == other.attendanceQrNonceReuseThreshold &&
             hasVerificationEmail == other.hasVerificationEmail && verificationEmailSender == other.verificationEmailSender &&
             (mfaEncryptionKey != null) == (other.mfaEncryptionKey != null) &&
+            (institutionIntegrationEncryptionKey != null) == (other.institutionIntegrationEncryptionKey != null) &&
             hasFirebasePush == other.hasFirebasePush
     }
 
@@ -152,6 +155,7 @@ data class ApiSettings(
         result = 31 * result + hasVerificationEmail.hashCode()
         result = 31 * result + (verificationEmailSender?.hashCode() ?: 0)
         result = 31 * result + (mfaEncryptionKey != null).hashCode()
+        result = 31 * result + (institutionIntegrationEncryptionKey != null).hashCode()
         result = 31 * result + hasFirebasePush.hashCode()
         return result
     }
@@ -181,6 +185,7 @@ data class ApiSettings(
             "attendanceQrNonceReuseThreshold=$attendanceQrNonceReuseThreshold, " +
             "verificationEmailConfigured=$hasVerificationEmail, " +
             "mfaEncryptionConfigured=${mfaEncryptionKey != null}, " +
+            "institutionIntegrationEncryptionConfigured=${institutionIntegrationEncryptionKey != null}, " +
             "firebasePushConfigured=$hasFirebasePush, " +
             "schoolPresenceConfigured=$hasSchoolPresenceVerification" +
             ")"
@@ -304,6 +309,28 @@ class SettingsLoader(
                 throw ConfigurationException("Invalid MFA_ENCRYPTION_KEY; require canonical unpadded base64url of 32 random bytes")
             decoded
         }
+        val institutionIntegrationKey = env("INSTITUTION_INTEGRATION_ENCRYPTION_KEY")?.let { encoded ->
+            val decoded = runCatching { Base64.getUrlDecoder().decode(encoded) }.getOrNull()
+            if (
+                !Regex("[A-Za-z0-9_-]{43}").matches(encoded) ||
+                    decoded?.size != 32 ||
+                    Base64.getUrlEncoder().withoutPadding().encodeToString(decoded) != encoded
+            ) {
+                throw ConfigurationException(
+                    "Invalid INSTITUTION_INTEGRATION_ENCRYPTION_KEY; require canonical unpadded base64url of 32 random bytes",
+                )
+            }
+            decoded
+        }
+        if (
+            mfaKey != null &&
+                institutionIntegrationKey != null &&
+                mfaKey.contentEquals(institutionIntegrationKey)
+        ) {
+            throw ConfigurationException(
+                "INSTITUTION_INTEGRATION_ENCRYPTION_KEY must be different from MFA_ENCRYPTION_KEY",
+            )
+        }
 
         if (jwtSecret != null && attendanceQrSecret != null && jwtSecret == attendanceQrSecret) {
             throw ConfigurationException("ATTENDANCE_QR_SECRET must be different from JWT_SECRET")
@@ -347,6 +374,7 @@ class SettingsLoader(
             verificationEmailApiKey = verificationEmailKey?.toCharArray(),
             verificationEmailSender = verificationEmailSender,
             mfaEncryptionKey = mfaKey,
+            institutionIntegrationEncryptionKey = institutionIntegrationKey,
             firebaseServiceAccountJson = firebaseJson?.toCharArray(),
             lateSyncReviewWindowSeconds = lateSyncReviewWindowSeconds,
             attendanceQrNonceReuseThreshold = attendanceQrNonceReuseThreshold,

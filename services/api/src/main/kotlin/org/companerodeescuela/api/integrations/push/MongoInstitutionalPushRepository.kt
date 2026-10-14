@@ -67,8 +67,8 @@ class MongoInstitutionalPushRepository(
                     .append("expiresAt", Date.from(expiresAt)),
             )
             true
-        } catch (error: com.mongodb.MongoWriteException) {
-            if (error.error.code == DUPLICATE_KEY_CODE) false else throw error
+        } catch (error: com.mongodb.MongoException) {
+            if (error.code == DUPLICATE_KEY_CODE) false else throw error
         }
     }
 
@@ -91,8 +91,8 @@ class MongoInstitutionalPushRepository(
                     update,
                     FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER),
                 )
-            } catch (error: com.mongodb.MongoWriteException) {
-                if (error.error.code != DUPLICATE_KEY_CODE) throw error
+            } catch (error: com.mongodb.MongoException) {
+                if (error.code != DUPLICATE_KEY_CODE) throw error
                 rateLimits.findOneAndUpdate(
                     filter,
                     update,
@@ -152,8 +152,8 @@ class MongoInstitutionalPushRepository(
         return try {
             events.insertOne(document)
             InstitutionalEventAcceptance.ACCEPTED
-        } catch (error: com.mongodb.MongoWriteException) {
-            if (error.error.code != DUPLICATE_KEY_CODE) throw error
+        } catch (error: com.mongodb.MongoException) {
+            if (error.code != DUPLICATE_KEY_CODE) throw error
             val priorById = events.find(eventIdentity).firstOrNull()
             if (priorById != null) {
                 return if (priorById.getString("payloadSha256") == record.payloadSha256) {

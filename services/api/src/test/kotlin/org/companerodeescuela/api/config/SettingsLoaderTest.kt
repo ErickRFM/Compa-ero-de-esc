@@ -12,14 +12,15 @@ import org.junit.jupiter.api.Test
 class SettingsLoaderTest {
 
     private fun loader(vararg values: Pair<String, String>): SettingsLoader {
-        val map = values.toMap()
+        val provided = values.toMap()
+        val map = if ("APP_ENV" in provided) provided else provided + ("APP_ENV" to "local")
         return SettingsLoader(env = { map[it] })
     }
 
     @Test
-    @DisplayName("Local defaults apply when only the port is set")
+    @DisplayName("Local defaults apply when APP_ENV is explicitly local")
     fun loadsWithMinimalEnvironment() {
-        val settings = loader("API_PORT" to "8080", "MONGODB_DATABASE" to "companero").load()
+        val settings = loader("APP_ENV" to "local", "API_PORT" to "8080", "MONGODB_DATABASE" to "companero").load()
 
         assertEquals(Environment.LOCAL, settings.environment)
         assertEquals("0.0.0.0", settings.host)
@@ -53,6 +54,17 @@ class SettingsLoaderTest {
     fun rejectsUnknownEnvironment() {
         val error = assertFailsWith<ConfigurationException> {
             loader("APP_ENV" to "prodution", "API_PORT" to "8080", "MONGODB_DATABASE" to "c").load()
+        }
+        assertContains(error.message!!, "APP_ENV")
+    }
+
+    @Test
+    @DisplayName("A missing APP_ENV is rejected instead of selecting local mode")
+    fun rejectsMissingEnvironment() {
+        val error = assertFailsWith<ConfigurationException> {
+            SettingsLoader(env = { name ->
+                mapOf("API_PORT" to "8080", "MONGODB_DATABASE" to "c")[name]
+            }).load()
         }
         assertContains(error.message!!, "APP_ENV")
     }
@@ -163,10 +175,10 @@ class SettingsLoaderTest {
 class EnvironmentTest {
 
     @Test
-    @DisplayName("Missing APP_ENV defaults to local")
-    fun defaultsToLocal() {
-        assertEquals(Environment.LOCAL, Environment.parse(null))
-        assertEquals(Environment.LOCAL, Environment.parse("  "))
+    @DisplayName("Missing or empty APP_ENV is rejected")
+    fun rejectsMissingEnvironment() {
+        assertFailsWith<ConfigurationException> { Environment.parse(null) }
+        assertFailsWith<ConfigurationException> { Environment.parse("  ") }
     }
 
     @Test

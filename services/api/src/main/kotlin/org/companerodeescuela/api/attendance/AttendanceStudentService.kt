@@ -1,6 +1,5 @@
 package org.companerodeescuela.api.attendance
 
-import org.companerodeescuela.api.runCatchingCancellable
 import io.ktor.http.HttpStatusCode
 import java.time.Clock
 import java.security.MessageDigest
@@ -8,6 +7,7 @@ import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.presence.SchoolPresenceService
+import org.companerodeescuela.api.runCatchingCancellable
 import org.companerodeescuela.shared.contracts.ApiErrorCode
 import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
 import org.companerodeescuela.shared.contracts.ClassCallConfirmationRequest
@@ -322,12 +322,13 @@ class AttendanceStudentService(
                 sessionId = session.id,
                 studentId = studentId,
                 operationId = operationId,
-                requestFingerprint = requestFingerprint(
-                    session.id,
-                    studentId,
-                    request.schoolNetwork,
-                    operationType = "class-call",
-                ),
+                requestFingerprint =
+                    requestFingerprint(
+                        session.id,
+                        studentId,
+                        request.schoolNetwork,
+                        operationType = "class-call",
+                    ),
                 maxAttempts = MAX_ATTEMPTS_PER_STUDENT_SESSION,
             )
         ) {
@@ -452,8 +453,8 @@ class AttendanceStudentService(
         sessionId: String,
         studentId: String,
         request: AttendanceAttemptRequest,
-    ): String {
-        return requestFingerprint(
+    ): String =
+        requestFingerprint(
             sessionId,
             studentId,
             request.schoolNetwork,
@@ -461,7 +462,6 @@ class AttendanceStudentService(
             timestamp = request.deviceTimestampEpochSeconds,
             qrToken = request.qrToken,
         )
-    }
 
     private fun requestFingerprint(
         sessionId: String,

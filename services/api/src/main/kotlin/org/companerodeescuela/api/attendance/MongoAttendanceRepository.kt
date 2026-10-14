@@ -122,9 +122,13 @@ class MongoAttendanceRepository(
             return AttemptWriteResult.Existing(byRecordId)
         }
 
-        val byStudentSession = records.find(
-            and(eq("sessionId", record.sessionId), eq("studentId", record.studentId)),
-        ).firstOrNull()?.toRecord()
+        val byStudentSession =
+            records
+                .find(
+                    and(eq("sessionId", record.sessionId), eq("studentId", record.studentId)),
+                )
+                .firstOrNull()
+                ?.toRecord()
         if (byStudentSession != null) {
             return AttemptWriteResult.Existing(byStudentSession)
         }
@@ -303,8 +307,10 @@ class MongoAttendanceRepository(
         studentId: String,
     ): AttendanceRecordResponse? {
         ensureIndexes()
-        return records.find(and(eq("sessionId", sessionId), eq("studentId", studentId)))
-            .firstOrNull()?.toRecord()
+        return records
+            .find(and(eq("sessionId", sessionId), eq("studentId", studentId)))
+            .firstOrNull()
+            ?.toRecord()
     }
 
     override suspend fun recordQrNonceUse(

@@ -1,6 +1,5 @@
 package org.companerodeescuela.api.tutoring
 
-import org.companerodeescuela.api.runCatchingCancellable
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
@@ -17,6 +16,7 @@ import org.companerodeescuela.shared.contracts.RevokeTutorAssignmentRequest
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
+import org.companerodeescuela.api.runCatchingCancellable
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.CreateTutorAssignmentRequest
 
@@ -55,14 +55,16 @@ fun Route.tutoringRoutes(
                 val actor = call.requireNativeActor(tokenService)
                 val assignmentId = call.parameters["assignmentId"]
                     ?: throw ApiException.Validation("assignmentId is required")
-                val request = runCatchingCancellable { call.boundedAuthRequest(RevokeTutorAssignmentRequest.serializer()) }
+                val request =
+                    runCatchingCancellable { call.boundedAuthRequest(RevokeTutorAssignmentRequest.serializer()) }
                     .getOrElse { if(it is kotlinx.coroutines.CancellationException) throw it;throw ApiException.Validation("Invalid tutor revocation request") }
                 call.respond(ApiResponse(data = service.revoke(actor, assignmentId, request), requestId = call.requestId()))
             }
 
             post("/assignments") {
                 val actor = call.requireNativeActor(tokenService)
-                val request = runCatchingCancellable { call.boundedAuthRequest(CreateTutorAssignmentRequest.serializer()) }
+                val request =
+                    runCatchingCancellable { call.boundedAuthRequest(CreateTutorAssignmentRequest.serializer()) }
                     .getOrElse { if(it is kotlinx.coroutines.CancellationException) throw it;throw ApiException.Validation("Invalid tutor assignment request") }
                 call.respond(
                     status = HttpStatusCode.Created,

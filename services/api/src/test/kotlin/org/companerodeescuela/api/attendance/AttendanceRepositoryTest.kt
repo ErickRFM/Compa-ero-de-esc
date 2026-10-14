@@ -48,22 +48,25 @@ class AttendanceRepositoryTest {
     }
 
     @Test
-    fun `new record id does not duplicate an existing legacy session student record`() = runTest {
-        val repository = InMemoryAttendanceRepository()
-        val legacy = record("session:student:entry", "session:student", "entry", "op-legacy")
-        val migratedIdAttempt = record(
-            AttendanceRecordIds.forStudentSession("session:student", "entry"),
-            "session:student",
-            "entry",
-            "op-after-deploy",
-        )
-        repository.writeAttempt(legacy)
+    fun `new record id does not duplicate an existing legacy session student record`() =
+        runTest {
+            val repository = InMemoryAttendanceRepository()
+            val legacy = record("session:student:entry", "session:student", "entry", "op-legacy")
+            val migratedIdAttempt =
+                record(
+                    AttendanceRecordIds.forStudentSession("session:student", "entry"),
+                    "session:student",
+                    "entry",
+                    "op-after-deploy",
+                )
+            repository.writeAttempt(legacy)
 
-        val existing = assertIs<AttemptWriteResult.Existing>(repository.writeAttempt(migratedIdAttempt))
+            val existing =
+                assertIs<AttemptWriteResult.Existing>(repository.writeAttempt(migratedIdAttempt))
 
-        assertEquals(legacy.id, existing.record.id)
-        assertEquals(1, repository.recordsForSession("session:student").size)
-    }
+            assertEquals(legacy.id, existing.record.id)
+            assertEquals(1, repository.recordsForSession("session:student").size)
+        }
 
     @Test
     fun `QR nonce usage counts distinct students per session until the session TTL`() = runTest {

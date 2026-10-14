@@ -1,6 +1,5 @@
 package org.companerodeescuela.api.classroom
 
-import org.companerodeescuela.api.runCatchingCancellable
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
@@ -16,6 +15,7 @@ import org.companerodeescuela.api.auth.boundedAuthRequest
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
+import org.companerodeescuela.api.runCatchingCancellable
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.CreateClassInviteRequest
 import org.companerodeescuela.shared.contracts.CreateClassroomRequest
@@ -47,7 +47,8 @@ fun Route.classroomRoutes(
 
             post {
                 val actor = call.requireNativeActor(tokenService)
-                val request = runCatchingCancellable { call.boundedAuthRequest(CreateClassroomRequest.serializer()) }
+                val request =
+                    runCatchingCancellable { call.boundedAuthRequest(CreateClassroomRequest.serializer()) }
                     .getOrElse { if(it is kotlinx.coroutines.CancellationException) throw it;throw ApiException.Validation("Invalid classroom request") }
                 call.respond(
                     status = HttpStatusCode.Created,
@@ -60,7 +61,8 @@ fun Route.classroomRoutes(
 
             post("/join") {
                 val actor = call.requireNativeActor(tokenService)
-                val request = runCatchingCancellable { call.boundedAuthRequest(JoinClassInviteRequest.serializer()) }
+                val request =
+                    runCatchingCancellable { call.boundedAuthRequest(JoinClassInviteRequest.serializer()) }
                     .getOrElse { if(it is kotlinx.coroutines.CancellationException) throw it;throw ApiException.Validation("Invalid invite request") }
                 call.respond(
                     ApiResponse(
@@ -73,7 +75,8 @@ fun Route.classroomRoutes(
             post("/{classroomId}/invites") {
                 val actor = call.requireNativeActor(tokenService)
                 val classroomId = call.requireClassroomId()
-                val request = runCatchingCancellable { call.boundedAuthRequest(CreateClassInviteRequest.serializer()) }
+                val request =
+                    runCatchingCancellable { call.boundedAuthRequest(CreateClassInviteRequest.serializer()) }
                     .getOrElse { if(it is kotlinx.coroutines.CancellationException) throw it;throw ApiException.Validation("Invalid invite configuration") }
                 call.respond(
                     status = HttpStatusCode.Created,

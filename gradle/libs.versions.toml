@@ -35,6 +35,7 @@ serializationJson = "1.9.0"
 
 # Backend
 ktor = "3.3.3"
+ktlintGradle = "14.2.0"
 mongodbDriver = "5.13.0"
 logback = "1.5.18"
 
@@ -158,3 +159,4 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlintGradle" }

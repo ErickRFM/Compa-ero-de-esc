@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<baseline version="1.0">
+    <file name="build.gradle.kts">
+        <error line="11" column="42" source="standard:chain-method-continuation" />
+        <error line="11" column="48" source="standard:chain-method-continuation" />
+        <error line="12" column="50" source="standard:chain-method-continuation" />
+        <error line="12" column="56" source="standard:chain-method-continuation" />
+    </file>
+    <file name="src/main/kotlin/org/companerodeescuela/feature/profile/ActiveExperiencePreferences.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+        <error line="11" column="34" source="standard:annotation" />
+        <error line="11" column="42" source="standard:annotation" />
+        <error line="14" column="31" source="standard:multiline-expression-wrapping" />
+        <error line="20" column="20" source="standard:chain-method-continuation" />
+        <error line="23" column="15" source="standard:function-signature" />
+        <error line="23" column="31" source="standard:function-signature" />
+        <error line="23" column="56" source="standard:function-signature" />
+    </file>
+    <file name="src/main/kotlin/org/companerodeescuela/feature/profile/ProfileScreen.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+        <error line="30" column="1" source="standard:no-unused-imports" />
+        <error line="45" column="5" source="standard:function-naming" />
+        <error line="64" column="24" source="standard:multiline-expression-wrapping" />
+        <error line="110" column="36" source="standard:multiline-expression-wrapping" />
+        <error line="149" column="15" source="standard:keyword-spacing" />
+        <error line="149" column="26" source="standard:op-spacing" />
+        <error line="149" column="36" source="standard:condition-wrapping" />
+        <error line="149" column="51" source="standard:op-spacing" />
+        <error line="150" column="35" source="standard:op-spacing" />
+        <error line="150" column="70" source="standard:wrapping" />
+        <error line="151" column="35" source="standard:op-spacing" />
+        <error line="153" column="36" source="standard:argument-list-wrapping" />
+        <error line="153" column="71" source="standard:argument-list-wrapping" />
+        <error line="153" column="128" source="standard:argument-list-wrapping" />
+        <error line="153" column="141" source="standard:max-line-length" />
+        <error line="153" column="155" source="standard:argument-list-wrapping" />
+        <error line="157" column="36" source="standard:argument-list-wrapping" />
+        <error line="157" column="41" source="standard:op-spacing" />
+        <error line="157" column="57" source="standard:argument-list-wrapping" />
+        <error line="157" column="82" source="standard:argument-list-wrapping" />
+        <error line="157" column="84" source="standard:comma-spacing" />
+        <error line="157" column="84" source="standard:argument-list-wrapping" />
+        <error line="157" column="90" source="standard:op-spacing" />
+        <error line="157" column="106" source="standard:argument-list-wrapping" />
+        <error line="157" column="141" source="standard:max-line-length" />
+        <error line="157" column="143" source="standard:argument-list-wrapping" />
+        <error line="157" column="145" source="standard:comma-spacing" />
+        <error line="157" column="145" source="standard:argument-list-wrapping" />
+        <error line="157" column="152" source="standard:op-spacing" />
+        <error line="157" column="159" source="standard:argument-list-wrapping" />
+        <error line="159" column="23" source="standard:keyword-spacing" />
+        <error line="159" column="38" source="standard:op-spacing" />
+        <error line="161" column="36" source="standard:argument-list-wrapping" />
+        <error line="161" column="41" source="standard:op-spacing" />
+        <error line="161" column="57" source="standard:argument-list-wrapping" />
+        <error line="161" column="87" source="standard:argument-list-wrapping" />
+        <error line="161" column="89" source="standard:comma-spacing" />
+        <error line="161" column="89" source="standard:argument-list-wrapping" />
+        <error line="161" column="95" source="standard:op-spacing" />
+        <error line="161" column="111" source="standard:argument-list-wrapping" />
+        <error line="161" column="141" source="standard:max-line-length" />
+        <error line="161" column="145" source="standard:argument-list-wrapping" />
+        <error line="161" column="147" source="standard:comma-spacing" />
+        <error line="161" column="147" source="standard:argument-list-wrapping" />
+        <error line="161" column="154" source="standard:op-spacing" />
+        <error line="161" column="169" source="standard:argument-list-wrapping" />
+        <error line="207" column="13" source="standard:function-naming" />
+        <error line="225" column="13" source="standard:function-naming" />
+        <error line="231" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="275" column="13" source="standard:function-naming" />
+        <error line="279" column="57" source="standard:multiline-expression-wrapping" />
+        <error line="279" column="57" source="standard:function-signature" />
+        <error line="293" column="5" source="standard:chain-method-continuation" />
+        <error line="295" column="54" source="standard:multiline-expression-wrapping" />
+        <error line="295" column="54" source="standard:function-signature" />
+        <error line="306" column="13" source="standard:function-naming" />
+    </file>
+</baseline>

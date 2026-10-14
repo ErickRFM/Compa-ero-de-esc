@@ -58,6 +58,8 @@ data class ApiSettings(
     val schoolWifiSsids: Set<String> = emptySet(),
     val schoolWifiBssids: Set<String> = emptySet(),
     val attendanceGraceMinutes: Int = 5,
+    /** Maximum live identity cache age; 0 disables caching, positive values delay revocation by at most this many milliseconds. */
+    val currentUserCacheTtlMillis: Int = 0,
     val verificationEmailApiKey: CharArray? = null,
     val verificationEmailSender: String? = null,
     val mfaEncryptionKey: ByteArray? = null,
@@ -95,6 +97,7 @@ data class ApiSettings(
             schoolWifiSsids == other.schoolWifiSsids &&
             schoolWifiBssids == other.schoolWifiBssids &&
             attendanceGraceMinutes == other.attendanceGraceMinutes &&
+            currentUserCacheTtlMillis == other.currentUserCacheTtlMillis &&
             hasVerificationEmail == other.hasVerificationEmail && verificationEmailSender == other.verificationEmailSender &&
             (mfaEncryptionKey != null) == (other.mfaEncryptionKey != null) &&
             hasFirebasePush == other.hasFirebasePush
@@ -117,6 +120,7 @@ data class ApiSettings(
         result = 31 * result + schoolWifiSsids.hashCode()
         result = 31 * result + schoolWifiBssids.hashCode()
         result = 31 * result + attendanceGraceMinutes
+        result = 31 * result + currentUserCacheTtlMillis
         result = 31 * result + hasVerificationEmail.hashCode()
         result = 31 * result + (verificationEmailSender?.hashCode() ?: 0)
         result = 31 * result + (mfaEncryptionKey != null).hashCode()
@@ -139,6 +143,7 @@ data class ApiSettings(
             "mongoDatabase=${mongo.databaseName}, " +
             "authenticationConfigured=$hasAuthentication, " +
             "attendanceQrSigningConfigured=$hasAttendanceQrSigning, " +
+            "currentUserCacheTtlMillis=$currentUserCacheTtlMillis, " +
             "verificationEmailConfigured=$hasVerificationEmail, " +
             "mfaEncryptionConfigured=${mfaEncryptionKey != null}, " +
             "firebasePushConfigured=$hasFirebasePush, " +
@@ -174,6 +179,13 @@ class SettingsLoader(
         val attendanceGraceMinutes = env("ATTENDANCE_GRACE_MINUTES")?.trim()?.toIntOrNull() ?: 5
         if (attendanceGraceMinutes !in 0..15) {
             throw ConfigurationException("ATTENDANCE_GRACE_MINUTES must be between 0 and 15")
+        }
+        val currentUserCacheRaw = env("CURRENT_USER_CACHE_TTL_MILLIS")
+        val currentUserCacheTtlMillis = if (currentUserCacheRaw == null) {
+            0
+        } else {
+            currentUserCacheRaw.trim().toIntOrNull()?.takeIf { it in 0..5_000 }
+                ?: throw ConfigurationException("CURRENT_USER_CACHE_TTL_MILLIS must be an integer between 0 and 5000")
         }
 
         val results = listOf(
@@ -248,6 +260,7 @@ class SettingsLoader(
             schoolWifiSsids = schoolWifiSsids,
             schoolWifiBssids = schoolWifiBssids,
             attendanceGraceMinutes = attendanceGraceMinutes,
+            currentUserCacheTtlMillis = currentUserCacheTtlMillis,
             verificationEmailApiKey = verificationEmailKey?.toCharArray(),
             verificationEmailSender = verificationEmailSender,
             mfaEncryptionKey = mfaKey,

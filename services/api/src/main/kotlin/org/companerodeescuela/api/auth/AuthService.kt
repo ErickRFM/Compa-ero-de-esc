@@ -37,8 +37,9 @@ class AuthService(
     private val random: SecureRandom = SecureRandom(),
     private val institutions: InstitutionRepository = InMemoryInstitutionRepository(),
     private val verification: AccountVerificationService = AccountVerificationService(accounts, UnavailableVerificationEmailGateway),
+    sessionAuthority: PlatformSessionAuthority? = null,
 ) {
-    private val authority = PlatformSessionAuthority(accounts, identityProvider, clock)
+    private val authority = sessionAuthority ?: PlatformSessionAuthority(accounts, identityProvider, clock)
     suspend fun register(request: RegisterRequest): LoginResponse {
         val displayName = request.displayName.trim()
         val email = request.email.trim().lowercase()

@@ -80,6 +80,33 @@ class SettingsLoaderTest {
     }
 
     @Test
+    fun currentUserCacheTtlDefaultsOffAndCanBeBounded() {
+        val defaults = loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c").load()
+        val configured = loader(
+            "API_PORT" to "8080",
+            "MONGODB_DATABASE" to "c",
+            "CURRENT_USER_CACHE_TTL_MILLIS" to "5000",
+        ).load()
+
+        assertEquals(0, defaults.currentUserCacheTtlMillis)
+        assertEquals(5_000, configured.currentUserCacheTtlMillis)
+    }
+
+    @Test
+    fun invalidCurrentUserCacheTtlFailsFast() {
+        for (raw in listOf("", "invalid", "-1", "5001")) {
+            val error = assertFailsWith<ConfigurationException> {
+                loader(
+                    "API_PORT" to "8080",
+                    "MONGODB_DATABASE" to "c",
+                    "CURRENT_USER_CACHE_TTL_MILLIS" to raw,
+                ).load()
+            }
+            assertContains(error.message!!, "CURRENT_USER_CACHE_TTL_MILLIS")
+        }
+    }
+
+    @Test
     @DisplayName("A valid secret enables authentication and is not exposed in toString")
     fun secretIsNotLogged() {
         val secret = "s".repeat(40)

@@ -59,8 +59,12 @@ fun Application.module(
         settings = settings,
         mongoConnection = mongoConnection,
     )
-    configurePlugins(settings, refreshSessions = identityGraph.refreshSessions,
-        sessionAuthority = PlatformSessionAuthority(identityGraph.accounts, providerRegistry.identity))
+    val sessionAuthority = PlatformSessionAuthority(
+        identityGraph.accounts,
+        providerRegistry.identity,
+        currentUserCacheTtlMillis = settings.currentUserCacheTtlMillis,
+    )
+    configurePlugins(settings, refreshSessions = identityGraph.refreshSessions, sessionAuthority = sessionAuthority)
 
     val academicGraph = buildAcademicFeatureGraph(
         settings = settings,
@@ -126,6 +130,7 @@ fun Application.module(
             accounts = identityGraph.accounts,
             institutions = identityGraph.institutions,
             verificationEmail = identityGraph.verificationEmail,
+            sessionAuthority = sessionAuthority,
         )
         mfaRoutes(settings, providerRegistry.identity, identityGraph.refreshSessions, identityGraph.accounts, identityGraph.mfa)
         accountAdministrationRoutes(settings, providerRegistry.identity, identityGraph.refreshSessions, identityGraph.accounts, administrationService)

@@ -29,10 +29,35 @@ class AttendanceStudentService(
         val enrolled = enrollmentResolver.courseGroupsFor(studentId,nativeActor)
         val now = clock.instant().epochSecond
 
-        return repository.findOpenSessions().filter { session ->
-            session.closesAtEpochSeconds > now &&
-                (session.courseId to session.groupName) in enrolled && isEnrolled(studentId,session,nativeActor)
+        val institutionId = nativeActor?.institutionId
+        val candidates = repository.findOpenSessions(
+            courseGroups = enrolled,
+            institutionId = institutionId,
+            afterEpochSeconds = now,
+            unscopedInstitutionalOnly = nativeActor == null,
+            limit = MAX_OPEN_SESSION_RESULTS,
+        )
+        val activeSessions = mutableListOf<AttendanceSessionResponse>()
+        for (session in candidates) {
+            if (session.closesAtEpochSeconds <= now) continue
+            if (nativeActor == null) {
+                if (session.identitySource == org.companerodeescuela.shared.contracts.AttendanceIdentitySource.NATIVE ||
+                    session.institutionId != null || session.groupId != null) continue
+                activeSessions += session
+                continue
+            }
+            if (nativeActor.id != studentId) continue
+            try {
+                (nativeProjection ?: throw ApiException.DependencyUnavailable("Native academic authority is unavailable"))
+                    .requireSession(nativeActor, session)
+                activeSessions += session
+            } catch (_: ApiException.Forbidden) {
+                // A stale or out-of-scope native session is not visible to this student.
+            } catch (_: ApiException.NotFound) {
+                // A deleted native group no longer grants attendance access.
+            }
         }
+        return activeSessions
     }
 
     suspend fun inspectQr(

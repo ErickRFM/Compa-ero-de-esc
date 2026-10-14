@@ -16,7 +16,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.coroutines.test.runTest
 import org.companerodeescuela.api.academic.AcademicOccurrenceProjection
 import org.companerodeescuela.api.errors.ApiException
+import org.companerodeescuela.api.integrations.academic.AcademicProvider
 import org.companerodeescuela.api.integrations.academic.mapper.AcademicMappers
+import org.companerodeescuela.api.integrations.academic.dto.ExternalAcademicLoad
 import org.companerodeescuela.api.integrations.mock.MockAcademicProvider
 import org.companerodeescuela.api.presence.InMemorySchoolPresenceRepository
 import org.companerodeescuela.api.presence.SchoolPresencePolicy
@@ -380,6 +382,43 @@ class AttendanceServiceTest {
         )
 
         assertEquals(listOf(real.id), service.activeFor("2020-10455").map { it.id })
+    }
+
+    @Test
+    fun `active session lookup resolves institutional enrollment once regardless of matching sessions`() = runTest {
+        var academicLoadCalls = 0
+        val countingProvider = object : AcademicProvider by provider {
+            override suspend fun getAcademicLoad(externalId: String): ExternalAcademicLoad {
+                academicLoadCalls++
+                return provider.getAcademicLoad(externalId)
+            }
+        }
+        val repository = InMemoryAttendanceRepository()
+        for (id in listOf("session-1", "session-2")) {
+            repository.createSession(
+                AttendanceSessionResponse(
+                    id = id,
+                    occurrenceId = "occurrence-$id",
+                    courseId = "C-9001",
+                    groupName = "101-A",
+                    occurrenceDate = occurrenceDate.toString(),
+                    scheduledStartsAt = "08:00",
+                    scheduledEndsAt = "09:00",
+                    openedBy = "T-0001",
+                    openedAtEpochSeconds = initialInstant.epochSecond,
+                    closesAtEpochSeconds = initialInstant.plusSeconds(600).epochSecond,
+                    status = AttendanceSessionStatus.OPEN,
+                ),
+            )
+        }
+        val students = AttendanceStudentService(
+            repository = repository,
+            enrollmentResolver = AttendanceEnrollmentResolver(countingProvider),
+            clock = Clock.fixed(initialInstant, ZoneOffset.UTC),
+        )
+
+        assertEquals(listOf("session-1", "session-2"), students.activeFor("2020-10455").map { it.id })
+        assertEquals(1, academicLoadCalls)
     }
 
 

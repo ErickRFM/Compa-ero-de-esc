@@ -42,6 +42,7 @@ fun Route.authRoutes(
     institutions: InstitutionRepository = InMemoryInstitutionRepository(),
     verificationEmail: VerificationEmailGateway = UnavailableVerificationEmailGateway,
     verificationClock: Clock = Clock.systemUTC(),
+    sessionAuthority: PlatformSessionAuthority? = null,
 ) {
     val tokenService = settings.jwtSecret?.let { AuthTokenService(settings) }
     val verification = AccountVerificationService(accounts, verificationEmail, verificationClock)
@@ -52,7 +53,15 @@ fun Route.authRoutes(
     route("/auth") {
         post("/login") {
             val service = tokenService?.let {
-                AuthService(identityProvider, it, sessions, accounts = accounts, institutions = institutions, verification = verification)
+                AuthService(
+                    identityProvider,
+                    it,
+                    sessions,
+                    accounts = accounts,
+                    institutions = institutions,
+                    verification = verification,
+                    sessionAuthority = sessionAuthority,
+                )
             }
                 ?: throw ApiException.DependencyUnavailable(
                     "Authentication is not configured",
@@ -165,13 +174,10 @@ fun Route.authRoutes(
                 }
                 get("/me") {
                     val payload = call.principal<JWTPrincipal>()?.payload ?: throw ApiException.Unauthorized()
-                    val session = tokenService.sessionIdFrom(payload)?.let { authenticationDependency { sessions.find(it) } }
-                        ?: throw ApiException.Unauthorized()
-                    val live = PlatformSessionAuthority(accounts, identityProvider).currentUser(session) ?: throw ApiException.Unauthorized()
+                    // The JWT provider has already resolved and compared live authority for this request.
+                    // Re-resolving here would make institutional providers pay for a duplicate upstream read.
                     val claimed = tokenService.userFrom(payload)
-                    if (live.id != claimed.id || live.authRevision != claimed.authRevision || live.roles != claimed.roles ||
-                        live.accountStatus != claimed.accountStatus || live.institutionId != claimed.institutionId) throw ApiException.Unauthorized()
-                    call.respond(ApiResponse(live, call.requestId()))
+                    call.respond(ApiResponse(claimed, call.requestId()))
                 }
             }
         }

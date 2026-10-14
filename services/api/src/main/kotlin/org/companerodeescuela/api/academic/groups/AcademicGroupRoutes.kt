@@ -14,6 +14,7 @@ import org.companerodeescuela.api.auth.boundedAuthRequest
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
+import org.companerodeescuela.api.runCatchingCancellable
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.AssignAcademicGroupMemberRequest
 import org.companerodeescuela.shared.contracts.CreateAcademicGroupRequest
@@ -44,7 +45,10 @@ fun Route.academicGroupRoutes(
 
             post {
                 val actor = call.requireNativeActor(tokenService)
-                val request = runCatching { call.boundedAuthRequest(CreateAcademicGroupRequest.serializer()) }
+                val request =
+                    runCatchingCancellable {
+                        call.boundedAuthRequest(CreateAcademicGroupRequest.serializer())
+                    }
                     .getOrElse { if(it is kotlinx.coroutines.CancellationException) throw it;throw ApiException.Validation("Invalid academic group request") }
                 call.respond(
                     status = HttpStatusCode.Created,
@@ -69,7 +73,10 @@ fun Route.academicGroupRoutes(
                 val groupId = call.parameters["groupId"]
                     ?.takeIf(String::isNotBlank)
                     ?: throw ApiException.Validation("groupId is required")
-                val request = runCatching { call.boundedAuthRequest(AssignAcademicGroupMemberRequest.serializer()) }
+                val request =
+                    runCatchingCancellable {
+                        call.boundedAuthRequest(AssignAcademicGroupMemberRequest.serializer())
+                    }
                     .getOrElse { if(it is kotlinx.coroutines.CancellationException) throw it;throw ApiException.Validation("Invalid group membership request") }
                 call.respond(
                     status = HttpStatusCode.Created,

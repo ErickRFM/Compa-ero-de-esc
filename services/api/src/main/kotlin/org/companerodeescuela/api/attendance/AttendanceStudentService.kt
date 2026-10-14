@@ -7,6 +7,7 @@ import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.presence.SchoolPresenceService
+import org.companerodeescuela.api.runCatchingCancellable
 import org.companerodeescuela.shared.contracts.ApiErrorCode
 import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
 import org.companerodeescuela.shared.contracts.ClassCallConfirmationRequest
@@ -187,7 +188,7 @@ class AttendanceStudentService(
         val hasLiveCampusEvidence = if (presence == null) true else {
             val campusActive = presence.activeFor(studentId, nativeActor) != null
             campusActive && request.schoolNetwork?.let { network ->
-                runCatching { presence.verifyNetworkForAttendance(network) }.isSuccess
+                runCatchingCancellable { presence.verifyNetworkForAttendance(network) }.isSuccess
             } == true
         }
         val offlineQrFallback = presence != null && !hasLiveCampusEvidence
@@ -241,7 +242,7 @@ class AttendanceStudentService(
         }
 
         val candidate = AttendanceRecordResponse(
-            id = session.id + ":" + studentId,
+            id = AttendanceRecordIds.forStudentSession(session.id, studentId),
             operationId = operationId,
             sessionId = session.id,
             occurrenceId = session.occurrenceId,
@@ -263,7 +264,7 @@ class AttendanceStudentService(
                     result.record.operationId != candidate.operationId &&
                     candidate.status != AttendanceStatus.REJECTED
                 ) {
-                    repository.replaceRejectedRecord(candidate).withCurrentPresencePolicy()
+                    repository.replaceRejectedRecord(candidate.copy(id = result.record.id)).withCurrentPresencePolicy()
                 } else {
                     result.record.withCurrentPresencePolicy()
                 }
@@ -316,8 +317,33 @@ class AttendanceStudentService(
         }
         presence.requireActive(studentId,nativeActor)
         presence.verifyNetworkForAttendance(request.schoolNetwork)
+        when (
+            repository.reserveAttempt(
+                sessionId = session.id,
+                studentId = studentId,
+                operationId = operationId,
+                requestFingerprint =
+                    requestFingerprint(
+                        session.id,
+                        studentId,
+                        request.schoolNetwork,
+                        operationType = "class-call",
+                    ),
+                maxAttempts = MAX_ATTEMPTS_PER_STUDENT_SESSION,
+            )
+        ) {
+            AttemptReservationResult.ACCEPTED -> Unit
+            AttemptReservationResult.LIMIT_REACHED ->
+                throw ApiException.RateLimited("Too many attendance attempts for this session")
+            AttemptReservationResult.OPERATION_CONFLICT ->
+                throw ApiException.Domain(
+                    status = HttpStatusCode.Conflict,
+                    code = ApiErrorCode.ATTENDANCE_OPERATION_CONFLICT,
+                    message = "operationId was already used for another attendance",
+                )
+        }
         val candidate = AttendanceRecordResponse(
-            id = session.id + ":" + studentId,
+            id = AttendanceRecordIds.forStudentSession(session.id, studentId),
             operationId = operationId,
             sessionId = session.id,
             occurrenceId = session.occurrenceId,
@@ -345,7 +371,7 @@ class AttendanceStudentService(
         if (!isEnrolled(studentId,session,nativeActor)) {
             throw ApiException.Forbidden("You are not enrolled in this class")
         }
-        return repository.findRecord("$sessionId:$studentId")?.withCurrentPresencePolicy()
+        return repository.findStudentSessionRecord(sessionId, studentId)?.withCurrentPresencePolicy()
     }
 
 
@@ -427,14 +453,32 @@ class AttendanceStudentService(
         sessionId: String,
         studentId: String,
         request: AttendanceAttemptRequest,
+    ): String =
+        requestFingerprint(
+            sessionId,
+            studentId,
+            request.schoolNetwork,
+            operationType = "attendance",
+            timestamp = request.deviceTimestampEpochSeconds,
+            qrToken = request.qrToken,
+        )
+
+    private fun requestFingerprint(
+        sessionId: String,
+        studentId: String,
+        network: org.companerodeescuela.shared.contracts.SchoolNetworkEvidence?,
+        operationType: String,
+        timestamp: Long? = null,
+        qrToken: String? = null,
     ): String {
         val values = listOf(
             sessionId,
             studentId,
-            request.deviceTimestampEpochSeconds.toString(),
-            request.qrToken.orEmpty(),
-            request.schoolNetwork?.ssid.orEmpty(),
-            request.schoolNetwork?.bssid.orEmpty(),
+            operationType,
+            timestamp?.toString().orEmpty(),
+            qrToken.orEmpty(),
+            network?.ssid.orEmpty(),
+            network?.bssid.orEmpty(),
         )
         val canonical = values.joinToString(separator = "") { "${it.length}:$it" }
         return MessageDigest.getInstance("SHA-256")

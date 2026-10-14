@@ -122,6 +122,17 @@ class MongoAttendanceRepository(
             return AttemptWriteResult.Existing(byRecordId)
         }
 
+        val byStudentSession =
+            records
+                .find(
+                    and(eq("sessionId", record.sessionId), eq("studentId", record.studentId)),
+                )
+                .firstOrNull()
+                ?.toRecord()
+        if (byStudentSession != null) {
+            return AttemptWriteResult.Existing(byStudentSession)
+        }
+
         return try {
             records.insertOne(record.toDocument())
             AttemptWriteResult.Created(record)
@@ -291,6 +302,17 @@ class MongoAttendanceRepository(
         return records.find(eq("_id", id)).firstOrNull()?.toRecord()
     }
 
+    override suspend fun findStudentSessionRecord(
+        sessionId: String,
+        studentId: String,
+    ): AttendanceRecordResponse? {
+        ensureIndexes()
+        return records
+            .find(and(eq("sessionId", sessionId), eq("studentId", studentId)))
+            .firstOrNull()
+            ?.toRecord()
+    }
+
     override suspend fun recordQrNonceUse(
         sessionId: String,
         nonce: String,
@@ -338,6 +360,10 @@ class MongoAttendanceRepository(
             records.createIndex(
                 Indexes.ascending("sessionId"),
                 IndexOptions().name("ix_attendance_record_session"),
+            )
+            records.createIndex(
+                Indexes.ascending("sessionId", "studentId"),
+                IndexOptions().name("ix_attendance_record_session_student"),
             )
             qrNonceUses.createIndex(
                 Indexes.ascending("sessionId", "nonce", "studentId"),

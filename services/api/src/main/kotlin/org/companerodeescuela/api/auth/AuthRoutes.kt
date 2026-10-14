@@ -23,6 +23,7 @@ import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.integrations.identity.IdentityProvider
 import org.companerodeescuela.api.plugins.clientAddress
 import org.companerodeescuela.api.plugins.requestId
+import org.companerodeescuela.api.runCatchingCancellable
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.LoginRequest
 import org.companerodeescuela.shared.contracts.RefreshSessionRequest
@@ -69,7 +70,8 @@ fun Route.authRoutes(
                     "Authentication is not configured",
                 )
 
-            val request = runCatching { call.boundedBody(LoginRequest.serializer(), AUTH_BODY_MAX_BYTES) }
+            val request =
+                runCatchingCancellable { call.boundedBody(LoginRequest.serializer(), AUTH_BODY_MAX_BYTES) }
                 .getOrElse {
                     throw ApiException.Validation("Invalid login request")
                 }
@@ -108,7 +110,8 @@ fun Route.authRoutes(
                 call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
                 throw ApiException.RateLimited()
             }
-            val request = runCatching { call.boundedBody(RegisterRequest.serializer(), AUTH_BODY_MAX_BYTES) }
+            val request =
+                runCatchingCancellable { call.boundedBody(RegisterRequest.serializer(), AUTH_BODY_MAX_BYTES) }
                 .getOrElse { throw ApiException.Validation("Invalid registration request") }
             registrationLimiter.acquire(request.email, clientAddress)?.let { retryAfter ->
                 call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
@@ -136,7 +139,8 @@ fun Route.authRoutes(
                 )
             }
                 ?: throw ApiException.DependencyUnavailable("Authentication is not configured")
-            val request = runCatching { call.boundedBody(RefreshSessionRequest.serializer(), AUTH_BODY_MAX_BYTES) }
+            val request =
+                runCatchingCancellable { call.boundedBody(RefreshSessionRequest.serializer(), AUTH_BODY_MAX_BYTES) }
                 .getOrElse { throw ApiException.Unauthorized() }
             call.respond(
                 ApiResponse(
@@ -159,7 +163,8 @@ fun Route.authRoutes(
                 )
             }
                 ?: throw ApiException.DependencyUnavailable("Authentication is not configured")
-            val request = runCatching { call.boundedBody(RefreshSessionRequest.serializer(), AUTH_BODY_MAX_BYTES) }
+            val request =
+                runCatchingCancellable { call.boundedBody(RefreshSessionRequest.serializer(), AUTH_BODY_MAX_BYTES) }
                 .getOrElse { throw ApiException.Unauthorized() }
             service.logout(request)
             call.respond(HttpStatusCode.NoContent)
@@ -195,7 +200,8 @@ fun Route.authRoutes(
                         call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
                         throw ApiException.RateLimited()
                     }
-                    val request = runCatching { call.boundedBody(VerifyEmailRequest.serializer(), AUTH_BODY_MAX_BYTES) }
+                    val request =
+                        runCatchingCancellable { call.boundedBody(VerifyEmailRequest.serializer(), AUTH_BODY_MAX_BYTES) }
                         .getOrElse { throw ApiException.Validation("Invalid email verification request") }
                     val service = AuthService(identityProvider, tokenService, sessions, accounts = accounts,
                         institutions = institutions, verification = verification)

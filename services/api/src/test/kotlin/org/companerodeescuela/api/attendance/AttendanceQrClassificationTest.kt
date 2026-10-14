@@ -136,7 +136,10 @@ class AttendanceQrClassificationTest {
             }
         }.awaitAll()
 
-        assertEquals(AttendanceStatus.REVIEW_REQUIRED, setup.repository.findRecord(setup.sessionId + ":2020-10455")?.status)
+        assertEquals(
+            AttendanceStatus.REVIEW_REQUIRED,
+            setup.repository.findStudentSessionRecord(setup.sessionId, "2020-10455")?.status,
+        )
         assertEquals(1, setup.repository.recordsForSession(setup.sessionId).size)
         assertTrue(retries.all { it.status == AttendanceStatus.REVIEW_REQUIRED })
     }

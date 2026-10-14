@@ -1,8 +1,8 @@
 package org.companerodeescuela.core.navigation
 
+import org.companerodeescuela.shared.contracts.UserRole
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import org.companerodeescuela.shared.contracts.UserRole
 
 class RoleExperienceResolverTest {
     @Test

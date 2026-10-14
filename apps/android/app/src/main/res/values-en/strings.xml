@@ -42,5 +42,6 @@
     <string name="login_continue_coordinator">Continue as coordinator</string>
     <string name="login_continue_admin">Continue as administrator</string>
     <string name="login_continue_super_admin">Continue as superadministrator</string>
+    <string name="login_continue_guest">Continue as guest</string>
     <string name="login_continue">Continue</string>
 </resources>

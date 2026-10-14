@@ -58,11 +58,12 @@ class HealthResponseSerializationTest {
 }
 
 class UserRoleTest {
-
     @Test
-    @DisplayName("Only students are non-staff")
+    @DisplayName("Guest and student roles are non-staff")
     fun staffClassification() {
         assertFalse(UserRole.STUDENT.isStaff)
+        assertFalse(UserRole.GUEST.isStaff)
+        assertFalse(UserRole.WORKSHOP_PARTICIPANT.isStaff)
         assertTrue(UserRole.TEACHER.isStaff)
         assertTrue(UserRole.COORDINATOR.isStaff)
         assertTrue(UserRole.ADMIN.isStaff)
@@ -73,6 +74,8 @@ class UserRoleTest {
     @DisplayName("Administrative roles are coordinator, admin and super admin")
     fun administrativeClassification() {
         assertFalse(UserRole.STUDENT.isAdministrative)
+        assertFalse(UserRole.GUEST.isAdministrative)
+        assertFalse(UserRole.WORKSHOP_PARTICIPANT.isAdministrative)
         assertFalse(UserRole.TEACHER.isAdministrative)
         assertTrue(UserRole.COORDINATOR.isAdministrative)
         assertTrue(UserRole.ADMIN.isAdministrative)
@@ -81,7 +84,6 @@ class UserRoleTest {
 }
 
 class UserSummaryTest {
-
     @Test
     @DisplayName("isStaff is true when any role is staff")
     fun isStaffAggregatesRoles() {

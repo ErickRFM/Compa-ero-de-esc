@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.feature.profile
 
 import androidx.compose.foundation.clickable
@@ -276,21 +278,23 @@ private fun GroupDivider() {
     HorizontalDivider(color = V8RedColors.Outline.copy(alpha = 0.5f))
 }
 
-private fun roleSummary(roles: Set<UserRole>): String = roles
-    .sortedBy(UserRole::ordinal)
-    .joinToString(" · ") { role ->
-        when (role) {
-            UserRole.STUDENT -> "Estudiante"
-            UserRole.WORKSHOP_PARTICIPANT -> "Participante"
-            UserRole.TEACHER_PENDING -> "Docente pendiente"
-            UserRole.TEACHER -> "Docente"
-            UserRole.TUTOR -> "Tutoría"
-            UserRole.COORDINATOR -> "Coordinación"
-            UserRole.ADMIN -> "Administración"
-            UserRole.SUPER_ADMIN -> "Administración general"
+private fun roleSummary(roles: Set<UserRole>): String =
+    roles
+        .sortedBy(UserRole::ordinal)
+        .joinToString(" · ") { role ->
+            when (role) {
+                UserRole.STUDENT -> "Estudiante"
+                UserRole.WORKSHOP_PARTICIPANT -> "Participante"
+                UserRole.GUEST -> "Invitado"
+                UserRole.TEACHER_PENDING -> "Docente pendiente"
+                UserRole.TEACHER -> "Docente"
+                UserRole.TUTOR -> "Tutoría"
+                UserRole.COORDINATOR -> "Coordinación"
+                UserRole.ADMIN -> "Administración"
+                UserRole.SUPER_ADMIN -> "Administración general"
+            }
         }
-    }
-    .ifBlank { "Rol no disponible" }
+        .ifBlank { "Rol no disponible" }
 
 private fun initials(displayName: String?): String = displayName
     ?.trim()

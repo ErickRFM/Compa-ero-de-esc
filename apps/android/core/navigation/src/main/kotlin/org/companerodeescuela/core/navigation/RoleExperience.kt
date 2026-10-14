@@ -9,6 +9,7 @@ enum class AppExperience {
     COORDINATOR,
     ADMIN,
     SUPER_ADMIN,
+    GUEST,
     UNSUPPORTED,
 }
 
@@ -35,6 +36,7 @@ object RoleExperienceResolver {
             if (UserRole.COORDINATOR in roles) add(AppExperience.COORDINATOR)
             if (UserRole.ADMIN in roles) add(AppExperience.ADMIN)
             if (UserRole.SUPER_ADMIN in roles) add(AppExperience.SUPER_ADMIN)
+            if (UserRole.GUEST in roles || UserRole.WORKSHOP_PARTICIPANT in roles) add(AppExperience.GUEST)
         }
 
     /** A login card is an intention, never a role grant. Null asks the user to choose. */
@@ -127,6 +129,12 @@ object RoleExperienceResolver {
                             TopLevelDestination.Classrooms,
                             TopLevelDestination.Channel,
                         ),
+                )
+            AppExperience.GUEST ->
+                RoleExperienceConfig(
+                    experience = selected,
+                    startDestination = Destination.Profile,
+                    topLevelDestinations = listOf(TopLevelDestination.Profile),
                 )
             AppExperience.UNSUPPORTED ->
                 RoleExperienceConfig(

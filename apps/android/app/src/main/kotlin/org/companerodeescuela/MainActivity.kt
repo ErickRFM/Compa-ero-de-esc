@@ -186,8 +186,7 @@ class MainActivity : AppCompatActivity() {
                                     )
                                 }
                             }
-                            session.accountStatus != org.companerodeescuela.shared.contracts.AccountStatus.ACTIVE ||
-                                session.roles == setOf(org.companerodeescuela.shared.contracts.UserRole.WORKSHOP_PARTICIPANT) -> {
+                            session.accountStatus != org.companerodeescuela.shared.contracts.AccountStatus.ACTIVE -> {
                                 AccountOnboardingScreen(
                                     session,
                                     sessionViewModel::verifyEmail,
@@ -556,6 +555,7 @@ private fun RoleUnavailableScreen(experience: AppExperience) {
             AppExperience.COORDINATOR -> "Coordinación"
             AppExperience.ADMIN -> "Administración"
             AppExperience.SUPER_ADMIN -> "Administración general"
+            AppExperience.GUEST -> "Invitado"
             AppExperience.UNSUPPORTED -> "Acceso no disponible"
             AppExperience.STUDENT -> "Estudiante"
             AppExperience.TEACHER -> "Docente"
@@ -642,6 +642,7 @@ private fun experienceLabel(experience: AppExperience): String =
             AppExperience.COORDINATOR -> R.string.login_continue_coordinator
             AppExperience.ADMIN -> R.string.login_continue_admin
             AppExperience.SUPER_ADMIN -> R.string.login_continue_super_admin
+            AppExperience.GUEST -> R.string.login_continue_guest
             AppExperience.UNSUPPORTED -> R.string.login_continue
         },
     )

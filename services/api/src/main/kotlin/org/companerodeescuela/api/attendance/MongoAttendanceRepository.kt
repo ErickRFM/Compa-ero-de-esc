@@ -5,11 +5,12 @@ import com.mongodb.client.model.Filters.and
 import com.mongodb.client.model.Filters.eq
 import com.mongodb.client.model.Filters.gt
 import com.mongodb.client.model.Filters.lt
-import com.mongodb.client.model.Filters.or
 import com.mongodb.client.model.Filters.exists
 import com.mongodb.client.model.Filters.elemMatch
 import com.mongodb.client.model.FindOneAndReplaceOptions
 import com.mongodb.client.model.FindOneAndUpdateOptions
+import com.mongodb.client.model.Filters.ne
+import com.mongodb.client.model.Filters.or
 import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
 import com.mongodb.client.model.ReturnDocument
@@ -87,6 +88,40 @@ class MongoAttendanceRepository(
         ensureIndexes()
         return sessions
             .find(eq("status", AttendanceSessionStatus.OPEN.name))
+            .toList()
+            .map { it.toSession() }
+    }
+
+    override suspend fun findOpenSessions(
+        courseGroups: Set<Pair<String, String>>,
+        institutionId: String?,
+        afterEpochSeconds: Long,
+        unscopedInstitutionalOnly: Boolean,
+        limit: Int,
+    ): List<AttendanceSessionResponse> {
+        ensureIndexes()
+        if (courseGroups.isEmpty()) {
+            return emptyList()
+        }
+
+        val filters = mutableListOf(
+            eq("status", AttendanceSessionStatus.OPEN.name),
+            eq("institutionId", institutionId),
+            gt("closesAtEpochSeconds", afterEpochSeconds),
+            or(*courseGroups.map { (courseId, groupName) ->
+                and(eq("courseId", courseId), eq("groupName", groupName))
+            }.toTypedArray()),
+        )
+        if (unscopedInstitutionalOnly) {
+            filters += ne(
+                "identitySource",
+                org.companerodeescuela.shared.contracts.AttendanceIdentitySource.NATIVE.name,
+            )
+            filters += eq("groupId", null)
+        }
+        return sessions
+            .find(and(filters))
+            .limit(limit.coerceIn(1, MAX_OPEN_SESSION_RESULTS))
             .toList()
             .map { it.toSession() }
     }
@@ -352,6 +387,10 @@ class MongoAttendanceRepository(
             sessions.createIndex(
                 Indexes.ascending("status"),
                 IndexOptions().name("ix_attendance_session_status"),
+            )
+            sessions.createIndex(
+                Indexes.ascending("status", "institutionId", "courseId", "groupName"),
+                IndexOptions().name("ix_attendance_open_scope"),
             )
             records.createIndex(
                 Indexes.ascending("operationId"),

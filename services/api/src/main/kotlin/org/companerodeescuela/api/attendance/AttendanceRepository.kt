@@ -2,6 +2,7 @@ package org.companerodeescuela.api.attendance
 
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.companerodeescuela.shared.contracts.AttendanceIdentitySource
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
@@ -28,6 +29,13 @@ interface AttendanceRepository {
     suspend fun findSession(id: String): AttendanceSessionResponse?
     suspend fun findSessionByOccurrence(occurrenceId: String): AttendanceSessionResponse?
     suspend fun findOpenSessions(): List<AttendanceSessionResponse>
+    suspend fun findOpenSessions(
+        courseGroups: Set<Pair<String, String>>,
+        institutionId: String?,
+        afterEpochSeconds: Long = 0,
+        unscopedInstitutionalOnly: Boolean = false,
+        limit: Int = MAX_OPEN_SESSION_RESULTS,
+    ): List<AttendanceSessionResponse>
     suspend fun replaceSession(session: AttendanceSessionResponse)
     suspend fun writeAttempt(record: AttendanceRecordResponse): AttemptWriteResult
     suspend fun reserveAttempt(
@@ -85,6 +93,27 @@ class InMemoryAttendanceRepository : AttendanceRepository {
         mutex.withLock {
             sessions.values.filter { it.status == AttendanceSessionStatus.OPEN }
         }
+
+    override suspend fun findOpenSessions(
+        courseGroups: Set<Pair<String, String>>,
+        institutionId: String?,
+        afterEpochSeconds: Long,
+        unscopedInstitutionalOnly: Boolean,
+        limit: Int,
+    ): List<AttendanceSessionResponse> = mutex.withLock {
+        if (courseGroups.isEmpty()) return@withLock emptyList()
+        sessions.values.asSequence()
+            .filter { it.status == AttendanceSessionStatus.OPEN }
+            .filter { (it.courseId to it.groupName) in courseGroups }
+            .filter { it.institutionId == institutionId }
+            .filter { it.closesAtEpochSeconds > afterEpochSeconds }
+            .filter {
+                !unscopedInstitutionalOnly
+                    || (it.identitySource != AttendanceIdentitySource.NATIVE && it.groupId == null)
+            }
+            .take(limit.coerceIn(1, MAX_OPEN_SESSION_RESULTS))
+            .toList()
+    }
 
     override suspend fun replaceSession(session: AttendanceSessionResponse) {
         mutex.withLock {
@@ -194,3 +223,5 @@ class InMemoryAttendanceRepository : AttendanceRepository {
         students.size.toLong()
     }
 }
+
+const val MAX_OPEN_SESSION_RESULTS = 100

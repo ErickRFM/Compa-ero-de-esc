@@ -215,7 +215,6 @@ class MongoInstitutionalPushRepository(
         if (indexesReady) return
         indexMutex.withLock {
             if (indexesReady) return
-            credentials.createIndex(Indexes.ascending("_id"), IndexOptions().unique(true))
             nonces.createIndex(Indexes.ascending("credentialId", "nonce"), IndexOptions().unique(true))
             nonces.createIndex(Indexes.ascending("expiresAt"), IndexOptions().expireAfter(0L, java.util.concurrent.TimeUnit.SECONDS))
             events.createIndex(Indexes.ascending("tenantId", "eventId"), IndexOptions().unique(true))

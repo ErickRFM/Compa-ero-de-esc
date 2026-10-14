@@ -2,39 +2,40 @@ package org.companerodeescuela.api.application
 
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
+import io.ktor.server.routing.routing
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import io.ktor.server.routing.routing
-import org.companerodeescuela.api.academic.groups.academicGroupRoutes
 import org.companerodeescuela.api.academic.academicRoutes
-import org.companerodeescuela.api.attendance.attendanceRoutes
-import org.companerodeescuela.api.institutions.institutionRoutes
+import org.companerodeescuela.api.academic.groups.academicGroupRoutes
 import org.companerodeescuela.api.admin.AccountAdministrationService
 import org.companerodeescuela.api.admin.accountAdministrationRoutes
-import org.companerodeescuela.api.security.mfaRoutes
-import org.companerodeescuela.api.auth.authRoutes
+import org.companerodeescuela.api.attendance.attendanceRoutes
 import org.companerodeescuela.api.auth.PlatformSessionAuthority
+import org.companerodeescuela.api.auth.authRoutes
 import org.companerodeescuela.api.channel.channelRoutes
 import org.companerodeescuela.api.classroom.classroomRoutes
 import org.companerodeescuela.api.config.ApiSettings
+import org.companerodeescuela.api.coordination.coordinationRoutes
 import org.companerodeescuela.api.database.MongoConnection
+import org.companerodeescuela.api.devices.deviceRoutes
 import org.companerodeescuela.api.events.academicEventRoutes
 import org.companerodeescuela.api.excuses.excuseRoutes
-import org.companerodeescuela.api.devices.deviceRoutes
-import org.companerodeescuela.api.health.HealthService
-import org.companerodeescuela.api.health.healthRoutes
+import org.companerodeescuela.api.grading.ClassroomGradeSyncAuthorization
 import org.companerodeescuela.api.grading.UnavailableGradeSyncGateway
 import org.companerodeescuela.api.grading.gradingRoutes
-import org.companerodeescuela.api.coordination.coordinationRoutes
+import org.companerodeescuela.api.health.HealthService
+import org.companerodeescuela.api.health.healthRoutes
+import org.companerodeescuela.api.institutions.institutionRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
 import org.companerodeescuela.api.plugins.configurePlugins
 import org.companerodeescuela.api.presence.schoolPresenceRoutes
 import org.companerodeescuela.api.representatives.groupRepresentativeRoutes
-import org.companerodeescuela.api.tutoring.tutoringRoutes
+import org.companerodeescuela.api.security.mfaRoutes
 import org.companerodeescuela.api.tutoring.tutorCaseRoutes
+import org.companerodeescuela.api.tutoring.tutoringRoutes
 
 /**
  * Composes the application graph.
@@ -55,10 +56,11 @@ fun Application.module(
     ProviderRegistry.requireEnvironmentSatisfied(providerRegistry, settings.environment)
 
     val healthService = HealthService(settings = settings, mongoConnection = mongoConnection)
-    val identityGraph = buildIdentityFeatureGraph(
-        settings = settings,
-        mongoConnection = mongoConnection,
-    )
+    val identityGraph =
+        buildIdentityFeatureGraph(
+            settings = settings,
+            mongoConnection = mongoConnection,
+        )
     val sessionAuthority =
         PlatformSessionAuthority(
             identityGraph.accounts,
@@ -71,55 +73,90 @@ fun Application.module(
         sessionAuthority = sessionAuthority,
     )
 
-    val academicGraph = buildAcademicFeatureGraph(
-        settings = settings,
-        mongoConnection = mongoConnection,
-        accounts = identityGraph.accounts,
-        mfa = identityGraph.mfa,
-        institutions = identityGraph.institutions,
-    )
-    val administrationService = AccountAdministrationService(identityGraph.accounts, identityGraph.institutions,
-        academicGraph.groupRepository, academicGraph.tutoringService, identityGraph.mfa)
-    val classroomGraph = buildClassroomFeatureGraph(
-        settings = settings,
-        mongoConnection = mongoConnection,
-        academicProvider = providerRegistry.academic,
-        groupRepository = academicGraph.groupRepository,
-        representativeService = academicGraph.representativeService,
-        accounts=identityGraph.accounts,mfa=identityGraph.mfa,
-    )
-    val scheduleManagement=org.companerodeescuela.api.academic.AcademicScheduleManagementService(academicGraph.scheduleOverrides,accounts=identityGraph.accounts,groups=academicGraph.groupRepository,mfa=identityGraph.mfa,classrooms=classroomGraph.classroomService)
-    val nativeAcademic=org.companerodeescuela.api.academic.NativeAcademicProjection(identityGraph.accounts,classroomGraph.classroomService,academicGraph.groupRepository,academicGraph.scheduleOverrides)
-    val presenceGraph = buildPresenceFeatureGraph(
-        settings = settings,
-        mongoConnection = mongoConnection,
-        accounts=identityGraph.accounts,mfa=identityGraph.mfa,institutions=identityGraph.institutions,
-    )
-    val attendanceGraph = buildAttendanceFeatureGraph(
-        settings = settings,
-        mongoConnection = mongoConnection,
-        academicProvider = providerRegistry.academic,
-        schoolPresenceService = presenceGraph?.service,
-        groupRepository = academicGraph.groupRepository,
-        accounts=identityGraph.accounts,classrooms=classroomGraph.classroomService,nativeProjection=nativeAcademic,
-    )
+    val academicGraph =
+        buildAcademicFeatureGraph(
+            settings = settings,
+            mongoConnection = mongoConnection,
+            accounts = identityGraph.accounts,
+            mfa = identityGraph.mfa,
+            institutions = identityGraph.institutions,
+        )
+    val administrationService =
+        AccountAdministrationService(
+            identityGraph.accounts,
+            identityGraph.institutions,
+            academicGraph.groupRepository,
+            academicGraph.tutoringService,
+            identityGraph.mfa,
+        )
+    val classroomGraph =
+        buildClassroomFeatureGraph(
+            settings = settings,
+            mongoConnection = mongoConnection,
+            academicProvider = providerRegistry.academic,
+            groupRepository = academicGraph.groupRepository,
+            representativeService = academicGraph.representativeService,
+            accounts = identityGraph.accounts,
+            mfa = identityGraph.mfa,
+        )
+    val scheduleManagement =
+        org.companerodeescuela.api.academic.AcademicScheduleManagementService(
+            academicGraph.scheduleOverrides,
+            accounts = identityGraph.accounts,
+            groups = academicGraph.groupRepository,
+            mfa = identityGraph.mfa,
+            classrooms = classroomGraph.classroomService,
+        )
+    val nativeAcademic =
+        org.companerodeescuela.api.academic.NativeAcademicProjection(
+            identityGraph.accounts,
+            classroomGraph.classroomService,
+            academicGraph.groupRepository,
+            academicGraph.scheduleOverrides,
+        )
+    val presenceGraph =
+        buildPresenceFeatureGraph(
+            settings = settings,
+            mongoConnection = mongoConnection,
+            accounts = identityGraph.accounts,
+            mfa = identityGraph.mfa,
+            institutions = identityGraph.institutions,
+        )
+    val attendanceGraph =
+        buildAttendanceFeatureGraph(
+            settings = settings,
+            mongoConnection = mongoConnection,
+            academicProvider = providerRegistry.academic,
+            schoolPresenceService = presenceGraph?.service,
+            groupRepository = academicGraph.groupRepository,
+            accounts = identityGraph.accounts,
+            classrooms = classroomGraph.classroomService,
+            nativeProjection = nativeAcademic,
+        )
 
-    val operationsGraph = buildOperationsFeatureGraph(
-        settings = settings,
-        mongoConnection = mongoConnection,
-        tutoringService = academicGraph.tutoringService,
-        groupRepository = academicGraph.groupRepository,
-        accounts=identityGraph.accounts,classrooms=classroomGraph.classroomService,institutions=identityGraph.institutions,mfa=identityGraph.mfa,
-        refreshSessions=identityGraph.refreshSessions,
-    )
+    val operationsGraph =
+        buildOperationsFeatureGraph(
+            settings = settings,
+            mongoConnection = mongoConnection,
+            tutoringService = academicGraph.tutoringService,
+            groupRepository = academicGraph.groupRepository,
+            accounts = identityGraph.accounts,
+            classrooms = classroomGraph.classroomService,
+            institutions = identityGraph.institutions,
+            mfa = identityGraph.mfa,
+            refreshSessions = identityGraph.refreshSessions,
+        )
 
     // Only a fully configured, authenticated Mongo deployment starts the durable worker.
     // A local/test instance never sends live Firebase notifications.
-    val pushWorker = if (settings.hasFirebasePush && settings.hasAuthentication && settings.mongo.isConfigured) {
-        CoroutineScope(SupervisorJob() + Dispatchers.IO).also { scope ->
-            scope.launch { operationsGraph.pushService.runLoop() }
+    val pushWorker =
+        if (settings.hasFirebasePush && settings.hasAuthentication && settings.mongo.isConfigured) {
+            CoroutineScope(SupervisorJob() + Dispatchers.IO).also { scope ->
+                scope.launch { operationsGraph.pushService.runLoop() }
+            }
+        } else {
+            null
         }
-    } else null
     monitor.subscribe(ApplicationStopped) {
         pushWorker?.cancel()
         providerRegistry.close()
@@ -138,7 +175,13 @@ fun Application.module(
             sessionAuthority = sessionAuthority,
         )
         mfaRoutes(settings, providerRegistry.identity, identityGraph.refreshSessions, identityGraph.accounts, identityGraph.mfa)
-        accountAdministrationRoutes(settings, providerRegistry.identity, identityGraph.refreshSessions, identityGraph.accounts, administrationService)
+        accountAdministrationRoutes(
+            settings,
+            providerRegistry.identity,
+            identityGraph.refreshSessions,
+            identityGraph.accounts,
+            administrationService,
+        )
         institutionRoutes(identityGraph.institutions)
         academicRoutes(
             settings = settings,
@@ -146,7 +189,7 @@ fun Application.module(
             scheduleManagement = scheduleManagement,
             scheduleOverrides = academicGraph.scheduleOverrides,
             groupRepository = academicGraph.groupRepository,
-            nativeProjection=nativeAcademic,
+            nativeProjection = nativeAcademic,
         )
         attendanceRoutes(
             settings = settings,
@@ -173,6 +216,10 @@ fun Application.module(
         academicEventRoutes(settings = settings, service = operationsGraph.eventService)
         excuseRoutes(settings = settings, service = operationsGraph.excuseService)
         deviceRoutes(settings = settings, repository = operationsGraph.deviceTokenRepository)
-        gradingRoutes(settings = settings, syncGateway = UnavailableGradeSyncGateway)
+        gradingRoutes(
+            settings = settings,
+            syncGateway = UnavailableGradeSyncGateway,
+            syncAuthorization = ClassroomGradeSyncAuthorization(classroomGraph.classroomService),
+        )
     }
 }

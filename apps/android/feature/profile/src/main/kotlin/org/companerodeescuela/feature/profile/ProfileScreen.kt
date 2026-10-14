@@ -25,11 +25,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.platform.testTag
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
@@ -63,11 +62,12 @@ fun ProfileScreen(
             V8CampusBackdrop(modifier = Modifier.matchParentSize())
         }
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .widthIn(max = CompaneroSize.homeContentMaxWidth)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .widthIn(max = CompaneroSize.homeContentMaxWidth)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -109,8 +109,9 @@ fun ProfileScreen(
                         verticalArrangement = Arrangement.spacedBy(3.dp),
                     ) {
                         Text(
-                            text = displayName?.takeIf(String::isNotBlank)
-                                ?: "Cuenta de Compañero",
+                            text =
+                                displayName?.takeIf(String::isNotBlank)
+                                    ?: "Cuenta de Compañero",
                             style = MaterialTheme.typography.titleLarge,
                             color = V8RedColors.TextPrimary,
                             fontWeight = FontWeight.SemiBold,
@@ -148,19 +149,33 @@ fun ProfileScreen(
                 )
             }
 
-            if(onSecurity!=null || (onTutorRequest!=null && UserRole.TEACHER in roles && UserRole.TUTOR !in roles) ||
-                (onRepresentatives!=null && UserRole.STUDENT in roles)) {
-                ProfileGroup(title=stringResource(R.string.profile_access)) {
+            if (onSecurity != null ||
+                (onTutorRequest != null && UserRole.TEACHER in roles && UserRole.TUTOR !in roles) ||
+                (onRepresentatives != null && UserRole.STUDENT in roles)
+            ) {
+                ProfileGroup(title = stringResource(R.string.profile_access)) {
                     if (onRepresentatives != null && UserRole.STUDENT in roles) {
-                        ProfileRow(title = "Representantes de grupo", detail = "Acepta o rechaza tus nombramientos de grupo.", onClick = onRepresentatives)
+                        ProfileRow(
+                            title = "Representantes de grupo",
+                            detail = "Acepta o rechaza tus nombramientos de grupo.",
+                            onClick = onRepresentatives,
+                        )
                         if (onSecurity != null || (onTutorRequest != null && UserRole.TEACHER in roles)) GroupDivider()
                     }
                     onSecurity?.let { action ->
-                        ProfileRow(title=stringResource(R.string.profile_security),detail=stringResource(R.string.profile_security_description),onClick=action)
+                        ProfileRow(
+                            title = stringResource(R.string.profile_security),
+                            detail = stringResource(R.string.profile_security_description),
+                            onClick = action,
+                        )
                     }
-                    if(onTutorRequest!=null && UserRole.TEACHER in roles && UserRole.TUTOR !in roles) {
+                    if (onTutorRequest != null && UserRole.TEACHER in roles && UserRole.TUTOR !in roles) {
                         GroupDivider()
-                        ProfileRow(title=stringResource(R.string.profile_tutor_request),detail=stringResource(R.string.profile_tutor_description),onClick=onTutorRequest)
+                        ProfileRow(
+                            title = stringResource(R.string.profile_tutor_request),
+                            detail = stringResource(R.string.profile_tutor_description),
+                            onClick = onTutorRequest,
+                        )
                     }
                 }
             }
@@ -230,10 +245,11 @@ private fun ProfileRow(
     trailingLabel: String? = null,
     onClick: (() -> Unit)? = null,
 ) {
-    val rowModifier = Modifier
-        .fillMaxWidth()
-        .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-        .padding(vertical = CompaneroSpacing.sm)
+    val rowModifier =
+        Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(vertical = CompaneroSpacing.sm)
 
     Row(
         modifier = rowModifier,
@@ -293,17 +309,17 @@ private fun roleSummary(roles: Set<UserRole>): String =
                 UserRole.ADMIN -> "Administración"
                 UserRole.SUPER_ADMIN -> "Administración general"
             }
-        }
-        .ifBlank { "Rol no disponible" }
+        }.ifBlank { "Rol no disponible" }
 
-private fun initials(displayName: String?): String = displayName
-    ?.trim()
-    ?.split(Regex("\\s+"))
-    ?.filter(String::isNotBlank)
-    ?.take(2)
-    ?.joinToString("") { it.first().uppercase() }
-    ?.ifBlank { "CC" }
-    ?: "CC"
+private fun initials(displayName: String?): String =
+    displayName
+        ?.trim()
+        ?.split(Regex("\\s+"))
+        ?.filter(String::isNotBlank)
+        ?.take(2)
+        ?.joinToString("") { it.first().uppercase() }
+        ?.ifBlank { "CC" }
+        ?: "CC"
 
 @Preview(showBackground = true)
 @Composable

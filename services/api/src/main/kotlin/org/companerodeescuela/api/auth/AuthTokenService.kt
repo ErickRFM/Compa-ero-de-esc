@@ -113,7 +113,10 @@ class AuthTokenService(
 
     companion object {
         private val NON_NEGATIVE_INTEGER = Regex("0|[1-9][0-9]*")
-        const val PROVIDER_NAME = "auth-jwt"
+        const val PROVIDER_NAME = "auth-jwt-active-academic"
+        const val ACTIVE_PROVIDER_NAME = "auth-jwt-active"
+        const val PENDING_VERIFICATION_PROVIDER_NAME = "auth-jwt-pending-verification"
+        const val PENDING_APPROVAL_PROVIDER_NAME = "auth-jwt-pending-approval"
         const val REALM = "companero-api"
 
         private val ACCESS_TOKEN_TTL: Duration = Duration.ofMinutes(15)

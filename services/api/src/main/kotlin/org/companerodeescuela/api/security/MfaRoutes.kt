@@ -3,6 +3,7 @@ package org.companerodeescuela.api.security
 import io.ktor.http.HttpHeaders
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
+import io.ktor.server.auth.AuthenticationStrategy
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
 import io.ktor.server.response.header
@@ -41,7 +42,11 @@ fun Route.mfaRoutes(settings:ApiSettings,identity:IdentityProvider,sessions:Refr
         }
         return actor
     }
-    authenticate(AuthTokenService.PROVIDER_NAME) {
+    authenticate(
+        AuthTokenService.ACTIVE_PROVIDER_NAME,
+        AuthTokenService.PENDING_APPROVAL_PROVIDER_NAME,
+        strategy = AuthenticationStrategy.FirstSuccessful,
+    ) {
         route("/auth/mfa") {
             get("/status") { call.respond(ApiResponse(mfa.status(call.actor()),call.requestId())) }
             post("/enrollment") {
@@ -53,6 +58,8 @@ fun Route.mfaRoutes(settings:ApiSettings,identity:IdentityProvider,sessions:Refr
                 call.respond(ApiResponse(mfa.confirmEnrollment(actor,request.enrollmentId,request.otp),call.requestId()))
             }
             post("/step-up") {
+                val payload = call.principal<JWTPrincipal>()?.payload ?: throw ApiException.Unauthorized()
+                if (tokens.userFrom(payload).accountStatus != AccountStatus.ACTIVE) throw ApiException.Unauthorized()
                 val actor=call.actor("step-up");val request=call.mfaRequest(MfaStepUpRequest.serializer())
                 call.respond(ApiResponse(mfa.issueStepUp(actor,request.password,request.otp,request.action,request.resourceId,request.operationId,request.payloadDigest),call.requestId()))
             }

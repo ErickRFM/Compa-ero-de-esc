@@ -29,6 +29,30 @@ class SettingsLoaderTest {
         assertEquals("v1", settings.apiVersion)
         assertFalse(settings.mongo.isConfigured)
         assertFalse(settings.hasAuthentication)
+        assertFalse(settings.trustedProxy)
+        assertEquals(1L, settings.loginProgressiveDelayBaseSeconds)
+        assertEquals(30L, settings.loginProgressiveDelayMaxSeconds)
+    }
+
+    @Test
+    fun trustedProxyAndProgressiveDelayMustBeExplicitlyValid() {
+        val enabled = loader(
+            "API_PORT" to "8080", "MONGODB_DATABASE" to "c", "TRUSTED_PROXY" to "true",
+            "LOGIN_PROGRESSIVE_DELAY_BASE_SECONDS" to "2", "LOGIN_PROGRESSIVE_DELAY_MAX_SECONDS" to "12",
+        ).load()
+        assertTrue(enabled.trustedProxy)
+        assertEquals(2L, enabled.loginProgressiveDelayBaseSeconds)
+        assertEquals(12L, enabled.loginProgressiveDelayMaxSeconds)
+
+        assertContains(assertFailsWith<ConfigurationException> {
+            loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c", "TRUSTED_PROXY" to "yes").load()
+        }.message!!, "TRUSTED_PROXY")
+        assertContains(assertFailsWith<ConfigurationException> {
+            loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c", "LOGIN_PROGRESSIVE_DELAY_BASE_SECONDS" to "31").load()
+        }.message!!, "LOGIN_PROGRESSIVE_DELAY_BASE_SECONDS")
+        assertContains(assertFailsWith<ConfigurationException> {
+            loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c", "LOGIN_PROGRESSIVE_DELAY_BASE_SECONDS" to "10", "LOGIN_PROGRESSIVE_DELAY_MAX_SECONDS" to "2").load()
+        }.message!!, "must be at least")
     }
 
     @Test

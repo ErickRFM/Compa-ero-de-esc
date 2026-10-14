@@ -17,8 +17,10 @@ import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.defaultheaders.DefaultHeaders
+import io.ktor.server.plugins.forwardedheaders.XForwardedHeaders
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.request.httpMethod
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.path
 import io.ktor.server.response.respond
 import io.ktor.server.response.header
@@ -66,6 +68,9 @@ private val AUTHORITY_UNAVAILABLE = AttributeKey<Boolean>("liveIdentityAuthority
  */
 fun ApplicationCall.requestId(): String? = callId
 
+/** Returns the client address, honoring forwarded headers only when configured as trusted. */
+fun ApplicationCall.clientAddress(): String = request.origin.remoteHost
+
 /**
  * Installs cross-cutting plugins.
  *
@@ -84,6 +89,8 @@ fun Application.configurePlugins(
         requireNotNull(sessionAuthority) { "Authentication requires live identity authority" }
     }
     install(DefaultHeaders)
+
+    if (settings.trustedProxy) install(XForwardedHeaders)
 
     install(CallId) {
         header(REQUEST_ID_HEADER)

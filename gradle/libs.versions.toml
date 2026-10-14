@@ -112,6 +112,7 @@ ktor-server-content-negotiation = { group = "io.ktor", name = "ktor-server-conte
 ktor-server-status-pages = { group = "io.ktor", name = "ktor-server-status-pages" }
 ktor-server-call-logging = { group = "io.ktor", name = "ktor-server-call-logging" }
 ktor-server-call-id = { group = "io.ktor", name = "ktor-server-call-id" }
+ktor-server-forwarded-header = { group = "io.ktor", name = "ktor-server-forwarded-header" }
 ktor-server-cors = { group = "io.ktor", name = "ktor-server-cors" }
 ktor-server-default-headers = { group = "io.ktor", name = "ktor-server-default-headers" }
 # auth and auth-jwt are staged for the login phase (M1). Referencing them from

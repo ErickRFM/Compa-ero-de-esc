@@ -64,6 +64,7 @@ import org.companerodeescuela.feature.coordinator.CoordinatorHomeScreen
 import org.companerodeescuela.feature.designsystem.DesignSystemCatalogScreen
 import org.companerodeescuela.feature.home.HomeScreen
 import org.companerodeescuela.feature.grading.GradebookScreen
+import org.companerodeescuela.feature.grading.StudentGradesScreen
 import org.companerodeescuela.shared.contracts.TeacherClassContext
 import org.companerodeescuela.feature.profile.ActiveExperiencePreferences
 import org.companerodeescuela.feature.profile.ProfileScreen
@@ -366,7 +367,11 @@ class MainActivity : AppCompatActivity() {
                                         }
                                         composable(Destination.Grading.route) { entry ->
                                             val selection by entry.savedStateHandle.getStateFlow<TeacherClassContext?>(TeacherClassContext.STATE_KEY, null).collectAsStateWithLifecycle()
-                                            GradebookScreen(requestedClassroom = selection)
+                                            if (roleConfig.experience == AppExperience.STUDENT) {
+                                                StudentGradesScreen()
+                                            } else {
+                                                GradebookScreen(requestedClassroom = selection)
+                                            }
                                         }
                                         composable(Destination.Channel.route) { entry ->
                                             val selection by entry.savedStateHandle.getStateFlow<TeacherClassContext?>(TeacherClassContext.STATE_KEY, null).collectAsStateWithLifecycle()

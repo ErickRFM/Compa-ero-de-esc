@@ -17,6 +17,7 @@ class RoleExperienceResolverTest {
                 TopLevelDestination.Schedule,
                 TopLevelDestination.Attendance,
                 TopLevelDestination.Classrooms,
+                TopLevelDestination.Grading,
                 TopLevelDestination.Profile,
             ),
             config.topLevelDestinations,
@@ -99,12 +100,13 @@ class RoleExperienceResolverTest {
 
         assertEquals(AppExperience.SUPER_ADMIN, superAdmin.experience)
         assertEquals(Destination.AdminHome, superAdmin.startDestination)
-        val expected = listOf(
-            TopLevelDestination.AdminHome,
-            TopLevelDestination.Schedule,
-            TopLevelDestination.Classrooms,
-            TopLevelDestination.Channel,
-        )
+        val expected =
+            listOf(
+                TopLevelDestination.AdminHome,
+                TopLevelDestination.Schedule,
+                TopLevelDestination.Classrooms,
+                TopLevelDestination.Channel,
+            )
         assertEquals(expected, admin.topLevelDestinations)
         assertEquals(expected, superAdmin.topLevelDestinations)
     }
@@ -119,7 +121,8 @@ class RoleExperienceResolverTest {
         )
         assertEquals(
             AppExperience.TEACHER,
-            RoleExperienceResolver.resolve(
+            RoleExperienceResolver
+                .resolve(
                 roles,
                 preferredExperience = AppExperience.TEACHER,
             ).experience,
@@ -128,10 +131,11 @@ class RoleExperienceResolverTest {
 
     @Test
     fun `ungranted preferred experience is ignored`() {
-        val config = RoleExperienceResolver.resolve(
-            roles = setOf(UserRole.STUDENT),
-            preferredExperience = AppExperience.ADMIN,
-        )
+        val config =
+            RoleExperienceResolver.resolve(
+                roles = setOf(UserRole.STUDENT),
+                preferredExperience = AppExperience.ADMIN,
+            )
 
         assertEquals(AppExperience.STUDENT, config.experience)
     }

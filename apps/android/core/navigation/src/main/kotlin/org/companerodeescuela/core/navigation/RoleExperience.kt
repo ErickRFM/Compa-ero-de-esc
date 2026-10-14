@@ -66,6 +66,7 @@ object RoleExperienceResolver {
                     TopLevelDestination.Schedule,
                     TopLevelDestination.Attendance,
                     TopLevelDestination.Classrooms,
+                    TopLevelDestination.Grading,
                     TopLevelDestination.Profile,
                 ),
             )

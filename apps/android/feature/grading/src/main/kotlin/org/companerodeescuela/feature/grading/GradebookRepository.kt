@@ -86,6 +86,20 @@ class GradebookRepository(
             }.map { it.data }
         }
 
+    suspend fun studentView(
+        classroomId: String,
+        gradingPeriod: String,
+    ): Outcome<GradebookSnapshot?> =
+        authorized { token ->
+            apiCall {
+                client
+                    .get("grading/students/$classroomId") {
+                        bearerAuth(token)
+                        parameter("gradingPeriod", gradingPeriod)
+                    }.requireBody<ApiResponse<GradebookSnapshot?>>()
+            }.map { it.data }
+        }
+
     private suspend fun <T> authorized(block: suspend (String) -> Outcome<T>): Outcome<T> {
         val token =
             when (val result = refreshCoordinator.currentAccessToken()) {

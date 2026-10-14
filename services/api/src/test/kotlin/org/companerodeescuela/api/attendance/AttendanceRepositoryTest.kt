@@ -47,6 +47,17 @@ class AttendanceRepositoryTest {
         assertEquals(1, repository.recordsForSession("session-1").size)
     }
 
+    @Test
+    fun `QR nonce usage counts distinct students per session until the session TTL`() = runTest {
+        val repository = InMemoryAttendanceRepository()
+
+        assertEquals(1L, repository.recordQrNonceUse("session-1", "nonce", "student-a", 100, 50))
+        assertEquals(1L, repository.recordQrNonceUse("session-1", "nonce", "student-a", 100, 60))
+        assertEquals(2L, repository.recordQrNonceUse("session-1", "nonce", "student-b", 100, 60))
+        assertEquals(1L, repository.recordQrNonceUse("session-2", "nonce", "student-c", 200, 60))
+        assertEquals(1L, repository.recordQrNonceUse("session-1", "nonce", "student-c", 200, 100))
+    }
+
     private fun session(id: String) = AttendanceSessionResponse(
         id = id,
         occurrenceId = "occ-1",

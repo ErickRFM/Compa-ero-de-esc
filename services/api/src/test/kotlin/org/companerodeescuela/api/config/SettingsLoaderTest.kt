@@ -27,6 +27,8 @@ class SettingsLoaderTest {
         assertEquals(8080, settings.port)
         assertEquals("companero-api", settings.serviceName)
         assertEquals("v1", settings.apiVersion)
+        assertEquals(7_200L, settings.lateSyncReviewWindowSeconds)
+        assertEquals(3, settings.attendanceQrNonceReuseThreshold)
         assertFalse(settings.mongo.isConfigured)
         assertFalse(settings.hasAuthentication)
         assertFalse(settings.trustedProxy)
@@ -81,6 +83,39 @@ class SettingsLoaderTest {
             loader("API_PORT" to "not-a-port", "MONGODB_DATABASE" to "companero").load()
         }
         assertContains(error.message!!, "API_PORT")
+    }
+
+    @Test
+    @DisplayName("Attendance QR abuse controls use bounded configurable defaults")
+    fun attendanceQrDecisionDefaultsAndOverrides() {
+        val defaults = loader("API_PORT" to "8080", "MONGODB_DATABASE" to "companero").load()
+        val configured = loader(
+            "API_PORT" to "8080",
+            "MONGODB_DATABASE" to "companero",
+            "LATE_SYNC_REVIEW_WINDOW_SECONDS" to "3600",
+            "ATTENDANCE_QR_NONCE_REUSE_THRESHOLD" to "4",
+        ).load()
+
+        assertEquals(7_200L, defaults.lateSyncReviewWindowSeconds)
+        assertEquals(3, defaults.attendanceQrNonceReuseThreshold)
+        assertEquals(3_600L, configured.lateSyncReviewWindowSeconds)
+        assertEquals(4, configured.attendanceQrNonceReuseThreshold)
+    }
+
+    @Test
+    @DisplayName("Invalid attendance QR abuse settings fail startup")
+    fun invalidAttendanceQrSettingsAreRejected() {
+        for ((name, value) in listOf(
+            "LATE_SYNC_REVIEW_WINDOW_SECONDS" to "not-a-number",
+            "LATE_SYNC_REVIEW_WINDOW_SECONDS" to "0",
+            "ATTENDANCE_QR_NONCE_REUSE_THRESHOLD" to "not-a-number",
+            "ATTENDANCE_QR_NONCE_REUSE_THRESHOLD" to "0",
+        )) {
+            val error = assertFailsWith<ConfigurationException> {
+                loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c", name to value).load()
+            }
+            assertContains(error.message!!, name)
+        }
     }
 
     @Test

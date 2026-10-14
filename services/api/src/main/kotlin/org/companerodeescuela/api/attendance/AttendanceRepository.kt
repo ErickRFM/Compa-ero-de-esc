@@ -27,6 +27,13 @@ interface AttendanceRepository {
     suspend fun recordsForSession(sessionId: String): List<AttendanceRecordResponse>
     suspend fun replaceRecord(record: AttendanceRecordResponse)
     suspend fun findRecord(id: String): AttendanceRecordResponse?
+    suspend fun recordQrNonceUse(
+        sessionId: String,
+        nonce: String,
+        studentId: String,
+        expiresAtEpochSeconds: Long,
+        nowEpochSeconds: Long,
+    ): Long
 }
 
 class InMemoryAttendanceRepository : AttendanceRepository {
@@ -35,6 +42,7 @@ class InMemoryAttendanceRepository : AttendanceRepository {
     private val occurrenceToSession = linkedMapOf<String, String>()
     private val records = linkedMapOf<String, AttendanceRecordResponse>()
     private val operationToRecord = linkedMapOf<String, String>()
+    private val qrNonceUses = linkedMapOf<Pair<String, String>, MutableMap<String, Long>>()
 
     override suspend fun createSession(session: AttendanceSessionResponse): SessionWriteResult =
         mutex.withLock {
@@ -105,4 +113,19 @@ class InMemoryAttendanceRepository : AttendanceRepository {
 
     override suspend fun findRecord(id: String): AttendanceRecordResponse? =
         mutex.withLock { records[id] }
+
+    override suspend fun recordQrNonceUse(
+        sessionId: String,
+        nonce: String,
+        studentId: String,
+        expiresAtEpochSeconds: Long,
+        nowEpochSeconds: Long,
+    ): Long = mutex.withLock {
+        val key = sessionId to nonce
+        val students = qrNonceUses.getOrPut(key) { linkedMapOf() }
+        students.entries.removeIf { it.value <= nowEpochSeconds }
+        if (expiresAtEpochSeconds > nowEpochSeconds) students.putIfAbsent(studentId, expiresAtEpochSeconds)
+        if (students.isEmpty()) qrNonceUses.remove(key)
+        students.size.toLong()
+    }
 }

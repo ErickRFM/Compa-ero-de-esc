@@ -1,10 +1,14 @@
 package org.companerodeescuela.api.attendance
 
 import com.mongodb.MongoWriteException
+import com.mongodb.client.model.Filters.and
 import com.mongodb.client.model.Filters.eq
+import com.mongodb.client.model.Filters.gt
 import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
 import com.mongodb.client.model.ReplaceOptions
+import com.mongodb.client.model.UpdateOptions
+import com.mongodb.client.model.Updates
 import com.mongodb.kotlin.client.coroutine.MongoCollection
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import kotlinx.coroutines.flow.firstOrNull
@@ -12,6 +16,8 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.bson.Document
+import java.util.Date
+import java.util.concurrent.TimeUnit
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.companerodeescuela.shared.contracts.AttendanceReviewEntry
@@ -29,6 +35,8 @@ class MongoAttendanceRepository(
         database.getCollection(SESSIONS_COLLECTION)
     private val records: MongoCollection<Document> =
         database.getCollection(RECORDS_COLLECTION)
+    private val qrNonceUses: MongoCollection<Document> =
+        database.getCollection(QR_NONCE_USES_COLLECTION)
     private val indexMutex = Mutex()
 
     @Volatile
@@ -147,6 +155,33 @@ class MongoAttendanceRepository(
         return records.find(eq("_id", id)).firstOrNull()?.toRecord()
     }
 
+    override suspend fun recordQrNonceUse(
+        sessionId: String,
+        nonce: String,
+        studentId: String,
+        expiresAtEpochSeconds: Long,
+        nowEpochSeconds: Long,
+    ): Long {
+        ensureIndexes()
+        val filter = and(eq("sessionId", sessionId), eq("nonce", nonce), eq("studentId", studentId))
+        try {
+            qrNonceUses.updateOne(
+                filter,
+                Updates.setOnInsert("expiresAt", Date.from(java.time.Instant.ofEpochSecond(expiresAtEpochSeconds))),
+                UpdateOptions().upsert(true),
+            )
+        } catch (error: MongoWriteException) {
+            if (error.error.code != 11000) throw error
+        }
+        return qrNonceUses.countDocuments(
+            and(
+                eq("sessionId", sessionId),
+                eq("nonce", nonce),
+                gt("expiresAt", Date.from(java.time.Instant.ofEpochSecond(nowEpochSeconds))),
+            ),
+        )
+    }
+
     private suspend fun ensureIndexes() {
         if (indexesReady) return
         indexMutex.withLock {
@@ -167,6 +202,14 @@ class MongoAttendanceRepository(
             records.createIndex(
                 Indexes.ascending("sessionId"),
                 IndexOptions().name("ix_attendance_record_session"),
+            )
+            qrNonceUses.createIndex(
+                Indexes.ascending("sessionId", "nonce", "studentId"),
+                IndexOptions().unique(true).name("uq_attendance_qr_nonce_student"),
+            )
+            qrNonceUses.createIndex(
+                Indexes.ascending("expiresAt"),
+                IndexOptions().expireAfter(0, TimeUnit.SECONDS).name("ttl_attendance_qr_nonce_use"),
             )
             indexesReady = true
         }
@@ -255,5 +298,6 @@ class MongoAttendanceRepository(
     private companion object {
         const val SESSIONS_COLLECTION = "attendance_sessions"
         const val RECORDS_COLLECTION = "attendance_records"
+        const val QR_NONCE_USES_COLLECTION = "attendance_qr_nonce_uses"
     }
 }

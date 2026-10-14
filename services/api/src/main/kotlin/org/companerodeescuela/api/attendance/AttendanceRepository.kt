@@ -12,6 +12,12 @@ sealed interface AttemptWriteResult {
     data object OperationConflict : AttemptWriteResult
 }
 
+enum class AttemptReservationResult {
+    ACCEPTED,
+    OPERATION_CONFLICT,
+    LIMIT_REACHED,
+}
+
 sealed interface SessionWriteResult {
     data class Created(val session: AttendanceSessionResponse) : SessionWriteResult
     data class Existing(val session: AttendanceSessionResponse) : SessionWriteResult
@@ -24,6 +30,14 @@ interface AttendanceRepository {
     suspend fun findOpenSessions(): List<AttendanceSessionResponse>
     suspend fun replaceSession(session: AttendanceSessionResponse)
     suspend fun writeAttempt(record: AttendanceRecordResponse): AttemptWriteResult
+    suspend fun reserveAttempt(
+        sessionId: String,
+        studentId: String,
+        operationId: String,
+        requestFingerprint: String,
+        maxAttempts: Int,
+    ): AttemptReservationResult
+    suspend fun replaceRejectedRecord(record: AttendanceRecordResponse): AttendanceRecordResponse
     suspend fun recordsForSession(sessionId: String): List<AttendanceRecordResponse>
     suspend fun replaceRecord(record: AttendanceRecordResponse)
     suspend fun findRecord(id: String): AttendanceRecordResponse?
@@ -43,6 +57,8 @@ class InMemoryAttendanceRepository : AttendanceRepository {
     private val records = linkedMapOf<String, AttendanceRecordResponse>()
     private val operationToRecord = linkedMapOf<String, String>()
     private val qrNonceUses = linkedMapOf<Pair<String, String>, MutableMap<String, Long>>()
+    private val attemptsByStudent = linkedMapOf<Pair<String, String>, MutableSet<String>>()
+    private val attemptOperationOwners = linkedMapOf<String, Pair<Pair<String, String>, String>>()
 
     override suspend fun createSession(session: AttendanceSessionResponse): SessionWriteResult =
         mutex.withLock {
@@ -97,6 +113,38 @@ class InMemoryAttendanceRepository : AttendanceRepository {
             records[record.id] = record
             operationToRecord[record.operationId] = record.id
             AttemptWriteResult.Created(record)
+        }
+
+    override suspend fun reserveAttempt(
+        sessionId: String,
+        studentId: String,
+        operationId: String,
+        requestFingerprint: String,
+        maxAttempts: Int,
+    ): AttemptReservationResult = mutex.withLock {
+        val key = sessionId to studentId
+        val owner = attemptOperationOwners[operationId]
+        if (owner != null) {
+            return@withLock if (owner == (key to requestFingerprint)) AttemptReservationResult.ACCEPTED
+            else AttemptReservationResult.OPERATION_CONFLICT
+        }
+        val operations = attemptsByStudent.getOrPut(key) { linkedSetOf() }
+        if (operations.size >= maxAttempts) return@withLock AttemptReservationResult.LIMIT_REACHED
+        operations += operationId
+        attemptOperationOwners[operationId] = key to requestFingerprint
+        AttemptReservationResult.ACCEPTED
+    }
+
+    override suspend fun replaceRejectedRecord(record: AttendanceRecordResponse): AttendanceRecordResponse =
+        mutex.withLock {
+            val current = records[record.id] ?: return@withLock record
+            if (current.status == org.companerodeescuela.shared.contracts.AttendanceStatus.REJECTED && current.reviewedBy == null) {
+                records[record.id] = record
+                operationToRecord[record.operationId] = record.id
+                record
+            } else {
+                current
+            }
         }
 
     override suspend fun recordsForSession(sessionId: String): List<AttendanceRecordResponse> =

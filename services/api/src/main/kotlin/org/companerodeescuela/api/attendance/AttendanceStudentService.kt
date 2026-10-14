@@ -2,6 +2,7 @@ package org.companerodeescuela.api.attendance
 
 import io.ktor.http.HttpStatusCode
 import java.time.Clock
+import java.security.MessageDigest
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.config.Environment
@@ -153,6 +154,26 @@ class AttendanceStudentService(
             )
         }
 
+        when (
+            repository.reserveAttempt(
+                sessionId = session.id,
+                studentId = studentId,
+                operationId = operationId,
+                requestFingerprint = requestFingerprint(session.id, studentId, request),
+                maxAttempts = MAX_ATTEMPTS_PER_STUDENT_SESSION,
+            )
+        ) {
+            AttemptReservationResult.ACCEPTED -> Unit
+            AttemptReservationResult.LIMIT_REACHED ->
+                throw ApiException.RateLimited("Too many attendance attempts for this session")
+            AttemptReservationResult.OPERATION_CONFLICT ->
+                throw ApiException.Domain(
+                    status = HttpStatusCode.Conflict,
+                    code = ApiErrorCode.ATTENDANCE_OPERATION_CONFLICT,
+                    message = "operationId was already used for another attendance",
+                )
+        }
+
         if (
             schoolPresenceService == null && environment != Environment.LOCAL &&
             request.qrToken.isNullOrBlank()
@@ -235,7 +256,18 @@ class AttendanceStudentService(
 
         return when (val result = repository.writeAttempt(candidate)) {
             is AttemptWriteResult.Created -> result.record.withCurrentPresencePolicy()
-            is AttemptWriteResult.Existing -> result.record.withCurrentPresencePolicy()
+            is AttemptWriteResult.Existing -> {
+                if (
+                    result.record.status == AttendanceStatus.REJECTED &&
+                    result.record.reviewedBy == null &&
+                    result.record.operationId != candidate.operationId &&
+                    candidate.status != AttendanceStatus.REJECTED
+                ) {
+                    repository.replaceRejectedRecord(candidate).withCurrentPresencePolicy()
+                } else {
+                    result.record.withCurrentPresencePolicy()
+                }
+            }
             AttemptWriteResult.OperationConflict ->
                 throw ApiException.Domain(
                     status = HttpStatusCode.Conflict,
@@ -391,8 +423,28 @@ class AttendanceStudentService(
         val qrNonce: String? = null,
     )
 
+    private fun requestFingerprint(
+        sessionId: String,
+        studentId: String,
+        request: AttendanceAttemptRequest,
+    ): String {
+        val values = listOf(
+            sessionId,
+            studentId,
+            request.deviceTimestampEpochSeconds.toString(),
+            request.qrToken.orEmpty(),
+            request.schoolNetwork?.ssid.orEmpty(),
+            request.schoolNetwork?.bssid.orEmpty(),
+        )
+        val canonical = values.joinToString(separator = "") { "${it.length}:$it" }
+        return MessageDigest.getInstance("SHA-256")
+            .digest(canonical.toByteArray(Charsets.UTF_8))
+            .joinToString(separator = "") { byte -> byte.toUByte().toString(16).padStart(2, '0') }
+    }
+
     private companion object {
         const val MAX_OPERATION_ID_LENGTH = 128
         const val MAX_QR_TOKEN_LENGTH = 2_048
+        const val MAX_ATTEMPTS_PER_STUDENT_SESSION = 10
     }
 }

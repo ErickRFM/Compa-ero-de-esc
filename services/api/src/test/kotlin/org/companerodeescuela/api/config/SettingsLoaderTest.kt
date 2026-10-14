@@ -157,6 +157,52 @@ class SettingsLoaderTest {
     }
 
     @Test
+    @DisplayName("Production requires MongoDB and the MFA encryption key")
+    fun productionRequiresMongoAndMfaKey() {
+        val jwt = "j".repeat(40)
+        val mongoError = assertFailsWith<ConfigurationException> {
+            loader("APP_ENV" to "production", "API_PORT" to "8080", "MONGODB_DATABASE" to "c",
+                "JWT_SECRET" to jwt, "MFA_ENCRYPTION_KEY" to "A".repeat(43)).load()
+        }
+        assertContains(mongoError.message!!, "MONGODB_URI")
+
+        val mfaError = assertFailsWith<ConfigurationException> {
+            loader("APP_ENV" to "production", "API_PORT" to "8080", "MONGODB_DATABASE" to "c",
+                "MONGODB_URI" to "mongodb://localhost:27017", "JWT_SECRET" to jwt).load()
+        }
+        assertContains(mfaError.message!!, "MFA_ENCRYPTION_KEY")
+    }
+
+    @Test
+    @DisplayName("JWT and attendance QR signing secrets cannot be reused")
+    fun rejectsReusedJwtAndAttendanceQrSecret() {
+        val secret = "same-secret-".padEnd(40, 'x')
+        val error = assertFailsWith<ConfigurationException> {
+            loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c",
+                "JWT_SECRET" to secret, "ATTENDANCE_QR_SECRET" to secret).load()
+        }
+        assertContains(error.message!!, "ATTENDANCE_QR_SECRET")
+    }
+
+    @Test
+    @DisplayName("Present invalid numeric configuration fails instead of using a default")
+    fun rejectsInvalidNumericConfiguration() {
+        for (name in listOf("ATTENDANCE_GRACE_MINUTES", "MONGODB_CONNECT_TIMEOUT_MS", "MONGODB_SERVER_SELECTION_TIMEOUT_MS")) {
+            val error = assertFailsWith<ConfigurationException>(name) {
+                loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c", name to "invalid").load()
+            }
+            assertContains(error.message!!, name)
+        }
+        for ((name, value) in listOf("ATTENDANCE_GRACE_MINUTES" to "16", "MONGODB_CONNECT_TIMEOUT_MS" to "0",
+            "MONGODB_SERVER_SELECTION_TIMEOUT_MS" to "-1")) {
+            val error = assertFailsWith<ConfigurationException>(name) {
+                loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c", name to value).load()
+            }
+            assertContains(error.message!!, name)
+        }
+    }
+
+    @Test
     @DisplayName("A short JWT secret is rejected in every environment")
     fun rejectsShortSecret() {
         val error = assertFailsWith<ConfigurationException> {

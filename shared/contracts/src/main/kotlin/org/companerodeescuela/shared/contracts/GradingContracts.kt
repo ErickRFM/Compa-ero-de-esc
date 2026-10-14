@@ -51,8 +51,11 @@ data class GradeSyncResult(
 
 @Serializable
 enum class GradebookStatus {
-    @SerialName("draft") DRAFT,
-    @SerialName("published") PUBLISHED,
+    @SerialName("draft")
+    DRAFT,
+
+    @SerialName("published")
+    PUBLISHED,
 }
 
 @Serializable

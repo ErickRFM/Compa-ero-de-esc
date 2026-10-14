@@ -50,7 +50,9 @@ data class ApiSettings(
     /**
      * Secret used to sign authentication tokens.
      *
-     * Held as [CharArray] rather than [String] so it can be zeroed after boot.
+     * Held as [CharArray] rather than [String] to avoid retaining an immutable
+     * copy. The loader does not zero it after boot because token signing needs
+     * the key for the lifetime of the service.
      * `null` means "authentication is not configured", which is the only
      * acceptable state in [Environment.LOCAL].
      */
@@ -232,10 +234,17 @@ class SettingsLoader(
         if(schoolPresenceInstitutionId!=null && (schoolPresenceInstitutionId.isBlank() || schoolPresenceInstitutionId!=schoolPresenceInstitutionId.trim() || schoolPresenceInstitutionId.length>128 || schoolPresenceInstitutionId.any(Char::isISOControl))) throw ConfigurationException("SCHOOL_PRESENCE_INSTITUTION_ID must be an explicit bounded institution identifier")
         val schoolWifiSsids = parseCsv(env("SCHOOL_WIFI_SSIDS"))
         val schoolWifiBssids = parseCsv(env("SCHOOL_WIFI_BSSIDS")).map { it.lowercase() }.toSet()
-        val attendanceGraceMinutes = env("ATTENDANCE_GRACE_MINUTES")?.trim()?.toIntOrNull() ?: 5
-        if (attendanceGraceMinutes !in 0..15) {
-            throw ConfigurationException("ATTENDANCE_GRACE_MINUTES must be between 0 and 15")
-        }
+        val attendanceGraceMinutes = intSetting("ATTENDANCE_GRACE_MINUTES", default = 5, range = 0..15)
+        val mongoConnectTimeoutMs = intSetting(
+            "MONGODB_CONNECT_TIMEOUT_MS",
+            default = MongoSettings.DEFAULT_CONNECT_TIMEOUT_MS,
+            range = 1..MAX_MONGODB_TIMEOUT_MS,
+        )
+        val mongoServerSelectionTimeoutMs = intSetting(
+            "MONGODB_SERVER_SELECTION_TIMEOUT_MS",
+            default = MongoSettings.DEFAULT_SERVER_SELECTION_TIMEOUT_MS,
+            range = 1..MAX_MONGODB_TIMEOUT_MS,
+        )
         val lateSyncReviewWindowSeconds = boundedLongSetting(
             "LATE_SYNC_REVIEW_WINDOW_SECONDS",
             env("LATE_SYNC_REVIEW_WINDOW_SECONDS"),
@@ -296,7 +305,14 @@ class SettingsLoader(
             decoded
         }
 
+        if (jwtSecret != null && attendanceQrSecret != null && jwtSecret == attendanceQrSecret) {
+            throw ConfigurationException("ATTENDANCE_QR_SECRET must be different from JWT_SECRET")
+        }
         validateSecret(environment, jwtSecret)
+        if (environment.isProduction) {
+            if (mongoUri.isBlank()) throw ConfigurationException("MONGODB_URI is required when APP_ENV=production")
+            if (mfaKey == null) throw ConfigurationException("MFA_ENCRYPTION_KEY is required when APP_ENV=production")
+        }
         validateOptionalSecret("ATTENDANCE_QR_SECRET", attendanceQrSecret)
         validateSchoolPresence(schoolPresenceQrSha256, schoolWifiSsids, schoolWifiBssids)
 
@@ -315,14 +331,8 @@ class SettingsLoader(
             mongo = MongoSettings(
                 uri = mongoUri,
                 databaseName = databaseName,
-                connectTimeoutMs = env("MONGODB_CONNECT_TIMEOUT_MS")
-                    ?.trim()
-                    ?.toIntOrNull()
-                    ?: MongoSettings.DEFAULT_CONNECT_TIMEOUT_MS,
-                serverSelectionTimeoutMs = env("MONGODB_SERVER_SELECTION_TIMEOUT_MS")
-                    ?.trim()
-                    ?.toIntOrNull()
-                    ?: MongoSettings.DEFAULT_SERVER_SELECTION_TIMEOUT_MS,
+                connectTimeoutMs = mongoConnectTimeoutMs,
+                serverSelectionTimeoutMs = mongoServerSelectionTimeoutMs,
             ),
             jwtSecret = jwtSecret?.toCharArray(),
             jwtIssuer = jwtIssuer,
@@ -365,6 +375,16 @@ class SettingsLoader(
             .map(String::trim)
             .filter(String::isNotEmpty)
             .toSet()
+
+    private fun intSetting(name: String, default: Int, range: IntRange): Int {
+        val raw = env(name) ?: return default
+        val value = raw.trim().toIntOrNull()
+            ?: throw ConfigurationException("$name must be an integer between ${range.first} and ${range.last}")
+        if (value !in range) {
+            throw ConfigurationException("$name must be an integer between ${range.first} and ${range.last}")
+        }
+        return value
+    }
 
     private fun validateSchoolPresence(
         qrSha256: String,
@@ -411,6 +431,7 @@ class SettingsLoader(
         const val DEFAULT_JWT_AUDIENCE = "companero-android"
         const val UNKNOWN_VERSION = "0.0.0-dev"
         const val MIN_SECRET_LENGTH = 32
+        const val MAX_MONGODB_TIMEOUT_MS = 120_000
 
         const val ENV_API_PORT = "API_PORT"
         const val ENV_MONGODB_DATABASE = "MONGODB_DATABASE"

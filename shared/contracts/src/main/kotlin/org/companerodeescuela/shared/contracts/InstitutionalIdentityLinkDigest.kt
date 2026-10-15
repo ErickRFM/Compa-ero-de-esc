@@ -1,5 +1,6 @@
 package org.companerodeescuela.shared.contracts
 
+import kotlinx.serialization.encodeToJsonElement
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject

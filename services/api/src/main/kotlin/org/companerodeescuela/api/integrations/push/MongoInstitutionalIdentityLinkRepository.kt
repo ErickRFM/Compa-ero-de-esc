@@ -35,7 +35,14 @@ class MongoInstitutionalIdentityLinkRepository(
         val byExternal = links.find(identityFilter(link.institutionId, link.entityType, link.externalId)).firstOrNull()
         if (byExternal != null) return byExternal.toRecord().accepts(link)
         val byNative = links.find(nativeFilter(link.institutionId, link.entityType, link.nativeUserId)).firstOrNull()
-        if (byNative != null) return InstitutionalIdentityLinkAcceptance.CONFLICT
+        if (byNative != null) {
+            val existing = byNative.toRecord()
+            return if (existing.externalId == link.externalId) {
+                existing.accepts(link)
+            } else {
+                InstitutionalIdentityLinkAcceptance.CONFLICT
+            }
+        }
         return try {
             links.insertOne(link.toDocument())
             InstitutionalIdentityLinkAcceptance.CREATED
@@ -110,6 +117,9 @@ class MongoInstitutionalIdentityLinkRepository(
 
     private fun InstitutionalIdentityLink.accepts(other: InstitutionalIdentityLink): InstitutionalIdentityLinkAcceptance =
         if (nativeUserId == other.nativeUserId &&
+            institutionId == other.institutionId &&
+            entityType == other.entityType &&
+            externalId == other.externalId &&
             linkedBy == other.linkedBy &&
             operationId == other.operationId &&
             payloadDigest == other.payloadDigest

@@ -30,6 +30,11 @@ import org.companerodeescuela.api.health.HealthService
 import org.companerodeescuela.api.health.healthRoutes
 import org.companerodeescuela.api.institutions.institutionRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
+import org.companerodeescuela.api.integrations.push.InstitutionalPushAuthenticator
+import org.companerodeescuela.api.integrations.push.InstitutionalPushService
+import org.companerodeescuela.api.integrations.push.InstitutionalSecretProtector
+import org.companerodeescuela.api.integrations.push.MongoInstitutionalPushRepository
+import org.companerodeescuela.api.integrations.push.institutionalPushRoutes
 import org.companerodeescuela.api.plugins.configurePlugins
 import org.companerodeescuela.api.presence.schoolPresenceRoutes
 import org.companerodeescuela.api.representatives.groupRepresentativeRoutes
@@ -81,6 +86,21 @@ fun Application.module(
             mfa = identityGraph.mfa,
             institutions = identityGraph.institutions,
         )
+    val institutionalPushRepository =
+        if (settings.mongo.isConfigured && settings.institutionIntegrationEncryptionKey != null) {
+            MongoInstitutionalPushRepository(
+                mongoConnection.database(),
+                InstitutionalSecretProtector(settings.institutionIntegrationEncryptionKey),
+            )
+        } else {
+            null
+        }
+    val institutionalPushAuthenticator =
+        institutionalPushRepository?.let { repository ->
+            InstitutionalPushAuthenticator(repository, repository)
+        }
+    val institutionalPushService =
+        institutionalPushRepository?.let { repository -> InstitutionalPushService(repository) }
     val administrationService =
         AccountAdministrationService(
             identityGraph.accounts,
@@ -184,6 +204,11 @@ fun Application.module(
             administrationService,
         )
         institutionRoutes(identityGraph.institutions)
+        institutionalPushRoutes(
+            institutionalPushAuthenticator,
+            institutionalPushService,
+            institutionalPushRepository,
+        )
         academicRoutes(
             settings = settings,
             academicProvider = providerRegistry.academic,

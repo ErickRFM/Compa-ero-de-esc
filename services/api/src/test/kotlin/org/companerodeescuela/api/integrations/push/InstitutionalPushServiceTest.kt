@@ -15,7 +15,7 @@ class InstitutionalPushServiceTest {
     private val service = InstitutionalPushService(repository, Clock.fixed(now, ZoneOffset.UTC))
     private val institution = VerifiedInstitution("key-a", "tenant-a", setOf("schedule:write"))
     private val body =
-        """{"schemaVersion":1,"eventId":"evt-1","entityType":"schedule","externalId":"class-01","sourceVersion":3,"occurredAtEpochSeconds":${now.epochSecond},"operation":"upsert","payload":{"subject":"Math"}}"""
+        """{"schemaVersion":1,"eventId":"evt-1","entityType":"schedule","externalId":"class-01","sourceVersion":3,"occurredAtEpochSeconds":${now.epochSecond},"operation":"upsert","payload":{"groupId":"group-1","classroomId":"class-1","dayOfWeek":"MONDAY","startTime":"07:00","endTime":"07:50","recurrence":"weekly","status":"scheduled","room":"Aula 1"}}"""
             .toByteArray()
 
     @Test
@@ -33,13 +33,11 @@ class InstitutionalPushServiceTest {
     fun `unknown fields and unsupported versions fail closed`() =
         runBlocking {
             val unknownField =
-                body
-                    .decodeToString()
-                    .replace(
-                        "\"schemaVersion\":1,",
-                        "\"schemaVersion\":1,\"tenantId\":\"attacker\",",
-                    ).toByteArray()
-            val unsupportedVersion = body.decodeToString().replace("\"schemaVersion\":1", "\"schemaVersion\":2").toByteArray()
+                """{"schemaVersion":1,"tenantId":"attacker","eventId":"evt-1","entityType":"schedule","externalId":"class-01","sourceVersion":3,"occurredAtEpochSeconds":${now.epochSecond},"operation":"upsert","payload":{"groupId":"group-1","classroomId":"class-1"}}"""
+                    .toByteArray()
+            val unsupportedVersion =
+                """{"schemaVersion":2,"eventId":"evt-1","entityType":"schedule","externalId":"class-01","sourceVersion":3,"occurredAtEpochSeconds":${now.epochSecond},"operation":"upsert","payload":{"groupId":"group-1","classroomId":"class-1"}}"""
+                    .toByteArray()
 
             assertEquals(InstitutionalPushResult.Invalid, service.accept(institution, unknownField))
             assertEquals(InstitutionalPushResult.Invalid, service.accept(institution, unsupportedVersion))
@@ -56,11 +54,24 @@ class InstitutionalPushServiceTest {
         }
 
     @Test
+    fun `schedule events without valid upsert payload fail before receipt`() =
+        runBlocking {
+            val incomplete =
+                """{"schemaVersion":1,"eventId":"evt-1","entityType":"schedule","externalId":"class-01","sourceVersion":3,"occurredAtEpochSeconds":${now.epochSecond},"operation":"upsert","payload":{}}"""
+                    .toByteArray()
+
+            assertEquals(InstitutionalPushResult.Invalid, service.accept(institution, incomplete))
+            assertEquals(0, repository.records.size)
+        }
+
+    @Test
     fun `repeat event is idempotent and conflicting event id is rejected`() =
         runBlocking {
             assertEquals(false, assertIs<InstitutionalPushResult.Accepted>(service.accept(institution, body)).duplicate)
             assertEquals(true, assertIs<InstitutionalPushResult.Accepted>(service.accept(institution, body)).duplicate)
-            val conflict = body.decodeToString().replace("Math", "History").toByteArray()
+            val conflict =
+                """{"schemaVersion":1,"eventId":"evt-1","entityType":"schedule","externalId":"class-01","sourceVersion":3,"occurredAtEpochSeconds":${now.epochSecond},"operation":"upsert","payload":{"groupId":"group-1","classroomId":"class-1","dayOfWeek":"TUESDAY","startTime":"07:00","endTime":"07:50","recurrence":"weekly","status":"scheduled","room":"Aula 1"}}"""
+                    .toByteArray()
 
             assertEquals(InstitutionalPushResult.Conflict, service.accept(institution, conflict))
             assertEquals(1, repository.records.size)

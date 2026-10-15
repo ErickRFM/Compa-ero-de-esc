@@ -114,7 +114,7 @@ fun Application.module(
             identityGraph.mfa,
         )
     val institutionalIdentityLinkRepository =
-        if (settings.mongo.isConfigured) {
+        if (settings.hasAuthentication && settings.mongo.isConfigured) {
             MongoInstitutionalIdentityLinkRepository(mongoConnection.database())
         } else {
             InMemoryInstitutionalIdentityLinkRepository()

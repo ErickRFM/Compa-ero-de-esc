@@ -32,12 +32,12 @@ import org.companerodeescuela.api.institutions.institutionRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
 import org.companerodeescuela.api.integrations.push.InMemoryInstitutionalIdentityLinkRepository
 import org.companerodeescuela.api.integrations.push.InstitutionalIdentityLinkService
-import org.companerodeescuela.api.integrations.push.institutionalIdentityLinkRoutes
 import org.companerodeescuela.api.integrations.push.InstitutionalPushAuthenticator
 import org.companerodeescuela.api.integrations.push.InstitutionalPushService
 import org.companerodeescuela.api.integrations.push.InstitutionalSecretProtector
 import org.companerodeescuela.api.integrations.push.MongoInstitutionalIdentityLinkRepository
 import org.companerodeescuela.api.integrations.push.MongoInstitutionalPushRepository
+import org.companerodeescuela.api.integrations.push.institutionalIdentityLinkRoutes
 import org.companerodeescuela.api.integrations.push.institutionalPushRoutes
 import org.companerodeescuela.api.plugins.configurePlugins
 import org.companerodeescuela.api.presence.schoolPresenceRoutes

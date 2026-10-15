@@ -1,10 +1,10 @@
 package org.companerodeescuela.api.integrations.push
 
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 data class InstitutionalIdentityLink(
     val institutionId: String,
@@ -43,9 +43,7 @@ class InMemoryInstitutionalIdentityLinkRepository : InstitutionalIdentityLinkRep
         externalId: String,
     ): InstitutionalIdentityLink? = links[key(institutionId, entityType, externalId)]
 
-    override suspend fun createIfAbsent(
-        link: InstitutionalIdentityLink,
-    ): InstitutionalIdentityLinkAcceptance =
+    override suspend fun createIfAbsent(link: InstitutionalIdentityLink): InstitutionalIdentityLinkAcceptance =
         mutex.withLock {
             val identityKey = key(link.institutionId, link.entityType, link.externalId)
             val current = links[identityKey]
@@ -57,18 +55,20 @@ class InMemoryInstitutionalIdentityLinkRepository : InstitutionalIdentityLinkRep
                 }
             }
 
-            val accountAlreadyLinked = links.values.any {
-                it.institutionId == link.institutionId &&
-                    it.entityType == link.entityType &&
-                    it.nativeUserId == link.nativeUserId
-            }
+            val accountAlreadyLinked =
+                links.values.any {
+                    it.institutionId == link.institutionId &&
+                        it.entityType == link.entityType &&
+                        it.nativeUserId == link.nativeUserId
+                }
             if (accountAlreadyLinked) return@withLock InstitutionalIdentityLinkAcceptance.CONFLICT
 
-            val operationAlreadyUsed = links.values.any {
-                it.institutionId == link.institutionId &&
-                    it.entityType == link.entityType &&
-                    it.operationId == link.operationId
-            }
+            val operationAlreadyUsed =
+                links.values.any {
+                    it.institutionId == link.institutionId &&
+                        it.entityType == link.entityType &&
+                        it.operationId == link.operationId
+                }
             if (operationAlreadyUsed) return@withLock InstitutionalIdentityLinkAcceptance.CONFLICT
 
             links[identityKey] = link

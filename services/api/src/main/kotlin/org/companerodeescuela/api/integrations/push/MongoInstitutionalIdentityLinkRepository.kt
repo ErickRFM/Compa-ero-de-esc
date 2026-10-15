@@ -5,12 +5,12 @@ import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
 import com.mongodb.kotlin.client.coroutine.MongoCollection
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
-import org.bson.Document
-import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
-import java.util.Date
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.bson.Document
+import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
+import java.util.Date
 
 class MongoInstitutionalIdentityLinkRepository(
     database: MongoDatabase,
@@ -40,10 +40,11 @@ class MongoInstitutionalIdentityLinkRepository(
             links.insertOne(link.toDocument())
             InstitutionalIdentityLinkAcceptance.CREATED
         } catch (error: MongoException) {
-            if (error.code != DUPLICATE_KEY_CODE) throw error
+            if (error.code != DUPLICATE_KEY_CODE) {
+                throw error
+            }
             val racedExternal = links.find(identityFilter(link.institutionId, link.entityType, link.externalId)).firstOrNull()
-            if (racedExternal != null) racedExternal.toRecord().accepts(link)
-            else InstitutionalIdentityLinkAcceptance.CONFLICT
+            racedExternal?.toRecord()?.accepts(link) ?: InstitutionalIdentityLinkAcceptance.CONFLICT
         }
     }
 
@@ -107,9 +108,7 @@ class MongoInstitutionalIdentityLinkRepository(
             linkedAt = getDate("linkedAt").toInstant(),
         )
 
-    private fun InstitutionalIdentityLink.accepts(
-        other: InstitutionalIdentityLink,
-    ): InstitutionalIdentityLinkAcceptance =
+    private fun InstitutionalIdentityLink.accepts(other: InstitutionalIdentityLink): InstitutionalIdentityLinkAcceptance =
         if (nativeUserId == other.nativeUserId &&
             linkedBy == other.linkedBy &&
             operationId == other.operationId &&

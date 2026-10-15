@@ -99,7 +99,10 @@ class InstitutionalIdentityLinkService(
         }
     }
 
-    private fun validateTarget(target: PlatformAccount, request: InstitutionalIdentityLinkRequest) {
+    private fun validateTarget(
+        target: PlatformAccount,
+        request: InstitutionalIdentityLinkRequest,
+    ) {
         if (!target.permitsSession ||
             target.accountStatus != AccountStatus.ACTIVE ||
             target.emailVerifiedAt == null ||

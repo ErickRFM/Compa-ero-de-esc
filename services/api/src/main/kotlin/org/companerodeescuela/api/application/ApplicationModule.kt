@@ -32,6 +32,7 @@ import org.companerodeescuela.api.institutions.institutionRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
 import org.companerodeescuela.api.integrations.push.InMemoryInstitutionalIdentityLinkRepository
 import org.companerodeescuela.api.integrations.push.InstitutionalIdentityLinkService
+import org.companerodeescuela.api.integrations.push.institutionalIdentityLinkRoutes
 import org.companerodeescuela.api.integrations.push.InstitutionalPushAuthenticator
 import org.companerodeescuela.api.integrations.push.InstitutionalPushService
 import org.companerodeescuela.api.integrations.push.InstitutionalSecretProtector
@@ -218,6 +219,12 @@ fun Application.module(
             identityGraph.refreshSessions,
             identityGraph.accounts,
             administrationService,
+        )
+        institutionalIdentityLinkRoutes(
+            settings,
+            providerRegistry.identity,
+            identityGraph.refreshSessions,
+            identityGraph.accounts,
             institutionalIdentityLinkService,
         )
         institutionRoutes(identityGraph.institutions)

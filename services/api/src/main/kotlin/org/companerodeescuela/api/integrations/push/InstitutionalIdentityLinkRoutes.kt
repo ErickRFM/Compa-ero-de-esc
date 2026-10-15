@@ -14,15 +14,14 @@ import io.ktor.server.routing.route
 import kotlinx.coroutines.CancellationException
 import org.companerodeescuela.api.auth.AuthTokenService
 import org.companerodeescuela.api.auth.LoginAttemptLimiter
-import org.companerodeescuela.api.auth.NativeActorResolver
 import org.companerodeescuela.api.auth.PlatformAccountRepository
 import org.companerodeescuela.api.auth.RefreshSessionRepository
 import org.companerodeescuela.api.auth.boundedAuthRequest
-import org.companerodeescuela.api.auth.toUserSummary
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.integrations.identity.IdentityProvider
 import org.companerodeescuela.api.plugins.requestId
+import org.companerodeescuela.api.security.NativeActorResolver
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkRequest
 

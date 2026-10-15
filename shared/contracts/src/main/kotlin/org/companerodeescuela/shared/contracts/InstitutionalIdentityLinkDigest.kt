@@ -17,10 +17,13 @@ object InstitutionalIdentityLinkDigest {
                 put("targetId", request.institutionId)
                 put("command", json.encodeToJsonElement(request.copy(proof = "")))
             }
-        val digest = MessageDigest.getInstance("SHA-256")
+        val digest =
+            MessageDigest
+                .getInstance("SHA-256")
             .digest(
-                json.encodeToString(envelope).toByteArray(Charsets.UTF_8),
-            )
+                    json.encodeToString(envelope)
+                        .toByteArray(Charsets.UTF_8),
+                )
         return digest.joinToString("") { "%02x".format(it.toInt() and 0xff) }
     }
 }

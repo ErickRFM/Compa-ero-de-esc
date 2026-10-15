@@ -50,6 +50,10 @@ class InMemoryInstitutionalIdentityLinkRepository : InstitutionalIdentityLinkRep
             it.institutionId == link.institutionId && it.entityType == link.entityType && it.nativeUserId == link.nativeUserId
         }
         if (accountAlreadyLinked) return@withLock InstitutionalIdentityLinkAcceptance.CONFLICT
+        val operationAlreadyUsed = links.values.any {
+            it.institutionId == link.institutionId && it.entityType == link.entityType && it.operationId == link.operationId
+        }
+        if (operationAlreadyUsed) return@withLock InstitutionalIdentityLinkAcceptance.CONFLICT
         links[identityKey] = link
         InstitutionalIdentityLinkAcceptance.CREATED
     }

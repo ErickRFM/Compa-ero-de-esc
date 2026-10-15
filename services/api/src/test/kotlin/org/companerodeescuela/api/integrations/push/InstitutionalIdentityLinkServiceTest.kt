@@ -6,16 +6,16 @@ import java.time.ZoneId
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import org.companerodeescuela.api.auth.InMemoryPlatformAccountRepository
 import org.companerodeescuela.api.auth.PasswordHasher
 import org.companerodeescuela.api.auth.PlatformAccount
+import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.institutions.InMemoryInstitutionRepository
 import org.companerodeescuela.api.security.InMemoryMfaRepository
 import org.companerodeescuela.api.security.MfaSecretCipher
 import org.companerodeescuela.api.security.MfaService
 import org.companerodeescuela.api.security.Totp
-import org.companerodeescuela.api.tutoring.InMemoryTutorAssignmentRepository
-import org.companerodeescuela.api.tutoring.TutorAssignmentService
 import org.companerodeescuela.shared.contracts.AdminCapability
 import org.companerodeescuela.shared.contracts.InstitutionSummary
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkRequest
@@ -91,8 +91,12 @@ class InstitutionalIdentityLinkServiceTest {
         )
 
         val linked = service.link(admin.toUserSummary(), request.copy(proof = proof.proof))
-        assertEquals("student-1", service.resolve("campus", "student", "SIS-0091")?.id)
+        assertEquals("student-1", service.resolve("campus", InstitutionalIdentityKind.STUDENT, "SIS-0091")?.id)
         assertEquals("student-1", linked.nativeUserId)
+        assertEquals(linked, service.link(admin.toUserSummary(), request.copy(proof = proof.proof)))
+        assertFailsWith<ApiException.Conflict> {
+            service.link(admin.toUserSummary(), request.copy(nativeUserId = "other-student", proof = "invalid"))
+        }
         assertEquals(null, service.resolve("campus", InstitutionalIdentityKind.STUDENT, "SIS-UNKNOWN"))
     }
 }

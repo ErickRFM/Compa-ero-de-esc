@@ -1,10 +1,14 @@
 package org.companerodeescuela.shared.contracts
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
 enum class InstitutionalIdentityKind {
+    @SerialName("student")
     STUDENT,
+
+    @SerialName("teacher")
     TEACHER,
 }
 

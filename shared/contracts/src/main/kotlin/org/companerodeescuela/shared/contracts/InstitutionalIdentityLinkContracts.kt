@@ -32,3 +32,4 @@ data class InstitutionalIdentityLinkSummary(
     val linkedBy: String,
     val linkedAtEpochSeconds: Long,
 )
+

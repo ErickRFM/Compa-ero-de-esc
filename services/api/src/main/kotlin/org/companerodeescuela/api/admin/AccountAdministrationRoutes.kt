@@ -15,12 +15,20 @@ import kotlinx.serialization.DeserializationStrategy
 import org.companerodeescuela.api.auth.*
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.integrations.identity.IdentityProvider
+import org.companerodeescuela.api.integrations.push.InstitutionalIdentityLinkService
 import org.companerodeescuela.api.security.NativeActorResolver
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.shared.contracts.*
 
-fun Route.accountAdministrationRoutes(settings:ApiSettings,identity:IdentityProvider,sessions:RefreshSessionRepository,accounts:PlatformAccountRepository,service:AccountAdministrationService) {
+fun Route.accountAdministrationRoutes(
+    settings: ApiSettings,
+    identity: IdentityProvider,
+    sessions: RefreshSessionRepository,
+    accounts: PlatformAccountRepository,
+    service: AccountAdministrationService,
+    identityLinkService: InstitutionalIdentityLinkService,
+) {
     if(!settings.hasAuthentication) return
     val tokens=AuthTokenService(settings);val resolver=NativeActorResolver(accounts,sessions,tokens,identity)
     val limiter=LoginAttemptLimiter(maxAttempts=20)
@@ -53,10 +61,16 @@ fun Route.accountAdministrationRoutes(settings:ApiSettings,identity:IdentityProv
             get("/academic-directory") { call.respond(ApiResponse(service.academicDirectory(call.actor()),call.requestId())) }
             get("/approval-groups") { call.respond(ApiResponse(service.approvalGroups(call.actor()),call.requestId())) }
             post("/institutional-identity-links") {
-                val actor=call.actor(true)
-                val request=call.administrationRequest(InstitutionalIdentityLinkRequest.serializer())
-                call.response.header(HttpHeaders.CacheControl,"no-store")
-                call.respond(HttpStatusCode.Created,ApiResponse(service.linkInstitutionalIdentity(actor,request),call.requestId()))
+                val actor = call.actor(true)
+                val request = call.administrationRequest(InstitutionalIdentityLinkRequest.serializer())
+                call.response.header(HttpHeaders.CacheControl, "no-store")
+                call.respond(
+                    HttpStatusCode.Created,
+                    ApiResponse(
+                        identityLinkService.link(actor.toUserSummary(), request),
+                        call.requestId(),
+                    ),
+                )
             }
             post("/{accountId}/staff-approval") {
                 val actor=call.actor(true);val request=call.administrationRequest(ApproveStaffRequest.serializer())
@@ -75,3 +89,4 @@ private suspend fun <T> ApplicationCall.administrationRequest(serializer:Deseria
     boundedAuthRequest(serializer)
 } catch(cancelled:CancellationException) { throw cancelled }
 catch(_:Exception) { throw ApiException.Validation("Invalid administration request") }
+

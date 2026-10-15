@@ -1,10 +1,10 @@
 package org.companerodeescuela.api.integrations.push
 
+import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
 
 data class InstitutionalIdentityLink(
     val institutionId: String,
@@ -17,7 +17,11 @@ data class InstitutionalIdentityLink(
     val linkedAt: Instant,
 )
 
-enum class InstitutionalIdentityLinkAcceptance { CREATED, DUPLICATE, CONFLICT }
+enum class InstitutionalIdentityLinkAcceptance {
+    CREATED,
+    DUPLICATE,
+    CONFLICT,
+}
 
 interface InstitutionalIdentityLinkRepository {
     suspend fun findByExternalId(
@@ -39,29 +43,48 @@ class InMemoryInstitutionalIdentityLinkRepository : InstitutionalIdentityLinkRep
         externalId: String,
     ): InstitutionalIdentityLink? = links[key(institutionId, entityType, externalId)]
 
-    override suspend fun createIfAbsent(link: InstitutionalIdentityLink): InstitutionalIdentityLinkAcceptance = mutex.withLock {
-        val identityKey = key(link.institutionId, link.entityType, link.externalId)
-        val current = links[identityKey]
-        if (current != null) {
-            return@withLock if (current.sameCommand(link)) InstitutionalIdentityLinkAcceptance.DUPLICATE
-            else InstitutionalIdentityLinkAcceptance.CONFLICT
-        }
-        val accountAlreadyLinked = links.values.any {
-            it.institutionId == link.institutionId && it.entityType == link.entityType && it.nativeUserId == link.nativeUserId
-        }
-        if (accountAlreadyLinked) return@withLock InstitutionalIdentityLinkAcceptance.CONFLICT
-        val operationAlreadyUsed = links.values.any {
-            it.institutionId == link.institutionId && it.entityType == link.entityType && it.operationId == link.operationId
-        }
-        if (operationAlreadyUsed) return@withLock InstitutionalIdentityLinkAcceptance.CONFLICT
-        links[identityKey] = link
-        InstitutionalIdentityLinkAcceptance.CREATED
-    }
+    override suspend fun createIfAbsent(
+        link: InstitutionalIdentityLink,
+    ): InstitutionalIdentityLinkAcceptance =
+        mutex.withLock {
+            val identityKey = key(link.institutionId, link.entityType, link.externalId)
+            val current = links[identityKey]
+            if (current != null) {
+                return@withLock if (current.sameCommand(link)) {
+                    InstitutionalIdentityLinkAcceptance.DUPLICATE
+                } else {
+                    InstitutionalIdentityLinkAcceptance.CONFLICT
+                }
+            }
 
-    private fun key(institutionId: String, entityType: InstitutionalIdentityKind, externalId: String) =
-        "$institutionId\u0000${entityType.name}\u0000$externalId"
+            val accountAlreadyLinked = links.values.any {
+                it.institutionId == link.institutionId &&
+                    it.entityType == link.entityType &&
+                    it.nativeUserId == link.nativeUserId
+            }
+            if (accountAlreadyLinked) return@withLock InstitutionalIdentityLinkAcceptance.CONFLICT
+
+            val operationAlreadyUsed = links.values.any {
+                it.institutionId == link.institutionId &&
+                    it.entityType == link.entityType &&
+                    it.operationId == link.operationId
+            }
+            if (operationAlreadyUsed) return@withLock InstitutionalIdentityLinkAcceptance.CONFLICT
+
+            links[identityKey] = link
+            InstitutionalIdentityLinkAcceptance.CREATED
+        }
+
+    private fun key(
+        institutionId: String,
+        entityType: InstitutionalIdentityKind,
+        externalId: String,
+    ) = "$institutionId\u0000${entityType.name}\u0000$externalId"
 
     private fun InstitutionalIdentityLink.sameCommand(other: InstitutionalIdentityLink): Boolean =
-        nativeUserId == other.nativeUserId && linkedBy == other.linkedBy &&
-            operationId == other.operationId && payloadDigest == other.payloadDigest
+        nativeUserId == other.nativeUserId &&
+            linkedBy == other.linkedBy &&
+            operationId == other.operationId &&
+            payloadDigest == other.payloadDigest
 }
+

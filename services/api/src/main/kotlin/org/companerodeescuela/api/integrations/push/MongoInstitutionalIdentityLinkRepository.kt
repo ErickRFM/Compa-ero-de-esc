@@ -5,18 +5,21 @@ import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
 import com.mongodb.kotlin.client.coroutine.MongoCollection
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
-import java.time.Instant
-import java.util.Date
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.flow.firstOrNull
 import org.bson.Document
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
+import java.util.Date
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
-class MongoInstitutionalIdentityLinkRepository(database: MongoDatabase) : InstitutionalIdentityLinkRepository {
+class MongoInstitutionalIdentityLinkRepository(
+    database: MongoDatabase,
+) : InstitutionalIdentityLinkRepository {
     private val links: MongoCollection<Document> = database.getCollection(COLLECTION)
     private val indexMutex = Mutex()
-    @Volatile private var indexesReady = false
+
+    @Volatile
+    private var indexesReady = false
 
     override suspend fun findByExternalId(
         institutionId: String,
@@ -48,20 +51,41 @@ class MongoInstitutionalIdentityLinkRepository(database: MongoDatabase) : Instit
         if (indexesReady) return
         indexMutex.withLock {
             if (indexesReady) return
-            links.createIndex(Indexes.ascending("institutionId", "entityType", "externalId"), IndexOptions().unique(true))
-            links.createIndex(Indexes.ascending("institutionId", "entityType", "nativeUserId"), IndexOptions().unique(true))
-            links.createIndex(Indexes.ascending("institutionId", "entityType", "operationId"), IndexOptions().unique(true))
+            links.createIndex(
+                Indexes.ascending("institutionId", "entityType", "externalId"),
+                IndexOptions().unique(true),
+            )
+            links.createIndex(
+                Indexes.ascending("institutionId", "entityType", "nativeUserId"),
+                IndexOptions().unique(true),
+            )
+            links.createIndex(
+                Indexes.ascending("institutionId", "entityType", "operationId"),
+                IndexOptions().unique(true),
+            )
             indexesReady = true
         }
     }
 
-    private fun identityFilter(institutionId: String, entityType: InstitutionalIdentityKind, externalId: String) =
-        Document("institutionId", institutionId).append("entityType", entityType.name).append("externalId", externalId)
+    private fun identityFilter(
+        institutionId: String,
+        entityType: InstitutionalIdentityKind,
+        externalId: String,
+    ): Document =
+        Document("institutionId", institutionId)
+            .append("entityType", entityType.name)
+            .append("externalId", externalId)
 
-    private fun nativeFilter(institutionId: String, entityType: InstitutionalIdentityKind, nativeUserId: String) =
-        Document("institutionId", institutionId).append("entityType", entityType.name).append("nativeUserId", nativeUserId)
+    private fun nativeFilter(
+        institutionId: String,
+        entityType: InstitutionalIdentityKind,
+        nativeUserId: String,
+    ): Document =
+        Document("institutionId", institutionId)
+            .append("entityType", entityType.name)
+            .append("nativeUserId", nativeUserId)
 
-    private fun InstitutionalIdentityLink.toDocument() =
+    private fun InstitutionalIdentityLink.toDocument(): Document =
         Document("institutionId", institutionId)
             .append("entityType", entityType.name)
             .append("externalId", externalId)
@@ -71,7 +95,7 @@ class MongoInstitutionalIdentityLinkRepository(database: MongoDatabase) : Instit
             .append("payloadDigest", payloadDigest)
             .append("linkedAt", Date.from(linkedAt))
 
-    private fun Document.toRecord() =
+    private fun Document.toRecord(): InstitutionalIdentityLink =
         InstitutionalIdentityLink(
             institutionId = getString("institutionId"),
             entityType = InstitutionalIdentityKind.valueOf(getString("entityType")),
@@ -83,8 +107,14 @@ class MongoInstitutionalIdentityLinkRepository(database: MongoDatabase) : Instit
             linkedAt = getDate("linkedAt").toInstant(),
         )
 
-    private fun InstitutionalIdentityLink.accepts(other: InstitutionalIdentityLink) =
-        if (nativeUserId == other.nativeUserId && linkedBy == other.linkedBy && operationId == other.operationId && payloadDigest == other.payloadDigest) {
+    private fun InstitutionalIdentityLink.accepts(
+        other: InstitutionalIdentityLink,
+    ): InstitutionalIdentityLinkAcceptance =
+        if (nativeUserId == other.nativeUserId &&
+            linkedBy == other.linkedBy &&
+            operationId == other.operationId &&
+            payloadDigest == other.payloadDigest
+        ) {
             InstitutionalIdentityLinkAcceptance.DUPLICATE
         } else {
             InstitutionalIdentityLinkAcceptance.CONFLICT
@@ -95,3 +125,4 @@ class MongoInstitutionalIdentityLinkRepository(database: MongoDatabase) : Instit
         const val DUPLICATE_KEY_CODE = 11000
     }
 }
+

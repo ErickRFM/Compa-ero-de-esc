@@ -30,12 +30,13 @@ import org.companerodeescuela.api.health.HealthService
 import org.companerodeescuela.api.health.healthRoutes
 import org.companerodeescuela.api.institutions.institutionRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
+import org.companerodeescuela.api.integrations.push.InMemoryInstitutionalIdentityLinkRepository
+import org.companerodeescuela.api.integrations.push.InstitutionalIdentityLinkService
 import org.companerodeescuela.api.integrations.push.InstitutionalPushAuthenticator
 import org.companerodeescuela.api.integrations.push.InstitutionalPushService
 import org.companerodeescuela.api.integrations.push.InstitutionalSecretProtector
-import org.companerodeescuela.api.integrations.push.MongoInstitutionalPushRepository
 import org.companerodeescuela.api.integrations.push.MongoInstitutionalIdentityLinkRepository
-import org.companerodeescuela.api.integrations.push.InMemoryInstitutionalIdentityLinkRepository
+import org.companerodeescuela.api.integrations.push.MongoInstitutionalPushRepository
 import org.companerodeescuela.api.integrations.push.institutionalPushRoutes
 import org.companerodeescuela.api.plugins.configurePlugins
 import org.companerodeescuela.api.presence.schoolPresenceRoutes
@@ -110,11 +111,19 @@ fun Application.module(
             academicGraph.groupRepository,
             academicGraph.tutoringService,
             identityGraph.mfa,
-            identityLinks = if (settings.mongo.isConfigured) {
-                MongoInstitutionalIdentityLinkRepository(mongoConnection.database())
-            } else {
-                InMemoryInstitutionalIdentityLinkRepository()
-            },
+        )
+    val institutionalIdentityLinkRepository =
+        if (settings.mongo.isConfigured) {
+            MongoInstitutionalIdentityLinkRepository(mongoConnection.database())
+        } else {
+            InMemoryInstitutionalIdentityLinkRepository()
+        }
+    val institutionalIdentityLinkService =
+        InstitutionalIdentityLinkService(
+            identityGraph.accounts,
+            identityGraph.institutions,
+            institutionalIdentityLinkRepository,
+            identityGraph.mfa,
         )
     val classroomGraph =
         buildClassroomFeatureGraph(
@@ -209,6 +218,7 @@ fun Application.module(
             identityGraph.refreshSessions,
             identityGraph.accounts,
             administrationService,
+            institutionalIdentityLinkService,
         )
         institutionRoutes(identityGraph.institutions)
         institutionalPushRoutes(
@@ -257,3 +267,4 @@ fun Application.module(
         )
     }
 }
+

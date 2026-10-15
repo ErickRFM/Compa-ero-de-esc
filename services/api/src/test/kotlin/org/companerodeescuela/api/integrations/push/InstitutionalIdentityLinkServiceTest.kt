@@ -117,3 +117,4 @@ class InstitutionalIdentityLinkServiceTest {
             assertEquals(null, service.resolve("campus", InstitutionalIdentityKind.STUDENT, "SIS-UNKNOWN"))
         }
 }
+

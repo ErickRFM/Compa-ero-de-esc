@@ -19,6 +19,7 @@ import org.companerodeescuela.api.tutoring.TutorAssignmentService
 import org.companerodeescuela.shared.contracts.AdminCapability
 import org.companerodeescuela.shared.contracts.InstitutionSummary
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkRequest
+import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
 import org.companerodeescuela.shared.contracts.StepUpAction
 import org.companerodeescuela.shared.contracts.UserRole
 
@@ -71,7 +72,7 @@ class InstitutionalIdentityLinkServiceTest {
 
         val request = InstitutionalIdentityLinkRequest(
             institutionId = "campus",
-            entityType = "student",
+            entityType = InstitutionalIdentityKind.STUDENT,
             externalId = "SIS-0091",
             nativeUserId = student.id,
             operationId = "link-0091",
@@ -92,6 +93,6 @@ class InstitutionalIdentityLinkServiceTest {
         val linked = service.link(admin.toUserSummary(), request.copy(proof = proof.proof))
         assertEquals("student-1", service.resolve("campus", "student", "SIS-0091")?.id)
         assertEquals("student-1", linked.nativeUserId)
-        assertEquals(null, service.resolve("campus", org.companerodeescuela.shared.contracts.InstitutionalIdentityKind.STUDENT, "SIS-UNKNOWN"))
+        assertEquals(null, service.resolve("campus", InstitutionalIdentityKind.STUDENT, "SIS-UNKNOWN"))
     }
 }

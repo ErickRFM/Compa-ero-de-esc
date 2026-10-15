@@ -8,14 +8,20 @@ import org.companerodeescuela.api.institutions.InstitutionRepository
 import org.companerodeescuela.api.academic.groups.AcademicGroupRepository
 import org.companerodeescuela.api.tutoring.TutorAssignmentService
 import org.companerodeescuela.api.security.MfaService
+import org.companerodeescuela.api.integrations.push.InstitutionalIdentityLinkRepository
+import org.companerodeescuela.api.integrations.push.InstitutionalIdentityLinkService
+import org.companerodeescuela.api.integrations.push.InMemoryInstitutionalIdentityLinkRepository
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.shared.contracts.*
 
 /** Approval updates one account atomically; deterministic assignment continuation never implies a multi-document transaction. */
 class AccountAdministrationService(private val accounts:PlatformAccountRepository,private val institutions:InstitutionRepository,
     private val groups:AcademicGroupRepository,private val tutoring:TutorAssignmentService,private val mfa:MfaService,
-    private val clock:Clock=Clock.systemUTC()) {
+    private val clock:Clock=Clock.systemUTC(), identityLinks:InstitutionalIdentityLinkRepository=InMemoryInstitutionalIdentityLinkRepository()) {
     private val policy=InstitutionScopePolicy(accounts,clock)
+    private val institutionalIdentityLinks=InstitutionalIdentityLinkService(accounts,institutions,identityLinks,mfa,clock)
+    suspend fun linkInstitutionalIdentity(actor:PlatformAccount,request:InstitutionalIdentityLinkRequest)=
+        institutionalIdentityLinks.link(actor.toUserSummary(),request)
     suspend fun overview(actor:PlatformAccount):AdministrationOverview {
         val capability=if(AdminCapability.APPROVE_STAFF in actor.adminCapabilities) AdminCapability.APPROVE_STAFF else AdminCapability.MANAGE_USERS
         val current=policy.require(actor.toUserSummary(),capability,actor.institutionId ?: "global")

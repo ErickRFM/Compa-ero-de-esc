@@ -34,6 +34,8 @@ import org.companerodeescuela.api.integrations.push.InstitutionalPushAuthenticat
 import org.companerodeescuela.api.integrations.push.InstitutionalPushService
 import org.companerodeescuela.api.integrations.push.InstitutionalSecretProtector
 import org.companerodeescuela.api.integrations.push.MongoInstitutionalPushRepository
+import org.companerodeescuela.api.integrations.push.MongoInstitutionalIdentityLinkRepository
+import org.companerodeescuela.api.integrations.push.InMemoryInstitutionalIdentityLinkRepository
 import org.companerodeescuela.api.integrations.push.institutionalPushRoutes
 import org.companerodeescuela.api.plugins.configurePlugins
 import org.companerodeescuela.api.presence.schoolPresenceRoutes
@@ -108,6 +110,11 @@ fun Application.module(
             academicGraph.groupRepository,
             academicGraph.tutoringService,
             identityGraph.mfa,
+            identityLinks = if (settings.mongo.isConfigured) {
+                MongoInstitutionalIdentityLinkRepository(mongoConnection.database())
+            } else {
+                InMemoryInstitutionalIdentityLinkRepository()
+            },
         )
     val classroomGraph =
         buildClassroomFeatureGraph(

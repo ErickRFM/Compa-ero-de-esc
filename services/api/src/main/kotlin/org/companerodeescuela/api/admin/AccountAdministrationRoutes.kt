@@ -52,6 +52,12 @@ fun Route.accountAdministrationRoutes(settings:ApiSettings,identity:IdentityProv
             get { call.respond(ApiResponse(service.overview(call.actor()),call.requestId())) }
             get("/academic-directory") { call.respond(ApiResponse(service.academicDirectory(call.actor()),call.requestId())) }
             get("/approval-groups") { call.respond(ApiResponse(service.approvalGroups(call.actor()),call.requestId())) }
+            post("/institutional-identity-links") {
+                val actor=call.actor(true)
+                val request=call.administrationRequest(InstitutionalIdentityLinkRequest.serializer())
+                call.response.header(HttpHeaders.CacheControl,"no-store")
+                call.respond(HttpStatusCode.Created,ApiResponse(service.linkInstitutionalIdentity(actor,request),call.requestId()))
+            }
             post("/{accountId}/staff-approval") {
                 val actor=call.actor(true);val request=call.administrationRequest(ApproveStaffRequest.serializer())
                 val id=call.parameters["accountId"] ?: throw ApiException.Validation("Account is required")

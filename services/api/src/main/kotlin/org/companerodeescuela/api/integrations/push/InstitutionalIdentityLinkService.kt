@@ -12,7 +12,7 @@ import org.companerodeescuela.shared.contracts.AdminCapability
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkRequest
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkSummary
-import org.companerodeescuela.shared.contracts.PrivilegedCommandDigests
+import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkDigest
 import org.companerodeescuela.shared.contracts.StepUpAction
 import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
@@ -30,7 +30,7 @@ class InstitutionalIdentityLinkService(
         validate(request)
         val current = policy.require(actor, AdminCapability.MANAGE_ACADEMICS, request.institutionId)
         if (institutions.findEnabled(request.institutionId) == null) throw ApiException.Validation("An enabled institution is required")
-        val digest = PrivilegedCommandDigests.institutionalIdentityLink(request)
+        val digest = InstitutionalIdentityLinkDigest.command(request)
         val prior = repository.findByExternalId(request.institutionId, request.entityType, request.externalId)
         if (prior != null) {
             if (prior.nativeUserId == request.nativeUserId && prior.linkedBy == current.id &&

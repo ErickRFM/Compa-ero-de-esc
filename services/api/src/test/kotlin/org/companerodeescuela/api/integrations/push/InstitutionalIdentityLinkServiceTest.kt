@@ -78,7 +78,7 @@ class InstitutionalIdentityLinkServiceTest {
             operationId = "link-0091",
             proof = "",
         )
-        val digest = org.companerodeescuela.shared.contracts.PrivilegedCommandDigests.institutionalIdentityLink(request)
+        val digest = org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkDigest.command(request)
         clock.current = clock.current.plusSeconds(30)
         val proof = mfa.issueStepUp(
             admin,

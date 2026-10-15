@@ -131,4 +131,3 @@ class AccountAdministrationService(private val accounts:PlatformAccountRepositor
     }
     private fun assignmentId(target:String,application:String,operation:String,group:String):String = "tutor-"+MessageDigest.getInstance("SHA-256").digest(listOf(target,application,operation,group).joinToString("\u0000").toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it.toInt() and 255) }
 }
-

@@ -125,4 +125,3 @@ class MongoInstitutionalIdentityLinkRepository(
         const val DUPLICATE_KEY_CODE = 11000
     }
 }
-

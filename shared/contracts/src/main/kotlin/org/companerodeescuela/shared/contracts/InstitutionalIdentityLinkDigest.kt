@@ -21,4 +21,3 @@ object InstitutionalIdentityLinkDigest {
         return digest.joinToString("") { "%02x".format(it.toInt() and 0xff) }
     }
 }
-

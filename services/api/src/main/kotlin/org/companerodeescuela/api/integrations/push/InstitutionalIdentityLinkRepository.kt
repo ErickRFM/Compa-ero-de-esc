@@ -87,4 +87,3 @@ class InMemoryInstitutionalIdentityLinkRepository : InstitutionalIdentityLinkRep
             operationId == other.operationId &&
             payloadDigest == other.payloadDigest
 }
-

@@ -89,4 +89,3 @@ private suspend fun <T> ApplicationCall.administrationRequest(serializer:Deseria
     boundedAuthRequest(serializer)
 } catch(cancelled:CancellationException) { throw cancelled }
 catch(_:Exception) { throw ApiException.Validation("Invalid administration request") }
-

@@ -151,4 +151,3 @@ class InstitutionalIdentityLinkService(
             linkedAtEpochSeconds = linkedAt.epochSecond,
         )
 }
-

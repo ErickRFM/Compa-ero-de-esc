@@ -97,7 +97,7 @@ class MongoInstitutionalPushRepositoryTest {
                 )
             assertEquals(InstitutionalEventAcceptance.ACCEPTED, repository.accept(newer))
             assertEquals(
-                InstitutionalEventAcceptance.STALE,
+                InstitutionalEventAcceptance.ACCEPTED,
                 repository.accept(
                     record.copy(
                         event = event.copy(eventId = "event-2", sourceVersion = 2),

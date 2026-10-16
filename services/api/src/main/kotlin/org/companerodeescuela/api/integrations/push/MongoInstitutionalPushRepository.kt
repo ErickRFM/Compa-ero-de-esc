@@ -171,6 +171,36 @@ class MongoInstitutionalPushRepository(
         }
     }
 
+    override suspend fun nextScope(now: Instant): InstitutionalProjectionScope? {
+        ensureIndexes()
+        val nowDate = Date.from(now)
+        val claimable =
+            Filters.or(
+                Filters.and(
+                    Filters.eq("projectionStatus", InstitutionalProjectionStatus.PENDING.name.lowercase()),
+                    Filters.lt("projectionAttemptCount", MAX_PROJECTION_ATTEMPTS),
+                ),
+                Filters.and(
+                    Filters.eq("projectionStatus", InstitutionalProjectionStatus.RETRYABLE.name.lowercase()),
+                    Filters.lte("projectionAvailableAt", nowDate),
+                    Filters.lt("projectionAttemptCount", MAX_PROJECTION_ATTEMPTS),
+                ),
+                Filters.and(
+                    Filters.eq("projectionStatus", InstitutionalProjectionStatus.PROCESSING.name.lowercase()),
+                    Filters.lte("projectionLeaseExpiresAt", nowDate),
+                ),
+            )
+        val document =
+            events.find(claimable)
+                .sort(Sorts.ascending("receivedAt", "sourceVersion"))
+                .firstOrNull()
+                ?: return null
+        return InstitutionalProjectionScope(
+            tenantId = document.getString("tenantId"),
+            adapterId = document.getString("projectionAdapterId"),
+        )
+    }
+
     override suspend fun claimNext(
         tenantId: String,
         adapterId: String,

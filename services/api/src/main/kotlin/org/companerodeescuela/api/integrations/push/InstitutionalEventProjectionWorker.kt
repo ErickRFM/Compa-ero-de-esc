@@ -1,12 +1,11 @@
 package org.companerodeescuela.api.integrations.push
 
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.JsonObject
 import org.companerodeescuela.shared.contracts.InstitutionalEventOperation
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind

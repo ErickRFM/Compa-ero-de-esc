@@ -12,6 +12,8 @@ import com.mongodb.client.model.Updates
 import com.mongodb.kotlin.client.coroutine.MongoCollection
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import org.bson.Document
+import org.companerodeescuela.shared.contracts.InstitutionalEventOperation
+import org.companerodeescuela.shared.contracts.InstitutionalPushEvent
 import java.security.MessageDigest
 import java.time.Instant
 import java.util.Date

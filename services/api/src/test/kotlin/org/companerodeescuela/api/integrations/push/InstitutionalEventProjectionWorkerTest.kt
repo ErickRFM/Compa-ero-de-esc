@@ -345,6 +345,7 @@ class InstitutionalEventProjectionWorkerTest {
         var retryAt: Instant? = null
         var retries = 0
         var completions = 0
+        var renewals = 0
 
         override suspend fun nextScope(now: Instant): InstitutionalProjectionScope? =
             queue.firstOrNull()?.let { InstitutionalProjectionScope(it.record.tenantId, it.adapterId) }
@@ -363,7 +364,10 @@ class InstitutionalEventProjectionWorkerTest {
             lease: InstitutionalProjectionLease,
             now: Instant,
             leaseDurationSeconds: Long,
-        ) = true
+        ): Boolean {
+            renewals += 1
+            return true
+        }
 
         override suspend fun complete(
             lease: InstitutionalProjectionLease,

@@ -8,9 +8,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
+import org.bson.Document
 import org.companerodeescuela.shared.contracts.InstitutionalEventOperation
 import org.companerodeescuela.shared.contracts.InstitutionalPushEvent
-import org.bson.Document
 import org.junit.jupiter.api.Timeout
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
 import java.time.Instant
@@ -122,7 +122,11 @@ class MongoInstitutionalPushRepositoryTest {
                     database,
                     InstitutionalSecretProtector(ByteArray(32) { it.toByte() }),
                 )
-            fun record(eventId: String, version: Long) =
+
+            fun record(
+                eventId: String,
+                version: Long,
+            ) =
                 InstitutionalEventRecord(
                     tenantId = "tenant-late",
                     sourceCredentialId = "institution-key",
@@ -147,7 +151,11 @@ class MongoInstitutionalPushRepositoryTest {
             val stored =
                 database
                     .getCollection<Document>(MongoInstitutionalPushRepository.EVENTS_COLLECTION)
-                    .find(Document("tenantId", "tenant-late").append("entityType", "schedule").append("externalId", "course-late"))
+                    .find(
+                        Document("tenantId", "tenant-late")
+                            .append("entityType", "schedule")
+                            .append("externalId", "course-late"),
+                    )
                     .toList()
             assertEquals(setOf(4L, 5L), stored.map { it.getLong("sourceVersion") }.toSet())
         }

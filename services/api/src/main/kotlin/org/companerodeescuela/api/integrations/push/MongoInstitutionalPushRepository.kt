@@ -295,8 +295,18 @@ class MongoInstitutionalPushRepository(
                 sourceVersion = protectedLease.getLong("sourceVersion"),
                 now = now,
             )
-        val status =
+        val appliedVersion =
             if (advanced) {
+                lease.record.event.sourceVersion
+            } else {
+                findAppliedVersion(
+                    tenantId = protectedLease.getString("tenantId"),
+                    entityType = protectedLease.getString("entityType"),
+                    externalId = protectedLease.getString("externalId"),
+                )
+            }
+        val status =
+            if (appliedVersion == lease.record.event.sourceVersion) {
                 InstitutionalProjectionStatus.PROJECTED
             } else {
                 InstitutionalProjectionStatus.SUPERSEDED

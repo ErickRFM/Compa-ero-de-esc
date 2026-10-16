@@ -8,19 +8,21 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.Job
 
 class ManagedWorkerLifecycleTest {
     @Test
     fun `worker is not started when integration is not configured`() =
         testApplication {
             val starts = AtomicInteger()
-            val job =
-                application {
+            var job: Job? = null
+            application {
+                job =
                     launchManagedWorker(enabled = false, context = Dispatchers.Unconfined) {
                         starts.incrementAndGet()
                         awaitCancellation()
                     }
-                }
+            }
 
             assertNull(job)
             assertEquals(0, starts.get())
@@ -29,7 +31,7 @@ class ManagedWorkerLifecycleTest {
     @Test
     fun `worker is cancelled when application stops`() {
         val starts = AtomicInteger()
-        lateinit var job: kotlinx.coroutines.Job
+        lateinit var job: Job
 
         testApplication {
             application {

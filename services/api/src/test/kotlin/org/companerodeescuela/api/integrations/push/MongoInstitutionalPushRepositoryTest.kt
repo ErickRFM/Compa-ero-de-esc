@@ -123,8 +123,11 @@ class MongoInstitutionalPushRepositoryTest {
                     InstitutionalSecretProtector(ByteArray(32) { it.toByte() }),
                 )
 
-            fun record(eventId: String, version: Long): InstitutionalEventRecord {
-                return InstitutionalEventRecord(
+            fun record(
+                eventId: String,
+                version: Long,
+            ): InstitutionalEventRecord =
+                InstitutionalEventRecord(
                     tenantId = "tenant-late",
                     sourceCredentialId = "institution-key",
                     event =
@@ -136,12 +139,14 @@ class MongoInstitutionalPushRepositoryTest {
                             sourceVersion = version,
                             occurredAtEpochSeconds = 1_792_000_000,
                             operation = InstitutionalEventOperation.UPSERT,
-                            payload = kotlinx.serialization.json.buildJsonObject { put("subject", JsonPrimitive("Math")) },
+                            payload =
+                                kotlinx.serialization.json.buildJsonObject {
+                                    put("subject", JsonPrimitive("Math"))
+                                },
                         ),
                     payloadSha256 = version.toString().padStart(64, '0'),
                     receivedAt = Instant.now(),
                 )
-            }
 
             assertEquals(InstitutionalEventAcceptance.ACCEPTED, repository.accept(record("event-5", 5)))
             assertEquals(InstitutionalEventAcceptance.ACCEPTED, repository.accept(record("event-4", 4)))

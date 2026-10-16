@@ -442,6 +442,10 @@ class MongoInstitutionalPushRepository(
                 Indexes.ascending("tenantId", "entityType", "externalId", "sourceVersion"),
                 IndexOptions().unique(true),
             )
+            projectionVersions.createIndex(
+                Indexes.ascending("tenantId", "entityType", "externalId"),
+                IndexOptions().unique(true),
+            )
             rateLimits.createIndex(
                 Indexes.ascending("expiresAt"),
                 IndexOptions().expireAfter(0L, java.util.concurrent.TimeUnit.SECONDS),
@@ -455,11 +459,15 @@ class MongoInstitutionalPushRepository(
         const val NONCES_COLLECTION = "institutional_integration_nonces"
         const val EVENTS_COLLECTION = "institutional_integration_events"
         const val RATE_LIMITS_COLLECTION = "institutional_integration_rate_limits"
+        const val PROJECTION_VERSIONS_COLLECTION = "institutional_integration_projection_versions"
         const val MAX_REQUESTS_PER_WINDOW = 120
         const val RATE_LIMIT_WINDOW_SECONDS = 60L
         const val RATE_LIMIT_RETENTION_SECONDS = 120L
         const val DUPLICATE_KEY_CODE = 11000
         const val CREDENTIAL_VERSION = 1
+        const val MAX_PROJECTION_ATTEMPTS = 8
+        const val MIN_LEASE_SECONDS = 1L
+        const val MAX_LEASE_SECONDS = 900L
     }
 
     private fun sha256(value: String): String {

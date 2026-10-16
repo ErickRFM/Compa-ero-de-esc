@@ -324,6 +324,47 @@ class MongoInstitutionalPushRepository(
         return completed.modifiedCount == 1L
     }
 
+    override suspend fun markPendingIdentity(
+        lease: InstitutionalProjectionLease,
+        now: Instant,
+    ): Boolean = transitionLease(lease, now, InstitutionalProjectionStatus.PENDING_IDENTITY, null)
+
+    override suspend fun markUnsupported(
+        lease: InstitutionalProjectionLease,
+        now: Instant,
+        failureCode: String,
+    ): Boolean {
+        require(SAFE_FAILURE_CODE.matches(failureCode))
+        return transitionLease(lease, now, InstitutionalProjectionStatus.UNSUPPORTED, failureCode)
+    }
+
+    override suspend fun supersede(
+        lease: InstitutionalProjectionLease,
+        now: Instant,
+    ): Boolean = transitionLease(lease, now, InstitutionalProjectionStatus.SUPERSEDED, null)
+
+    private suspend fun transitionLease(
+        lease: InstitutionalProjectionLease,
+        now: Instant,
+        status: InstitutionalProjectionStatus,
+        failureCode: String?,
+    ): Boolean {
+        ensureIndexes()
+        val updates =
+            mutableListOf(
+                Updates.set("projectionStatus", status.name.lowercase()),
+                Updates.unset("projectionLeaseToken"),
+                Updates.unset("projectionLeaseExpiresAt"),
+                Updates.unset("projectionAvailableAt"),
+            )
+        if (failureCode == null) {
+            updates += Updates.unset("projectionFailureCode")
+        } else {
+            updates += Updates.set("projectionFailureCode", failureCode)
+        }
+        return events.updateOne(activeLeaseFilter(lease, now), Updates.combine(updates)).modifiedCount == 1L
+    }
+
     override suspend fun retry(
         lease: InstitutionalProjectionLease,
         now: Instant,

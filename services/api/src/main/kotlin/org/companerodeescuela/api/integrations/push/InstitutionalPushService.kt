@@ -62,6 +62,22 @@ interface InstitutionalProjectionRepository {
         now: Instant,
     ): Boolean
 
+    suspend fun markPendingIdentity(
+        lease: InstitutionalProjectionLease,
+        now: Instant,
+    ): Boolean
+
+    suspend fun markUnsupported(
+        lease: InstitutionalProjectionLease,
+        now: Instant,
+        failureCode: String,
+    ): Boolean
+
+    suspend fun supersede(
+        lease: InstitutionalProjectionLease,
+        now: Instant,
+    ): Boolean
+
     suspend fun retry(
         lease: InstitutionalProjectionLease,
         now: Instant,
@@ -162,7 +178,7 @@ class InstitutionalPushService(
     }
 
     private fun isValid(event: InstitutionalPushEvent): Boolean {
-        if (event.schemaVersion != CURRENT_SCHEMA_VERSION) return false
+        if (event.schemaVersion !in MIN_SUPPORTED_SCHEMA_VERSION..MAX_SUPPORTED_SCHEMA_VERSION) return false
         if (event.eventId.length !in 1..MAX_EVENT_ID_LENGTH || !SAFE_IDENTIFIER.matches(event.eventId)) return false
         if (event.externalId.length !in 1..MAX_EXTERNAL_ID_LENGTH || event.externalId.any(Char::isISOControl)) return false
         if (event.entityType !in InstitutionalPushAuthenticator.ALLOWED_ENTITY_TYPES) return false
@@ -185,6 +201,8 @@ class InstitutionalPushService(
 
     companion object {
         const val CURRENT_SCHEMA_VERSION = 1
+        const val MIN_SUPPORTED_SCHEMA_VERSION = 1
+        const val MAX_SUPPORTED_SCHEMA_VERSION = 32
         const val MAX_BODY_BYTES = 1_048_576
         const val MAX_EVENT_ID_LENGTH = 128
         const val MAX_EXTERNAL_ID_LENGTH = 256

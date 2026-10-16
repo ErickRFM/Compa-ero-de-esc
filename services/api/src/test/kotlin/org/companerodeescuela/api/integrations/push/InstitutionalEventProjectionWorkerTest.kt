@@ -1,17 +1,17 @@
 package org.companerodeescuela.api.integrations.push
 
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneOffset
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import org.companerodeescuela.shared.contracts.InstitutionalEventOperation
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
 import org.companerodeescuela.shared.contracts.InstitutionalPushEvent
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class InstitutionalEventProjectionWorkerTest {
     private val now = Instant.parse("2026-10-15T12:00:00Z")
@@ -327,7 +327,8 @@ class InstitutionalEventProjectionWorkerTest {
             now: Instant,
             leaseDurationSeconds: Long,
         ): InstitutionalProjectionLease? {
-            return queue.removeFirstOrNull()?.takeIf { it.record.tenantId == tenantId && it.adapterId == adapterId }
+            val lease = queue.removeFirstOrNull() ?: return null
+            return lease.takeIf { it.record.tenantId == tenantId && it.adapterId == adapterId }
         }
 
         override suspend fun renew(
@@ -336,7 +337,10 @@ class InstitutionalEventProjectionWorkerTest {
             leaseDurationSeconds: Long,
         ) = true
 
-        override suspend fun complete(lease: InstitutionalProjectionLease, now: Instant): Boolean {
+        override suspend fun complete(
+            lease: InstitutionalProjectionLease,
+            now: Instant,
+        ): Boolean {
             completions += 1
             val result = completeResults.removeFirstOrNull() ?: true
             if (result) {
@@ -363,9 +367,7 @@ class InstitutionalEventProjectionWorkerTest {
             tenantId: String,
             entityType: String,
             externalId: String,
-        ): Long? {
-            return appliedVersions["$tenantId:$entityType:$externalId"]
-        }
+        ): Long? = appliedVersions["$tenantId:$entityType:$externalId"]
 
         override suspend fun reconcile(
             tenantId: String,
@@ -423,7 +425,8 @@ class InstitutionalEventProjectionWorkerTest {
         }
 
         private fun key(record: InstitutionalEventRecord): String {
-            return "${record.tenantId}:${record.event.entityType}:${record.event.externalId}"
+            val event = record.event
+            return "${record.tenantId}:${event.entityType}:${event.externalId}"
         }
     }
 }

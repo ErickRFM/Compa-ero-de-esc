@@ -179,6 +179,7 @@ class MongoInstitutionalPushRepository(
         require(leaseDurationSeconds in MIN_LEASE_SECONDS..MAX_LEASE_SECONDS)
         ensureIndexes()
         val nowDate = Date.from(now)
+        markExhaustedLeases(tenantId, adapterId, nowDate)
         val leaseToken = UUID.randomUUID().toString()
         val leaseExpiresAt = now.plusSeconds(leaseDurationSeconds)
         val claimable =
@@ -293,6 +294,77 @@ class MongoInstitutionalPushRepository(
                 ),
             )
         return completed.modifiedCount == 1L
+    }
+
+    override suspend fun retry(
+        lease: InstitutionalProjectionLease,
+        now: Instant,
+        retryAt: Instant,
+        failureCode: String,
+    ): Boolean {
+        require(retryAt >= now)
+        require(SAFE_FAILURE_CODE.matches(failureCode))
+        ensureIndexes()
+        val exhausted = lease.attemptCount >= MAX_PROJECTION_ATTEMPTS
+        val status =
+            if (exhausted) {
+                InstitutionalProjectionStatus.FAILED
+            } else {
+                InstitutionalProjectionStatus.RETRYABLE
+            }
+        val update =
+            Updates.combine(
+                Updates.set("projectionStatus", status.name.lowercase()),
+                Updates.set("projectionFailureCode", if (exhausted) RETRIES_EXHAUSTED else failureCode),
+                if (exhausted) {
+                    Updates.unset("projectionAvailableAt")
+                } else {
+                    Updates.set("projectionAvailableAt", Date.from(retryAt))
+                },
+                Updates.unset("projectionLeaseToken"),
+                Updates.unset("projectionLeaseExpiresAt"),
+            )
+        return events.updateOne(activeLeaseFilter(lease, now), update).modifiedCount == 1L
+    }
+
+    override suspend fun fail(
+        lease: InstitutionalProjectionLease,
+        now: Instant,
+        failureCode: String,
+    ): Boolean {
+        require(SAFE_FAILURE_CODE.matches(failureCode))
+        ensureIndexes()
+        val update =
+            Updates.combine(
+                Updates.set("projectionStatus", InstitutionalProjectionStatus.FAILED.name.lowercase()),
+                Updates.set("projectionFailureCode", failureCode),
+                Updates.unset("projectionAvailableAt"),
+                Updates.unset("projectionLeaseToken"),
+                Updates.unset("projectionLeaseExpiresAt"),
+            )
+        return events.updateOne(activeLeaseFilter(lease, now), update).modifiedCount == 1L
+    }
+
+    private suspend fun markExhaustedLeases(
+        tenantId: String,
+        adapterId: String,
+        now: Date,
+    ) {
+        events.updateMany(
+            Filters.and(
+                Filters.eq("tenantId", tenantId),
+                Filters.eq("projectionAdapterId", adapterId),
+                Filters.eq("projectionStatus", InstitutionalProjectionStatus.PROCESSING.name.lowercase()),
+                Filters.lte("projectionLeaseExpiresAt", now),
+                Filters.gte("projectionAttemptCount", MAX_PROJECTION_ATTEMPTS),
+            ),
+            Updates.combine(
+                Updates.set("projectionStatus", InstitutionalProjectionStatus.FAILED.name.lowercase()),
+                Updates.set("projectionFailureCode", RETRIES_EXHAUSTED),
+                Updates.unset("projectionLeaseToken"),
+                Updates.unset("projectionLeaseExpiresAt"),
+            ),
+        )
     }
 
     override suspend fun advanceAppliedVersion(
@@ -468,6 +540,8 @@ class MongoInstitutionalPushRepository(
         const val MAX_PROJECTION_ATTEMPTS = 8
         const val MIN_LEASE_SECONDS = 1L
         const val MAX_LEASE_SECONDS = 900L
+        const val RETRIES_EXHAUSTED = "RETRIES_EXHAUSTED"
+        val SAFE_FAILURE_CODE = Regex("[A-Z0-9_]{1,64}")
     }
 
     private fun sha256(value: String): String {

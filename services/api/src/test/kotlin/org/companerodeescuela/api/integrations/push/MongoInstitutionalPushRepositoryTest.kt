@@ -222,6 +222,34 @@ class MongoInstitutionalPushRepositoryTest {
         }
 
     @Test
+    fun `projection retry attempts stop at configured limit`() =
+        database { database ->
+            val repository =
+                MongoInstitutionalPushRepository(
+                    database,
+                    InstitutionalSecretProtector(ByteArray(32) { it.toByte() }),
+                )
+            var now = Instant.parse("2026-10-15T12:00:00Z")
+            repository.accept(projectionRecord("tenant-a", "event-retry"))
+
+            repeat(8) { index ->
+                val lease = assertNotNull(repository.claimNext("tenant-a", "schedule:v1", now, 1))
+                assertEquals(index + 1, lease.attemptCount)
+                assertTrue(repository.retry(lease, now, now, "TEMPORARY"))
+                now = now.plusSeconds(2)
+            }
+
+            assertEquals(null, repository.claimNext("tenant-a", "schedule:v1", now, 30))
+            val stored =
+                database
+                    .getCollection<Document>("institutional_integration_events")
+                    .find(Document("eventId", "event-retry"))
+                    .firstOrNull()
+            assertEquals("failed", stored?.getString("projectionStatus"))
+            assertEquals("RETRIES_EXHAUSTED", stored?.getString("projectionFailureCode"))
+        }
+
+    @Test
     fun `applied version never moves backwards`() =
         database { database ->
             val repository =
@@ -235,7 +263,7 @@ class MongoInstitutionalPushRepositoryTest {
             assertFalse(repository.advanceAppliedVersion("tenant-a", "schedule", "course-a", 4, now.plusSeconds(1)))
             assertTrue(repository.advanceAppliedVersion("tenant-a", "schedule", "course-a", 8, now.plusSeconds(2)))
 
-            assertEquals(8, repository.findAppliedVersion("tenant-a", "schedule", "course-a"))
+            assertEquals(8L, repository.findAppliedVersion("tenant-a", "schedule", "course-a"))
         }
 
     @Test

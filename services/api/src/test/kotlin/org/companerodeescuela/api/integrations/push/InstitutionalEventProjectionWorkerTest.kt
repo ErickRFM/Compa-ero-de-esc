@@ -3,15 +3,15 @@ package org.companerodeescuela.api.integrations.push
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import org.companerodeescuela.shared.contracts.InstitutionalEventOperation
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
 import org.companerodeescuela.shared.contracts.InstitutionalPushEvent
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class InstitutionalEventProjectionWorkerTest {
     private val now = Instant.parse("2026-10-15T12:00:00Z")
@@ -160,7 +160,11 @@ class InstitutionalEventProjectionWorkerTest {
         runBlocking {
             val reference = InstitutionalIdentityReference(InstitutionalIdentityKind.STUDENT, "student-1")
             val record = record(entityType = "student")
-            val leases = listOf(lease("student:v1", record = record, token = "lease-1"), lease("student:v1", record = record, token = "lease-2"))
+            val leases =
+                listOf(
+                    lease("student:v1", record = record, token = "lease-1"),
+                    lease("student:v1", record = record, token = "lease-2"),
+                )
             val adapter =
                 adapter("student:v1") {
                     InstitutionalAdapterOutcome.Command(command("student", identityReferences = listOf(reference)))
@@ -196,7 +200,11 @@ class InstitutionalEventProjectionWorkerTest {
     fun `successful domain write is safe to replay with the same idempotency key`() =
         runBlocking {
             val source = record()
-            val leases = listOf(lease("schedule:v1", record = source, token = "lease-1"), lease("schedule:v1", record = source, token = "lease-2"))
+            val leases =
+                listOf(
+                    lease("schedule:v1", record = source, token = "lease-1"),
+                    lease("schedule:v1", record = source, token = "lease-2"),
+                )
             val adapter = adapter("schedule:v1") { InstitutionalAdapterOutcome.Command(command("schedule")) }
             val repository = FakeProjectionRepository(leases)
             val appliedKeys = mutableSetOf<String>()
@@ -321,7 +329,11 @@ class InstitutionalEventProjectionWorkerTest {
         ): InstitutionalProjectionLease? =
             queue.removeFirstOrNull()?.takeIf { it.record.tenantId == tenantId && it.adapterId == adapterId }
 
-        override suspend fun renew(lease: InstitutionalProjectionLease, now: Instant, leaseDurationSeconds: Long) = true
+        override suspend fun renew(
+            lease: InstitutionalProjectionLease,
+            now: Instant,
+            leaseDurationSeconds: Long,
+        ) = true
 
         override suspend fun complete(lease: InstitutionalProjectionLease, now: Instant): Boolean {
             completions += 1
@@ -346,10 +358,17 @@ class InstitutionalEventProjectionWorkerTest {
             return true
         }
 
-        override suspend fun findAppliedVersion(tenantId: String, entityType: String, externalId: String): Long? =
-            appliedVersions["$tenantId:$entityType:$externalId"]
+        override suspend fun findAppliedVersion(
+            tenantId: String,
+            entityType: String,
+            externalId: String,
+        ): Long? = appliedVersions["$tenantId:$entityType:$externalId"]
 
-        override suspend fun reconcile(tenantId: String, adapterId: String, now: Instant) = 0L
+        override suspend fun reconcile(
+            tenantId: String,
+            adapterId: String,
+            now: Instant,
+        ) = 0L
 
         override suspend fun retry(
             lease: InstitutionalProjectionLease,
@@ -364,13 +383,20 @@ class InstitutionalEventProjectionWorkerTest {
             return true
         }
 
-        override suspend fun fail(lease: InstitutionalProjectionLease, now: Instant, failureCode: String): Boolean {
+        override suspend fun fail(
+            lease: InstitutionalProjectionLease,
+            now: Instant,
+            failureCode: String,
+        ): Boolean {
             this.failureCode = failureCode
             status = InstitutionalProjectionStatus.FAILED
             return true
         }
 
-        override suspend fun markPendingIdentity(lease: InstitutionalProjectionLease, now: Instant): Boolean {
+        override suspend fun markPendingIdentity(
+            lease: InstitutionalProjectionLease,
+            now: Instant,
+        ): Boolean {
             status = InstitutionalProjectionStatus.PENDING_IDENTITY
             return true
         }
@@ -385,7 +411,10 @@ class InstitutionalEventProjectionWorkerTest {
             return true
         }
 
-        override suspend fun supersede(lease: InstitutionalProjectionLease, now: Instant): Boolean {
+        override suspend fun supersede(
+            lease: InstitutionalProjectionLease,
+            now: Instant,
+        ): Boolean {
             status = InstitutionalProjectionStatus.SUPERSEDED
             return true
         }

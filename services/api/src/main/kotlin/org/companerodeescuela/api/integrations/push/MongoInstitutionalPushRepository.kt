@@ -270,13 +270,29 @@ class MongoInstitutionalPushRepository(
     ): Boolean {
         ensureIndexes()
         val filter = activeLeaseFilter(lease, now)
-        if (events.find(filter).firstOrNull() == null) return false
+        val protectedLease =
+            events.findOneAndUpdate(
+                filter,
+                Updates.set(
+                    "projectionLeaseExpiresAt",
+                    Date.from(now.plusSeconds(MAX_LEASE_SECONDS)),
+                ),
+                FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
+            ) ?: return false
+        val completionFilter =
+            Filters.and(
+                Filters.eq("tenantId", lease.record.tenantId),
+                Filters.eq("eventId", lease.record.event.eventId),
+                Filters.eq("projectionAdapterId", lease.adapterId),
+                Filters.eq("projectionStatus", InstitutionalProjectionStatus.PROCESSING.name.lowercase()),
+                Filters.eq("projectionLeaseToken", lease.leaseToken),
+            )
         val advanced =
             advanceAppliedVersion(
-                tenantId = lease.record.tenantId,
-                entityType = lease.record.event.entityType,
-                externalId = lease.record.event.externalId,
-                sourceVersion = lease.record.event.sourceVersion,
+                tenantId = protectedLease.getString("tenantId"),
+                entityType = protectedLease.getString("entityType"),
+                externalId = protectedLease.getString("externalId"),
+                sourceVersion = protectedLease.getLong("sourceVersion"),
                 now = now,
             )
         val status =
@@ -287,7 +303,7 @@ class MongoInstitutionalPushRepository(
             }
         val completed =
             events.updateOne(
-                filter,
+                completionFilter,
                 Updates.combine(
                     Updates.set("projectionStatus", status.name.lowercase()),
                     Updates.unset("projectionLeaseToken"),

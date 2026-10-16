@@ -30,18 +30,19 @@ class InstitutionalPushServiceTest {
         }
 
     @Test
-    fun `unknown fields and unsupported versions fail closed`() =
+    fun `unknown fields fail closed and unsupported schemas are receipted`() =
         runBlocking {
             val unknownField =
                 """{"schemaVersion":1,"tenantId":"attacker","eventId":"evt-1","entityType":"schedule","externalId":"class-01","sourceVersion":3,"occurredAtEpochSeconds":${now.epochSecond},"operation":"upsert","payload":{"groupId":"group-1","classroomId":"class-1"}}"""
                     .toByteArray()
             val unsupportedVersion =
-                """{"schemaVersion":2,"eventId":"evt-1","entityType":"schedule","externalId":"class-01","sourceVersion":3,"occurredAtEpochSeconds":${now.epochSecond},"operation":"upsert","payload":{"groupId":"group-1","classroomId":"class-1"}}"""
+                """{"schemaVersion":2,"eventId":"evt-2","entityType":"schedule","externalId":"class-01","sourceVersion":3,"occurredAtEpochSeconds":${now.epochSecond},"operation":"upsert","payload":{"groupId":"group-1","classroomId":"class-1"}}"""
                     .toByteArray()
 
             assertEquals(InstitutionalPushResult.Invalid, service.accept(institution, unknownField))
-            assertEquals(InstitutionalPushResult.Invalid, service.accept(institution, unsupportedVersion))
-            assertEquals(0, repository.records.size)
+            assertIs<InstitutionalPushResult.Accepted>(service.accept(institution, unsupportedVersion))
+            assertEquals(1, repository.records.size)
+            assertEquals(2, repository.lastRecord?.event?.schemaVersion)
         }
 
     @Test

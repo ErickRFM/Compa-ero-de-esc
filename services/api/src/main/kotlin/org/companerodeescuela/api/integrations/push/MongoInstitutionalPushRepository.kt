@@ -5,7 +5,6 @@ import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
 import com.mongodb.client.model.ReturnDocument
 import com.mongodb.client.model.ReplaceOptions
-import com.mongodb.client.model.Sorts
 import com.mongodb.client.model.Updates
 import com.mongodb.kotlin.client.coroutine.MongoCollection
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
@@ -117,22 +116,11 @@ class MongoInstitutionalPushRepository(
                 InstitutionalEventAcceptance.CONFLICT
             }
         }
-        val entityIdentity =
+        val entityVersionIdentity =
             Document("tenantId", record.tenantId)
                 .append("entityType", record.event.entityType)
                 .append("externalId", record.event.externalId)
-        val latest =
-            events
-                .find(entityIdentity)
-                .sort(Sorts.descending("sourceVersion"))
-                .firstOrNull()
-        if (latest != null && latest.getLong("sourceVersion") >= record.event.sourceVersion) {
-            return if (latest.getLong("sourceVersion") == record.event.sourceVersion) {
-                InstitutionalEventAcceptance.CONFLICT
-            } else {
-                InstitutionalEventAcceptance.STALE
-            }
-        }
+                .append("sourceVersion", record.event.sourceVersion)
         val document =
             Document("tenantId", record.tenantId)
                 .append("eventId", record.event.eventId)
@@ -162,15 +150,10 @@ class MongoInstitutionalPushRepository(
                     InstitutionalEventAcceptance.CONFLICT
                 }
             }
-            val latestAfterRace =
-                events
-                    .find(entityIdentity)
-                    .sort(Sorts.descending("sourceVersion"))
-                    .firstOrNull() ?: throw error
-            if (latestAfterRace.getLong("sourceVersion") == record.event.sourceVersion) {
+            if (events.find(entityVersionIdentity).firstOrNull() != null) {
                 InstitutionalEventAcceptance.CONFLICT
             } else {
-                InstitutionalEventAcceptance.STALE
+                throw error
             }
         }
     }

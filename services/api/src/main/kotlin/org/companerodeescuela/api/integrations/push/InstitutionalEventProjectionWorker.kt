@@ -1,10 +1,10 @@
 package org.companerodeescuela.api.integrations.push
 
-import java.time.Clock
-import java.time.Instant
 import kotlinx.serialization.json.JsonObject
 import org.companerodeescuela.shared.contracts.InstitutionalEventOperation
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
+import java.time.Clock
+import java.time.Instant
 
 data class InstitutionalIdentityReference(
     val kind: InstitutionalIdentityKind,

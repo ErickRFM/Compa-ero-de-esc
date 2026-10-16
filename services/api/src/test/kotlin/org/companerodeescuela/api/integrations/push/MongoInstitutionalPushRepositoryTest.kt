@@ -163,6 +163,167 @@ class MongoInstitutionalPushRepositoryTest {
             assertEquals(setOf(4L, 5L), stored.map { it.getLong("sourceVersion") }.toSet())
         }
 
+    @Test
+    fun `projection claim is tenant scoped`() =
+        database { database ->
+            val repository =
+                MongoInstitutionalPushRepository(
+                    database,
+                    InstitutionalSecretProtector(ByteArray(32) { it.toByte() }),
+                )
+            val now = Instant.parse("2026-10-15T12:00:00Z")
+            repository.accept(projectionRecord("tenant-a", "event-a"))
+            repository.accept(projectionRecord("tenant-b", "event-b"))
+
+            val claimed = repository.claimNext("tenant-b", "schedule:v1", now, 30)
+
+            assertEquals("tenant-b", claimed?.record?.tenantId)
+            assertEquals("event-b", claimed?.record?.event?.eventId)
+        }
+
+    @Test
+    fun `only one worker claims an event`() =
+        database { database ->
+            val repository =
+                MongoInstitutionalPushRepository(
+                    database,
+                    InstitutionalSecretProtector(ByteArray(32) { it.toByte() }),
+                )
+            val now = Instant.parse("2026-10-15T12:00:00Z")
+            repository.accept(projectionRecord("tenant-a", "event-one"))
+
+            val claims =
+                coroutineScope {
+                    (1..16)
+                        .map { async { repository.claimNext("tenant-a", "schedule:v1", now, 30) } }
+                        .awaitAll()
+                }
+
+            assertEquals(1, claims.count { it != null })
+        }
+
+    @Test
+    fun `expired lease can be reclaimed`() =
+        database { database ->
+            val repository =
+                MongoInstitutionalPushRepository(
+                    database,
+                    InstitutionalSecretProtector(ByteArray(32) { it.toByte() }),
+                )
+            val now = Instant.parse("2026-10-15T12:00:00Z")
+            repository.accept(projectionRecord("tenant-a", "event-lease"))
+
+            val first = assertNotNull(repository.claimNext("tenant-a", "schedule:v1", now, 30))
+            val reclaimed = assertNotNull(repository.claimNext("tenant-a", "schedule:v1", now.plusSeconds(31), 30))
+
+            assertTrue(first.leaseToken != reclaimed.leaseToken)
+            assertEquals(2, reclaimed.attemptCount)
+            assertFalse(repository.renew(first, now.plusSeconds(31), 30))
+        }
+
+    @Test
+    fun `applied version never moves backwards`() =
+        database { database ->
+            val repository =
+                MongoInstitutionalPushRepository(
+                    database,
+                    InstitutionalSecretProtector(ByteArray(32) { it.toByte() }),
+                )
+            val now = Instant.parse("2026-10-15T12:00:00Z")
+
+            assertTrue(repository.advanceAppliedVersion("tenant-a", "schedule", "course-a", 5, now))
+            assertFalse(repository.advanceAppliedVersion("tenant-a", "schedule", "course-a", 4, now.plusSeconds(1)))
+            assertTrue(repository.advanceAppliedVersion("tenant-a", "schedule", "course-a", 8, now.plusSeconds(2)))
+
+            assertEquals(8, repository.findAppliedVersion("tenant-a", "schedule", "course-a"))
+        }
+
+    @Test
+    fun `active lease can be renewed`() =
+        database { database ->
+            val repository =
+                MongoInstitutionalPushRepository(
+                    database,
+                    InstitutionalSecretProtector(ByteArray(32) { it.toByte() }),
+                )
+            val now = Instant.parse("2026-10-15T12:00:00Z")
+            repository.accept(projectionRecord("tenant-a", "event-renew"))
+
+            val lease = assertNotNull(repository.claimNext("tenant-a", "schedule:v1", now, 30))
+
+            assertTrue(repository.renew(lease, now.plusSeconds(10), 60))
+            assertEquals(null, repository.claimNext("tenant-a", "schedule:v1", now.plusSeconds(40), 30))
+            assertNotNull(repository.claimNext("tenant-a", "schedule:v1", now.plusSeconds(71), 30))
+        }
+
+    @Test
+    fun `reconciliation requeues only matching tenant and adapter events`() =
+        database { database ->
+            val repository =
+                MongoInstitutionalPushRepository(
+                    database,
+                    InstitutionalSecretProtector(ByteArray(32) { it.toByte() }),
+                )
+            val now = Instant.parse("2026-10-15T12:00:00Z")
+            val events = database.getCollection<Document>("institutional_integration_events")
+            repository.accept(projectionRecord("tenant-a", "event-matching"))
+            repository.accept(projectionRecord("tenant-a", "event-other-adapter", entityType = "course"))
+            repository.accept(projectionRecord("tenant-b", "event-other-tenant"))
+            events.updateOne(
+                Document("eventId", "event-matching"),
+                Document("\$set", Document("projectionStatus", "unsupported")),
+            )
+            events.updateOne(
+                Document("eventId", "event-other-adapter"),
+                Document("\$set", Document("projectionStatus", "unsupported")),
+            )
+            events.updateOne(
+                Document("eventId", "event-other-tenant"),
+                Document("\$set", Document("projectionStatus", "unsupported")),
+            )
+
+            assertEquals(1, repository.reconcile("tenant-a", "schedule:v1", now))
+            assertEquals(
+                "pending",
+                events.find(Document("eventId", "event-matching")).firstOrNull()?.getString("projectionStatus"),
+            )
+            assertEquals(
+                "unsupported",
+                events.find(Document("eventId", "event-other-adapter")).firstOrNull()?.getString("projectionStatus"),
+            )
+            assertEquals(
+                "unsupported",
+                events.find(Document("eventId", "event-other-tenant")).firstOrNull()?.getString("projectionStatus"),
+            )
+        }
+
+    private fun projectionRecord(
+        tenantId: String,
+        eventId: String,
+        entityType: String = "schedule",
+        externalId: String = "course-a",
+        version: Long = 1,
+    ) = InstitutionalEventRecord(
+        tenantId = tenantId,
+        sourceCredentialId = "institution-key",
+        event =
+            InstitutionalPushEvent(
+                schemaVersion = 1,
+                eventId = eventId,
+                entityType = entityType,
+                externalId = externalId,
+                sourceVersion = version,
+                occurredAtEpochSeconds = 1_792_000_000,
+                operation = InstitutionalEventOperation.UPSERT,
+                payload =
+                    kotlinx.serialization.json.buildJsonObject {
+                        put("subject", JsonPrimitive("Math"))
+                    },
+            ),
+        payloadSha256 = version.toString().padStart(64, '0'),
+        receivedAt = Instant.parse("2026-10-15T12:00:00Z"),
+    )
+
     private fun database(block: suspend (MongoDatabase) -> Unit) =
         runBlocking {
             val uri = System.getenv("V12_TEST_MONGODB_URI")

@@ -1,5 +1,6 @@
 package org.companerodeescuela.api.integrations.push
 
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -16,6 +17,28 @@ import kotlin.test.assertTrue
 class InstitutionalEventProjectionWorkerTest {
     private val now = Instant.parse("2026-10-15T12:00:00Z")
     private val clock = Clock.fixed(now, ZoneOffset.UTC)
+
+    @Test
+    fun `worker renews an active lease during long handler execution`() =
+        runBlocking {
+            val adapter = adapter("schedule:v1") { InstitutionalAdapterOutcome.Command(command("schedule")) }
+            val repository = FakeProjectionRepository(lease("schedule:v1"))
+            val worker =
+                worker(
+                    repository,
+                    listOf(adapter),
+                    commandHandler =
+                        InstitutionalProjectionCommandHandler { _, _, _ ->
+                            delay(1_200)
+                        },
+                    leaseDurationSeconds = 3,
+                )
+
+            worker.processNext("tenant-a", "schedule:v1")
+
+            assertTrue(repository.renewals > 0)
+            assertEquals(InstitutionalProjectionStatus.PROJECTED, repository.status)
+        }
 
     @Test
     fun `unsupported schema remains in the receipt ledger for reconciliation`() =
@@ -235,12 +258,14 @@ class InstitutionalEventProjectionWorkerTest {
         adapters: Collection<InstitutionalEventAdapter>,
         identityResolver: InstitutionalProjectionIdentityResolver = InstitutionalProjectionIdentityResolver { _, _ -> null },
         commandHandler: InstitutionalProjectionCommandHandler = InstitutionalProjectionCommandHandler { _, _, _ -> },
+        leaseDurationSeconds: Long = 90,
     ) = InstitutionalEventProjectionWorker(
         repository = repository,
         identityResolver = identityResolver,
         commandHandler = commandHandler,
         adapters = adapters,
         clock = clock,
+        leaseDurationSeconds = leaseDurationSeconds,
     )
 
     private fun adapter(
@@ -320,6 +345,9 @@ class InstitutionalEventProjectionWorkerTest {
         var retryAt: Instant? = null
         var retries = 0
         var completions = 0
+
+        override suspend fun nextScope(now: Instant): InstitutionalProjectionScope? =
+            queue.firstOrNull()?.let { InstitutionalProjectionScope(it.record.tenantId, it.adapterId) }
 
         override suspend fun claimNext(
             tenantId: String,

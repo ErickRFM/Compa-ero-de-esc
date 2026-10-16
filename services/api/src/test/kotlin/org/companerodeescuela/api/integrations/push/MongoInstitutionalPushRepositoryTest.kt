@@ -295,6 +295,30 @@ class MongoInstitutionalPushRepositoryTest {
         }
 
     @Test
+    fun `completion recovers when its version was applied before state update`() =
+        database { database ->
+            val repository =
+                MongoInstitutionalPushRepository(
+                    database,
+                    InstitutionalSecretProtector(ByteArray(32) { it.toByte() }),
+                )
+            val now = Instant.parse("2026-10-15T12:00:00Z")
+            repository.accept(projectionRecord("tenant-a", "event-recovery"))
+            val lease = assertNotNull(repository.claimNext("tenant-a", "schedule:v1", now, 30))
+            assertTrue(repository.advanceAppliedVersion("tenant-a", "schedule", "course-a", 1, now))
+
+            assertTrue(repository.complete(lease, now.plusSeconds(1)))
+            assertEquals(
+                "projected",
+                database
+                    .getCollection<Document>("institutional_integration_events")
+                    .find(Document("eventId", "event-recovery"))
+                    .firstOrNull()
+                    ?.getString("projectionStatus"),
+            )
+        }
+
+    @Test
     fun `active lease can be renewed`() =
         database { database ->
             val repository =

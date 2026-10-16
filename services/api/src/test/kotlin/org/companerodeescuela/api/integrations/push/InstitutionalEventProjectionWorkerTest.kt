@@ -11,8 +11,6 @@ import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
 import org.companerodeescuela.shared.contracts.InstitutionalPushEvent
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class InstitutionalEventProjectionWorkerTest {
@@ -256,7 +254,7 @@ class InstitutionalEventProjectionWorkerTest {
     ) = InstitutionalProjectionCommand(
         institutionId = institutionId,
         entityType = entityType,
-        externalId = "class-1",
+        externalId = if (entityType in setOf("student", "teacher")) "student-1" else "class-1",
         eventId = "event-1",
         sourceVersion = sourceVersion,
         schemaVersion = 1,

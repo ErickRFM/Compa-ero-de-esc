@@ -123,10 +123,8 @@ class MongoInstitutionalPushRepositoryTest {
                     InstitutionalSecretProtector(ByteArray(32) { it.toByte() }),
                 )
 
-            fun record(
-                eventId: String,
-                version: Long,
-            ) = InstitutionalEventRecord(
+            fun record(eventId: String, version: Long): InstitutionalEventRecord {
+                return InstitutionalEventRecord(
                     tenantId = "tenant-late",
                     sourceCredentialId = "institution-key",
                     event =
@@ -143,18 +141,19 @@ class MongoInstitutionalPushRepositoryTest {
                     payloadSha256 = version.toString().padStart(64, '0'),
                     receivedAt = Instant.now(),
                 )
+            }
 
             assertEquals(InstitutionalEventAcceptance.ACCEPTED, repository.accept(record("event-5", 5)))
             assertEquals(InstitutionalEventAcceptance.ACCEPTED, repository.accept(record("event-4", 4)))
 
-            val stored =
-                database.getCollection<Document>(MongoInstitutionalPushRepository.EVENTS_COLLECTION)
-                    .find(
-                        Document("tenantId", "tenant-late")
-                            .append("entityType", "schedule")
-                            .append("externalId", "course-late"),
-                    )
-                    .toList()
+            val events = database.getCollection<Document>(MongoInstitutionalPushRepository.EVENTS_COLLECTION)
+            val filter =
+                Document().apply {
+                    put("tenantId", "tenant-late")
+                    put("entityType", "schedule")
+                    put("externalId", "course-late")
+                }
+            val stored = events.find(filter).toList()
             assertEquals(setOf(4L, 5L), stored.map { it.getLong("sourceVersion") }.toSet())
         }
 

@@ -151,7 +151,6 @@ class InstitutionalEventProjectionWorker(
                     lease = lease,
                     adapter = adapter,
                     command = outcome.value,
-                    priorAppliedVersion = appliedVersion,
                 )
             }
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
@@ -178,7 +177,6 @@ class InstitutionalEventProjectionWorker(
         lease: InstitutionalProjectionLease,
         adapter: InstitutionalEventAdapter,
         command: InstitutionalProjectionCommand,
-        priorAppliedVersion: Long?,
     ) {
         val event = lease.record.event
         if (command.institutionId != lease.record.tenantId ||
@@ -212,6 +210,21 @@ class InstitutionalEventProjectionWorker(
             return
         }
 
+        val requiredIdentity =
+            when (event.entityType) {
+                "student" -> InstitutionalIdentityReference(InstitutionalIdentityKind.STUDENT, event.externalId)
+                "teacher" -> InstitutionalIdentityReference(InstitutionalIdentityKind.TEACHER, event.externalId)
+                else -> null
+            }
+        if (requiredIdentity != null && requiredIdentity !in command.identityReferences) {
+            if (command.identityReferences.any { it.kind == requiredIdentity.kind }) {
+                repository.fail(lease, clock.instant(), COMMAND_IDENTITY_MISMATCH)
+            } else {
+                repository.markPendingIdentity(lease, clock.instant())
+            }
+            return
+        }
+
         val resolved = linkedMapOf<InstitutionalIdentityReference, String>()
         for (reference in command.identityReferences) {
             val nativeUserId = identityResolver.resolve(lease.record.tenantId, reference)
@@ -240,7 +253,7 @@ class InstitutionalEventProjectionWorker(
     }
 
     private fun safeFailureCode(value: String): String =
-        value.takeIf(SAFE_FAILURE_CODE.matches(it)) ?: ADAPTER_EXECUTION_FAILED
+        value.takeIf { SAFE_FAILURE_CODE.matches(it) } ?: ADAPTER_EXECUTION_FAILED
 
     private companion object {
         const val DEFAULT_LEASE_SECONDS = 90L

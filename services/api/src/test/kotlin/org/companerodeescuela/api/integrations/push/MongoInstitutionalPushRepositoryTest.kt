@@ -250,6 +250,34 @@ class MongoInstitutionalPushRepositoryTest {
         }
 
     @Test
+    fun `projection completion requires the current lease and records applied version`() =
+        database { database ->
+            val repository =
+                MongoInstitutionalPushRepository(
+                    database,
+                    InstitutionalSecretProtector(ByteArray(32) { it.toByte() }),
+                )
+            val now = Instant.parse("2026-10-15T12:00:00Z")
+            repository.accept(projectionRecord("tenant-a", "event-complete"))
+
+            val original = assertNotNull(repository.claimNext("tenant-a", "schedule:v1", now, 30))
+            val current = assertNotNull(repository.claimNext("tenant-a", "schedule:v1", now.plusSeconds(31), 30))
+
+            assertFalse(repository.complete(original, now.plusSeconds(31)))
+            assertTrue(repository.complete(current, now.plusSeconds(31)))
+            assertEquals(1L, repository.findAppliedVersion("tenant-a", "schedule", "course-a"))
+            assertEquals(
+                "projected",
+                database
+                    .getCollection<Document>("institutional_integration_events")
+                    .find(Document("eventId", "event-complete"))
+                    .firstOrNull()
+                    ?.getString("projectionStatus"),
+            )
+            assertEquals(null, repository.claimNext("tenant-a", "schedule:v1", now.plusSeconds(32), 30))
+        }
+
+    @Test
     fun `applied version never moves backwards`() =
         database { database ->
             val repository =

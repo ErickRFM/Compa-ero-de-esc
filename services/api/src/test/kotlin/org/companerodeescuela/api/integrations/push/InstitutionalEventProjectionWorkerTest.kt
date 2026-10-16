@@ -169,7 +169,7 @@ class InstitutionalEventProjectionWorkerTest {
                 adapter("student:v1") {
                     InstitutionalAdapterOutcome.Command(command("student", identityReferences = listOf(reference)))
                 }
-            val repository = FakeProjectionRepository(leases)
+            val repository = FakeProjectionRepository(*leases.toTypedArray())
             var resolutions = 0
             var calls = 0
             val worker =
@@ -206,7 +206,7 @@ class InstitutionalEventProjectionWorkerTest {
                     lease("schedule:v1", record = source, token = "lease-2"),
                 )
             val adapter = adapter("schedule:v1") { InstitutionalAdapterOutcome.Command(command("schedule")) }
-            val repository = FakeProjectionRepository(leases)
+            val repository = FakeProjectionRepository(*leases.toTypedArray())
             val appliedKeys = mutableSetOf<String>()
             var handlerCalls = 0
             val worker =

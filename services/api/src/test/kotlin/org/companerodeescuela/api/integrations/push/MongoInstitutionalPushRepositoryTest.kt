@@ -10,6 +10,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
 import org.companerodeescuela.shared.contracts.InstitutionalEventOperation
 import org.companerodeescuela.shared.contracts.InstitutionalPushEvent
+import org.bson.Document
 import org.junit.jupiter.api.Timeout
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
 import java.time.Instant
@@ -111,6 +112,44 @@ class MongoInstitutionalPushRepositoryTest {
             )
             assertTrue(repository.revokeCredential(credential.keyId))
             assertFalse(assertNotNull(repository.findCredential(credential.keyId)).enabled)
+        }
+
+    @Test
+    fun `late versions remain in the receipt ledger`() =
+        database { database ->
+            val repository =
+                MongoInstitutionalPushRepository(
+                    database,
+                    InstitutionalSecretProtector(ByteArray(32) { it.toByte() }),
+                )
+            fun record(eventId: String, version: Long) =
+                InstitutionalEventRecord(
+                    tenantId = "tenant-late",
+                    sourceCredentialId = "institution-key",
+                    event =
+                        InstitutionalPushEvent(
+                            schemaVersion = 1,
+                            eventId = eventId,
+                            entityType = "schedule",
+                            externalId = "course-late",
+                            sourceVersion = version,
+                            occurredAtEpochSeconds = 1_792_000_000,
+                            operation = InstitutionalEventOperation.UPSERT,
+                            payload = kotlinx.serialization.json.buildJsonObject { put("subject", JsonPrimitive("Math")) },
+                        ),
+                    payloadSha256 = version.toString().padStart(64, '0'),
+                    receivedAt = Instant.now(),
+                )
+
+            assertEquals(InstitutionalEventAcceptance.ACCEPTED, repository.accept(record("event-5", 5)))
+            assertEquals(InstitutionalEventAcceptance.ACCEPTED, repository.accept(record("event-4", 4)))
+
+            val stored =
+                database
+                    .getCollection<Document>(MongoInstitutionalPushRepository.EVENTS_COLLECTION)
+                    .find(Document("tenantId", "tenant-late").append("entityType", "schedule").append("externalId", "course-late"))
+                    .toList()
+            assertEquals(setOf(4L, 5L), stored.map { it.getLong("sourceVersion") }.toSet())
         }
 
     private fun database(block: suspend (MongoDatabase) -> Unit) =

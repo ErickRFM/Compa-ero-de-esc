@@ -24,6 +24,78 @@ interface InstitutionalEventRepository {
     suspend fun accept(record: InstitutionalEventRecord): InstitutionalEventAcceptance
 }
 
+enum class InstitutionalProjectionStatus {
+    PENDING,
+    PROCESSING,
+    PENDING_IDENTITY,
+    PROJECTED,
+    SUPERSEDED,
+    RETRYABLE,
+    UNSUPPORTED,
+    FAILED,
+}
+
+data class InstitutionalProjectionLease(
+    val record: InstitutionalEventRecord,
+    val adapterId: String,
+    val leaseToken: String,
+    val leaseExpiresAt: Instant,
+    val attemptCount: Int,
+)
+
+interface InstitutionalProjectionRepository {
+    suspend fun claimNext(
+        tenantId: String,
+        adapterId: String,
+        now: Instant,
+        leaseDurationSeconds: Long,
+    ): InstitutionalProjectionLease?
+
+    suspend fun renew(
+        lease: InstitutionalProjectionLease,
+        now: Instant,
+        leaseDurationSeconds: Long,
+    ): Boolean
+
+    suspend fun complete(
+        lease: InstitutionalProjectionLease,
+        now: Instant,
+    ): Boolean
+
+    suspend fun retry(
+        lease: InstitutionalProjectionLease,
+        now: Instant,
+        retryAt: Instant,
+        failureCode: String,
+    ): Boolean
+
+    suspend fun fail(
+        lease: InstitutionalProjectionLease,
+        now: Instant,
+        failureCode: String,
+    ): Boolean
+
+    suspend fun advanceAppliedVersion(
+        tenantId: String,
+        entityType: String,
+        externalId: String,
+        sourceVersion: Long,
+        now: Instant,
+    ): Boolean
+
+    suspend fun findAppliedVersion(
+        tenantId: String,
+        entityType: String,
+        externalId: String,
+    ): Long?
+
+    suspend fun reconcile(
+        tenantId: String,
+        adapterId: String,
+        now: Instant,
+    ): Long
+}
+
 sealed interface InstitutionalPushResult {
     data class Accepted(
         val eventId: String,

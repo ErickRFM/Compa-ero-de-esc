@@ -2,13 +2,13 @@ package org.companerodeescuela.api.application
 
 import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import kotlinx.coroutines.Job
 
 class ManagedWorkerLifecycleTest {
     @Test

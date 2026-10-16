@@ -5,10 +5,10 @@ import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Job
 import org.companerodeescuela.api.academic.academicRoutes
 import org.companerodeescuela.api.academic.groups.academicGroupRoutes
 import org.companerodeescuela.api.admin.AccountAdministrationService
@@ -33,7 +33,6 @@ import org.companerodeescuela.api.institutions.institutionRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
 import org.companerodeescuela.api.integrations.push.InMemoryInstitutionalIdentityLinkRepository
 import org.companerodeescuela.api.integrations.push.InstitutionalEventProjectionWorker
-import org.companerodeescuela.api.integrations.push.InstitutionalIdentityKind
 import org.companerodeescuela.api.integrations.push.InstitutionalIdentityLinkService
 import org.companerodeescuela.api.integrations.push.InstitutionalProjectionCommandHandler
 import org.companerodeescuela.api.integrations.push.InstitutionalProjectionIdentityResolver

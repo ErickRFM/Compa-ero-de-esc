@@ -1,6 +1,7 @@
 package org.companerodeescuela.api.integrations.push
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -124,12 +125,14 @@ class InstitutionalEventProjectionWorker(
         val claimedAt = clock.instant()
         val lease = repository.claimNext(tenantId, adapterId, claimedAt, leaseDurationSeconds) ?: return false
         return coroutineScope {
+            val workerContext = currentCoroutineContext()
             val renewalJob =
                 launch {
                     while (isActive) {
                         delay(leaseRenewalIntervalMillis)
                         if (!repository.renew(lease, clock.instant(), leaseDurationSeconds)) {
-                            throw CancellationException("Institutional projection lease was lost")
+                            workerContext.cancel(CancellationException("Institutional projection lease was lost"))
+                            return@launch
                         }
                     }
                 }

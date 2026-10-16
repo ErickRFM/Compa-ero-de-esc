@@ -6,6 +6,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
 import org.bson.Document
@@ -151,7 +152,7 @@ class MongoInstitutionalPushRepositoryTest {
             assertEquals(InstitutionalEventAcceptance.ACCEPTED, repository.accept(record("event-5", 5)))
             assertEquals(InstitutionalEventAcceptance.ACCEPTED, repository.accept(record("event-4", 4)))
 
-            val events = database.getCollection<Document>(MongoInstitutionalPushRepository.EVENTS_COLLECTION)
+            val events = database.getCollection<Document>("institutional_integration_events")
             val filter =
                 Document().apply {
                     put("tenantId", "tenant-late")

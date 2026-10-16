@@ -152,7 +152,14 @@ class InstitutionalEventProjectionWorker(
     suspend fun runForever(pollIntervalMillis: Long = DEFAULT_POLL_INTERVAL_MILLIS) {
         require(pollIntervalMillis > 0)
         while (currentCoroutineContext().isActive) {
-            if (!processNextAvailable()) delay(pollIntervalMillis)
+            try {
+                if (!processNextAvailable()) delay(pollIntervalMillis)
+            } catch (cancelled: CancellationException) {
+                if (!currentCoroutineContext().isActive) throw cancelled
+                delay(pollIntervalMillis)
+            } catch (_: Exception) {
+                delay(pollIntervalMillis)
+            }
         }
     }
 

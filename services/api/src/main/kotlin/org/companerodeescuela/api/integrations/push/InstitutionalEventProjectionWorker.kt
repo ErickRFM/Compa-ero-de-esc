@@ -1,5 +1,12 @@
 package org.companerodeescuela.api.integrations.push
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import org.companerodeescuela.shared.contracts.InstitutionalEventOperation
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
@@ -97,11 +104,13 @@ class InstitutionalEventProjectionWorker(
     adapters: Collection<InstitutionalEventAdapter>,
     private val clock: Clock = Clock.systemUTC(),
     private val leaseDurationSeconds: Long = DEFAULT_LEASE_SECONDS,
+    private val leaseRenewalIntervalMillis: Long = leaseDurationSeconds * 1_000 / 3,
 ) {
     private val adaptersById = adapters.associateBy(InstitutionalEventAdapter::adapterId)
 
     init {
         require(leaseDurationSeconds in MIN_LEASE_SECONDS..MAX_LEASE_SECONDS)
+        require(leaseRenewalIntervalMillis in 1 until leaseDurationSeconds * 1_000)
         require(adaptersById.size == adapters.size) { "Adapter IDs must be unique" }
         adapters.forEach { adapter ->
             require(adapter.adapterId.isNotBlank())
@@ -115,6 +124,49 @@ class InstitutionalEventProjectionWorker(
     ): Boolean {
         val claimedAt = clock.instant()
         val lease = repository.claimNext(tenantId, adapterId, claimedAt, leaseDurationSeconds) ?: return false
+        return coroutineScope {
+            val workerContext = currentCoroutineContext()
+            val renewalJob =
+                launch {
+                    while (isActive) {
+                        delay(leaseRenewalIntervalMillis)
+                        if (!repository.renew(lease, clock.instant(), leaseDurationSeconds)) {
+                            workerContext.cancel(CancellationException("Institutional projection lease was lost"))
+                            return@launch
+                        }
+                    }
+                }
+            try {
+                processClaimedLease(lease, adapterId)
+            } finally {
+                renewalJob.cancel()
+            }
+        }
+    }
+
+    suspend fun processNextAvailable(): Boolean {
+        val scope = repository.nextScope(clock.instant()) ?: return false
+        return processNext(scope.tenantId, scope.adapterId)
+    }
+
+    suspend fun runForever(pollIntervalMillis: Long = DEFAULT_POLL_INTERVAL_MILLIS) {
+        require(pollIntervalMillis > 0)
+        while (currentCoroutineContext().isActive) {
+            try {
+                if (!processNextAvailable()) delay(pollIntervalMillis)
+            } catch (cancelled: CancellationException) {
+                if (!currentCoroutineContext().isActive) throw cancelled
+                delay(pollIntervalMillis)
+            } catch (_: Exception) {
+                delay(pollIntervalMillis)
+            }
+        }
+    }
+
+    private suspend fun processClaimedLease(
+        lease: InstitutionalProjectionLease,
+        adapterId: String,
+    ): Boolean {
         val event = lease.record.event
         try {
             val appliedVersion =
@@ -158,7 +210,7 @@ class InstitutionalEventProjectionWorker(
                         command = outcome.value,
                     )
             }
-        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (failure: InstitutionalProjectionTransientFailure) {
             repository.retry(
@@ -266,6 +318,7 @@ class InstitutionalEventProjectionWorker(
         const val INITIAL_RETRY_SECONDS = 5L
         const val MAX_RETRY_SECONDS = 900L
         const val MAX_BACKOFF_EXPONENT = 7
+        const val DEFAULT_POLL_INTERVAL_MILLIS = 5_000L
         const val ADAPTER_UNAVAILABLE = "ADAPTER_UNAVAILABLE"
         const val UNSUPPORTED_SCHEMA = "UNSUPPORTED_SCHEMA"
         const val UNSUPPORTED_CONTRACT = "UNSUPPORTED_CONTRACT"

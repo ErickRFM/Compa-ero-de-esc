@@ -5,6 +5,7 @@ import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -31,7 +32,11 @@ import org.companerodeescuela.api.health.healthRoutes
 import org.companerodeescuela.api.institutions.institutionRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
 import org.companerodeescuela.api.integrations.push.InMemoryInstitutionalIdentityLinkRepository
+import org.companerodeescuela.api.integrations.push.InstitutionalEventProjectionWorker
 import org.companerodeescuela.api.integrations.push.InstitutionalIdentityLinkService
+import org.companerodeescuela.api.integrations.push.InstitutionalProjectionCommandHandler
+import org.companerodeescuela.api.integrations.push.InstitutionalProjectionIdentityResolver
+import org.companerodeescuela.api.integrations.push.InstitutionalProjectionTransientFailure
 import org.companerodeescuela.api.integrations.push.InstitutionalPushAuthenticator
 import org.companerodeescuela.api.integrations.push.InstitutionalPushService
 import org.companerodeescuela.api.integrations.push.InstitutionalSecretProtector
@@ -45,6 +50,7 @@ import org.companerodeescuela.api.representatives.groupRepresentativeRoutes
 import org.companerodeescuela.api.security.mfaRoutes
 import org.companerodeescuela.api.tutoring.tutorCaseRoutes
 import org.companerodeescuela.api.tutoring.tutoringRoutes
+import kotlin.coroutines.CoroutineContext
 
 /**
  * Composes the application graph.
@@ -126,6 +132,37 @@ fun Application.module(
             institutionalIdentityLinkRepository,
             identityGraph.mfa,
         )
+    val institutionalProjectionWorker =
+        if (settings.hasAuthentication) {
+            institutionalPushRepository?.let { repository ->
+                InstitutionalEventProjectionWorker(
+                    repository = repository,
+                    identityResolver =
+                        InstitutionalProjectionIdentityResolver { institutionId, reference ->
+                            institutionalIdentityLinkService
+                                .resolve(
+                                    institutionId,
+                                    reference.kind,
+                                    reference.externalId,
+                                )?.id
+                        },
+                    commandHandler =
+                        InstitutionalProjectionCommandHandler { _, _, _ ->
+                            throw InstitutionalProjectionTransientFailure("COMMAND_HANDLER_UNAVAILABLE")
+                        },
+                    adapters = emptyList(),
+                    leaseDurationSeconds = 120,
+                )
+            }
+        } else {
+            null
+        }
+    launchManagedWorker(
+        enabled = institutionalProjectionWorker != null,
+        context = Dispatchers.IO,
+    ) {
+        institutionalProjectionWorker?.runForever()
+    }
     val classroomGraph =
         buildClassroomFeatureGraph(
             settings = settings,
@@ -273,4 +310,18 @@ fun Application.module(
             gradebookService = gradingGraph.gradebookService,
         )
     }
+}
+
+internal fun Application.launchManagedWorker(
+    enabled: Boolean,
+    context: CoroutineContext = Dispatchers.IO,
+    worker: suspend CoroutineScope.() -> Unit,
+): Job? {
+    if (!enabled) return null
+    val scope = CoroutineScope(SupervisorJob() + context)
+    val job = scope.launch(block = worker)
+    monitor.subscribe(ApplicationStopped) {
+        scope.cancel()
+    }
+    return job
 }

@@ -43,7 +43,14 @@ data class InstitutionalProjectionLease(
     val attemptCount: Int,
 )
 
+data class InstitutionalProjectionScope(
+    val tenantId: String,
+    val adapterId: String,
+)
+
 interface InstitutionalProjectionRepository {
+    suspend fun nextScope(now: Instant): InstitutionalProjectionScope?
+
     suspend fun claimNext(
         tenantId: String,
         adapterId: String,

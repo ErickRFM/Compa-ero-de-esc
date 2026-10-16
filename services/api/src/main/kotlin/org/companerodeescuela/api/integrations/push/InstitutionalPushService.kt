@@ -62,6 +62,19 @@ interface InstitutionalProjectionRepository {
         now: Instant,
     ): Boolean
 
+    suspend fun retry(
+        lease: InstitutionalProjectionLease,
+        now: Instant,
+        retryAt: Instant,
+        failureCode: String,
+    ): Boolean
+
+    suspend fun fail(
+        lease: InstitutionalProjectionLease,
+        now: Instant,
+        failureCode: String,
+    ): Boolean
+
     suspend fun advanceAppliedVersion(
         tenantId: String,
         entityType: String,

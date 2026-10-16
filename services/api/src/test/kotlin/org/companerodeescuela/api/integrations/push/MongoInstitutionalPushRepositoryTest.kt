@@ -126,8 +126,7 @@ class MongoInstitutionalPushRepositoryTest {
             fun record(
                 eventId: String,
                 version: Long,
-            ) =
-                InstitutionalEventRecord(
+            ) = InstitutionalEventRecord(
                     tenantId = "tenant-late",
                     sourceCredentialId = "institution-key",
                     event =
@@ -149,8 +148,7 @@ class MongoInstitutionalPushRepositoryTest {
             assertEquals(InstitutionalEventAcceptance.ACCEPTED, repository.accept(record("event-4", 4)))
 
             val stored =
-                database
-                    .getCollection<Document>(MongoInstitutionalPushRepository.EVENTS_COLLECTION)
+                database.getCollection<Document>(MongoInstitutionalPushRepository.EVENTS_COLLECTION)
                     .find(
                         Document("tenantId", "tenant-late")
                             .append("entityType", "schedule")

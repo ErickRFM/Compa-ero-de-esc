@@ -191,7 +191,8 @@ class MongoInstitutionalPushRepository(
                 ),
             )
         val document =
-            events.find(claimable)
+            events
+                .find(claimable)
                 .sort(Sorts.ascending("receivedAt", "sourceVersion"))
                 .firstOrNull()
                 ?: return null

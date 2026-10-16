@@ -1,5 +1,6 @@
 package org.companerodeescuela.api.application
 
+import io.ktor.client.request.get
 import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -42,7 +43,9 @@ class ManagedWorkerLifecycleTest {
                     }!!
             }
 
+            assertEquals(404, client.get("/health").status.value)
             assertEquals(1, starts.get())
+            assertTrue(job.isActive)
         }
 
         assertTrue(job.isCancelled)

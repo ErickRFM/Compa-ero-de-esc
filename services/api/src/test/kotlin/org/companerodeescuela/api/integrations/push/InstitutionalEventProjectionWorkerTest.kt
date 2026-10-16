@@ -326,8 +326,9 @@ class InstitutionalEventProjectionWorkerTest {
             adapterId: String,
             now: Instant,
             leaseDurationSeconds: Long,
-        ): InstitutionalProjectionLease? =
-            queue.removeFirstOrNull()?.takeIf { it.record.tenantId == tenantId && it.adapterId == adapterId }
+        ): InstitutionalProjectionLease? {
+            return queue.removeFirstOrNull()?.takeIf { it.record.tenantId == tenantId && it.adapterId == adapterId }
+        }
 
         override suspend fun renew(
             lease: InstitutionalProjectionLease,
@@ -362,7 +363,9 @@ class InstitutionalEventProjectionWorkerTest {
             tenantId: String,
             entityType: String,
             externalId: String,
-        ): Long? = appliedVersions["$tenantId:$entityType:$externalId"]
+        ): Long? {
+            return appliedVersions["$tenantId:$entityType:$externalId"]
+        }
 
         override suspend fun reconcile(
             tenantId: String,
@@ -419,7 +422,8 @@ class InstitutionalEventProjectionWorkerTest {
             return true
         }
 
-        private fun key(record: InstitutionalEventRecord) =
-            "${record.tenantId}:${record.event.entityType}:${record.event.externalId}"
+        private fun key(record: InstitutionalEventRecord): String {
+            return "${record.tenantId}:${record.event.entityType}:${record.event.externalId}"
+        }
     }
 }

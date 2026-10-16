@@ -139,11 +139,12 @@ fun Application.module(
                     repository = repository,
                     identityResolver =
                         InstitutionalProjectionIdentityResolver { institutionId, reference ->
-                            institutionalIdentityLinkService.resolve(
-                                institutionId,
-                                reference.kind,
-                                reference.externalId,
-                            )?.id
+                            institutionalIdentityLinkService
+                                .resolve(
+                                    institutionId,
+                                    reference.kind,
+                                    reference.externalId,
+                                )?.id
                         },
                     commandHandler =
                         InstitutionalProjectionCommandHandler { _, _, _ ->

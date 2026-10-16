@@ -393,8 +393,7 @@ class MongoInstitutionalPushRepository(
         Filters.gt("projectionLeaseExpiresAt", Date.from(now)),
     )
 
-    private fun adapterIdFor(event: InstitutionalPushEvent): String =
-        "${event.entityType}:v${event.schemaVersion}"
+    private fun adapterIdFor(event: InstitutionalPushEvent): String = "${event.entityType}:v${event.schemaVersion}"
 
     /** Trusted provisioning seam for deployment tooling; never exposed as a public route. */
     suspend fun putCredential(

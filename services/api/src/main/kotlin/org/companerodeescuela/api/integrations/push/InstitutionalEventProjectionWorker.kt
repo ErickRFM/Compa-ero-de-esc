@@ -46,13 +46,17 @@ data class InstitutionalProjectionCommand(
 }
 
 sealed interface InstitutionalAdapterOutcome {
-    data class Command(val value: InstitutionalProjectionCommand) : InstitutionalAdapterOutcome
+    data class Command(
+        val value: InstitutionalProjectionCommand,
+    ) : InstitutionalAdapterOutcome
 
     data object PendingIdentity : InstitutionalAdapterOutcome
 
     data object UnsupportedContract : InstitutionalAdapterOutcome
 
-    data class PermanentFailure(val failureCode: String) : InstitutionalAdapterOutcome
+    data class PermanentFailure(
+        val failureCode: String,
+    ) : InstitutionalAdapterOutcome
 }
 
 interface InstitutionalEventAdapter {
@@ -147,11 +151,12 @@ class InstitutionalEventProjectionWorker(
                     repository.fail(lease, clock.instant(), safeFailureCode(outcome.failureCode))
                     return true
                 }
-                is InstitutionalAdapterOutcome.Command -> applyCommand(
-                    lease = lease,
-                    adapter = adapter,
-                    command = outcome.value,
-                )
+                is InstitutionalAdapterOutcome.Command ->
+                    applyCommand(
+                        lease = lease,
+                        adapter = adapter,
+                        command = outcome.value,
+                    )
             }
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
@@ -252,8 +257,7 @@ class InstitutionalEventProjectionWorker(
         return now.plusSeconds(delaySeconds)
     }
 
-    private fun safeFailureCode(value: String): String =
-        value.takeIf { SAFE_FAILURE_CODE.matches(it) } ?: ADAPTER_EXECUTION_FAILED
+    private fun safeFailureCode(value: String): String = value.takeIf { SAFE_FAILURE_CODE.matches(it) } ?: ADAPTER_EXECUTION_FAILED
 
     private companion object {
         const val DEFAULT_LEASE_SECONDS = 90L

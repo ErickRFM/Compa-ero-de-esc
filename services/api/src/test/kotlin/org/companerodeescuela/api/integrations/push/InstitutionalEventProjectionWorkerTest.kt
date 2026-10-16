@@ -1,7 +1,10 @@
 package org.companerodeescuela.api.integrations.push
 
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import org.companerodeescuela.shared.contracts.InstitutionalEventOperation
@@ -38,6 +41,50 @@ class InstitutionalEventProjectionWorkerTest {
 
             assertTrue(repository.renewals > 0)
             assertEquals(InstitutionalProjectionStatus.PROJECTED, repository.status)
+        }
+
+    @Test
+    fun `worker loop recovers after a transient scope lookup failure`() =
+        runBlocking {
+            val repository = FakeProjectionRepository(lease("schedule:v1"))
+            repository.nextScopeFailuresRemaining = 1
+            val worker = worker(repository, emptyList())
+            val loopJob = launch { worker.runForever(pollIntervalMillis = 1) }
+
+            withTimeout(2_000) {
+                while (repository.status != InstitutionalProjectionStatus.UNSUPPORTED) delay(5)
+            }
+            loopJob.cancelAndJoin()
+
+            assertTrue(repository.nextScopeCalls >= 2)
+            assertEquals(InstitutionalProjectionStatus.UNSUPPORTED, repository.status)
+        }
+
+    @Test
+    fun `worker loop continues when a lease renewal is lost`() =
+        runBlocking {
+            val repository = FakeProjectionRepository(lease("schedule:v1"))
+            repository.renewalFailuresRemaining = 1
+            val worker =
+                worker(
+                    repository,
+                    listOf(adapter("schedule:v1") { InstitutionalAdapterOutcome.Command(command("schedule")) }),
+                    commandHandler =
+                        InstitutionalProjectionCommandHandler { _, _, _ ->
+                            delay(5_000)
+                        },
+                    leaseDurationSeconds = 3,
+                )
+            val loopJob = launch { worker.runForever(pollIntervalMillis = 1) }
+
+            withTimeout(2_000) {
+                while (repository.renewals == 0) delay(5)
+            }
+            delay(25)
+
+            assertTrue(loopJob.isActive)
+            assertEquals(0, repository.completions)
+            loopJob.cancelAndJoin()
         }
 
     @Test
@@ -346,9 +393,18 @@ class InstitutionalEventProjectionWorkerTest {
         var retries = 0
         var completions = 0
         var renewals = 0
+        var renewalFailuresRemaining = 0
+        var nextScopeCalls = 0
+        var nextScopeFailuresRemaining = 0
 
-        override suspend fun nextScope(now: Instant): InstitutionalProjectionScope? =
-            queue.firstOrNull()?.let { InstitutionalProjectionScope(it.record.tenantId, it.adapterId) }
+        override suspend fun nextScope(now: Instant): InstitutionalProjectionScope? {
+            nextScopeCalls += 1
+            if (nextScopeFailuresRemaining > 0) {
+                nextScopeFailuresRemaining -= 1
+                throw IllegalStateException("temporary scope lookup failure")
+            }
+            return queue.firstOrNull()?.let { InstitutionalProjectionScope(it.record.tenantId, it.adapterId) }
+        }
 
         override suspend fun claimNext(
             tenantId: String,
@@ -366,6 +422,10 @@ class InstitutionalEventProjectionWorkerTest {
             leaseDurationSeconds: Long,
         ): Boolean {
             renewals += 1
+            if (renewalFailuresRemaining > 0) {
+                renewalFailuresRemaining -= 1
+                return false
+            }
             return true
         }
 

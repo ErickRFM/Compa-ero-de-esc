@@ -29,7 +29,8 @@ subject: { sourceId: UUID, code: string, name: string, credits: integer 0..30 }
 teachers: [{ sourceId: UUID, externalId: employeeNumber, fullName: string }]
 enrollments: [{ sourceId: UUID, studentSourceId: UUID,
                 studentExternalId: enrollmentNumber, fullName: string,
-                status: enrolled | withdrawn }]
+                status: enrolled | withdrawn,
+                studentStatus: active | inactive | withdrawn | graduated }]
 occurrences: [{ sourceId: persisted occurrence UUID, patternSourceId: UUID,
                 date: ISO date, startsAt: UTC instant, endsAt: UTC instant,
                 status: SCHEDULED | CANCELLED | ONLINE,
@@ -49,13 +50,15 @@ Persist authenticated institutional snapshots independently of whether every ros
 
 The caller must already be authenticated through the existing native session authority; no public route is added in this block. The reader requires the existing SessionIdentitySource explicitly with no default and denies INSTITUTIONAL and LEGACY even when an account ID collides. Future HTTP wiring must use requireNativeActor plus verifiedSessionSource, never a source field from a request or an unverified JWT/ID. UserSummary alone cannot prove session source or session revocation. The reader additionally requires an enabled institution and a current verified account through existing live-authority checks. It then resolves the requested external student/teacher identity using `InstitutionalIdentityLinkService.resolve`, compares the resolved account ID with the actual caller, and checks institution plus the actual current matching role. It never trusts role/source/tenant claims supplied inside the snapshot or request body.
 
-- Student view requires that exact external identity to have an enrolled row in the latest open section. Return only that enrollment and section/teacher/occurrence data; omit every other roster identity.
+- Student view requires that exact external identity to have an enrolled row with required `studentStatus=active` in the latest open section. Siii can deactivate/withdraw/graduate a student while retaining an enrolled historical row; the enrollment status alone never grants read access. Return only that enrollment and section/teacher/occurrence data; omit every other roster identity.
 - Teacher view requires the exact currently linked teacher to be assigned in the latest section snapshot. Only that authorized teacher view may return the institutional roster. An absent/revoked account, removed role, disabled institution or wrong tenant denies the read immediately. Session revocation remains enforced at the existing authentication boundary; its end-to-end reader coverage must be added with the future API route.
 - Tombstones/archived sections are unavailable to these initial schedule readers. Other historical/grade use cases need explicit future policy. Return only sourceVersion and syncedAt metadata; never expose raw stored payload, digest, credential IDs, event provenance or peer identities through a student view. No native write authority follows from a snapshot.
 
 Local account/role/institution revocation is checked live. A source withdrawal, removed teacher assignment or source identity deactivation is only known after a newer signed snapshot/tombstone arrives. Ktor cannot infer source revocation from its last snapshot. The Siii sender must publish updated membership and withdraw/tombstone sections when source identities lose access; sender reconciliation must be tested before production activation.
 
 The actual Android route remains pending; tests call the real reader service with current verified fixture actors. Existing `NativeAcademicProjection` and source-isolation behavior remain unchanged.
+
+The emitter preserves every enrollment row and its actual student status, rather than inventing withdrawals or filtering history. Repeated historical rows for the same student must agree on that current source status. Teacher entries include only non-revoked assignments whose institutional teacher is currently active; inactive teachers disappear from the authoritative list and fail the reader assignment check. Neither rule creates or changes a native role.
 
 ## Durable application and crash recovery
 
@@ -81,6 +84,8 @@ gradlew :services:api:test --tests '*SiiiSection*' --tests '*InstitutionalEventP
   -Pkotlin.incremental=false -Pkotlin.compiler.execution.strategy=in-process
 ```
 
-JUnit XML: 8 real Mongo projection tests + 7 strict codec tests + 11 existing worker tests, 26 passed, zero failures/errors/skips; Gradle successful in 1m50s. The tests first demonstrated absent projection behavior and then the compatibility/security failures for unassigned open sections, session-source ID collisions, extreme date conversion and quoted numeric credits. Scoped ktlint1.5.0 format/check passed on exactly the eight changed Kotlin files.
+Final JUnit XML: 9 real Mongo projection tests + 8 strict codec tests + 11 existing worker tests, 28 passed, zero failures/errors/skips. The tests first demonstrated absent projection behavior and then the compatibility/security failures for unassigned open sections, session-source ID collisions, extreme date conversion, quoted numeric credits, and an inactive source student retaining an enrolled row and current native role/link. Scoped ktlint1.5.0 format/check passed on exactly the eight changed Kotlin files.
+
+After reconciling main `f29587d7` (the Mongo readiness fix), full validation ran `ktlintCheck :services:api:test :shared:contracts:test :shared:validation:test :services:api:installDist` with the flags above plus `--no-build-cache`. API: 581 reported tests, 580 passed, zero failures/errors, one skipped opt-in `SiiiLiveContractTest` because its external Next fixture was not configured. All Mongo tests executed. Shared contracts: 18, and validation: 7 passed during the preceding full run and remained unchanged/up-to-date in the final run. Full final lint/test/assembly succeeded in 4m50s. The separate real Next read-contract success belongs to PR196, not a claim of sender/mobile validation here.
 
 This is service-boundary HMAC authentication and a real Mongo pipeline, not an HTTP sender/mobile end-to-end claim. Every Mongo test creates and drops only its own synthetic `v12_test_*` database. Source delivery, native session HTTP wiring and Android consumption remain pending; no production data, credentials or writes are used.

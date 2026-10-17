@@ -65,6 +65,53 @@ import kotlin.test.assertTrue
 @Timeout(120)
 class MongoSiiiSectionProjectionTest {
     @Test
+    fun `inactive source students lose enrolled access while their native role and link remain current`() =
+        database { db ->
+            val f = Fixture(db).also { it.initialize() }
+            f.send()
+            f.worker().processNext("tenant-a", "group:v1")
+            assertEquals(
+                "active",
+                f.reader
+                    .student(
+                        f.student.toUserSummary(),
+                        SessionIdentitySource.NATIVE,
+                        "tenant-a",
+                        SECTION_ID,
+                        "STU-01",
+                    ).enrollment.studentStatus,
+            )
+            for ((index, state) in listOf("inactive", "withdrawn", "graduated").withIndex()) {
+                val payload = sectionPayload()
+                val rows =
+                    JsonArray(
+                        (payload["enrollments"] as JsonArray).mapIndexed { rowIndex, row ->
+                            if (rowIndex == 0) (row as JsonObject).withField("studentStatus", state) else row
+                        },
+                    )
+                f.send(version = index + 2L, payload = JsonObject(payload + ("enrollments" to rows)))
+                f.worker().processNext("tenant-a", "group:v1")
+                assertEquals(setOf(UserRole.STUDENT), f.accounts.findById(f.student.id)?.roles)
+                assertEquals(f.student.id, f.identities.resolve("tenant-a", InstitutionalIdentityKind.STUDENT, "STU-01")?.id)
+                assertFailsWith<ApiException.Forbidden> {
+                    f.reader.student(f.student.toUserSummary(), SessionIdentitySource.NATIVE, "tenant-a", SECTION_ID, "STU-01")
+                }
+                val history =
+                    f.reader
+                        .teacher(
+                            f.teacher.toUserSummary(),
+                            SessionIdentitySource.NATIVE,
+                            "tenant-a",
+                            SECTION_ID,
+                            "EMP-01",
+                        ).enrollments
+                        .first()
+                assertEquals("enrolled", history.status)
+                assertEquals(state, history.studentStatus)
+            }
+        }
+
+    @Test
     fun `institutional and legacy sources never gain access through a colliding native account ID`() =
         database { db ->
             val f = Fixture(db).also { it.initialize() }

@@ -64,7 +64,7 @@ class SiiiSectionReader(
         val stored = available(institutionId, sectionId)
         val snapshot = checkNotNull(stored.snapshot)
         val own = snapshot.enrollments.singleOrNull { it.studentExternalId == externalId && it.status == "enrolled" }
-        if (snapshot.status != "open" || own == null) throw ApiException.Forbidden()
+        if (snapshot.status != "open" || own == null || own.studentStatus != "active") throw ApiException.Forbidden()
         return SiiiStudentSectionView(stored.details(), own)
     }
 

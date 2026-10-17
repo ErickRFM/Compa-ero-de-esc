@@ -61,6 +61,7 @@ data class SiiiEnrollment(
     val studentExternalId: String,
     val fullName: String,
     val status: String,
+    val studentStatus: String,
 )
 
 @Serializable
@@ -149,10 +150,11 @@ object SiiiSectionSnapshotCodec {
             code(it.studentExternalId, 32)
             text(it.fullName, 2, 241)
             require(it.status in setOf("enrolled", "withdrawn"))
+            require(it.studentStatus in setOf("active", "inactive", "withdrawn", "graduated"))
         }
         require(
             value.enrollments.groupBy { it.studentSourceId }.values.all { rows ->
-                rows.map { it.studentExternalId to it.fullName }.distinct().size ==
+                rows.map { Triple(it.studentExternalId, it.fullName, it.studentStatus) }.distinct().size ==
                     1
             },
         )

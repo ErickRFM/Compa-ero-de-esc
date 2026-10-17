@@ -22,8 +22,8 @@ internal fun sectionPayload(): JsonObject =
           "subject":{"sourceId":"00000000-0000-4000-8000-000000000003","code":"MAT-01","name":"Mathematics","credits":6},
           "teachers":[{"sourceId":"00000000-0000-4000-8000-000000000004","externalId":"EMP-01","fullName":"Fixture Teacher"}],
           "enrollments":[
-            {"sourceId":"00000000-0000-4000-8000-000000000005","studentSourceId":"00000000-0000-4000-8000-000000000006","studentExternalId":"STU-01","fullName":"Fixture Student","status":"enrolled"},
-            {"sourceId":"00000000-0000-4000-8000-000000000007","studentSourceId":"00000000-0000-4000-8000-000000000008","studentExternalId":"STU-02","fullName":"Private Peer","status":"enrolled"}
+        {"sourceId":"00000000-0000-4000-8000-000000000005","studentSourceId":"00000000-0000-4000-8000-000000000006","studentExternalId":"STU-01","fullName":"Fixture Student","status":"enrolled","studentStatus":"active"},
+        {"sourceId":"00000000-0000-4000-8000-000000000007","studentSourceId":"00000000-0000-4000-8000-000000000008","studentExternalId":"STU-02","fullName":"Private Peer","status":"enrolled","studentStatus":"active"}
           ],
           "occurrences":[{"sourceId":"00000000-0000-4000-8000-000000000009","patternSourceId":"00000000-0000-4000-8000-000000000010","date":"2026-10-17","startsAt":"2026-10-18T05:00:00Z","endsAt":"2026-10-18T06:00:00Z","status":"SCHEDULED",
             "room":{"sourceId":"00000000-0000-4000-8000-000000000011","code":"ROOM-01","building":"Building One","campusSourceId":"00000000-0000-4000-8000-000000000012","campusName":"Fixture Campus"}}]
@@ -37,6 +37,30 @@ internal fun JsonObject.withField(
 ): JsonObject = JsonObject(this + (key to JsonPrimitive(value)))
 
 class SiiiSectionSnapshotTest {
+    @Test
+    fun `source student status is required closed and consistent across enrollment history`() {
+        val valid = sectionPayload()
+        val rows = valid["enrollments"] as JsonArray
+        val first = rows.first() as JsonObject
+        for (state in listOf("active", "inactive", "withdrawn", "graduated")) {
+            val changed = first.withField("studentStatus", state)
+            val decoded = SiiiSectionSnapshotCodec.decode(JsonObject(valid + ("enrollments" to JsonArray(listOf(changed)))), SECTION_ID)
+            assertEquals(state, decoded.enrollments.single().studentStatus)
+        }
+        val missing = JsonObject(first - "studentStatus")
+        val unknown = first.withField("studentStatus", "suspended")
+        val conflicting =
+            first
+                .withField("sourceId", "00000000-0000-4000-8000-000000000099")
+                .withField("status", "withdrawn")
+                .withField("studentStatus", "inactive")
+        for (invalidRows in listOf(listOf(missing), listOf(unknown), rows + conflicting)) {
+            assertFailsWith<IllegalArgumentException> {
+                SiiiSectionSnapshotCodec.decode(JsonObject(valid + ("enrollments" to JsonArray(invalidRows))), SECTION_ID)
+            }
+        }
+    }
+
     @Test
     fun `source snapshot preserves persisted IDs and exact next-day midnight boundary`() {
         val value = SiiiSectionSnapshotCodec.decode(sectionPayload(), SECTION_ID)

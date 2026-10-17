@@ -1,14 +1,17 @@
 package org.companerodeescuela.api.database
 
+import com.mongodb.ConnectionString
+import com.mongodb.MongoClientSettings
 import com.mongodb.kotlin.client.coroutine.MongoClient
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.bson.Document
 import org.companerodeescuela.api.config.MongoSettings
 import org.slf4j.LoggerFactory
+import java.util.concurrent.TimeUnit
 
 /**
  * Owns the lifecycle of the MongoDB client.
@@ -64,14 +67,12 @@ object NoOpMongoConnectionFactory : MongoConnectionFactory {
 private class NoOpMongoConnection(
     private val settings: MongoSettings,
 ) : MongoConnection {
-
     override val databaseName: String
         get() = settings.databaseName
 
     override suspend fun ping(): Boolean = false
 
-    override fun database(): MongoDatabase =
-        error("No MONGODB_URI is configured; database() must not be called")
+    override fun database(): MongoDatabase = error("No MONGODB_URI is configured; database() must not be called")
 
     override fun close() = Unit
 }
@@ -84,7 +85,6 @@ class DriverMongoConnectionFactory(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val pingTimeoutMs: Long = DEFAULT_PING_TIMEOUT_MS,
 ) : MongoConnectionFactory {
-
     private val log = LoggerFactory.getLogger(DriverMongoConnectionFactory::class.java)
 
     override fun create(settings: MongoSettings): MongoConnection {
@@ -107,7 +107,6 @@ class DriverMongoConnectionFactory(
         private val ioDispatcher: CoroutineDispatcher,
         private val pingTimeoutMs: Long,
     ) : MongoConnection {
-
         private val log = LoggerFactory.getLogger(DriverMongoConnection::class.java)
 
         private var client: MongoClient? = null
@@ -116,17 +115,21 @@ class DriverMongoConnectionFactory(
         override val databaseName: String
             get() = settings.databaseName
 
-        override suspend fun ping(): Boolean = withContext(ioDispatcher) {
+        override suspend fun ping(): Boolean {
             try {
-                withTimeout(pingTimeoutMs) {
-                    database().runCommand(Document("ping", 1))
-                }
-                true
+                // Only this probe's deadline is an unavailable dependency result.
+                // withTimeoutOrNull preserves cancellation from its external caller.
+                return withTimeoutOrNull(pingTimeoutMs) {
+                    withContext(ioDispatcher) {
+                        database().runCommand(Document("ping", 1))
+                        true
+                    }
+                } ?: false
             } catch (cancellation: kotlinx.coroutines.CancellationException) {
                 throw cancellation
             } catch (error: Exception) {
                 log.warn("MongoDB ping failed: {}", error::class.simpleName)
-                false
+                return false
             }
         }
 
@@ -139,7 +142,7 @@ class DriverMongoConnectionFactory(
         }
 
         private fun createClient(): MongoDatabase {
-            val created = MongoClient.create(settings.uri)
+            val created = MongoClient.create(mongoClientSettings(settings))
             client = created
             return created.getDatabase(settings.databaseName)
         }
@@ -158,3 +161,12 @@ class DriverMongoConnectionFactory(
         const val DEFAULT_PING_TIMEOUT_MS = 3_000L
     }
 }
+
+/** Preserve URI options while applying the explicit application connection budgets. */
+internal fun mongoClientSettings(settings: MongoSettings): MongoClientSettings =
+    MongoClientSettings
+        .builder()
+        .applyConnectionString(ConnectionString(settings.uri))
+        .applyToSocketSettings { it.connectTimeout(settings.connectTimeoutMs.toLong(), TimeUnit.MILLISECONDS) }
+        .applyToClusterSettings { it.serverSelectionTimeout(settings.serverSelectionTimeoutMs.toLong(), TimeUnit.MILLISECONDS) }
+        .build()

@@ -32,7 +32,6 @@ class ProviderRegistry private constructor(
     val events: EventsProvider,
     val sync: List<SyncProvider>,
 ) : AutoCloseable {
-
     /**
      * Providers that return fabricated data. Must be empty in any environment
      * other than local.
@@ -46,11 +45,20 @@ class ProviderRegistry private constructor(
         log.info("Closing integration providers: {}", all().map { it.id })
     }
 
-    fun all(): List<IntegrationProvider> =
-        listOf(academic, identity, learning, library, events) + sync
+    fun all(): List<IntegrationProvider> = listOf(academic, identity, learning, library, events) + sync
 
     companion object {
         private val log = LoggerFactory.getLogger(ProviderRegistry::class.java)
+
+        /** Explicit composition seam; environment validation still rejects all remaining mocks. */
+        fun configured(
+            academic: AcademicProvider,
+            identity: IdentityProvider,
+            learning: LearningProvider,
+            library: LibraryProvider,
+            events: EventsProvider,
+            sync: List<SyncProvider>,
+        ): ProviderRegistry = ProviderRegistry(academic, identity, learning, library, events, sync.toList())
 
         /**
          * Non-production wiring: every provider is mocked. Identity demo and QA
@@ -59,14 +67,15 @@ class ProviderRegistry private constructor(
          * This is the default so `.\gradlew :services:api:run` works on a fresh
          * clone with no external credentials.
          */
-        fun mocks(environment: Environment = Environment.LOCAL): ProviderRegistry = ProviderRegistry(
-            academic = MockAcademicProvider(),
-            identity = MockIdentityProvider(environment),
-            learning = MockLearningProvider(),
-            library = MockLibraryProvider(),
-            events = MockEventsProvider(),
-            sync = listOf(MockSyncProvider()),
-        )
+        fun mocks(environment: Environment = Environment.LOCAL): ProviderRegistry =
+            ProviderRegistry(
+                academic = MockAcademicProvider(),
+                identity = MockIdentityProvider(environment),
+                learning = MockLearningProvider(),
+                library = MockLibraryProvider(),
+                events = MockEventsProvider(),
+                sync = listOf(MockSyncProvider()),
+            )
 
         /**
          * Validates a registry against the environment it will run in.

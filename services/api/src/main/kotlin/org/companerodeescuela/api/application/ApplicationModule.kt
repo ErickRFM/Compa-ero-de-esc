@@ -31,12 +31,11 @@ import org.companerodeescuela.api.health.HealthService
 import org.companerodeescuela.api.health.healthRoutes
 import org.companerodeescuela.api.institutions.institutionRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
+import org.companerodeescuela.api.integrations.academic.siii.SiiiSectionProjectionFeature
 import org.companerodeescuela.api.integrations.push.InMemoryInstitutionalIdentityLinkRepository
 import org.companerodeescuela.api.integrations.push.InstitutionalEventProjectionWorker
 import org.companerodeescuela.api.integrations.push.InstitutionalIdentityLinkService
-import org.companerodeescuela.api.integrations.push.InstitutionalProjectionCommandHandler
 import org.companerodeescuela.api.integrations.push.InstitutionalProjectionIdentityResolver
-import org.companerodeescuela.api.integrations.push.InstitutionalProjectionTransientFailure
 import org.companerodeescuela.api.integrations.push.InstitutionalPushAuthenticator
 import org.companerodeescuela.api.integrations.push.InstitutionalPushService
 import org.companerodeescuela.api.integrations.push.InstitutionalSecretProtector
@@ -135,6 +134,13 @@ fun Application.module(
     val institutionalProjectionWorker =
         if (settings.hasAuthentication) {
             institutionalPushRepository?.let { repository ->
+                val sections =
+                    SiiiSectionProjectionFeature(
+                        mongoConnection.database(),
+                        identityGraph.accounts,
+                        identityGraph.institutions,
+                        institutionalIdentityLinkService,
+                    )
                 InstitutionalEventProjectionWorker(
                     repository = repository,
                     identityResolver =
@@ -146,11 +152,8 @@ fun Application.module(
                                     reference.externalId,
                                 )?.id
                         },
-                    commandHandler =
-                        InstitutionalProjectionCommandHandler { _, _, _ ->
-                            throw InstitutionalProjectionTransientFailure("COMMAND_HANDLER_UNAVAILABLE")
-                        },
-                    adapters = emptyList(),
+                    commandHandler = sections.handler,
+                    adapters = listOf(sections.adapter),
                     leaseDurationSeconds = 120,
                 )
             }

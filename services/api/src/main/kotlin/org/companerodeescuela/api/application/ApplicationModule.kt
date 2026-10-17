@@ -59,13 +59,13 @@ import kotlin.coroutines.CoroutineContext
  * whole graph can be rebuilt in tests with fakes and no environment variables.
  *
  * @param providerRegistry selects which institutional providers are active.
- *   It defaults to the environment-scoped mock registry for local development.
- *   Production cannot start until a real registry is explicitly supplied.
+ *   It defaults to development mocks locally and unavailable institutional providers in staging/production.
+ *   Native Mongo features remain available; real institutional adapters require explicit configuration.
  */
 fun Application.module(
     settings: ApiSettings,
     mongoConnection: MongoConnection,
-    providerRegistry: ProviderRegistry = ProviderRegistry.mocks(settings.environment),
+    providerRegistry: ProviderRegistry = ProviderRegistry.defaultsFor(settings.environment),
 ) {
     ProviderRegistry.requireEnvironmentSatisfied(providerRegistry, settings.environment)
 

@@ -25,3 +25,9 @@ Health/readiness reports process and Mongo state; it does not certify disabled i
 Full command: gradlew.bat ktlintCheck :services:api:test :shared:contracts:test :shared:validation:test :services:api:installDist --no-build-cache --no-configuration-cache --no-parallel --max-workers=1 -Pkotlin.incremental=false -Pkotlin.compiler.execution.strategy=in-process --console=plain. JDK17, V12_TEST_MONGODB_URI=mongodb://127.0.0.1:27017. Result: BUILD SUCCESSFUL in 3m59, 202 tasks (192 executed,10 up-to-date). XML counts verified after task completion. Source tested at e565c82f; subsequent documentation-only evidence commits do not change Kotlin sources.
 
 Merged receiver main0652c5336fadbf17205272f35b02fb04148f8c8b was reconciled by normal merge with an empty source/tree diff. Independent source and test review is favorable; the published head still requires API/Android CI before merge. APP_ENV and all deployed configuration remain unchanged by this work.
+
+## Main reconciliation after PR199
+
+Normal merge e90fa471b99b0217d4fa79a6e314a64e36fb0d22 incorporates main3254db3ea1650c8eff8e871f086b08ac3f1a9b99 (PR199: only the signed live harness test and its documentation). Diff of services/api/src/main against pre-reconciliation e5c90d1b is empty. Recompiled test Kotlin and reran the seven focused tests: BUILD SUCCESSFUL in 1m04, zero failures/errors/skips, fresh XML timestamps 23:43:07–14Z. Full API584/shared25/style/installDist evidence above remains from the unchanged production tree; no second full manual run was needed for this test/document-only reconciliation.
+
+All eight API/Android checks passed for the previous head e5c90d1b (runs39079527634/27658/30790/30791). Those results are historical evidence and do not certify this reconciled head: fresh API/Android CI is required before merging. No production environment or secret was read or changed.

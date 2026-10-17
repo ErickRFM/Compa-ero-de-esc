@@ -1,4 +1,4 @@
-# Proposed Siii academic section snapshot v1
+# Siii academic section snapshot v1 receiver
 
 Status: receiver contract approved on 2026-10-17; implementation evidence is recorded separately. Base is read-adapter commit `ec88ad509cbb47aaa2f5308fe6f75ccf382fe0ab`. Production enablement is prohibited until the source emitter and reconciliation flow are tested.
 
@@ -37,7 +37,7 @@ occurrences: [{ sourceId: persisted occurrence UUID, patternSourceId: UUID,
                         campusSourceId: UUID, campusName: string } }]
 ```
 
-IDs/names are bounded, nonblank and without control characters; UUIDs must be canonical lowercase strings. Section, room and identity codes match Siii uppercase codes of 2..32 characters; term/subject codes are 2..25. Names are 3..160 for catalog fields, 2..241 for combined person names, and building is 2..120. Teachers, enrollment IDs and occurrence IDs must be unique. Historical withdrawn rows may share a student, but there is at most one enrolled row per student and UUID/external identity/name references must remain consistent. Roster cap is 500 and occurrence cap is 3000, with the existing 1 MiB signed-body cap still enforced. These are receiver bounds, not a claim that Siii's full history is bounded; an oversized section fails explicitly and an emitter must not silently truncate it. Term end must follow or equal start (Siii has no term-duration maximum). Every occurrence date lies within the term, start precedes end, and local start/end match a same-day minute schedule or an exact next-day midnight end under `timezone`. This preserves Siii endMinute=1440 without guessing UTC or converting to 23:59. Empty roster/occurrences are valid complete snapshots. An open section requires at least one actual assigned teacher.
+IDs/names are bounded, nonblank and without control characters; UUIDs must be canonical lowercase strings. Section, room and identity codes match Siii uppercase codes of 2..32 characters; term/subject codes are 2..25. Names are 3..160 for catalog fields, 2..241 for combined person names, and building is 2..120. Teachers, enrollment IDs and occurrence IDs must be unique. Historical withdrawn rows may share a student, but there is at most one enrolled row per student and UUID/external identity/name references must remain consistent. Roster cap is 500 and occurrence cap is 3000, with the existing 1 MiB signed-body cap still enforced. These are receiver bounds, not a claim that Siii's full history is bounded; an oversized section fails explicitly and an emitter must not silently truncate it. Term end must follow or equal start (Siii has no term-duration maximum). Every occurrence date lies within the term, start precedes end, and local start/end match a same-day minute schedule or an exact next-day midnight end under `timezone`. This preserves Siii endMinute=1440 without guessing UTC or converting to 23:59. Empty roster/occurrences are valid complete snapshots. An open section may have no assigned teachers because Siii creates sections and teacher assignments separately. No teacher identity is invented.
 
 Source cross-check: Siii `db/schema/registry.ts`, `db/schema/schedule.ts`, `src/modules/registry/validation.ts`, `src/modules/scheduling/validation.ts` and `src/modules/academic/catalog-validation.ts` supply these status/code/credit/date/time vocabularies. No student or teacher source status is inferred from native roles.
 
@@ -45,9 +45,9 @@ Siii section UUID is the offered course ID; academic-course UUID belongs to subj
 
 ## Identity and reader authorization
 
-Recommended policy: persist authenticated institutional snapshots independently of whether every roster member has joined Compañero. These records contain external identities and confer no account, role, or native membership. `group:v1` commands therefore require no bulk native identity creation or whole-roster link resolution. The existing resolver is reused at **every reader call** for the actual requesting identity. Missing student links deny that student's read without blocking everyone else's section snapshot.
+Persist authenticated institutional snapshots independently of whether every roster member has joined Compañero. These records contain external identities and confer no account, role, or native membership. `group:v1` commands therefore require no bulk native identity creation or whole-roster link resolution. The existing resolver is reused at **every reader call** for the actual requesting identity. Missing student links deny that student's read without blocking everyone else's section snapshot.
 
-The caller must already be authenticated through the existing native session authority; no public route is added in this block. The reader additionally requires an enabled institution and a current verified account through existing live-authority checks. It then resolves the requested external student/teacher identity using `InstitutionalIdentityLinkService.resolve`, compares the resolved account ID with the actual caller, and checks institution plus the actual current matching role. It never trusts role/source/tenant claims supplied inside the snapshot or request body.
+The caller must already be authenticated through the existing native session authority; no public route is added in this block. The reader requires the existing SessionIdentitySource explicitly with no default and denies INSTITUTIONAL and LEGACY even when an account ID collides. Future HTTP wiring must use requireNativeActor plus verifiedSessionSource, never a source field from a request or an unverified JWT/ID. UserSummary alone cannot prove session source or session revocation. The reader additionally requires an enabled institution and a current verified account through existing live-authority checks. It then resolves the requested external student/teacher identity using `InstitutionalIdentityLinkService.resolve`, compares the resolved account ID with the actual caller, and checks institution plus the actual current matching role. It never trusts role/source/tenant claims supplied inside the snapshot or request body.
 
 - Student view requires that exact external identity to have an enrolled row in the latest open section. Return only that enrollment and section/teacher/occurrence data; omit every other roster identity.
 - Teacher view requires the exact currently linked teacher to be assigned in the latest section snapshot. Only that authorized teacher view may return the institutional roster. An absent/revoked account, removed role, disabled institution or wrong tenant denies the read immediately. Session revocation remains enforced at the existing authentication boundary; its end-to-end reader coverage must be added with the future API route.
@@ -70,3 +70,17 @@ Composition must instantiate concrete adapter/handler/reader only with the confi
 Real local Mongo and the actual signed push service: HMAC/nonce authentication → receipt → worker → persisted snapshot → authorized reader. Cover duplicate delivery, a newer version winning before an older event, wrong-tenant ID collisions, missing identity, account/role/institution revocation, teacher removal, student withdrawal, cancellation/tombstone, invalid time/zone/IDs/unknown fields, and crash-after-write retry. Student reads must prove no peer roster leakage. No production data or writes are required.
 
 Siii must later assign sourceVersion and insert the outbox event in the same transaction as the academic mutation/audit. Its delivery worker must reuse event/body/version across retries while signing each attempt with a fresh timestamp and nonce. Until that sender and a mobile API flow are exercised, this block proves only the receiver/projection/reader slice.
+
+## Executed receiver validation
+
+On 2026-10-17, cached JDK17 and the disposable `mongodb://127.0.0.1:27017` lab ran:
+
+```text
+gradlew :services:api:test --tests '*SiiiSection*' --tests '*InstitutionalEventProjectionWorkerTest'
+  --no-configuration-cache --no-parallel --max-workers=1
+  -Pkotlin.incremental=false -Pkotlin.compiler.execution.strategy=in-process
+```
+
+JUnit XML: 8 real Mongo projection tests + 7 strict codec tests + 11 existing worker tests, 26 passed, zero failures/errors/skips; Gradle successful in 1m50s. The tests first demonstrated absent projection behavior and then the compatibility/security failures for unassigned open sections, session-source ID collisions, extreme date conversion and quoted numeric credits. Scoped ktlint1.5.0 format/check passed on exactly the eight changed Kotlin files.
+
+This is service-boundary HMAC authentication and a real Mongo pipeline, not an HTTP sender/mobile end-to-end claim. Every Mongo test creates and drops only its own synthetic `v12_test_*` database. Source delivery, native session HTTP wiring and Android consumption remain pending; no production data, credentials or writes are used.

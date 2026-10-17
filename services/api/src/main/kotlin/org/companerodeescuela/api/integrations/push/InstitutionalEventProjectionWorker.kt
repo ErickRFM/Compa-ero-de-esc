@@ -96,6 +96,10 @@ class InstitutionalProjectionTransientFailure(
     val failureCode: String,
 ) : RuntimeException()
 
+class InstitutionalProjectionPermanentFailure(
+    val failureCode: String,
+) : RuntimeException()
+
 /** One claimed event per invocation keeps lease ownership and retries independently recoverable. */
 class InstitutionalEventProjectionWorker(
     private val repository: InstitutionalProjectionRepository,
@@ -212,6 +216,8 @@ class InstitutionalEventProjectionWorker(
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
+        } catch (failure: InstitutionalProjectionPermanentFailure) {
+            repository.fail(lease, clock.instant(), safeFailureCode(failure.failureCode))
         } catch (failure: InstitutionalProjectionTransientFailure) {
             repository.retry(
                 lease,

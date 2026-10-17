@@ -34,7 +34,7 @@
 - [x] Test registry environment defaults and every disabled provider operation; identity authenticate/currentState deny, refreshRoles fails.
 - [x] Implement nativeOnly/defaultsFor registry factories and explicit unavailable implementations; update module default while retaining configured seam and guard.
 - [x] Run focused tests with real disposable Mongo, including native login/load/refresh/logout/revocation and colliding institutional/legacy source sessions.
-- [ ] Run scoped formatting, full API/shared tests, ktlintCheck and installDist; record actual evidence.
+- [x] Run scoped formatting, full API/shared tests, ktlintCheck and installDist; record actual evidence.
 - [ ] Obtain independent review; reconcile main after PR198 merge, publish separate PR, require API/Android CI before merge.
 
 Production promotion is a later operational action. Existing names: APP_ENV, API_PORT, MONGODB_URI, MONGODB_DATABASE, JWT_SECRET and MFA_ENCRYPTION_KEY. No claim is made that their deployed values are present or valid.

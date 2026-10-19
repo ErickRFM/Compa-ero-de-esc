@@ -13,7 +13,7 @@ val debugApiBaseUrl = providers
 
 val releaseApiBaseUrl = providers
     .environmentVariable("COMPANERO_RELEASE_API_BASE_URL")
-    .orElse("https://invalid.invalid/")
+    .orElse(debugApiBaseUrl)
     .get()
 
 fun validateApiBaseUrl(name: String, value: String, requireHttps: Boolean = false) {
@@ -78,6 +78,7 @@ android {
             isMinifyEnabled = true
             buildConfigField("String", "API_BASE_URL", "\"$releaseApiBaseUrl\"")
             isShrinkResources = true
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",

@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -43,6 +44,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
+import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
@@ -178,7 +180,7 @@ fun GradebookScreen(
                         Text("Ponderación acumulada", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
                             formatWeight(state.totalWeight) + "% de 100%",
-                            color = if (state.schemeComplete) V8RedColors.Success else MaterialTheme.colorScheme.onSurface,
+                            color = if (state.schemeComplete) if (MaterialTheme.colorScheme.background.luminance() > 0.5f) CompanionColors.semanticGreen else V8RedColors.Success else MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold,
                         )
                     }

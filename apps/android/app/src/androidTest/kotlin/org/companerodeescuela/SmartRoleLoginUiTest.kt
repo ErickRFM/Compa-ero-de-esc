@@ -50,7 +50,17 @@ class SmartRoleLoginUiTest {
         // The keyboard may obscure the card; assert selected access and the retained shared form.
         compose.onNodeWithTag("role_TUTOR").assertIsSelected()
         compose.onNodeWithTag("login_registration").assertDoesNotExist()
-        compose.onNodeWithTag("login_submit").performScrollTo().performClick()
+        // The pager locks submission while the role transition is in progress.
+        // API 35 can deliver the click before the carousel finishes settling.
+        compose.waitUntil(timeoutMillis = 8_000) {
+            compose.onAllNodesWithTag("login_submit")
+                .fetchSemanticsNodes()
+                .firstOrNull()
+                ?.config
+                ?.contains(SemanticsProperties.Disabled) == false
+        }
+        compose.onNodeWithTag("login_submit").assertIsEnabled().performScrollTo().performClick()
+        compose.waitUntil(timeoutMillis = 5_000) { submitted != null }
         assertEquals(Triple("qa.docente", "test-password", AppExperience.TUTOR), submitted)
     }
 

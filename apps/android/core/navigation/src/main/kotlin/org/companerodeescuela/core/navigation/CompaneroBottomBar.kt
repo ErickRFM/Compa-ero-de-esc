@@ -78,7 +78,7 @@ fun CompaneroBottomBar(
     val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
     val glass = LocalV8GlassEnabled.current
     val largeText = LocalDensity.current.fontScale >= 1.5f
-    val itemHeight = if (largeText) 74.dp else 60.dp
+    val itemHeight = if (largeText) 88.dp else 74.dp
 
     Surface(
         modifier =
@@ -89,7 +89,7 @@ fun CompaneroBottomBar(
                     vertical = CompaneroSpacing.xxs,
                 ).then(if (glass) Modifier.v8GlassSurface(cornerRadius = 28.dp) else Modifier),
         shape = MaterialTheme.shapes.extraLarge,
-        color = if (glass) Color.Transparent else V8RedColors.Background,
+        color = if (glass) Color.Transparent else MaterialTheme.colorScheme.surface,
         tonalElevation = if (glass) 0.dp else CompaneroElevation.raised,
         shadowElevation = if (glass) 0.dp else CompaneroElevation.immersive,
     ) {
@@ -131,7 +131,7 @@ fun CompaneroBottomBar(
                                 } else {
                                     Modifier
                                         .clip(MaterialTheme.shapes.extraLarge)
-                                        .background(V8RedColors.DeepCrimson.copy(alpha = 0.30f))
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
                                 },
                             ),
                 )
@@ -200,8 +200,8 @@ fun CompaneroBottomBar(
                                     tint =
                                         when {
                                             isQr -> Color.White
-                                            isSelected -> V8RedColors.Crimson
-                                            else -> V8RedColors.TextSecondary
+                                            isSelected -> MaterialTheme.colorScheme.primary
+                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
                                         },
                                 )
                             }
@@ -212,11 +212,12 @@ fun CompaneroBottomBar(
                                         TopLevelDestination.CoordinatorHome -> "Gestión"
                                         else -> topLevel.label
                                     },
-                                fontSize = if (largeText) 11.sp else 10.sp,
+                                fontSize = if (largeText) 12.sp else 11.sp,
+                                lineHeight = if (largeText) 14.sp else 13.sp,
                                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                maxLines = 1,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
-                                color = if (isSelected) V8RedColors.TextPrimary else V8RedColors.TextSecondary,
+                                color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }

@@ -15,6 +15,40 @@ val releaseApiBaseUrl = providers
     .environmentVariable("COMPANERO_RELEASE_API_BASE_URL")
     .orElse(debugApiBaseUrl)
     .get()
+ 
+// Debug-signed internal test builds remain explicit. Only an opt-in
+// distribution build may use a persistent private signing identity.
+val signingMode = providers.environmentVariable("COMPANERO_SIGNING_MODE").orElse("internal").get()
+require(signingMode in setOf("internal", "distribution")) {
+    "COMPANERO_SIGNING_MODE must be internal or distribution"
+}
+val distributionStorePath = providers.environmentVariable("COMPANERO_RELEASE_KEYSTORE_PATH").orNull
+val distributionStorePassword = providers.environmentVariable("COMPANERO_RELEASE_STORE_PASSWORD").orNull
+val distributionKeyAlias = providers.environmentVariable("COMPANERO_RELEASE_KEY_ALIAS").orNull
+val distributionKeyPassword = providers.environmentVariable("COMPANERO_RELEASE_KEY_PASSWORD").orNull
+val signingInputs =
+    listOf(distributionStorePath, distributionStorePassword, distributionKeyAlias, distributionKeyPassword)
+require(
+    signingInputs.all { it.isNullOrBlank() } ||
+        (signingMode == "distribution" && signingInputs.all { !it.isNullOrBlank() }),
+) {
+    "Distribution signing requires all four environment variables; never supply partial signing secrets"
+}
+if (signingMode == "distribution") {
+    require(signingInputs.all { !it.isNullOrBlank() }) {
+        "Production distribution cannot use the Android debug certificate"
+    }
+    require(file(distributionStorePath!!).isFile) {
+        "Distribution signing keystore file does not exist"
+    }
+}
+val appVersionCode = providers.environmentVariable("COMPANERO_VERSION_CODE").orElse("1").get().toInt()
+require(appVersionCode > 0) { "COMPANERO_VERSION_CODE must be positive" }
+val appVersionName = providers.environmentVariable("COMPANERO_VERSION_NAME").orElse("0.1.0").get()
+require(appVersionName.matches(Regex("[0-9]+\\.[0-9]+\\.[0-9]+(?:-[a-zA-Z0-9.-]+)?"))) {
+    "COMPANERO_VERSION_NAME must be a valid version name"
+}
+
 
 fun validateApiBaseUrl(name: String, value: String, requireHttps: Boolean = false) {
     require(value.startsWith(if (requireHttps) "https://" else "http")) {
@@ -56,8 +90,8 @@ android {
         applicationId = "org.companerodeescuela"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         buildConfigField("boolean", "FIREBASE_CONFIGURED", firebaseConfigured.toString())
         buildConfigField("String", "FIREBASE_APP_ID", "\"$firebaseAppId\"")
@@ -69,6 +103,17 @@ android {
 
     }
 
+    signingConfigs {
+        if (signingMode == "distribution") {
+            create("distribution") {
+                storeFile = file(distributionStorePath!!)
+                storePassword = distributionStorePassword
+                keyAlias = distributionKeyAlias
+                keyPassword = distributionKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         debug {
             isMinifyEnabled = false
@@ -78,7 +123,13 @@ android {
             isMinifyEnabled = true
             buildConfigField("String", "API_BASE_URL", "\"$releaseApiBaseUrl\"")
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig =
+                if (signingMode == "distribution") {
+                    signingConfigs.getByName("distribution")
+                } else {
+                    // Only for labeled internal test artifacts. Never publish to app stores.
+                    signingConfigs.getByName("debug")
+                }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",

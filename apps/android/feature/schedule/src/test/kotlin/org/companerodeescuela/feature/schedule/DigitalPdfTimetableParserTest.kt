@@ -117,11 +117,21 @@ class DigitalPdfTimetableParserTest {
 
     private fun assertBlock(
         entries: List<org.companerodeescuela.core.academic.PersonalScheduleDraft>,
-        day: String, start: String, end: String, subject: String, teacher: String,
+        day: String,
+        start: String,
+        end: String,
+        subject: String,
+        teacher: String,
     ) {
-        assertTrue(entries.any {
-            it.dayOfWeek == day && it.startsAt == start && it.endsAt == end &&
-                it.subjectName == subject && it.teacherName == teacher
-        }, "Missing $day $start-$end $subject / $teacher")
+        assertTrue(
+            entries.any {
+                it.dayOfWeek == day &&
+                    it.startsAt == start &&
+                    it.endsAt == end &&
+                    it.subjectName == subject &&
+                    it.teacherName == teacher
+            },
+            "Missing $day $start-$end $subject / $teacher",
+        )
     }
 }

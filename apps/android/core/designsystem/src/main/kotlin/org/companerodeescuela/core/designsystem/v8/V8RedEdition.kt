@@ -82,18 +82,24 @@ fun V8RedPrimaryButton(
             glossy -> listOf(V8RedColors.DeepCrimson, V8RedColors.Crimson)
             else -> listOf(solidAccent, solidAccent)
         }
+    val shaded =
+        modifier.shadow(
+            if (enabled && glossy) 8.dp else 0.dp,
+            shape,
+            ambientColor = V8RedColors.Crimson.copy(alpha = 0.25f),
+            spotColor = V8RedColors.Crimson.copy(alpha = 0.25f),
+        )
+    val tinted = shaded.background(Brush.horizontalGradient(fills), shape)
+    val framed =
+        tinted.border(
+            1.dp,
+            if (glossy) V8RedColors.Crimson else solidAccent.copy(alpha = 0.45f),
+            shape,
+        )
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier =
-            modifier.shadow(
-                if (enabled && glossy) 8.dp else 0.dp,
-                shape,
-                ambientColor = V8RedColors.Crimson.copy(alpha = 0.25f),
-                spotColor = V8RedColors.Crimson.copy(alpha = 0.25f),
-            )
-            .background(Brush.horizontalGradient(fills), shape)
-            .border(1.dp, if (glossy) V8RedColors.Crimson else solidAccent.copy(alpha = 0.45f), shape),
+        modifier = framed,
         shape = RoundedCornerShape(V8RedDimensions.ControlCorner),
         colors =
             ButtonDefaults.buttonColors(

@@ -2,18 +2,10 @@
 
 package org.companerodeescuela.feature.home
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -24,24 +16,17 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.unit.sp
-import org.companerodeescuela.core.designsystem.v8.V8RedColors
-import org.companerodeescuela.core.designsystem.v8.V8GlassCard
-import org.companerodeescuela.core.designsystem.v8.V8ClassSummary
-import org.companerodeescuela.core.designsystem.v8.V8DailyClassRow
-import org.companerodeescuela.core.designsystem.v8.V8DashboardStat
-import org.companerodeescuela.core.designsystem.v8.V8SectionTitle
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.LocalDate
@@ -51,11 +36,13 @@ import java.util.Locale
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
-import org.companerodeescuela.core.motion.CompaneroMotionDuration
+import org.companerodeescuela.core.designsystem.v8.V8ClassSummary
+import org.companerodeescuela.core.designsystem.v8.V8DailyClassRow
+import org.companerodeescuela.core.designsystem.v8.V8DashboardStat
+import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8SectionTitle
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 import org.companerodeescuela.core.ui.component.AcademicClassCard
-import org.companerodeescuela.core.ui.component.AcademicTimelineItem
-import org.companerodeescuela.core.ui.component.HeroAcademicCard
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ScheduleEntry
@@ -78,12 +65,13 @@ fun HomeScreen(
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val splitLayout = maxWidth >= CompaneroWindowBreakpoints.medium
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .widthIn(max = CompaneroSize.homeContentMaxWidth)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm)
-                .align(Alignment.TopCenter),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .widthIn(max = CompaneroSize.homeContentMaxWidth)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm)
+                    .align(Alignment.TopCenter),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
         ) {
             val firstName =
@@ -330,6 +318,6 @@ private fun todayLabel(): String {
         )
     val date = LocalDate.now().format(formatter)
     return date.replaceFirstChar {
-            if (it.isLowerCase()) it.titlecase(Locale("es", "MX")) else it.toString()
-        }
+        if (it.isLowerCase()) it.titlecase(Locale("es", "MX")) else it.toString()
+    }
 }

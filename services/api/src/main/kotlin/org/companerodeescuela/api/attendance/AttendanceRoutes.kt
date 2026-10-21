@@ -1,7 +1,5 @@
 package org.companerodeescuela.api.attendance
 
-import org.companerodeescuela.api.auth.boundedBody
-
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -10,23 +8,24 @@ import io.ktor.server.routing.patch
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import org.companerodeescuela.api.auth.AuthTokenService
-import org.companerodeescuela.api.auth.platformRoles
-import org.companerodeescuela.api.auth.requireNativeActor
-import org.companerodeescuela.api.auth.verifiedSessionSource
 import org.companerodeescuela.api.auth.SessionIdentitySource
+import org.companerodeescuela.api.auth.boundedBody
+import org.companerodeescuela.api.auth.platformRoles
 import org.companerodeescuela.api.auth.requireAdministrative
+import org.companerodeescuela.api.auth.requireNativeActor
 import org.companerodeescuela.api.auth.requirePlatformPrincipal
 import org.companerodeescuela.api.auth.requireRole
 import org.companerodeescuela.api.auth.requireStaff
 import org.companerodeescuela.api.auth.subjectId
+import org.companerodeescuela.api.auth.verifiedSessionSource
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
-import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
 import org.companerodeescuela.shared.contracts.ClassCallConfirmationRequest
+import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
 import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
 import org.companerodeescuela.shared.contracts.UserRole
 
@@ -38,9 +37,10 @@ fun Route.attendanceRoutes(
     qrService: AttendanceQrService? = null,
     campusRoster: TeacherCampusRosterService? = null,
 ) {
-    val tokens=if(settings.hasAuthentication) AuthTokenService(settings) else null
-    suspend fun nativeActor(call:io.ktor.server.application.ApplicationCall)=
-        if(call.verifiedSessionSource()==SessionIdentitySource.NATIVE) call.requireNativeActor(tokens!!) else null
+    val tokens = if (settings.hasAuthentication) AuthTokenService(settings) else null
+
+    suspend fun nativeActor(call: io.ktor.server.application.ApplicationCall) =
+        if (call.verifiedSessionSource() == SessionIdentitySource.NATIVE) call.requireNativeActor(tokens!!) else null
     route("/attendance") {
         if (!settings.hasAuthentication) {
             get("/sessions/active") {
@@ -66,7 +66,7 @@ fun Route.attendanceRoutes(
                 principal.requireRole(UserRole.STUDENT)
                 call.respond(
                     ApiResponse(
-                        data = studentService.activeFor(principal.subjectId(),nativeActor(call)),
+                        data = studentService.discoverActiveFor(principal.subjectId(), nativeActor(call)),
                         requestId = call.requestId(),
                     ),
                 )
@@ -77,11 +77,12 @@ fun Route.attendanceRoutes(
                 principal.requireRole(UserRole.STUDENT)
                 call.respond(
                     ApiResponse(
-                        data = studentService.inspectQr(
-                            studentId = principal.subjectId(),
-                            request = call.boundedBody(AttendanceQrInspectionRequest.serializer()),
-                            nativeActor = nativeActor(call),
-                        ),
+                        data =
+                            studentService.inspectQr(
+                                studentId = principal.subjectId(),
+                                request = call.boundedBody(AttendanceQrInspectionRequest.serializer()),
+                                nativeActor = nativeActor(call),
+                            ),
                         requestId = call.requestId(),
                     ),
                 )
@@ -90,20 +91,24 @@ fun Route.attendanceRoutes(
             get("/occurrences/{occurrenceId}/campus-roster") {
                 val principal = call.requirePlatformPrincipal()
                 principal.requireRole(UserRole.TEACHER)
-                val occurrenceId = call.parameters["occurrenceId"]
-                    ?: throw ApiException.Validation("occurrenceId is required")
-                val occurrenceDate = call.request.queryParameters["date"]
-                    ?: throw ApiException.Validation("date is required")
-                val rosterService = campusRoster
-                    ?: throw ApiException.DependencyUnavailable("School presence verification is not configured")
+                val occurrenceId =
+                    call.parameters["occurrenceId"]
+                        ?: throw ApiException.Validation("occurrenceId is required")
+                val occurrenceDate =
+                    call.request.queryParameters["date"]
+                        ?: throw ApiException.Validation("date is required")
+                val rosterService =
+                    campusRoster
+                        ?: throw ApiException.DependencyUnavailable("School presence verification is not configured")
                 call.respond(
                     ApiResponse(
-                        data = rosterService.forTeacher(
-                            teacherId = principal.subjectId(),
-                            occurrenceId = occurrenceId,
-                            date = occurrenceDate,
-                            nativeActor = nativeActor(call),
-                        ),
+                        data =
+                            rosterService.forTeacher(
+                                teacherId = principal.subjectId(),
+                                occurrenceId = occurrenceId,
+                                date = occurrenceDate,
+                                nativeActor = nativeActor(call),
+                            ),
                         requestId = call.requestId(),
                     ),
                 )
@@ -114,7 +119,7 @@ fun Route.attendanceRoutes(
                 principal.requireRole(UserRole.TEACHER)
                 call.respond(
                     ApiResponse(
-                        data = sessionService.activeForTeacher(principal.subjectId(),nativeActor(call)),
+                        data = sessionService.activeForTeacher(principal.subjectId(), nativeActor(call)),
                         requestId = call.requestId(),
                     ),
                 )
@@ -125,11 +130,12 @@ fun Route.attendanceRoutes(
                 principal.requireRole(UserRole.TEACHER)
                 call.respond(
                     ApiResponse(
-                        data = sessionService.openSession(
-                            teacherId = principal.subjectId(),
-                            request = call.boundedBody(CreateAttendanceSessionRequest.serializer()),
-                            nativeActor = nativeActor(call),
-                        ),
+                        data =
+                            sessionService.openSession(
+                                teacherId = principal.subjectId(),
+                                request = call.boundedBody(CreateAttendanceSessionRequest.serializer()),
+                                nativeActor = nativeActor(call),
+                            ),
                         requestId = call.requestId(),
                     ),
                 )
@@ -138,20 +144,23 @@ fun Route.attendanceRoutes(
             post("/sessions/{sessionId}/qr") {
                 val principal = call.requirePlatformPrincipal()
                 principal.requireStaff()
-                val sessionId = call.parameters["sessionId"]
-                    ?: throw ApiException.Validation("sessionId is required")
-                val serviceQr = qrService
-                    ?: throw ApiException.DependencyUnavailable(
-                        "Attendance QR signing is not configured",
-                    )
+                val sessionId =
+                    call.parameters["sessionId"]
+                        ?: throw ApiException.Validation("sessionId is required")
+                val serviceQr =
+                    qrService
+                        ?: throw ApiException.DependencyUnavailable(
+                            "Attendance QR signing is not configured",
+                        )
                 call.respond(
                     ApiResponse(
-                        data = serviceQr.issue(
-                            actorId = principal.subjectId(),
-                            sessionId = sessionId,
-                            allowCrossOwner = principal.platformRoles().any { it==UserRole.ADMIN || it==UserRole.SUPER_ADMIN },
-                            nativeActor = nativeActor(call),
-                        ),
+                        data =
+                            serviceQr.issue(
+                                actorId = principal.subjectId(),
+                                sessionId = sessionId,
+                                allowCrossOwner = principal.platformRoles().any { it == UserRole.ADMIN || it == UserRole.SUPER_ADMIN },
+                                nativeActor = nativeActor(call),
+                            ),
                         requestId = call.requestId(),
                     ),
                 )
@@ -160,20 +169,23 @@ fun Route.attendanceRoutes(
             post("/sessions/{sessionId}/qr-pack") {
                 val principal = call.requirePlatformPrincipal()
                 principal.requireStaff()
-                val sessionId = call.parameters["sessionId"]
-                    ?: throw ApiException.Validation("sessionId is required")
-                val serviceQr = qrService
-                    ?: throw ApiException.DependencyUnavailable(
-                        "Attendance QR signing is not configured",
-                    )
+                val sessionId =
+                    call.parameters["sessionId"]
+                        ?: throw ApiException.Validation("sessionId is required")
+                val serviceQr =
+                    qrService
+                        ?: throw ApiException.DependencyUnavailable(
+                            "Attendance QR signing is not configured",
+                        )
                 call.respond(
                     ApiResponse(
-                        data = serviceQr.issuePack(
-                            actorId = principal.subjectId(),
-                            sessionId = sessionId,
-                            allowCrossOwner = principal.platformRoles().any { it==UserRole.ADMIN || it==UserRole.SUPER_ADMIN },
-                            nativeActor = nativeActor(call),
-                        ),
+                        data =
+                            serviceQr.issuePack(
+                                actorId = principal.subjectId(),
+                                sessionId = sessionId,
+                                allowCrossOwner = principal.platformRoles().any { it == UserRole.ADMIN || it == UserRole.SUPER_ADMIN },
+                                nativeActor = nativeActor(call),
+                            ),
                         requestId = call.requestId(),
                     ),
                 )
@@ -182,16 +194,18 @@ fun Route.attendanceRoutes(
             post("/sessions/{sessionId}/attempts") {
                 val principal = call.requirePlatformPrincipal()
                 principal.requireRole(UserRole.STUDENT)
-                val sessionId = call.parameters["sessionId"]
-                    ?: throw ApiException.Validation("sessionId is required")
+                val sessionId =
+                    call.parameters["sessionId"]
+                        ?: throw ApiException.Validation("sessionId is required")
                 call.respond(
                     ApiResponse(
-                        data = studentService.register(
-                            studentId = principal.subjectId(),
-                            sessionId = sessionId,
-                            request = call.boundedBody(AttendanceAttemptRequest.serializer()),
-                            nativeActor = nativeActor(call),
-                        ),
+                        data =
+                            studentService.register(
+                                studentId = principal.subjectId(),
+                                sessionId = sessionId,
+                                request = call.boundedBody(AttendanceAttemptRequest.serializer()),
+                                nativeActor = nativeActor(call),
+                            ),
                         requestId = call.requestId(),
                     ),
                 )
@@ -200,11 +214,12 @@ fun Route.attendanceRoutes(
             get("/sessions/{sessionId}/mine") {
                 val principal = call.requirePlatformPrincipal()
                 principal.requireRole(UserRole.STUDENT)
-                val sessionId = call.parameters["sessionId"]
-                    ?: throw ApiException.Validation("sessionId is required")
+                val sessionId =
+                    call.parameters["sessionId"]
+                        ?: throw ApiException.Validation("sessionId is required")
                 call.respond(
                     ApiResponse(
-                        data = studentService.myClassRecord(principal.subjectId(), sessionId,nativeActor(call)),
+                        data = studentService.myClassRecord(principal.subjectId(), sessionId, nativeActor(call)),
                         requestId = call.requestId(),
                     ),
                 )
@@ -213,16 +228,18 @@ fun Route.attendanceRoutes(
             post("/sessions/{sessionId}/confirm") {
                 val principal = call.requirePlatformPrincipal()
                 principal.requireRole(UserRole.STUDENT)
-                val sessionId = call.parameters["sessionId"]
-                    ?: throw ApiException.Validation("sessionId is required")
+                val sessionId =
+                    call.parameters["sessionId"]
+                        ?: throw ApiException.Validation("sessionId is required")
                 call.respond(
                     ApiResponse(
-                        data = studentService.confirmClassCall(
-                            studentId = principal.subjectId(),
-                            sessionId = sessionId,
-                            request = call.boundedBody(ClassCallConfirmationRequest.serializer()),
-                            nativeActor = nativeActor(call),
-                        ),
+                        data =
+                            studentService.confirmClassCall(
+                                studentId = principal.subjectId(),
+                                sessionId = sessionId,
+                                request = call.boundedBody(ClassCallConfirmationRequest.serializer()),
+                                nativeActor = nativeActor(call),
+                            ),
                         requestId = call.requestId(),
                     ),
                 )
@@ -231,16 +248,18 @@ fun Route.attendanceRoutes(
             post("/sessions/{sessionId}/close") {
                 val principal = call.requirePlatformPrincipal()
                 principal.requireStaff()
-                val sessionId = call.parameters["sessionId"]
-                    ?: throw ApiException.Validation("sessionId is required")
+                val sessionId =
+                    call.parameters["sessionId"]
+                        ?: throw ApiException.Validation("sessionId is required")
                 call.respond(
                     ApiResponse(
-                        data = sessionService.closeSession(
-                            actorId = principal.subjectId(),
-                            sessionId = sessionId,
-                            allowCrossOwner = principal.platformRoles().any { it==UserRole.ADMIN || it==UserRole.SUPER_ADMIN },
-                            nativeActor = nativeActor(call),
-                        ),
+                        data =
+                            sessionService.closeSession(
+                                actorId = principal.subjectId(),
+                                sessionId = sessionId,
+                                allowCrossOwner = principal.platformRoles().any { it == UserRole.ADMIN || it == UserRole.SUPER_ADMIN },
+                                nativeActor = nativeActor(call),
+                            ),
                         requestId = call.requestId(),
                     ),
                 )
@@ -249,16 +268,18 @@ fun Route.attendanceRoutes(
             get("/sessions/{sessionId}/roster") {
                 val principal = call.requirePlatformPrincipal()
                 principal.requireStaff()
-                val sessionId = call.parameters["sessionId"]
-                    ?: throw ApiException.Validation("sessionId is required")
+                val sessionId =
+                    call.parameters["sessionId"]
+                        ?: throw ApiException.Validation("sessionId is required")
                 call.respond(
                     ApiResponse(
-                        data = sessionService.roster(
-                            actorId = principal.subjectId(),
-                            sessionId = sessionId,
-                            allowCrossOwner = principal.platformRoles().any { it==UserRole.ADMIN || it==UserRole.SUPER_ADMIN },
-                            nativeActor = nativeActor(call),
-                        ),
+                        data =
+                            sessionService.roster(
+                                actorId = principal.subjectId(),
+                                sessionId = sessionId,
+                                allowCrossOwner = principal.platformRoles().any { it == UserRole.ADMIN || it == UserRole.SUPER_ADMIN },
+                                nativeActor = nativeActor(call),
+                            ),
                         requestId = call.requestId(),
                     ),
                 )
@@ -267,17 +288,19 @@ fun Route.attendanceRoutes(
             patch("/records/{recordId}/review") {
                 val principal = call.requirePlatformPrincipal()
                 principal.requireStaff()
-                val recordId = call.parameters["recordId"]
-                    ?: throw ApiException.Validation("recordId is required")
+                val recordId =
+                    call.parameters["recordId"]
+                        ?: throw ApiException.Validation("recordId is required")
                 call.respond(
                     ApiResponse(
-                        data = reviewService.review(
-                            reviewerId = principal.subjectId(),
-                            recordId = recordId,
-                            request = call.boundedBody(ReviewAttendanceRequest.serializer()),
-                            allowCrossOwner = principal.platformRoles().any { it==UserRole.ADMIN || it==UserRole.SUPER_ADMIN },
-                            nativeActor = nativeActor(call),
-                        ),
+                        data =
+                            reviewService.review(
+                                reviewerId = principal.subjectId(),
+                                recordId = recordId,
+                                request = call.boundedBody(ReviewAttendanceRequest.serializer()),
+                                allowCrossOwner = principal.platformRoles().any { it == UserRole.ADMIN || it == UserRole.SUPER_ADMIN },
+                                nativeActor = nativeActor(call),
+                            ),
                         requestId = call.requestId(),
                     ),
                 )

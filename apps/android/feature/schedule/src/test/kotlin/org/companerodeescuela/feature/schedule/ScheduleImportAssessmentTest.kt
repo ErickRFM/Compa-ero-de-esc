@@ -22,6 +22,8 @@ class ScheduleImportAssessmentTest {
         val fixture = requireNotNull(javaClass.getResource("/fixtures/9A-ocr.txt")).readText()
         val complete = ScheduleOcrParser.parse(fixture)
         assertEquals(25, complete.size)
+        // Independently checked against the private original PDF, not just a synthetic total.
+        assertEquals(listOf(5, 5, 4, 4, 6, 1), ScheduleImportAssessment.counts(complete).map { it.second })
         assertTrue(ScheduleImportAssessment.missingDays(complete).isEmpty())
         assertFalse(ScheduleImportAssessment.shouldCrossCheckNative(complete))
     }

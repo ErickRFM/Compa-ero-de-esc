@@ -9,6 +9,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.companerodeescuela.api.academic.academicRoutes
 import org.companerodeescuela.api.academic.groups.academicGroupRoutes
 import org.companerodeescuela.api.admin.AccountAdministrationService
@@ -41,6 +43,7 @@ import org.companerodeescuela.api.integrations.push.InstitutionalPushService
 import org.companerodeescuela.api.integrations.push.InstitutionalSecretProtector
 import org.companerodeescuela.api.integrations.push.MongoInstitutionalIdentityLinkRepository
 import org.companerodeescuela.api.integrations.push.MongoInstitutionalPushRepository
+import org.companerodeescuela.api.integrations.push.SiiiPilotCredentialBootstrap
 import org.companerodeescuela.api.integrations.push.institutionalIdentityLinkRoutes
 import org.companerodeescuela.api.integrations.push.institutionalPushRoutes
 import org.companerodeescuela.api.plugins.configurePlugins
@@ -104,6 +107,22 @@ fun Application.module(
         } else {
             null
         }
+    // One-time provisioning is an explicit operator action and blocks startup on mismatch.
+    // Do not start an HTTP listener before the encrypted credential is persisted.
+    SiiiPilotCredentialBootstrap.parse(System::getenv)?.let { desired ->
+        try {
+            val repository =
+                institutionalPushRepository
+                    ?: error("Institutional integration encryption and MongoDB are required for bootstrap")
+            runBlocking {
+                withTimeout(15_000L) {
+                    SiiiPilotCredentialBootstrap.provision(repository, desired)
+                }
+            }
+        } finally {
+            desired.secret.fill(0)
+        }
+    }
     val institutionalPushAuthenticator =
         institutionalPushRepository?.let { repository ->
             InstitutionalPushAuthenticator(repository, repository)

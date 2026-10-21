@@ -76,11 +76,12 @@ class AppDistributionRoleResolverTest {
         )
         assertEquals(
             AppExperience.STUDENT,
-            RoleExperienceResolver.resolve(
-                roles = roles,
-                preferredExperience = AppExperience.ADMIN,
-                distribution = AppDistribution.ACADEMIC,
-            ).experience,
+            RoleExperienceResolver
+                .resolve(
+                    roles = roles,
+                    preferredExperience = AppExperience.ADMIN,
+                    distribution = AppDistribution.ACADEMIC,
+                ).experience,
         )
     }
 

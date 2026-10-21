@@ -26,7 +26,10 @@ data class RoleExperienceConfig(
  * experience is honored only when the authenticated role set actually grants it.
  */
 object RoleExperienceResolver {
-    fun available(roles: Set<UserRole>): List<AppExperience> =
+    fun available(
+        roles: Set<UserRole>,
+        distribution: AppDistribution = AppDistribution.LEGACY,
+    ): List<AppExperience> =
         buildList {
             if (UserRole.STUDENT in roles) add(AppExperience.STUDENT)
             if (UserRole.TEACHER in roles || UserRole.TEACHER_PENDING in roles) {
@@ -37,15 +40,16 @@ object RoleExperienceResolver {
             if (UserRole.ADMIN in roles) add(AppExperience.ADMIN)
             if (UserRole.SUPER_ADMIN in roles) add(AppExperience.SUPER_ADMIN)
             if (UserRole.GUEST in roles || UserRole.WORKSHOP_PARTICIPANT in roles) add(AppExperience.GUEST)
-        }
+        }.filter(distribution::allows)
 
     /** A login card is an intention, never a role grant. Null asks the user to choose. */
     fun preferredAfterLogin(
         roles: Set<UserRole>,
         requested: AppExperience?,
         saved: AppExperience?,
+        distribution: AppDistribution = AppDistribution.LEGACY,
     ): AppExperience? {
-        val granted = available(roles)
+        val granted = available(roles, distribution)
         if (requested != null) return requested.takeIf(granted::contains)
         return saved?.takeIf(granted::contains) ?: granted.singleOrNull()
     }
@@ -53,8 +57,9 @@ object RoleExperienceResolver {
     fun resolve(
         roles: Set<UserRole>,
         preferredExperience: AppExperience? = null,
+        distribution: AppDistribution = AppDistribution.LEGACY,
     ): RoleExperienceConfig {
-        val available = available(roles)
+        val available = available(roles, distribution)
         val selected =
             preferredExperience
                 ?.takeIf(available::contains)

@@ -26,41 +26,41 @@ class CoordinatorHomeViewModel
     constructor(
         private val repository: CoordinatorRepository,
     ) : ViewModel() {
-    private val _state = MutableStateFlow(CoordinatorOverviewUiState())
-    val state: StateFlow<CoordinatorOverviewUiState> = _state.asStateFlow()
-    private var refreshJob: Job? = null
+        private val _state = MutableStateFlow(CoordinatorOverviewUiState())
+        val state: StateFlow<CoordinatorOverviewUiState> = _state.asStateFlow()
+        private var refreshJob: Job? = null
 
-    init {
-        refresh()
-    }
+        init {
+            refresh()
+        }
 
-    fun refresh() {
-        // init and ON_RESUME can occur together; avoid duplicate network calls.
-        if (refreshJob?.isActive == true) return
-        refreshJob =
-            viewModelScope.launch {
-                _state.update { it.copy(loading = true, errorMessage = null) }
-                when (val result = repository.overview()) {
-                    is Outcome.Success ->
-                        _state.value =
-                            CoordinatorOverviewUiState(
-                                loading = false,
-                                overview = result.value,
-                            )
-                    is Outcome.Failure ->
-                        _state.update { old ->
-                            // Only transient failures may retain the last authorized snapshot.
-                            // 401/403 and other permission/contract failures must invalidate it.
-                            old.copy(
-                                loading = false,
-                                overview = old.overview.takeIf { retainCoordinationSnapshot(result.error) },
-                                errorMessage = result.error.userMessage,
-                            )
-                        }
+        fun refresh() {
+            // init and ON_RESUME can occur together; avoid duplicate network calls.
+            if (refreshJob?.isActive == true) return
+            refreshJob =
+                viewModelScope.launch {
+                    _state.update { it.copy(loading = true, errorMessage = null) }
+                    when (val result = repository.overview()) {
+                        is Outcome.Success ->
+                            _state.value =
+                                CoordinatorOverviewUiState(
+                                    loading = false,
+                                    overview = result.value,
+                                )
+                        is Outcome.Failure ->
+                            _state.update { old ->
+                                // Only transient failures may retain the last authorized snapshot.
+                                // 401/403 and other permission/contract failures must invalidate it.
+                                old.copy(
+                                    loading = false,
+                                    overview = old.overview.takeIf { retainCoordinationSnapshot(result.error) },
+                                    errorMessage = result.error.userMessage,
+                                )
+                            }
+                    }
                 }
-            }
+        }
     }
-}
 
 internal fun retainCoordinationSnapshot(error: AppError): Boolean =
     when (error) {

@@ -32,7 +32,7 @@ object SiiiPilotInstitutionBootstrap {
         require(id.matches(Regex("[A-Za-z0-9._:-]{1,128}"))) {
             "SIII_PILOT_TENANT_ID is invalid"
         }
-        require(displayName.length in 2..128 && displayName.none { it.isISOControl() }) {
+        require(displayName.length in 2..128 && displayName.none { Character.isISOControl(it) }) {
             "SIII_PILOT_TENANT_DISPLAY_NAME is invalid"
         }
         return PilotInstitutionSpec(id, displayName)

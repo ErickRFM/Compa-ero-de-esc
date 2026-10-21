@@ -153,7 +153,7 @@ class TodayScheduleTest {
             )
         val monday = TodaySchedule.calculate(load, LocalDateTime.of(2026, 10, 5, 23, 59))
         val tuesday = TodaySchedule.calculate(load, LocalDateTime.of(2026, 10, 6, 9, 15))
-        assertEquals("En 1 días", nextClassStatLabel(monday).replace("Mañana", "En 1 días"))
+        assertEquals("Mañana", nextClassStatLabel(monday))
         assertEquals("Redes", tuesday.current?.subjectName)
         assertEquals(1, tuesday.classes.size)
     }

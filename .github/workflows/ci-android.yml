@@ -59,18 +59,18 @@ jobs:
         run: python3 -m unittest discover -s infrastructure/scripts/tests -p test_export_v10_evidence.py
 
       - name: Compile Android sources
-        run: ./gradlew :apps:android:app:compileDebugKotlin --console=plain
+        run: ./gradlew :apps:android:app:compileAcademicDebugKotlin :apps:android:app:compileManagementDebugKotlin --console=plain
 
       # BUG-003: AGP defaults to the JUnit 4 runner, which compiles a JUnit 5
       # suite and then reports zero tests without failing. useJUnitPlatform()
       # is set in every Android module; this step proves it took effect.
       - name: Run Android unit tests
-        run: ./gradlew testDebugUnitTest --console=plain
+        run: ./gradlew testDebugUnitTest :apps:android:app:testAcademicDebugUnitTest :apps:android:app:testManagementDebugUnitTest --console=plain
 
       - name: Verify Android tests actually executed
         run: |
           set -euo pipefail
-          reports=$(find apps -path '*test-results/testDebugUnitTest/*' -name 'TEST-*.xml' | wc -l)
+          reports=$(find apps -path '*/build/test-results/*' -name 'TEST-*.xml' | wc -l)
           if [ "$reports" -eq 0 ]; then
             echo "::error::No Android JUnit reports. The tests did not run. See BUG-003."
             exit 1
@@ -78,7 +78,7 @@ jobs:
           # awk, not bc: bc is not guaranteed to be installed on the runner
           # image, and under `set -e` a missing binary fails the step for a
           # reason unrelated to the tests.
-          read -r total failures errors <<< "$(find apps -path '*test-results/testDebugUnitTest/*' -name 'TEST-*.xml' -print0 \
+          read -r total failures errors <<< "$(find apps -path '*/build/test-results/*' -name 'TEST-*.xml' -print0 \
             | xargs -0 -r grep -hoE '(tests|failures|errors)="[0-9]+"' \
             | awk -F'"' '{ v=$2+0; if ($1 ~ /^tests/) t+=v; else if ($1 ~ /^failures/) f+=v; else e+=v }
                        END { printf "%d %d %d", t+0, f+0, e+0 }')"
@@ -118,17 +118,19 @@ jobs:
           fi
 
       - name: Build debug APK
-        run: ./gradlew :apps:android:app:assembleDebug --console=plain
+        run: ./gradlew :apps:android:app:assembleAcademicDebug :apps:android:app:assembleManagementDebug --console=plain
 
       - name: Debug APK exists
         run: |
           set -euo pipefail
-          apk=apps/android/app/build/outputs/apk/debug/app-debug.apk
-          test -f "$apk" || { echo "::error::$apk not found"; exit 1; }
-          echo "debug apk: $(du -h "$apk" | cut -f1)"
+          for flavor in academic management; do
+            apk="apps/android/app/build/outputs/apk/$flavor/debug/app-$flavor-debug.apk"
+            test -f "$apk" || { echo "::error::$apk not found"; exit 1; }
+            echo "$flavor debug apk: $(du -h "$apk" | cut -f1)"
+          done
 
       - name: Build minified release APK
-        run: ./gradlew :apps:android:app:assembleRelease --console=plain
+        run: ./gradlew :apps:android:app:assembleAcademicRelease :apps:android:app:assembleManagementRelease --console=plain
 
       # Release is minified and resource-shrunk. The current build is signed
       # with the debug key for internal testing, not production distribution.
@@ -136,22 +138,27 @@ jobs:
       - name: Release APK exists and is minified
         run: |
           set -euo pipefail
-          release=apps/android/app/build/outputs/apk/release/app-release.apk
-          debug=apps/android/app/build/outputs/apk/debug/app-debug.apk
-          test -f "$release" || { echo "::error::$release not found"; exit 1; }
-          r=$(stat -c%s "$release")
-          d=$(stat -c%s "$debug")
-          echo "debug=$d bytes release=$r bytes"
-          if [ "$r" -ge "$d" ]; then
-            echo "::error::Release APK is not smaller than debug. R8 may be disabled."
-            exit 1
-          fi
-          echo "test-release apk: $(du -h "$release" | cut -f1)"
           sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
           test -n "$sdk_root" || { echo "::error::ANDROID_HOME/ANDROID_SDK_ROOT unavailable"; exit 1; }
           signer="$(find "$sdk_root/build-tools" -mindepth 2 -maxdepth 2 -type f -name apksigner | sort -V | tail -n 1)"
-          test -x "$signer" || { echo "::error::apksigner unavailable"; exit 1; }
-          "$signer" verify --verbose --print-certs "$release"
+          aapt="$(find "$sdk_root/build-tools" -mindepth 2 -maxdepth 2 -type f -name aapt | sort -V | tail -n 1)"
+          test -x "$signer" && test -x "$aapt" || exit 1
+          for flavor in academic management; do
+            release="apps/android/app/build/outputs/apk/$flavor/release/app-$flavor-release.apk"
+            debug="apps/android/app/build/outputs/apk/$flavor/debug/app-$flavor-debug.apk"
+            test -f "$release" && test -f "$debug" || { echo "::error::Missing $flavor APK"; exit 1; }
+            r=$(stat -c%s "$release"); d=$(stat -c%s "$debug")
+            if [ "$r" -ge "$d" ]; then
+              echo "::error::$flavor release not minified"; exit 1
+            fi
+            "$signer" verify --verbose --print-certs "$release"
+            expected="org.companerodeescuela"
+            if [ "$flavor" = management ]; then expected="org.companerodeescuela.gestion"; fi
+            "$aapt" dump badging "$release" | grep -F "package: name='$expected'" > /dev/null || {
+              echo "::error::$flavor release has unexpected package ID"; exit 1;
+            }
+            echo "$flavor: debug=$d bytes, release=$r bytes, package=$expected"
+          done
 
       - name: No secrets committed
         run: bash infrastructure/scripts/secret-scan.sh
@@ -162,10 +169,12 @@ jobs:
           short_sha="${GITHUB_SHA::7}"
           out="build/rc-artifacts"
           mkdir -p "$out"
-          cp apps/android/app/build/outputs/apk/debug/app-debug.apk \
-            "$out/companero-escuela-debug-$short_sha.apk"
-          cp apps/android/app/build/outputs/apk/release/app-release.apk \
-            "$out/companero-escuela-test-release-debug-signed-$short_sha.apk"
+          for flavor in academic management; do
+            cp "apps/android/app/build/outputs/apk/$flavor/debug/app-$flavor-debug.apk" \
+              "$out/companero-$flavor-debug-$short_sha.apk"
+            cp "apps/android/app/build/outputs/apk/$flavor/release/app-$flavor-release.apk" \
+              "$out/companero-$flavor-test-release-debug-signed-$short_sha.apk"
+          done
           {
             echo "commit=$GITHUB_SHA"
             echo "ref=$GITHUB_REF"
@@ -193,11 +202,12 @@ jobs:
           retention-days: 7
 
   instrumentation:
-    name: Android instrumentation API ${{ matrix.api-level }}
+    name: Android ${{ matrix.flavor }} instrumentation API ${{ matrix.api-level }}
     strategy:
       fail-fast: false
       matrix:
         api-level: [31, 35]
+        flavor: [academic, management]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -222,7 +232,13 @@ jobs:
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
 
       - name: Build instrumentation APKs before starting the emulator
-        run: ./gradlew :apps:android:app:assembleDebug :apps:android:app:assembleDebugAndroidTest --max-workers=2 --no-daemon --console=plain
+        run: |
+          case "${{ matrix.flavor }}" in
+            academic) variant=Academic ;;
+            management) variant=Management ;;
+            *) exit 1 ;;
+          esac
+          ./gradlew ":apps:android:app:assemble${variant}Debug" ":apps:android:app:assemble${variant}DebugAndroidTest" --max-workers=2 --no-daemon --console=plain
 
       - name: Run Instrumentation Tests
         timeout-minutes: 20
@@ -239,7 +255,7 @@ jobs:
           emulator-options: -no-window -gpu swangle -no-snapshot -noaudio -no-boot-anim -show-kernel
           # App contains the smoke tests. Root task also launches empty library
           # suites concurrently against the same emulator and can stall ADB.
-          script: bash infrastructure/scripts/run-v10-instrumentation.sh
+          script: bash infrastructure/scripts/run-v10-instrumentation.sh ${{ matrix.flavor }}
 
       - name: Verify instrumentation tests actually executed
         run: |
@@ -263,7 +279,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: v10-login-ui-evidence-api-${{ matrix.api-level }}
+          name: v10-login-ui-evidence-${{ matrix.flavor }}-api-${{ matrix.api-level }}
           path: |
             build/v10-device-evidence/**
             build/v10-runner-diagnostics/**

@@ -1,0 +1,107 @@
+name: android-distribution-signed
+
+# Manually requested only. The ordinary Android CI is debug-signed internal QA.
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: "Positive monotonically increasing Android versionCode"
+        required: true
+        type: string
+      version_name:
+        description: "Version name (e.g. 1.0.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  distribution:
+    environment: android-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      COMPANERO_SIGNING_MODE: distribution
+      COMPANERO_RELEASE_KEYSTORE_PATH: ${{ runner.temp }}/companero-distribution.jks
+      COMPANERO_RELEASE_STORE_PASSWORD: ${{ secrets.COMPANERO_RELEASE_STORE_PASSWORD }}
+      COMPANERO_RELEASE_KEY_ALIAS: ${{ secrets.COMPANERO_RELEASE_KEY_ALIAS }}
+      COMPANERO_RELEASE_KEY_PASSWORD: ${{ secrets.COMPANERO_RELEASE_KEY_PASSWORD }}
+      COMPANERO_VERSION_CODE: ${{ inputs.version_code }}
+      COMPANERO_VERSION_NAME: ${{ inputs.version_name }}
+      COMPANERO_RELEASE_API_BASE_URL: ${{ vars.COMPANERO_RELEASE_API_BASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Decode release keystore securely
+        env:
+          KEYSTORE_B64: ${{ secrets.COMPANERO_RELEASE_KEYSTORE_B64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$KEYSTORE_B64" || { echo "::error::Release keystore secret missing"; exit 1; }
+          test -n "$COMPANERO_RELEASE_STORE_PASSWORD" || exit 1
+          test -n "$COMPANERO_RELEASE_KEY_ALIAS" || exit 1
+          test -n "$COMPANERO_RELEASE_KEY_PASSWORD" || exit 1
+          test -n "$COMPANERO_RELEASE_API_BASE_URL" || {
+            echo "::error::Explicit production HTTPS API URL missing"; exit 1;
+          }
+          umask 077
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$COMPANERO_RELEASE_KEYSTORE_PATH"
+          test -s "$COMPANERO_RELEASE_KEYSTORE_PATH"
+      - name: Build signed production and comparison debug APK
+        run: ./gradlew :apps:android:app:assembleDebug :apps:android:app:assembleRelease --console=plain
+      - name: Verify release signing identity
+        shell: bash
+        env:
+          EXPECTED_CERT_SHA256: ${{ vars.COMPANERO_RELEASE_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          test -n "$sdk_root"
+          signer="$(find "$sdk_root/build-tools" -mindepth 2 -maxdepth 2 -type f -name apksigner | sort -V | tail -1)"
+          test -x "$signer"
+          release=apps/android/app/build/outputs/apk/release/app-release.apk
+          debug=apps/android/app/build/outputs/apk/debug/app-debug.apk
+          "$signer" verify --verbose --print-certs "$release"
+          "$signer" verify --verbose --print-certs "$debug"
+          fingerprint() {
+            "$signer" verify --print-certs "$1" |
+              sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1 | tr '[:upper:]' '[:lower:]'
+          }
+          actual="$(fingerprint "$release")"
+          debug_cert="$(fingerprint "$debug")"
+          expected="$(printf '%s' "$EXPECTED_CERT_SHA256" | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
+          test -n "$actual" && test -n "$expected" || {
+            echo "::error::Release certificate fingerprint must be pinned as android-release environment variable"; exit 1;
+          }
+          test "$actual" = "$expected" || {
+            echo "::error::Release signer does not match approved certificate"; exit 1;
+          }
+          test "$actual" != "$debug_cert" || {
+            echo "::error::Production APK uses debug certificate"; exit 1;
+          }
+          mkdir -p dist/distribution
+          cp "$release" "dist/distribution/companero-v${COMPANERO_VERSION_NAME}-signed.apk"
+          {
+            echo "sha=$GITHUB_SHA"
+            echo "version_code=$COMPANERO_VERSION_CODE"
+            echo "version_name=$COMPANERO_VERSION_NAME"
+            echo "certificate_sha256=$actual"
+            echo "signing_mode=production_distribution"
+          } > dist/distribution/PROVENANCE.txt
+      - name: Upload verified APK and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: companero-production-signed-${{ github.run_number }}
+          path: dist/distribution/
+          retention-days: 30
+          if-no-files-found: error
+      - name: Remove private keystore
+        if: always()
+        shell: bash
+        run: rm -f "$COMPANERO_RELEASE_KEYSTORE_PATH"

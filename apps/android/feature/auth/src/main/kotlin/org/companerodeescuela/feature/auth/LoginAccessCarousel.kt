@@ -40,13 +40,23 @@ internal val loginAccesses = listOf(
     LoginAccess(AppExperience.STUDENT, R.string.auth_role_student, R.string.auth_student_description, Icons.Filled.School),
     LoginAccess(AppExperience.TEACHER, R.string.auth_role_teacher, R.string.auth_teacher_description, Icons.Filled.MenuBook),
     LoginAccess(AppExperience.TUTOR, R.string.auth_role_tutor, R.string.auth_tutor_description, Icons.Filled.Groups),
-    LoginAccess(AppExperience.COORDINATOR, R.string.auth_role_coordinator, R.string.auth_coordinator_description, Icons.Filled.Business),
     LoginAccess(AppExperience.ADMIN, R.string.auth_role_admin, R.string.auth_admin_description, Icons.Filled.AdminPanelSettings),
     LoginAccess(AppExperience.SUPER_ADMIN, R.string.auth_role_super_admin, R.string.auth_super_admin_description, Icons.Filled.VerifiedUser),
 )
 
 internal fun loginAccessesFor(distribution: AppDistribution): List<LoginAccess> =
-    loginAccesses.filter { distribution.allows(it.experience) }
+    if (distribution == AppDistribution.MANAGEMENT) {
+        listOf(
+            LoginAccess(
+                AppExperience.COORDINATOR,
+                R.string.auth_role_coordinator,
+                R.string.auth_coordinator_description,
+                Icons.Filled.Business,
+            ),
+        ) + loginAccesses.filter { distribution.allows(it.experience) }
+    } else {
+        loginAccesses.filter { distribution.allows(it.experience) }
+    }
 
 @Composable
 internal fun LoginAccessCarousel(pager: PagerState, enabled: Boolean, accesses: List<LoginAccess> = loginAccesses) {

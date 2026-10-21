@@ -48,8 +48,8 @@ object TodaySchedule {
             allEntries
                 .filter { it.dayOfWeek == now.dayOfWeek.name }
                 .mapNotNull { entry ->
-                val start = runCatching { LocalTime.parse(entry.startsAt) }.getOrNull()
-                val end = runCatching { LocalTime.parse(entry.endsAt) }.getOrNull()
+                    val start = runCatching { LocalTime.parse(entry.startsAt) }.getOrNull()
+                    val end = runCatching { LocalTime.parse(entry.endsAt) }.getOrNull()
                     if (start == null || end == null || start >= end) {
                         null
                     } else {

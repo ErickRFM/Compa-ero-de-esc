@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.core.designsystem.v8
 
 import androidx.compose.foundation.background
@@ -34,7 +36,10 @@ internal enum class V8SurfaceFinish {
     LIGHT_HIGH_CONTRAST,
 }
 
-internal fun v8SurfaceFinish(light: Boolean, highContrast: Boolean): V8SurfaceFinish =
+internal fun v8SurfaceFinish(
+    light: Boolean,
+    highContrast: Boolean,
+): V8SurfaceFinish =
     when {
         light && highContrast -> V8SurfaceFinish.LIGHT_HIGH_CONTRAST
         light -> V8SurfaceFinish.LIGHT_CLEAN
@@ -92,8 +97,7 @@ fun Modifier.v8GlassSurface(
     val borderWidth =
         if (finish == V8SurfaceFinish.DARK_HIGH_CONTRAST || finish == V8SurfaceFinish.LIGHT_HIGH_CONTRAST) 2.dp else 1.dp
 
-    return this
-        .shadow(
+    return this.shadow(
             elevation = shadowElevation,
             shape = shape,
             ambientColor = Color.Black.copy(alpha = 0.25f),

@@ -128,10 +128,10 @@ class MainActivity : AppCompatActivity() {
                         val authDraft: AuthDraftViewModel = viewModel()
                         val session by sessionViewModel.state.collectAsStateWithLifecycle()
                         SideEffect {
-                            val v8Dark =
-                                session.authenticated && session.roles == setOf(org.companerodeescuela.shared.contracts.UserRole.STUDENT)
+                            // Follow the selected theme, not the student's role:
+                            // light-mode screens must use dark system-bar icons.
                             val style =
-                                if (v8Dark || darkTheme) {
+                                if (darkTheme) {
                                     SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
                                 } else {
                                     SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)

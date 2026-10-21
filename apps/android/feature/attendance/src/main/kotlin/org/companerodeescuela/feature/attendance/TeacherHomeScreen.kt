@@ -130,7 +130,12 @@ fun TeacherHomeScreen(
                         Text(
                             text = if (active != null) "EN VIVO · ${active.groupName}" else "Sin pase abierto",
                             style = MaterialTheme.typography.labelLarge,
-                            color = if (active != null) if (MaterialTheme.colorScheme.background.luminance() > 0.5f) CompanionColors.semanticGreen else V8RedColors.Success else MaterialTheme.colorScheme.onSurfaceVariant,
+                            color =
+                                when {
+                                    active == null -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    MaterialTheme.colorScheme.background.luminance() > 0.5f -> CompanionColors.semanticGreen
+                                    else -> V8RedColors.Success
+                                },
                         )
                         Text(
                             text = if (active != null) {

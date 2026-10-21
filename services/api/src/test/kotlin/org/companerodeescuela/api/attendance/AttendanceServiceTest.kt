@@ -328,7 +328,7 @@ class AttendanceServiceTest {
     }
 
     @Test
-    fun `class attendance prompt requires active school presence when policy is enabled`() = runTest {
+    fun `student sees enrolled session before check-in but confirmation remains protected`() = runTest {
         val presence = SchoolPresenceService(
             repository = InMemorySchoolPresenceRepository(),
             policy = SchoolPresencePolicy(
@@ -342,9 +342,9 @@ class AttendanceServiceTest {
         val service = service(schoolPresenceService = presence)
         val session = service.openSession("T-0001", requestFor(teacherOccurrence()))
 
-        assertFailsWith<ApiException.Forbidden> {
-            service.activeFor("2020-10455")
-        }
+        assertEquals(listOf(session.id), service.activeFor("2020-10455").map { it.id })
+        // Viewing the schedule is never treated as an attendance confirmation.
+        assertEquals(0, service.roster("T-0001", session.id).records.size)
 
         presence.start(
             studentId = "2020-10455",

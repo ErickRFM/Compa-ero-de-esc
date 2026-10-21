@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.core.designsystem.v8
 
 import androidx.compose.foundation.background

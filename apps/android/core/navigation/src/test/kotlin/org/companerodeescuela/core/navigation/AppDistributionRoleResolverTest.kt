@@ -3,7 +3,6 @@ package org.companerodeescuela.core.navigation
 import org.companerodeescuela.shared.contracts.UserRole
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 
 /** The APK selector must not leak an experience from the other distribution. */
 class AppDistributionRoleResolverTest {
@@ -66,7 +65,8 @@ class AppDistributionRoleResolverTest {
     @Test
     fun `saved management choice cannot cross into academic product`() {
         val roles = setOf(UserRole.STUDENT, UserRole.ADMIN)
-        assertNull(
+        assertEquals(
+            AppExperience.STUDENT,
             RoleExperienceResolver.preferredAfterLogin(
                 roles = roles,
                 requested = null,

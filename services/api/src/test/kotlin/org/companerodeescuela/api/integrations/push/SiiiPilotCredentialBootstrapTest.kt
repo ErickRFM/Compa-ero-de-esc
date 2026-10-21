@@ -1,5 +1,6 @@
 package org.companerodeescuela.api.integrations.push
 
+import kotlinx.coroutines.runBlocking
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -43,6 +44,19 @@ class SiiiPilotCredentialBootstrapTest {
         assertEquals(32, credential.secret.size)
         assertEquals(pilotExpiry, credential.expiresAtEpochSeconds)
     }
+
+    @Test
+    fun `bootstrap refuses credentials for unknown or disabled institution`() =
+        runBlocking {
+            val credential = requireNotNull(SiiiPilotCredentialBootstrap.parse(settings()::get, clock))
+            SiiiPilotCredentialBootstrap.requireEnabledTenant(credential.tenantId) { it == "institution-pilot" }
+            assertFailsWith<IllegalArgumentException> {
+                SiiiPilotCredentialBootstrap.requireEnabledTenant(credential.tenantId) { false }
+            }
+            assertFailsWith<IllegalArgumentException> {
+                SiiiPilotCredentialBootstrap.requireEnabledTenant(credential.tenantId) { it == "other-tenant" }
+            }
+        }
 
     @Test
     fun `bootstrap rejects incomplete secrets and excessive lifetimes`() {

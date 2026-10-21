@@ -116,7 +116,9 @@ fun Application.module(
                     ?: error("Institutional integration encryption and MongoDB are required for bootstrap")
             runBlocking {
                 withTimeout(15_000L) {
-                    SiiiPilotCredentialBootstrap.provision(repository, desired)
+                    SiiiPilotCredentialBootstrap.provision(repository, desired) { tenantId ->
+                        identityGraph.institutions.findEnabled(tenantId) != null
+                    }
                 }
             }
         } finally {

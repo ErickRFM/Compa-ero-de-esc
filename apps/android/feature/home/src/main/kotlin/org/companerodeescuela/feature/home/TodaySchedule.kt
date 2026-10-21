@@ -3,6 +3,7 @@ package org.companerodeescuela.feature.home
 import java.time.DayOfWeek
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.util.Locale
 import org.companerodeescuela.shared.contracts.AcademicLoadResponse
 import org.companerodeescuela.shared.contracts.ScheduleEntry
 
@@ -15,6 +16,28 @@ data class TodayOverview(
     val nextScheduled: ScheduleEntry? = null,
     val nextScheduledDaysAway: Int? = null,
 )
+
+
+/** Personal OCR imports share the placeholder code PERSONAL, not the same subject. */
+internal fun scheduleSubjectKey(entry: ScheduleEntry): String {
+    val code = entry.subjectCode.trim()
+    return if (code.isEmpty() || code.equals("PERSONAL", ignoreCase = true)) {
+        entry.subjectName.trim().lowercase(Locale.ROOT)
+    } else {
+        code.uppercase(Locale.ROOT)
+    }
+}
+
+/** The compact stat remains informative after today's final class. */
+internal fun nextClassStatLabel(day: TodayOverview): String {
+    day.next?.let { return it.startsAt }
+    val upcoming = day.nextScheduled ?: return "—"
+    return when (val away = day.nextScheduledDaysAway) {
+        1 -> "Mañana"
+        null, 0 -> upcoming.startsAt
+        else -> "En ${away} días"
+    }
+}
 
 object TodaySchedule {
     fun calculate(

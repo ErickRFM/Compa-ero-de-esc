@@ -90,10 +90,17 @@ def validate_archive(path, stage):
     return len(names)
 
 
+def evidence_package():
+    package = os.environ.get("COMPANERO_EVIDENCE_PACKAGE", "org.companerodeescuela")
+    if package not in ("org.companerodeescuela", "org.companerodeescuela.gestion"):
+        raise EvidenceExportError("Unsupported evidence package")
+    return package
+
+
 def fetch_adb(path):
     with path.open("wb") as stream:
         result = subprocess.run(
-            ["adb", "exec-out", "run-as", "org.companerodeescuela", "tar", "-C", "files", "-cf", "-", "v10-evidence"],
+            ["adb", "exec-out", "run-as", evidence_package(), "tar", "-C", "files", "-cf", "-", "v10-evidence"],
             stdout=stream, stderr=subprocess.DEVNULL, timeout=60,
         )
     if result.returncode:

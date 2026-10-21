@@ -23,20 +23,22 @@ class ScheduleImportProcessor(
 
         // Digital-text-first; a partial native extraction can omit complete
         // weekday columns while still returning a nonempty schedule.
-        val native = readNativePdfOrNull {
-            DigitalPdfTimetableReader(context).extract(uri)
-        }.orEmpty()
+        val native =
+            readNativePdfOrNull {
+                DigitalPdfTimetableReader(context).extract(uri)
+            }.orEmpty()
         if (native.isNotEmpty() && !ScheduleImportAssessment.shouldCrossCheckNative(native)) {
             return native
         }
-        val ocr = try {
-            ScheduleOcrParser.parse(extractPdf(uri))
-        } catch (cancelled: kotlinx.coroutines.CancellationException) {
-            throw cancelled
-        } catch (failure: Exception) {
-            if (native.isNotEmpty()) return native
-            throw failure
-        }
+        val ocr =
+            try {
+                ScheduleOcrParser.parse(extractPdf(uri))
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                if (native.isNotEmpty()) return native
+                throw failure
+            }
         return ScheduleImportAssessment.select(native, ocr)
     }
 
@@ -294,6 +296,13 @@ internal object TimetableOcrReconstructor {
 }
 
 /** SAF providers occasionally omit the PDF content type entirely. */
-internal fun isPdfDocument(mime: String?, lastPathSegment: String?): Boolean =
-    mime?.substringBefore(';')?.trim()?.equals("application/pdf", ignoreCase = true) == true ||
-        lastPathSegment?.substringBefore('?')?.lowercase()?.endsWith(".pdf") == true
+internal fun isPdfDocument(
+    mime: String?,
+    lastPathSegment: String?,
+): Boolean {
+    val mimeIsPdf = mime?.substringBefore(';')?.trim()
+        ?.equals("application/pdf", ignoreCase = true) == true
+    val pathIsPdf = lastPathSegment?.substringBefore('?')
+        ?.lowercase()?.endsWith(".pdf") == true
+    return mimeIsPdf || pathIsPdf
+}

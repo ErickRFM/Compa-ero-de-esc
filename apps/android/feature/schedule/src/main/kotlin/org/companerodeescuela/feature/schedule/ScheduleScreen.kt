@@ -1225,9 +1225,10 @@ private fun ImportReviewDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    val warnings = remember(candidates, previous) {
-        ScheduleImportAssessment.warnings(candidates, previous)
-    }
+    val warnings =
+        remember(candidates, previous) {
+            ScheduleImportAssessment.warnings(candidates, previous)
+        }
     var acknowledged by remember(candidates, previous) { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
@@ -1240,9 +1241,11 @@ private fun ImportReviewDialog(
                 Text(
                     "Detectamos " + candidates.size + " clases consolidadas. Corrige cualquier dato antes de guardar.",
                 )
-                Text(
+                val daySummary =
                     ScheduleImportAssessment.counts(candidates)
-                        .joinToString("  ·  ") { (day, count) -> day + ": " + count },
+                        .joinToString("  ·  ") { (day, count) -> "$day: $count" }
+                Text(
+                    daySummary,
                     style = MaterialTheme.typography.labelMedium,
                 )
                 if (warnings.isNotEmpty()) {

@@ -52,10 +52,13 @@ internal object DigitalPdfTimetableParser {
     internal fun assembleColumnAwareLines(glyphs: List<DigitalPdfGlyph>): List<DigitalPdfLine> {
         val initial = assembleLines(glyphs)
         val boundaries = inferDayBoundaries(initial) ?: return initial
-        return glyphs.groupBy { glyph ->
-            val center = glyph.x + glyph.width / 2f
-            boundaries.indexOfLast { it <= center }
-        }.values.flatMap(::assembleLines)
+        return glyphs
+            .groupBy { glyph ->
+                val center = glyph.x + glyph.width / 2f
+                boundaries.indexOfLast { it <= center }
+            }
+            .values
+            .flatMap(::assembleLines)
     }
 
     internal fun assembleLines(glyphs: List<DigitalPdfGlyph>): List<DigitalPdfLine> {

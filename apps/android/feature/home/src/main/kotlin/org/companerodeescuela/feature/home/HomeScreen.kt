@@ -83,7 +83,11 @@ fun HomeScreen(
                 .align(Alignment.TopCenter),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
         ) {
-            val firstName = overview?.studentName?.substringBefore(" ")?.takeIf { it.isNotBlank() }
+            val firstName =
+                overview?.studentName?.trim()?.substringBefore(" ")?.takeIf { it.isNotBlank() }
+                    ?.replaceFirstChar {
+                        if (it.isLowerCase()) it.titlecase(Locale("es", "MX")) else it.toString()
+                    }
             Text(
                 text = buildAnnotatedString {
                     append("Hola")
@@ -148,13 +152,13 @@ fun HomeScreen(
                     )
                     V8DashboardStat(
                         label = "Materias hoy",
-                        value = day.classes.distinctBy { entry -> entry.subjectCode.ifBlank { entry.subjectName } }.size.toString(),
+                        value = day.classes.distinctBy(::scheduleSubjectKey).size.toString(),
                         onClick = onOpenClassrooms,
                         modifier = Modifier.weight(1f),
                     )
                     V8DashboardStat(
                         label = "Próxima clase",
-                        value = day.next?.subjectName ?: "—",
+                        value = nextClassStatLabel(day),
                         onClick = onOpenSchedule,
                         modifier = Modifier.weight(1f),
                     )
@@ -196,7 +200,7 @@ fun HomeScreen(
                                         " · " + upcoming.startsAt + " – " + upcoming.endsAt,
                                     location = locationLabel(upcoming),
                                     teacher = upcoming.teacherName,
-                                    subjectKey = upcoming.subjectCode.ifBlank { upcoming.subjectName },
+                                    subjectKey = scheduleSubjectKey(upcoming),
                                 )
                             }
                         }
@@ -243,7 +247,7 @@ private fun DayTimeline(day: TodayOverview, onOpenSchedule: () -> Unit) {
         val status = classStatus(entry, day.current, day.next)
         V8DailyClassRow(
             classInfo = V8ClassSummary(
-                id = entry.subjectCode.ifBlank { entry.subjectName },
+                id = scheduleSubjectKey(entry) + ":" + entry.dayOfWeek + ":" + entry.startsAt,
                 title = entry.subjectName,
                 start = entry.startsAt,
                 end = entry.endsAt,

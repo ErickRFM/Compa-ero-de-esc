@@ -1,0 +1,37 @@
+name: temporary-v16-ktlint-format-inspect
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/temporary-v16-ktlint-format-inspect.yml'
+      - 'services/api/src/main/kotlin/org/companerodeescuela/api/attendance/AttendanceRoutes.kt'
+      - 'services/api/src/main/kotlin/org/companerodeescuela/api/attendance/AttendanceStudentService.kt'
+permissions:
+  contents: read
+jobs:
+  format-inspect:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'fix/v16-attendance-schedule-security-readiness-20261021'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Calculate formatter-only source changes
+        run: ./gradlew :services:api:ktlintFormat --console=plain
+      - name: Print formatted Kotlin sources for review
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in services/api/src/main/kotlin/org/companerodeescuela/api/attendance/AttendanceRoutes.kt services/api/src/main/kotlin/org/companerodeescuela/api/attendance/AttendanceStudentService.kt services/api/src/test/kotlin/org/companerodeescuela/api/attendance/AttendanceDiscoveryBeforeCampusTest.kt; do
+            echo "BEGIN_V16_FORMATTED:${path}"
+            base64 -w 0 "${path}"
+            echo
+            echo "END_V16_FORMATTED:${path}"
+          done

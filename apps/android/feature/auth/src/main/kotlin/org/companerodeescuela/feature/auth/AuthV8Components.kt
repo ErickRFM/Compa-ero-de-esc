@@ -56,7 +56,9 @@ private fun AuthV8Frame(modifier: Modifier, content: @Composable ColumnScope.() 
         if (LocalCompaneroHighContrast.current) Color.Black else V8RedColors.Background
     } else MaterialTheme.colorScheme.background
     Box(modifier.fillMaxSize().background(background)) {
-        V8CampusBackdrop(Modifier.matchParentSize(), login = true, backgroundColor = background)
+        if (authDark() && !LocalCompaneroHighContrast.current) {
+            V8CampusBackdrop(Modifier.matchParentSize(), login = true, backgroundColor = background)
+        }
         CompositionLocalProvider(LocalContentColor provides authInk()) {
             Column(Modifier.widthIn(max = CompaneroSize.loginContentMaxWidth).fillMaxWidth().align(Alignment.TopCenter)
                 .statusBarsPadding().navigationBarsPadding().imePadding()

@@ -180,7 +180,12 @@ fun GradebookScreen(
                         Text("Ponderación acumulada", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
                             formatWeight(state.totalWeight) + "% de 100%",
-                            color = if (state.schemeComplete) if (MaterialTheme.colorScheme.background.luminance() > 0.5f) CompanionColors.semanticGreen else V8RedColors.Success else MaterialTheme.colorScheme.onSurface,
+                            color =
+                                when {
+                                    !state.schemeComplete -> MaterialTheme.colorScheme.onSurface
+                                    MaterialTheme.colorScheme.background.luminance() > 0.5f -> CompanionColors.semanticGreen
+                                    else -> V8RedColors.Success
+                                },
                             fontWeight = FontWeight.SemiBold,
                         )
                     }

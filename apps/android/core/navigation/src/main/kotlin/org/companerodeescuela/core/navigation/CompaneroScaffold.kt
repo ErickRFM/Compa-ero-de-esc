@@ -13,7 +13,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.MaterialTheme
-import org.companerodeescuela.core.designsystem.v8.V8ColorScheme
 import org.companerodeescuela.core.designsystem.v8.v8ResolvedColorScheme
 import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
 import org.companerodeescuela.core.designsystem.v8.LocalV8HeaderAction
@@ -65,8 +64,10 @@ fun CompaneroScaffold(
 
     val parentColors = MaterialTheme.colorScheme
     val lightTheme = parentColors.background.luminance() > 0.5f
-    val studentColors = v8ResolvedColorScheme(parentColors, highContrast)
-    val studentGlass = startDestination == Destination.Home || startDestination == Destination.TeacherHome
+    // Every role uses the same V9 palette and matte surfaces. Only the
+    // student/teacher home screens keep the campus photograph as a backdrop.
+    val v9Colors = v8ResolvedColorScheme(parentColors, highContrast)
+    val showCampusBackdrop = startDestination == Destination.Home || startDestination == Destination.TeacherHome
     val headerAction: (@Composable () -> Unit)? =
         if (!onSecondaryScreen && topLevelDestinations.none { it.destination == Destination.Profile }) {
             {
@@ -77,25 +78,26 @@ fun CompaneroScaffold(
                 }
             }
         } else null
-    MaterialTheme(colorScheme = if (studentGlass) studentColors else MaterialTheme.colorScheme) {
+    MaterialTheme(colorScheme = v9Colors) {
     CompositionLocalProvider(
-        LocalV8GlassEnabled provides studentGlass,
+        LocalV8GlassEnabled provides true,
         LocalV8HeaderAction provides headerAction,
-        LocalContentColor provides if (studentGlass) studentColors.onSurface else LocalContentColor.current,
+        LocalContentColor provides v9Colors.onSurface,
     ) {
     Box(Modifier.fillMaxSize()) {
-    if (studentGlass) {
-        if (lightTheme || highContrast) Box(Modifier.matchParentSize().background(studentColors.background))
-        else V8CampusBackdrop(Modifier.matchParentSize())
+    if (lightTheme || highContrast || !showCampusBackdrop) {
+        Box(Modifier.matchParentSize().background(v9Colors.background))
+    } else {
+        V8CampusBackdrop(Modifier.matchParentSize())
     }
     Scaffold(
-        containerColor = if (studentGlass) Color.Transparent else MaterialTheme.colorScheme.background,
+        containerColor = Color.Transparent,
         topBar = {
             if (onSecondaryScreen) {
                 TopAppBar(
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = if (studentGlass) Color.Transparent else MaterialTheme.colorScheme.surface,
-                        scrolledContainerColor = if (studentGlass) Color.Transparent else MaterialTheme.colorScheme.surface,
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = Color.Transparent,
                     ),
                     title = { Text(secondaryTitle.orEmpty()) },
                     navigationIcon = {

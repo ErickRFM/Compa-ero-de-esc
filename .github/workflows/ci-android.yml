@@ -2,7 +2,8 @@ name: ci-android
 
 # Android validation. No deployment and no store publishing.
 # Proves the app compiles, the JUnit 5 suites genuinely execute, lint is
-# clean of errors, and both a debug and a minified release APK build.
+# clean of errors, and both a debug and a minified test-release APK build.
+# The test-release uses the debug key and is NOT a production distribution.
 
 on:
   push:
@@ -129,13 +130,13 @@ jobs:
       - name: Build minified release APK
         run: ./gradlew :apps:android:app:assembleRelease --console=plain
 
-      # Release is minified and resource-shrunk. R8 failing to keep a
-      # serialization class would only show up at runtime, so the size
-      # difference is checked here as a cheap proxy.
+      # Release is minified and resource-shrunk. The current build is signed
+      # with the debug key for internal testing, not production distribution.
+      # R8 runtime correctness still requires instrumentation/smoke testing.
       - name: Release APK exists and is minified
         run: |
           set -euo pipefail
-          release=apps/android/app/build/outputs/apk/release/app-release-unsigned.apk
+          release=apps/android/app/build/outputs/apk/release/app-release.apk
           debug=apps/android/app/build/outputs/apk/debug/app-debug.apk
           test -f "$release" || { echo "::error::$release not found"; exit 1; }
           r=$(stat -c%s "$release")
@@ -145,7 +146,12 @@ jobs:
             echo "::error::Release APK is not smaller than debug. R8 may be disabled."
             exit 1
           fi
-          echo "release apk: $(du -h "$release" | cut -f1)"
+          echo "test-release apk: $(du -h "$release" | cut -f1)"
+          sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          test -n "$sdk_root" || { echo "::error::ANDROID_HOME/ANDROID_SDK_ROOT unavailable"; exit 1; }
+          signer="$(find "$sdk_root/build-tools" -mindepth 2 -maxdepth 2 -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$signer" || { echo "::error::apksigner unavailable"; exit 1; }
+          "$signer" verify --verbose --print-certs "$release"
 
       - name: No secrets committed
         run: bash infrastructure/scripts/secret-scan.sh
@@ -158,13 +164,15 @@ jobs:
           mkdir -p "$out"
           cp apps/android/app/build/outputs/apk/debug/app-debug.apk \
             "$out/companero-escuela-debug-$short_sha.apk"
-          cp apps/android/app/build/outputs/apk/release/app-release-unsigned.apk \
-            "$out/companero-escuela-release-unsigned-$short_sha.apk"
+          cp apps/android/app/build/outputs/apk/release/app-release.apk \
+            "$out/companero-escuela-test-release-debug-signed-$short_sha.apk"
           {
             echo "commit=$GITHUB_SHA"
             echo "ref=$GITHUB_REF"
             echo "run_id=$GITHUB_RUN_ID"
             echo "run_attempt=$GITHUB_RUN_ATTEMPT"
+            echo "release_signing=debug_key_internal_testing_only"
+            echo "production_distribution_ready=false"
           } > "$out/BUILD_PROVENANCE.txt"
           ls -lh "$out"
 

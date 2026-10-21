@@ -1,17 +1,11 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.feature.home
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -22,40 +16,36 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.unit.sp
-import org.companerodeescuela.core.designsystem.v8.V8RedColors
-import org.companerodeescuela.core.designsystem.v8.V8GlassCard
-import org.companerodeescuela.core.designsystem.v8.V8ClassSummary
-import org.companerodeescuela.core.designsystem.v8.V8DailyClassRow
-import org.companerodeescuela.core.designsystem.v8.V8DashboardStat
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.companerodeescuela.core.designsystem.theme.CompaneroSize
+import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
+import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
+import org.companerodeescuela.core.designsystem.v8.V8ClassSummary
+import org.companerodeescuela.core.designsystem.v8.V8DailyClassRow
+import org.companerodeescuela.core.designsystem.v8.V8DashboardStat
+import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8SectionTitle
+import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
+import org.companerodeescuela.core.ui.component.AcademicClassCard
+import org.companerodeescuela.core.ui.component.NoticeTone
+import org.companerodeescuela.core.ui.component.StatusNotice
+import org.companerodeescuela.shared.contracts.ScheduleEntry
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import org.companerodeescuela.core.designsystem.theme.CompaneroSize
-import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
-import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
-import org.companerodeescuela.core.motion.CompaneroMotionDuration
-import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
-import org.companerodeescuela.core.ui.component.AcademicClassCard
-import org.companerodeescuela.core.ui.component.AcademicTimelineItem
-import org.companerodeescuela.core.ui.component.HeroAcademicCard
-import org.companerodeescuela.core.ui.component.NoticeTone
-import org.companerodeescuela.core.ui.component.StatusNotice
-import org.companerodeescuela.shared.contracts.ScheduleEntry
 
 @Composable
 fun HomeScreen(
@@ -75,23 +65,33 @@ fun HomeScreen(
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val splitLayout = maxWidth >= CompaneroWindowBreakpoints.medium
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .widthIn(max = CompaneroSize.homeContentMaxWidth)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm)
-                .align(Alignment.TopCenter),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .widthIn(max = CompaneroSize.homeContentMaxWidth)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm)
+                    .align(Alignment.TopCenter),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
         ) {
-            val firstName = overview?.studentName?.substringBefore(" ")?.takeIf { it.isNotBlank() }
-            Text(
-                text = buildAnnotatedString {
-                    append("Hola")
-                    if (firstName != null) {
-                        append(", ")
-                        withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append(firstName) }
+            val firstName =
+                overview
+                    ?.studentName
+                    ?.trim()
+                    ?.substringBefore(" ")
+                    ?.takeIf { it.isNotBlank() }
+                    ?.replaceFirstChar {
+                        if (it.isLowerCase()) it.titlecase(Locale("es", "MX")) else it.toString()
                     }
-                },
+            Text(
+                text =
+                    buildAnnotatedString {
+                        append("Hola")
+                        if (firstName != null) {
+                            append(", ")
+                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append(firstName) }
+                        }
+                    },
                 modifier = Modifier.padding(top = 8.dp, end = 42.dp),
                 fontSize = 37.sp,
                 lineHeight = 43.sp,
@@ -139,6 +139,10 @@ fun HomeScreen(
             }
 
             overview?.let { day ->
+                val distinctSubjectCount =
+                    day.classes
+                        .distinctBy(::scheduleSubjectKey)
+                        .size
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     V8DashboardStat(
                         label = "Clases hoy",
@@ -148,13 +152,13 @@ fun HomeScreen(
                     )
                     V8DashboardStat(
                         label = "Materias hoy",
-                        value = day.classes.distinctBy { entry -> entry.subjectCode.ifBlank { entry.subjectName } }.size.toString(),
+                        value = distinctSubjectCount.toString(),
                         onClick = onOpenClassrooms,
                         modifier = Modifier.weight(1f),
                     )
                     V8DashboardStat(
                         label = "Próxima clase",
-                        value = day.next?.subjectName ?: "—",
+                        value = nextClassStatLabel(day),
                         onClick = onOpenSchedule,
                         modifier = Modifier.weight(1f),
                     )
@@ -163,7 +167,9 @@ fun HomeScreen(
                     !day.hasSchedule -> {
                         StatusNotice(
                             title = "Todavía no tienes horario",
-                            message = "Importa una imagen o PDF, crea tu agenda manualmente o conecta el sistema escolar desde Configuración.",
+                            message =
+                                "Importa una imagen o PDF, crea tu agenda manualmente o " +
+                                    "conecta el sistema escolar desde Configuración.",
                         )
                         Button(
                             onClick = onOpenSchedule,
@@ -172,7 +178,9 @@ fun HomeScreen(
                             Text("Preparar mi agenda")
                         }
                         Text(
-                            text = "La agenda local funciona sin integración escolar y conserva tus bloques personales, importaciones y recordatorios.",
+                            text =
+                                "La agenda local funciona sin integración escolar y conserva " +
+                                    "tus bloques personales, importaciones y recordatorios.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -192,11 +200,12 @@ fun HomeScreen(
                                 )
                                 AcademicClassCard(
                                     subject = upcoming.subjectName,
-                                    time = upcomingDayLabel(day.nextScheduledDaysAway) +
-                                        " · " + upcoming.startsAt + " – " + upcoming.endsAt,
+                                    time =
+                                        upcomingDayLabel(day.nextScheduledDaysAway) +
+                                            " · " + upcoming.startsAt + " – " + upcoming.endsAt,
                                     location = locationLabel(upcoming),
                                     teacher = upcoming.teacherName,
-                                    subjectKey = upcoming.subjectCode.ifBlank { upcoming.subjectName },
+                                    subjectKey = scheduleSubjectKey(upcoming),
                                 )
                             }
                         }
@@ -206,7 +215,12 @@ fun HomeScreen(
                     }
                 }
 
-                Text("Avisos", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                Text(
+                    "Avisos",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold,
+                )
                 V8GlassCard(modifier = Modifier.fillMaxWidth()) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
@@ -237,18 +251,22 @@ fun HomeScreen(
 }
 
 @Composable
-private fun DayTimeline(day: TodayOverview, onOpenSchedule: () -> Unit) {
-    org.companerodeescuela.core.designsystem.v8.V8SectionTitle("Horario de hoy")
+private fun DayTimeline(
+    day: TodayOverview,
+    onOpenSchedule: () -> Unit,
+) {
+    V8SectionTitle("Horario de hoy")
     day.classes.forEach { entry ->
         val status = classStatus(entry, day.current, day.next)
         V8DailyClassRow(
-            classInfo = V8ClassSummary(
-                id = entry.subjectCode.ifBlank { entry.subjectName },
-                title = entry.subjectName,
-                start = entry.startsAt,
-                end = entry.endsAt,
-                room = locationLabel(entry),
-            ),
+            classInfo =
+                V8ClassSummary(
+                    id = scheduleSubjectKey(entry) + ":" + entry.dayOfWeek + ":" + entry.startsAt,
+                    title = entry.subjectName,
+                    start = entry.startsAt,
+                    end = entry.endsAt,
+                    room = locationLabel(entry),
+                ),
             isNext = status.highlighted || status.label == "Siguiente",
             onClick = { onOpenSchedule() },
         )
@@ -286,20 +304,20 @@ private fun upcomingDayLabel(daysAway: Int?): String {
     if (daysAway == 0) return "Hoy"
     if (daysAway == 1) return "Mañana"
     val formatter = DateTimeFormatter.ofPattern("EEEE", Locale("es", "MX"))
-    return LocalDate.now()
-        .plusDays(daysAway.toLong())
-        .format(formatter)
-        .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale("es", "MX")) else it.toString() }
+    val date = LocalDate.now().plusDays(daysAway.toLong()).format(formatter)
+    return date.replaceFirstChar {
+        if (it.isLowerCase()) it.titlecase(Locale("es", "MX")) else it.toString()
+    }
 }
 
 private fun todayLabel(): String {
-    val formatter = DateTimeFormatter.ofPattern(
-        "EEEE d 'de' MMMM",
-        Locale("es", "MX"),
-    )
-    return LocalDate.now()
-        .format(formatter)
-        .replaceFirstChar {
-            if (it.isLowerCase()) it.titlecase(Locale("es", "MX")) else it.toString()
-        }
+    val formatter =
+        DateTimeFormatter.ofPattern(
+            "EEEE d 'de' MMMM",
+            Locale("es", "MX"),
+        )
+    val date = LocalDate.now().format(formatter)
+    return date.replaceFirstChar {
+        if (it.isLowerCase()) it.titlecase(Locale("es", "MX")) else it.toString()
+    }
 }

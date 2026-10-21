@@ -66,7 +66,7 @@ fun Route.attendanceRoutes(
                 principal.requireRole(UserRole.STUDENT)
                 call.respond(
                     ApiResponse(
-                        data = studentService.activeFor(principal.subjectId(),nativeActor(call)),
+                        data = studentService.discoverActiveFor(principal.subjectId(),nativeActor(call)),
                         requestId = call.requestId(),
                     ),
                 )

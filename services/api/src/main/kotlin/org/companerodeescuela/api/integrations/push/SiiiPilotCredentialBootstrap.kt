@@ -61,10 +61,22 @@ object SiiiPilotCredentialBootstrap {
         )
     }
 
+    internal suspend fun requireEnabledTenant(
+        tenantId: String,
+        isEnabledTenant: suspend (String) -> Boolean,
+    ) {
+        require(isEnabledTenant(tenantId)) {
+            "Institutional pilot tenant is missing or disabled; refusing credential bootstrap"
+        }
+    }
+
     suspend fun provision(
         repository: MongoInstitutionalPushRepository,
         desired: IntegrationCredential,
+        isEnabledTenant: suspend (String) -> Boolean,
     ) {
+        // Authorize the destination before reading or writing any secret material.
+        requireEnabledTenant(desired.tenantId, isEnabledTenant)
         val existing = repository.findCredential(desired.keyId)
         if (existing == null) {
             repository.putCredential(desired)

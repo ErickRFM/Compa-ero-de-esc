@@ -8,6 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlinx.coroutines.runBlocking
 
 class SiiiPilotCredentialBootstrapTest {
     private val clock = Clock.fixed(Instant.parse("2026-10-21T10:00:00Z"), ZoneOffset.UTC)
@@ -42,6 +43,18 @@ class SiiiPilotCredentialBootstrapTest {
         assertEquals(true, credential.enabled)
         assertEquals(32, credential.secret.size)
         assertEquals(pilotExpiry, credential.expiresAtEpochSeconds)
+    }
+
+    @Test
+    fun `bootstrap refuses credentials for unknown or disabled institution`() = runBlocking {
+        val credential = requireNotNull(SiiiPilotCredentialBootstrap.parse(settings()::get, clock))
+        SiiiPilotCredentialBootstrap.requireEnabledTenant(credential.tenantId) { it == "institution-pilot" }
+        assertFailsWith<IllegalArgumentException> {
+            SiiiPilotCredentialBootstrap.requireEnabledTenant(credential.tenantId) { false }
+        }
+        assertFailsWith<IllegalArgumentException> {
+            SiiiPilotCredentialBootstrap.requireEnabledTenant(credential.tenantId) { it == "other-tenant" }
+        }
     }
 
     @Test

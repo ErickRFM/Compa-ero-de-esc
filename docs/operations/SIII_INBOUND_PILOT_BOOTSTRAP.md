@@ -18,6 +18,12 @@ Variables **permanentes** ya soportadas por Ktor: `INSTITUTION_INTEGRATION_ENCRY
 
 **Nunca** metas credenciales en `NEXT_PUBLIC_*`, GitHub, .env compartido, logs o comentarios de código. Genera 32 bytes aleatorios desde tu equipo: `node -p "require('node:crypto').randomBytes(32).toString('base64')"` para HMAC; y `node -p "require('node:crypto').randomBytes(32).toString('base64url')"` para la clave AES de Mongo. Guarda los resultados solo en los entornos de secretos. No pegarlos aquí.
 
+## Comprobación indispensable del tenant receptor
+
+Antes de habilitar el bootstrap, la institución destino debe existir en `platform_institutions` del MongoDB configurado en Render y tener `registrationEnabled: true`, con `_id` igual a `SIII_INBOUND_TENANT_ID`. El backend consulta el repositorio institucional antes de guardar cualquier credencial. Si no existe o está deshabilitada, **el despliegue falla cerrado y no se provisiona el HMAC**.
+
+No uses automáticamente el UUID de SIII: puede ser distinto del identificador nativo de Compañero. Si falta la institución, detener el piloto y realizar un alta institucional autorizada, con revisión de identidad y procedencia. No insertar documentos ni secretos arbitrarios desde Atlas.
+
 ## Secuencia segura
 
 1. Confirmar que SIII #68 está desplegado en `main` (no únicamente fusionado), Supabase tiene la migración 0018 aplicada **en orden**, y la identidad institucional de prueba existe en ambos sistemas.

@@ -1,6 +1,21 @@
 #!/usr/bin/env bash
 # One shell: android-emulator-runner runs separate script lines in separate shells.
 set -uo pipefail
+# Variant-specific package for run-as evidence; never probe another package.
+case "${1:-academic}" in
+  academic)
+    variant=Academic
+    export COMPANERO_EVIDENCE_PACKAGE=org.companerodeescuela
+    ;;
+  management)
+    variant=Management
+    export COMPANERO_EVIDENCE_PACKAGE=org.companerodeescuela.gestion
+    ;;
+  *)
+    echo "Unsupported Compañero test variant" >&2
+    exit 2
+    ;;
+esac
 # Record host pressure without environment values, command arguments or user data.
 # A vanished emulator is distinct from an assertion failure in the app.
 mkdir -p build/v10-runner-diagnostics
@@ -68,7 +83,7 @@ finish_diagnostics() {
   fi
 }
 trap finish_diagnostics EXIT
-./gradlew :apps:android:app:connectedDebugAndroidTest --max-workers=2 --no-daemon \
+./gradlew ":apps:android:app:connected${variant}DebugAndroidTest" --max-workers=2 --no-daemon \
   -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
   -Dorg.gradle.jvmargs="-Xmx1536m -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8" --console=plain
 instrumentation_status=$?

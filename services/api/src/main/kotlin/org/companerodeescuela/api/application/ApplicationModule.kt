@@ -31,6 +31,7 @@ import org.companerodeescuela.api.grading.UnavailableGradeSyncGateway
 import org.companerodeescuela.api.grading.gradingRoutes
 import org.companerodeescuela.api.health.HealthService
 import org.companerodeescuela.api.health.healthRoutes
+import org.companerodeescuela.api.institutions.SiiiPilotInstitutionBootstrap
 import org.companerodeescuela.api.institutions.institutionRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
 import org.companerodeescuela.api.integrations.academic.siii.SiiiSectionProjectionFeature
@@ -44,7 +45,6 @@ import org.companerodeescuela.api.integrations.push.InstitutionalSecretProtector
 import org.companerodeescuela.api.integrations.push.MongoInstitutionalIdentityLinkRepository
 import org.companerodeescuela.api.integrations.push.MongoInstitutionalPushRepository
 import org.companerodeescuela.api.integrations.push.SiiiPilotCredentialBootstrap
-import org.companerodeescuela.api.institutions.SiiiPilotInstitutionBootstrap
 import org.companerodeescuela.api.integrations.push.institutionalIdentityLinkRoutes
 import org.companerodeescuela.api.integrations.push.institutionalPushRoutes
 import org.companerodeescuela.api.plugins.configurePlugins

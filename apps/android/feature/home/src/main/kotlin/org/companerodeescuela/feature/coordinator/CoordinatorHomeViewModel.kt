@@ -21,9 +21,11 @@ data class CoordinatorOverviewUiState(
 )
 
 @HiltViewModel
-class CoordinatorHomeViewModel @Inject constructor(
-    private val repository: CoordinatorRepository,
-) : ViewModel() {
+class CoordinatorHomeViewModel
+    @Inject
+    constructor(
+        private val repository: CoordinatorRepository,
+    ) : ViewModel() {
     private val _state = MutableStateFlow(CoordinatorOverviewUiState())
     val state: StateFlow<CoordinatorOverviewUiState> = _state.asStateFlow()
     private var refreshJob: Job? = null

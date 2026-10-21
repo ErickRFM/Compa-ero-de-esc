@@ -22,12 +22,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.designsystem.v8.V8FrostedGlassPanel
+import org.companerodeescuela.core.navigation.AppDistribution
 import org.companerodeescuela.core.navigation.AppExperience
 
 @Composable
 fun LoginScreen(
     state: SessionUiState,
     onLogin: (String, String, AppExperience) -> Unit,
+    distribution: AppDistribution = AppDistribution.LEGACY,
     onCreateAccount: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -35,8 +37,10 @@ fun LoginScreen(
     // Passwords never enter saved instance state; paging keeps this one form mounted.
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    val pager = rememberPagerState(pageCount = { loginAccesses.size })
-    val access = loginAccesses[pager.currentPage]
+    val accesses = remember(distribution) { loginAccessesFor(distribution) }
+    require(accesses.isNotEmpty()) { "No login cards configured for this app" }
+    val pager = rememberPagerState(pageCount = { accesses.size })
+    val access = accesses[pager.currentPage.coerceIn(0, accesses.lastIndex)]
     val focus = LocalFocusManager.current
     val usernameIssue = InstitutionalCredentialValidator.identifierIssue(username)
     val passwordIssue = InstitutionalCredentialValidator.passwordIssue(password)
@@ -55,7 +59,7 @@ fun LoginScreen(
         Text(stringResource(R.string.auth_hero_accent), color = accent, fontSize = 30.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 3.dp))
         Text(stringResource(R.string.auth_hero_description), color = muted, fontSize = 15.sp, lineHeight = 21.sp,
             modifier = Modifier.padding(top = 13.dp, bottom = 12.dp))
-        LoginAccessCarousel(pager, enabled = !state.submitting)
+        LoginAccessCarousel(pager, enabled = !state.submitting, accesses = accesses)
         if (!state.noticeMessage.isNullOrBlank()) {
             V8FrostedGlassPanel(Modifier.fillMaxWidth().padding(top = 12.dp), themeAware = true) {
                 Column(Modifier.padding(18.dp)) {

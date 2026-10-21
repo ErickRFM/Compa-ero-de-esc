@@ -126,4 +126,6 @@
 <string name="staff_request_rejected">Request rejected</string>
 <string name="staff_request_unavailable">This account cannot request additional tutor access.</string>
 <string name="staff_request_empty">No previous requests</string>
+<string name="auth_role_coordinator">Coordination</string>
+<string name="auth_coordinator_description">Review and coordinate authorized groups at your institution.</string>
 </resources>

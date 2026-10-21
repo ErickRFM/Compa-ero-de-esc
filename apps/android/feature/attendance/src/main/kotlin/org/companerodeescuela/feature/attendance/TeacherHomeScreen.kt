@@ -1,6 +1,5 @@
 package org.companerodeescuela.feature.attendance
 
-import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,21 +12,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Campaign
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.ui.graphics.vector.ImageVector
-import org.companerodeescuela.core.designsystem.v8.V8IconTile
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -36,14 +35,17 @@ import java.time.LocalDate
 import java.time.LocalTime
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
+import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8ClassSummary
 import org.companerodeescuela.core.designsystem.v8.V8DailyClassRow
 import org.companerodeescuela.core.designsystem.v8.V8DashboardStat
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8HeroTitle
+import org.companerodeescuela.core.designsystem.v8.V8IconTile
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
+import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.ui.component.StatusNotice
 
 /**
@@ -128,7 +130,7 @@ fun TeacherHomeScreen(
                         Text(
                             text = if (active != null) "EN VIVO · ${active.groupName}" else "Sin pase abierto",
                             style = MaterialTheme.typography.labelLarge,
-                            color = if (active != null) V8RedColors.Success else MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (active != null) if (MaterialTheme.colorScheme.background.luminance() > 0.5f) CompanionColors.semanticGreen else V8RedColors.Success else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
                             text = if (active != null) {

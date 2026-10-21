@@ -81,3 +81,4 @@ internal object ScheduleImportAssessment {
                 add(message)
             }
         }
+}

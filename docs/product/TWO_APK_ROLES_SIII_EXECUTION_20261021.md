@@ -1,6 +1,6 @@
 # Plan maestro V17 — Dos APK, perfiles, permisos y sincronización SIII
 
-**Fecha:** 2026-10-21 · **Estado:** ejecución incremental, no liberación de producción.  
+**Fecha:** 2026-10-21 · **Estado:** ejecución incremental, no liberación de producción.
 **Baseline auditado:** Compañero `main@5ad15061903ff21a308043177abbe0336285f221`; SIII `main@e494f651b011d8567f999eac0a4103b0eac01c76`.
 
 ## 0. Decisión de producto y límites

@@ -1,6 +1,5 @@
 package org.companerodeescuela.feature.coordinator
 
-import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,15 +12,16 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.ui.Modifier
-import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
-import org.companerodeescuela.core.ui.component.CompaneroHeroSurface
+import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.ui.component.CompaneroSurface
 import org.companerodeescuela.core.ui.component.CompaneroSurfaceRole
 import org.companerodeescuela.core.ui.component.StatusNotice
@@ -29,18 +29,20 @@ import org.companerodeescuela.core.ui.component.StatusNotice
 @Composable
 fun CoordinatorHomeScreen(
     onOpenSchedule: () -> Unit,
-    onOpenAttendance: () -> Unit,
-    onOpenChannel: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CoordinatorHomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+        viewModel.refresh()
+    }
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .widthIn(max = CompaneroSize.homeContentMaxWidth)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .widthIn(max = CompaneroSize.homeContentMaxWidth)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
         V8ScreenHeader {
@@ -55,10 +57,7 @@ fun CoordinatorHomeScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
-        CompaneroHeroSurface(
-            modifier = Modifier.fillMaxWidth(),
-            containerColor = CompanionColors.graphite,
-        ) {
+        V8GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier.padding(CompaneroSpacing.md),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
@@ -66,32 +65,51 @@ fun CoordinatorHomeScreen(
                 Text(
                     text = "INDICADORES ACADÉMICOS",
                     style = MaterialTheme.typography.labelLarge,
-                    color = CompanionColors.crimsonContainer,
+                    color = MaterialTheme.colorScheme.primary,
                 )
                 when {
-                    state.loading -> CircularProgressIndicator()
                     state.overview != null -> {
                         Text(
-                            text = "${state.overview!!.activeGroups} grupos activos",
+                            text = "${state.overview?.activeGroups ?: 0} grupos activos",
                             style = MaterialTheme.typography.titleLarge,
-                            color = CompanionColors.onDarkSurface,
+                            color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
-                            text = "Dato consultado del servidor para tu institución y periodo vigente.",
+                            text =
+                                if (state.errorMessage == null) {
+                                    "Grupos consultados del servidor para tu institución."
+                                } else {
+                                    "Último resumen disponible. No se pudo verificar el estado actual."
+                                },
                             style = MaterialTheme.typography.bodyMedium,
-                            color = CompanionColors.onDarkSurfaceVariant,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    else -> StatusNotice(
-                        title = "Sin estadísticas verificadas",
-                        message = state.errorMessage ?: "No se pudieron consultar los grupos institucionales.",
+                    state.loading -> CircularProgressIndicator()
+                    else ->
+                        StatusNotice(
+                            title = "No se pudo consultar el resumen",
+                            message = state.errorMessage ?: "Vuelve a intentar la consulta institucional.",
+                        )
+                }
+                if (state.overview != null && state.errorMessage != null) {
+                    StatusNotice(
+                        title = "Datos sin actualizar",
+                        message = state.errorMessage.orEmpty(),
                     )
                 }
                 Text(
                     text = "Asistencia docente e incidencias: indicadores pendientes de integración institucional.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = CompanionColors.onDarkSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                TextButton(
+                    onClick = viewModel::refresh,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !state.loading,
+                ) {
+                    Text(if (state.loading) "Actualizando…" else "Actualizar indicadores")
+                }
             }
         }
 
@@ -107,13 +125,17 @@ fun CoordinatorHomeScreen(
             ) {
                 Text("Monitoreo de Asistencia", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "Revisa el cumplimiento de clases y pases de lista reportados por docentes.",
+                    "El reporte consolidado requiere una consulta institucional autorizada; " +
+                        "el pase de lista de alumno y docente no concede acceso a Coordinación.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Button(onClick = onOpenAttendance, modifier = Modifier.fillMaxWidth()) {
-                    Text("Ver reporte de asistencia")
-                }
+                StatusNotice(
+                    title = "Reporte aún no disponible",
+                    message =
+                        "Los indicadores de asistencia no están conectados todavía. " +
+                            "No se mostrará información de otros perfiles como si fuera un reporte.",
+                )
             }
         }
 
@@ -125,15 +147,19 @@ fun CoordinatorHomeScreen(
                 modifier = Modifier.padding(CompaneroSpacing.sm),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
             ) {
-                Text("Horarios y Aulas", style = MaterialTheme.typography.titleSmall)
+                Text("Agenda personal", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "Consulta la distribución de materias, profesores y asignación de salones.",
+                    "Consulta o prepara tu agenda local. No cambia grupos, docentes ni aulas oficiales.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Button(onClick = onOpenSchedule, modifier = Modifier.fillMaxWidth()) {
-                    Text("Consultar agenda académica")
+                    Text("Abrir mi agenda")
                 }
+                StatusNotice(
+                    title = "Gestión de horarios institucionales pendiente",
+                    message = "La asignación global de aulas y grupos se habilitará desde un módulo autorizado.",
+                )
             }
         }
 
@@ -147,13 +173,16 @@ fun CoordinatorHomeScreen(
             ) {
                 Text("Canal de avisos generales", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "Comunica novedades, cambios de aula o cancelaciones a grupos y docentes.",
+                    "La publicación general requiere un canal institucional con alcance y permisos explícitos.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Button(onClick = onOpenChannel, modifier = Modifier.fillMaxWidth()) {
-                    Text("Publicar aviso institucional")
-                }
+                StatusNotice(
+                    title = "Publicación institucional pendiente",
+                    message =
+                        "No se abrirá el canal de clase de otro perfil. " +
+                            "La función se habilitará cuando el servidor verifique destinatarios y permisos.",
+                )
             }
         }
     }

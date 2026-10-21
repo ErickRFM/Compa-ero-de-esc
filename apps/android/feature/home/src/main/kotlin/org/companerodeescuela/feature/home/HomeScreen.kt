@@ -42,8 +42,10 @@ import org.companerodeescuela.core.ui.component.AcademicClassCard
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ScheduleEntry
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -119,12 +121,34 @@ fun HomeScreen(
                 CircularProgressIndicator()
             }
 
-            if (state.fromCache) {
-                StatusNotice(
-                    title = "Usando información guardada",
-                    message = "Tu agenda sigue disponible. La integración escolar se puede actualizar después desde Configuración.",
-                    tone = NoticeTone.WARNING,
-                )
+            if (state.fromCache || (state.errorMessage != null && overview != null)) {
+                V8GlassCard(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                cacheStatusLabel(state.updatedAtEpochSeconds),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                if (state.errorMessage != null) {
+                                    "No se pudo actualizar. Tus clases guardadas siguen disponibles."
+                                } else {
+                                    "Puedes consultar tu horario mientras se restablece la sincronización."
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        TextButton(onClick = viewModel::refresh, enabled = !state.loading) {
+                            Text(if (state.loading) "Actualizando" else "Reintentar")
+                        }
+                    }
+                }
             }
 
             if (state.errorMessage != null && overview == null) {
@@ -268,30 +292,48 @@ private fun DayTimeline(
                     room = locationLabel(entry),
                 ),
             isNext = status.highlighted || status.label == "Siguiente",
+            statusLabel = status.label,
             onClick = { onOpenSchedule() },
         )
     }
 }
 
-private data class ClassStatus(
+internal data class ClassStatus(
     val label: String?,
     val highlighted: Boolean,
 )
 
-private fun classStatus(
+internal fun classStatus(
     entry: ScheduleEntry,
     current: ScheduleEntry?,
     next: ScheduleEntry?,
+    now: LocalTime = LocalTime.now(),
 ): ClassStatus {
     if (entry == current) return ClassStatus("Ahora", true)
     if (entry == next) return ClassStatus("Siguiente", false)
 
     val end = runCatching { LocalTime.parse(entry.endsAt) }.getOrNull()
-    return if (end != null && LocalTime.now().isAfter(end)) {
+    return if (end != null && !now.isBefore(end)) {
         ClassStatus("Finalizada", false)
     } else {
         ClassStatus(null, false)
     }
+}
+
+/** Local timestamp for an existing cached snapshot, never a fabricated sync time. */
+internal fun cacheStatusLabel(
+    updatedAtEpochSeconds: Long?,
+    zone: ZoneId = ZoneId.systemDefault(),
+    today: LocalDate = LocalDate.now(zone),
+): String {
+    val lastUpdated =
+        updatedAtEpochSeconds
+            ?.takeIf { it > 0L }
+            ?.let { Instant.ofEpochSecond(it).atZone(zone) }
+            ?: return "Agenda guardada"
+    val pattern = if (lastUpdated.toLocalDate() == today) "HH:mm" else "d MMM · HH:mm"
+    return "Agenda guardada · " +
+        lastUpdated.format(DateTimeFormatter.ofPattern(pattern, Locale("es", "MX")))
 }
 
 private fun locationLabel(entry: ScheduleEntry): String =

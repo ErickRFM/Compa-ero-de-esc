@@ -40,6 +40,27 @@ class NavigationChromePolicyTest {
     }
 
     @Test
+    fun `coordinator does not show a misleading institution-wide publishing tab`() {
+        val coordinator = RoleExperienceResolver.resolve(setOf(UserRole.COORDINATOR))
+        assertFalse(coordinator.topLevelDestinations.contains(TopLevelDestination.Channel))
+        assertTrue(coordinator.topLevelDestinations.contains(TopLevelDestination.Schedule))
+        val multipleRoles =
+            RoleExperienceResolver.resolve(
+                setOf(UserRole.TEACHER, UserRole.COORDINATOR),
+                AppExperience.COORDINATOR,
+            )
+        assertFalse(multipleRoles.topLevelDestinations.contains(TopLevelDestination.Channel))
+        // The same authenticated account may still use its assigned teacher channels
+        // after switching to the Teacher experience; navigation grants no extra role.
+        val teacher =
+            RoleExperienceResolver.resolve(
+                setOf(UserRole.TEACHER, UserRole.COORDINATOR),
+                AppExperience.TEACHER,
+            )
+        assertTrue(teacher.topLevelDestinations.contains(TopLevelDestination.Channel))
+    }
+
+    @Test
     fun `tutor requests are a primary destination`() {
         val config = RoleExperienceResolver.resolve(setOf(UserRole.TUTOR))
         val tabs = config.topLevelDestinations.map { it.destination.route }

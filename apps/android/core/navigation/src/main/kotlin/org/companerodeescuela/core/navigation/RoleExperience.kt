@@ -118,7 +118,6 @@ object RoleExperienceResolver {
                         listOf(
                             TopLevelDestination.CoordinatorHome,
                             TopLevelDestination.Schedule,
-                            TopLevelDestination.Channel,
                         ),
                 )
             AppExperience.ADMIN,

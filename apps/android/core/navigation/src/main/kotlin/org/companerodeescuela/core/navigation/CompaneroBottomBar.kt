@@ -157,7 +157,7 @@ fun CompaneroBottomBar(
                                     role = Role.Tab
                                     selected = isSelected
                                     contentDescription = topLevel.label
-                                }.clickable {
+                                }.clickable(onClickLabel = "Abrir ${topLevel.label}") {
                                     navController.navigateToTopLevel(topLevel.destination)
                                 },
                         contentAlignment = Alignment.Center,
@@ -210,6 +210,7 @@ fun CompaneroBottomBar(
                                     when (topLevel) {
                                         TopLevelDestination.AdminHome -> "Admin"
                                         TopLevelDestination.CoordinatorHome -> "Gestión"
+                                        TopLevelDestination.Grading -> "Notas"
                                         else -> topLevel.label
                                     },
                                 fontSize = if (largeText) 12.sp else 11.sp,

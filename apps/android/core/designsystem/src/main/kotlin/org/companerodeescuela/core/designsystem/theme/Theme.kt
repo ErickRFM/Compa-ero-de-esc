@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.core.designsystem.theme
 
 import android.os.Build
@@ -49,37 +51,38 @@ private val LightColors = lightColorScheme(
     outlineVariant = Color(0xFFC9CDD5),
 )
 
-private val DarkColors = darkColorScheme(
-    primary = CompanionColors.crimsonContainer,
-    onPrimary = CompanionColors.crimson,
-    primaryContainer = CompanionColors.crimson,
-    onPrimaryContainer = CompanionColors.crimsonSubtle,
-    secondary = CompanionColors.semanticBlueContainer,
-    onSecondary = CompanionColors.semanticBlue,
-    secondaryContainer = CompanionColors.semanticBlue,
-    onSecondaryContainer = CompanionColors.semanticBlueContainer,
-    tertiary = CompanionColors.semanticAmberContainer,
-    onTertiary = CompanionColors.semanticAmber,
-    tertiaryContainer = CompanionColors.semanticAmber,
-    onTertiaryContainer = CompanionColors.semanticAmberContainer,
-    error = CompanionColors.semanticRedContainer,
-    onError = CompanionColors.semanticRed,
-    errorContainer = CompanionColors.semanticRed,
-    onErrorContainer = CompanionColors.semanticRedContainer,
-    background = CompanionColors.darkBackground,
-    onBackground = CompanionColors.onDarkSurface,
-    surface = CompanionColors.darkSurface,
-    onSurface = CompanionColors.onDarkSurface,
-    surfaceContainerLowest = CompanionColors.darkBackground,
-    surfaceContainerLow = CompanionColors.darkInset,
-    surfaceContainer = CompanionColors.darkRaised,
-    surfaceContainerHigh = CompanionColors.darkSurfaceVariant,
-    surfaceContainerHighest = CompanionColors.darkFloating,
-    surfaceVariant = CompanionColors.darkSurfaceVariant,
-    onSurfaceVariant = CompanionColors.onDarkSurfaceVariant,
-    outline = CompanionColors.darkOutline,
-    outlineVariant = CompanionColors.darkSurfaceVariant,
-)
+private val DarkColors =
+    darkColorScheme(
+        primary = CompanionColors.crimsonContainer,
+        onPrimary = CompanionColors.crimson,
+        primaryContainer = CompanionColors.crimson,
+        onPrimaryContainer = CompanionColors.crimsonSubtle,
+        secondary = CompanionColors.semanticBlueContainer,
+        onSecondary = CompanionColors.semanticBlue,
+        secondaryContainer = CompanionColors.semanticBlue,
+        onSecondaryContainer = CompanionColors.semanticBlueContainer,
+        tertiary = CompanionColors.semanticAmberContainer,
+        onTertiary = CompanionColors.semanticAmber,
+        tertiaryContainer = CompanionColors.semanticAmber,
+        onTertiaryContainer = CompanionColors.semanticAmberContainer,
+        error = CompanionColors.semanticRedContainer,
+        onError = CompanionColors.semanticRed,
+        errorContainer = CompanionColors.semanticRed,
+        onErrorContainer = CompanionColors.semanticRedContainer,
+        background = CompanionColors.darkBackground,
+        onBackground = CompanionColors.onDarkSurface,
+        surface = CompanionColors.darkSurface,
+        onSurface = CompanionColors.onDarkSurface,
+        surfaceContainerLowest = CompanionColors.darkBackground,
+        surfaceContainerLow = CompanionColors.darkInset,
+        surfaceContainer = CompanionColors.darkRaised,
+        surfaceContainerHigh = CompanionColors.darkSurfaceVariant,
+        surfaceContainerHighest = CompanionColors.darkFloating,
+        surfaceVariant = CompanionColors.darkSurfaceVariant,
+        onSurfaceVariant = CompanionColors.onDarkSurfaceVariant,
+        outline = CompanionColors.darkOutline,
+        outlineVariant = CompanionColors.darkSurfaceVariant,
+    )
 
 /**
  * App theme with product-level accessibility preferences.
@@ -95,47 +98,50 @@ fun CompaneroTheme(
     highContrast: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val baseScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    val baseScheme =
+        when {
+            dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+                val context = LocalContext.current
+                if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            }
+            darkTheme -> DarkColors
+            else -> LightColors
         }
-        darkTheme -> DarkColors
-        else -> LightColors
-    }
-    val colorScheme = if (highContrast) {
-        if (darkTheme) {
-            baseScheme.copy(
-                background = Color(0xFF000000),
-                surface = Color(0xFF0F0E13),
-                surfaceVariant = Color(0xFF18171E),
-                onBackground = Color(0xFFFFFFFF),
-                onSurface = Color(0xFFFFFFFF),
-                onSurfaceVariant = Color(0xFFEEEEEE),
-                outline = Color(0xFFFFFFFF),
-                outlineVariant = Color(0xCCFFFFFF),
-            )
+    val colorScheme =
+        if (highContrast) {
+            if (darkTheme) {
+                baseScheme.copy(
+                    background = Color(0xFF000000),
+                    surface = Color(0xFF0F0E13),
+                    surfaceVariant = Color(0xFF18171E),
+                    onBackground = Color(0xFFFFFFFF),
+                    onSurface = Color(0xFFFFFFFF),
+                    onSurfaceVariant = Color(0xFFEEEEEE),
+                    outline = Color(0xFFFFFFFF),
+                    outlineVariant = Color(0xCCFFFFFF),
+                )
+            } else {
+                baseScheme.copy(
+                    background = Color(0xFFFFFFFF),
+                    surface = Color(0xFFFAFAFA),
+                    surfaceVariant = Color(0xFFF0F0F0),
+                    onBackground = Color(0xFF000000),
+                    onSurface = Color(0xFF000000),
+                    onSurfaceVariant = Color(0xFF111111),
+                    outline = Color(0xFF000000),
+                    outlineVariant = Color(0xCC000000),
+                )
+            }
         } else {
-            baseScheme.copy(
-                background = Color(0xFFFFFFFF),
-                surface = Color(0xFFFAFAFA),
-                surfaceVariant = Color(0xFFF0F0F0),
-                onBackground = Color(0xFF000000),
-                onSurface = Color(0xFF000000),
-                onSurfaceVariant = Color(0xFF111111),
-                outline = Color(0xFF000000),
-                outlineVariant = Color(0xCC000000),
-            )
+            baseScheme
         }
-    } else {
-        baseScheme
-    }
-
+    
     val density = LocalDensity.current
-    val adjustedDensity = Density(
-        density = density.density,
-        fontScale = density.fontScale * fontScaleMultiplier.coerceIn(0.9f, 1.2f),
-    )
+    val adjustedDensity =
+        Density(
+            density = density.density,
+            fontScale = density.fontScale * fontScaleMultiplier.coerceIn(0.9f, 1.2f),
+        )
 
     CompositionLocalProvider(
         LocalDensity provides adjustedDensity,

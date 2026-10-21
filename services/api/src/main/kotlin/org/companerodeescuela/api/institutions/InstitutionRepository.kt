@@ -34,23 +34,19 @@ class MongoInstitutionRepository(
 ) : InstitutionRepository {
     private val directory = database.getCollection<Document>("platform_institutions")
 
-    override suspend fun findConfigured(id: String): InstitutionSummary? =
-        directory.find(eq("_id", id)).firstOrNull()?.summary()
+    override suspend fun findConfigured(id: String): InstitutionSummary? {
+        return directory.find(eq("_id", id)).firstOrNull()?.summary()
+    }
 
-    override suspend fun findEnabled(id: String): InstitutionSummary? =
-        directory.find(
-            Filters.and(
-                eq("_id", id),
-                eq("registrationEnabled", true),
-            ),
-        ).firstOrNull()?.summary()
+    override suspend fun findEnabled(id: String): InstitutionSummary? {
+        val filter = Filters.and(eq("_id", id), eq("registrationEnabled", true))
+        return directory.find(filter).firstOrNull()?.summary()
+    }
 
-    override suspend fun listEnabled(): List<InstitutionSummary> =
-        directory.find(eq("registrationEnabled", true))
-            .sort(ascending("_id"))
-            .limit(100)
-            .toList()
-            .mapNotNull { it.summary() }
+    override suspend fun listEnabled(): List<InstitutionSummary> {
+        val rows = directory.find(eq("registrationEnabled", true)).sort(ascending("_id")).limit(100).toList()
+        return rows.mapNotNull { it.summary() }
+    }
 
     private fun Document.summary(): InstitutionSummary? {
         val id = getString("_id")?.takeIf { it.isNotBlank() && it.length <= 128 } ?: return null

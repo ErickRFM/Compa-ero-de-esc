@@ -147,15 +147,19 @@ fun CoordinatorHomeScreen(
                 modifier = Modifier.padding(CompaneroSpacing.sm),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
             ) {
-                Text("Horarios y Aulas", style = MaterialTheme.typography.titleSmall)
+                Text("Agenda personal", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "Consulta la distribución de materias, profesores y asignación de salones.",
+                    "Consulta o prepara tu agenda local. No cambia grupos, docentes ni aulas oficiales.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Button(onClick = onOpenSchedule, modifier = Modifier.fillMaxWidth()) {
-                    Text("Consultar agenda académica")
+                    Text("Abrir mi agenda")
                 }
+                StatusNotice(
+                    title = "Gestión de horarios institucionales pendiente",
+                    message = "La asignación global de aulas y grupos se habilitará desde un módulo autorizado.",
+                )
             }
         }
 

@@ -38,7 +38,12 @@ class AttendanceStudentService(
     }
 
     suspend fun activeFor(studentId: String,nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null): List<AttendanceSessionResponse> {
-        // Read-only discovery checks enrollment and session scope; check-in is required for confirmation.
+        schoolPresenceService?.requireActive(studentId,nativeActor)
+        return discoverActiveFor(studentId,nativeActor)
+    }
+
+    /** Reading enrolled sessions never records or proves campus attendance. */
+    suspend fun discoverActiveFor(studentId: String,nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null): List<AttendanceSessionResponse> {
         val enrolled = enrollmentResolver.courseGroupsFor(studentId,nativeActor)
         val now = clock.instant().epochSecond
 

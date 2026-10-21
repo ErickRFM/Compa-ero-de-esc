@@ -102,7 +102,6 @@ class RoleExperienceResolverTest {
             listOf(
                 TopLevelDestination.CoordinatorHome,
                 TopLevelDestination.Schedule,
-                TopLevelDestination.Channel,
             ),
             config.topLevelDestinations,
         )

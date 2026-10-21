@@ -15,7 +15,7 @@ val releaseApiBaseUrl = providers
     .environmentVariable("COMPANERO_RELEASE_API_BASE_URL")
     .orElse(debugApiBaseUrl)
     .get()
- 
+
 // Debug-signed internal test builds remain explicit. Only an opt-in
 // distribution build may use a persistent private signing identity.
 val signingMode = providers.environmentVariable("COMPANERO_SIGNING_MODE").orElse("internal").get()
@@ -48,7 +48,6 @@ val appVersionName = providers.environmentVariable("COMPANERO_VERSION_NAME").orE
 require(appVersionName.matches(Regex("[0-9]+\\.[0-9]+\\.[0-9]+(?:-[a-zA-Z0-9.-]+)?"))) {
     "COMPANERO_VERSION_NAME must be a valid version name"
 }
-
 
 fun validateApiBaseUrl(name: String, value: String, requireHttps: Boolean = false) {
     require(value.startsWith(if (requireHttps) "https://" else "http")) {

@@ -328,7 +328,8 @@ class AttendanceServiceTest {
     }
 
     @Test
-    fun `list enrolled sessions without check in`() = runTest {
+    fun `list enrolled sessions without check in`() =
+        runTest {
         val presence = SchoolPresenceService(
             repository = InMemorySchoolPresenceRepository(),
             policy = SchoolPresencePolicy(

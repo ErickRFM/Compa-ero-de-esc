@@ -81,10 +81,8 @@ object TodaySchedule {
     ): WeeklyCandidate? {
         val candidates =
             entries.mapNotNull { entry ->
-                val day = runCatching { DayOfWeek.valueOf(entry.dayOfWeek) }.getOrNull()
-                    ?: return@mapNotNull null
-                val start = runCatching { LocalTime.parse(entry.startsAt) }.getOrNull()
-                    ?: return@mapNotNull null
+                val day = runCatching { DayOfWeek.valueOf(entry.dayOfWeek) }.getOrNull() ?: return@mapNotNull null
+                val start = runCatching { LocalTime.parse(entry.startsAt) }.getOrNull() ?: return@mapNotNull null
                 var daysAway = (day.value - now.dayOfWeek.value + 7) % 7
                 if (daysAway == 0 && !start.isAfter(now.toLocalTime())) {
                     daysAway = 7

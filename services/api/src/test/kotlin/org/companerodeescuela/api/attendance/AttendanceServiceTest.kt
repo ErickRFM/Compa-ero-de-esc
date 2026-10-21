@@ -328,7 +328,7 @@ class AttendanceServiceTest {
     }
 
     @Test
-    fun `student sees enrolled session before check-in but confirmation remains protected`() = runTest {
+    fun `student can discover enrolled sessions before campus check-in`() = runTest {
         val presence = SchoolPresenceService(
             repository = InMemorySchoolPresenceRepository(),
             policy = SchoolPresencePolicy(

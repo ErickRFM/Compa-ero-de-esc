@@ -30,11 +30,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import org.companerodeescuela.core.designsystem.theme.CompanionColors
-import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
+import org.companerodeescuela.core.designsystem.theme.CompanionColors
+import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8RedColors

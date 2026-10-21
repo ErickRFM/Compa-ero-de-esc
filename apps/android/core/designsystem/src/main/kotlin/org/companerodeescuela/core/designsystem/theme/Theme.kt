@@ -135,7 +135,7 @@ fun CompaneroTheme(
         } else {
             baseScheme
         }
-    
+
     val density = LocalDensity.current
     val adjustedDensity =
         Density(

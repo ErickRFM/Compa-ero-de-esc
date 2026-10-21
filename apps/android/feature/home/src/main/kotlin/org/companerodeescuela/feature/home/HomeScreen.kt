@@ -35,6 +35,7 @@ import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8ClassSummary
 import org.companerodeescuela.core.designsystem.v8.V8DailyClassRow
 import org.companerodeescuela.core.designsystem.v8.V8DashboardStat
+import org.companerodeescuela.core.designsystem.v8.V8SectionTitle
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -97,12 +98,12 @@ fun HomeScreen(
             Text(
                 text =
                     buildAnnotatedString {
-                    append("Hola")
-                    if (firstName != null) {
-                        append(", ")
-                        withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append(firstName) }
-                    }
-                },
+                        append("Hola")
+                        if (firstName != null) {
+                            append(", ")
+                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append(firstName) }
+                        }
+                    },
                 modifier = Modifier.padding(top = 8.dp, end = 42.dp),
                 fontSize = 37.sp,
                 lineHeight = 43.sp,
@@ -266,7 +267,7 @@ private fun DayTimeline(
     day: TodayOverview,
     onOpenSchedule: () -> Unit,
 ) {
-    org.companerodeescuela.core.designsystem.v8.V8SectionTitle("Horario de hoy")
+    V8SectionTitle("Horario de hoy")
     day.classes.forEach { entry ->
         val status = classStatus(entry, day.current, day.next)
         V8DailyClassRow(

@@ -9,6 +9,12 @@ miércoles Seguridad Informática 17:00–20:00, jueves Programación Móvil
 privacidad; hay una fixture sintética existente para pruebas Kotlin.
 
 ## Hallazgos verificables en main anterior
+- En el PDF real 9A, varias materias están impresas exactamente sobre la
+  misma línea horizontal en columnas contiguas. La separación de ≈9.7 puntos
+  era menor que el umbral de unión por palabra (≈10.8 pt). El parser
+  concatenaba asignaturas de lunes/martes/miércoles/jueves, las atribuía
+  al día de la primera columna y perdía celdas de los demás días.
+  Ejemplo de colisión: tres etiquetas "Seguridad Informática" a la misma Y.
 - El lector nativo PdfBox + TextPosition de #112 está integrado.
 - ScheduleImportProcessor retornaba tan pronto como el parser nativo
   producía una sola clase: eso bloqueaba el segundo pase OCR aunque
@@ -21,6 +27,9 @@ privacidad; hay una fixture sintética existente para pruebas Kotlin.
   de días; no duplicar ni reemplazar esa UI sin más evidencia.
 
 ## Cambios
+- Antes de unir caracteres y palabras, inferir separadores de día con los
+  encabezados del PDF y agrupar los glifos de cada columna por separado.
+  Agregada regresión con posiciones 9A de materias de columnas vecinas.
 - PDF digital: texto primero; si hay menos de 25 bloques o falta alguno
   de los seis días, ejecutar también la extracción raster PdfRenderer
   + ML Kit existente.

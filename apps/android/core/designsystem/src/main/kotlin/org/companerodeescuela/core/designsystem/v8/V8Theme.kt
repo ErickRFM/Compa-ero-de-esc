@@ -48,7 +48,10 @@ fun v8EffectiveColorScheme(highContrast: Boolean): ColorScheme =
  * of a dynamic wallpaper palette. Keep semantic error/secondary colors from the
  * parent while enforcing readable ink on white cards and across Material surfaces.
  */
-fun v8ResolvedColorScheme(parent: ColorScheme, highContrast: Boolean): ColorScheme =
+fun v8ResolvedColorScheme(
+    parent: ColorScheme,
+    highContrast: Boolean,
+): ColorScheme =
     if (parent.background.luminance() > 0.5f) {
         parent.copy(
             primary = Color(0xFF9B1C31),

@@ -97,15 +97,16 @@ fun Modifier.v8GlassSurface(
     val borderWidth =
         if (finish == V8SurfaceFinish.DARK_HIGH_CONTRAST || finish == V8SurfaceFinish.LIGHT_HIGH_CONTRAST) 2.dp else 1.dp
 
-    return this.shadow(
+    val shaded =
+        this.shadow(
             elevation = shadowElevation,
             shape = shape,
             ambientColor = Color.Black.copy(alpha = 0.25f),
             spotColor = Color.Black,
         )
-        .clip(shape)
-        .background(Brush.verticalGradient(tint))
-        .border(borderWidth, Brush.verticalGradient(edge), shape)
+    val clipped = shaded.clip(shape)
+    val painted = clipped.background(Brush.verticalGradient(tint))
+    return painted.border(borderWidth, Brush.verticalGradient(edge), shape)
 }
 
 @Composable

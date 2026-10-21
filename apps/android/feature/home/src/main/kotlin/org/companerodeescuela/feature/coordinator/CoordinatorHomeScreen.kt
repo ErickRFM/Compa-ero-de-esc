@@ -1,6 +1,5 @@
 package org.companerodeescuela.feature.coordinator
 
-import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,12 +14,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.ui.Modifier
-import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
+import org.companerodeescuela.core.designsystem.theme.CompanionColors
+import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.ui.component.CompaneroHeroSurface
 import org.companerodeescuela.core.ui.component.CompaneroSurface
 import org.companerodeescuela.core.ui.component.CompaneroSurfaceRole
@@ -29,18 +29,18 @@ import org.companerodeescuela.core.ui.component.StatusNotice
 @Composable
 fun CoordinatorHomeScreen(
     onOpenSchedule: () -> Unit,
-    onOpenAttendance: () -> Unit,
     onOpenChannel: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CoordinatorHomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .widthIn(max = CompaneroSize.homeContentMaxWidth)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .widthIn(max = CompaneroSize.homeContentMaxWidth)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
         V8ScreenHeader {
@@ -82,10 +82,11 @@ fun CoordinatorHomeScreen(
                             color = CompanionColors.onDarkSurfaceVariant,
                         )
                     }
-                    else -> StatusNotice(
-                        title = "Sin estadísticas verificadas",
-                        message = state.errorMessage ?: "No se pudieron consultar los grupos institucionales.",
-                    )
+                    else ->
+                        StatusNotice(
+                            title = "Sin estadísticas verificadas",
+                            message = state.errorMessage ?: "No se pudieron consultar los grupos institucionales.",
+                        )
                 }
                 Text(
                     text = "Asistencia docente e incidencias: indicadores pendientes de integración institucional.",
@@ -107,13 +108,17 @@ fun CoordinatorHomeScreen(
             ) {
                 Text("Monitoreo de Asistencia", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "Revisa el cumplimiento de clases y pases de lista reportados por docentes.",
+                    "El reporte consolidado requiere una consulta institucional autorizada; " +
+                        "el pase de lista de alumno y docente no concede acceso a Coordinación.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Button(onClick = onOpenAttendance, modifier = Modifier.fillMaxWidth()) {
-                    Text("Ver reporte de asistencia")
-                }
+                StatusNotice(
+                    title = "Reporte aún no disponible",
+                    message =
+                        "Los indicadores de asistencia no están conectados todavía. " +
+                            "No se mostrará información de otros perfiles como si fuera un reporte.",
+                )
             }
         }
 

@@ -330,11 +330,6 @@ class MainActivity : AppCompatActivity() {
                                                         launchSingleTop = true
                                                     }
                                                 },
-                                                onOpenAttendance = {
-                                                    navController.navigate(Destination.Attendance.route) {
-                                                        launchSingleTop = true
-                                                    }
-                                                },
                                                 onOpenChannel = {
                                                     navController.navigate(Destination.Channel.route) {
                                                         launchSingleTop = true

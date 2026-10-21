@@ -8,11 +8,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.shadow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -68,14 +71,27 @@ fun V8RedPrimaryButton(
     enabled: Boolean = true,
 ) {
     val shape = RoundedCornerShape(V8RedDimensions.ControlCorner)
-    val accent = if (enabled) V8RedColors.Crimson else V8RedColors.DeepCrimson.copy(alpha = 0.4f)
+    val light = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val glossy = LocalCompaneroHighContrast.current && !light
+    val solidAccent = if (light) MaterialTheme.colorScheme.primary else V8RedColors.DeepCrimson
+    val fills =
+        when {
+            !enabled -> listOf(solidAccent.copy(alpha = 0.35f), solidAccent.copy(alpha = 0.35f))
+            glossy -> listOf(V8RedColors.DeepCrimson, V8RedColors.Crimson)
+            else -> listOf(solidAccent, solidAccent)
+        }
     Button(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier
-            .shadow(if (enabled) 12.dp else 0.dp, shape, ambientColor = V8RedColors.Crimson, spotColor = V8RedColors.Crimson)
-            .background(Brush.horizontalGradient(listOf(V8RedColors.DeepCrimson.copy(alpha = if (enabled) 1f else .4f), accent)), shape)
-            .border(1.dp, V8RedColors.Crimson.copy(alpha = if (enabled) 1f else .5f), shape),
+            .shadow(
+                if (enabled && glossy) 8.dp else 0.dp,
+                shape,
+                ambientColor = V8RedColors.Crimson.copy(alpha = 0.25f),
+                spotColor = V8RedColors.Crimson.copy(alpha = 0.25f),
+            )
+            .background(Brush.horizontalGradient(fills), shape)
+            .border(1.dp, if (glossy) V8RedColors.Crimson else solidAccent.copy(alpha = 0.45f), shape),
         shape = RoundedCornerShape(V8RedDimensions.ControlCorner),
         colors = ButtonDefaults.buttonColors(
             containerColor = Color.Transparent,

@@ -1,0 +1,33 @@
+name: temporary-v16-v9-shell-format-review
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/temporary-v16-v9-shell-format-review.yml'
+permissions:
+  contents: read
+jobs:
+  formatter-review:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'fix/v16-unified-v9-role-shell-20261021'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Format V9 shell in ephemeral checkout
+        run: ./gradlew :apps:android:core:navigation:ktlintFormat --console=plain || echo 'Existing module style may require manual review'
+      - name: Print V9 formatted file
+        shell: bash
+        run: |
+          set -euo pipefail
+          path=apps/android/core/navigation/src/main/kotlin/org/companerodeescuela/core/navigation/CompaneroScaffold.kt
+          echo "BEGIN_V9_SHELL:${path}"
+          base64 -w 0 "${path}"
+          echo
+          echo "END_V9_SHELL:${path}"

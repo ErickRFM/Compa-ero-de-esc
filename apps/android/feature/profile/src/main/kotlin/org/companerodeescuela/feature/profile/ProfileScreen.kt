@@ -25,10 +25,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import org.companerodeescuela.core.designsystem.theme.CompanionColors
+import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
@@ -58,7 +61,10 @@ fun ProfileScreen(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
-        if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current) {
+        if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current &&
+            MaterialTheme.colorScheme.background.luminance() < 0.5f &&
+            !LocalCompaneroHighContrast.current
+        ) {
             V8CampusBackdrop(modifier = Modifier.matchParentSize())
         }
         Column(
@@ -75,12 +81,12 @@ fun ProfileScreen(
                     text = "Mi perfil",
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
-                    color = V8RedColors.TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     text = "Tus datos, preferencias y acceso escolar en un solo lugar.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = V8RedColors.TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
@@ -100,7 +106,7 @@ fun ProfileScreen(
                                 text = initials(displayName),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = V8RedColors.TextPrimary,
+                                color = MaterialTheme.colorScheme.onSurface,
                             )
                         }
                     }
@@ -113,18 +119,18 @@ fun ProfileScreen(
                                 displayName?.takeIf(String::isNotBlank)
                                     ?: "Cuenta de Compañero",
                             style = MaterialTheme.typography.titleLarge,
-                            color = V8RedColors.TextPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
                             text = roleSummary(roles),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = V8RedColors.TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
                             text = "Sesión activa",
                             style = MaterialTheme.typography.labelLarge,
-                            color = V8RedColors.Success,
+                            color = profileSuccessColor(),
                         )
                     }
                 }
@@ -229,7 +235,7 @@ private fun ProfileGroup(
         Text(
             text = title,
             style = MaterialTheme.typography.titleLarge,
-            color = V8RedColors.TextPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.SemiBold,
         )
         V8GlassCard(modifier = Modifier.fillMaxWidth()) {
@@ -263,27 +269,27 @@ private fun ProfileRow(
             Text(
                 title,
                 style = MaterialTheme.typography.titleSmall,
-                color = V8RedColors.TextPrimary,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Medium,
             )
             Text(
                 detail,
                 style = MaterialTheme.typography.bodyMedium,
-                color = V8RedColors.TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         trailingLabel?.let {
             Text(
                 text = it,
                 style = MaterialTheme.typography.labelLarge,
-                color = V8RedColors.Success,
+                color = profileSuccessColor(),
             )
         }
         if (onClick != null) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                tint = V8RedColors.TextSecondary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -291,8 +297,16 @@ private fun ProfileRow(
 
 @Composable
 private fun GroupDivider() {
-    HorizontalDivider(color = V8RedColors.Outline.copy(alpha = 0.5f))
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 }
+
+@Composable
+private fun profileSuccessColor(): androidx.compose.ui.graphics.Color =
+    if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
+        CompanionColors.semanticGreen
+    } else {
+        V8RedColors.Success
+    }
 
 private fun roleSummary(roles: Set<UserRole>): String =
     roles

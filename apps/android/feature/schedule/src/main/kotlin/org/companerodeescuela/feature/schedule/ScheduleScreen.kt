@@ -1241,9 +1241,8 @@ private fun ImportReviewDialog(
                 Text(
                     "Detectamos " + candidates.size + " clases consolidadas. Corrige cualquier dato antes de guardar.",
                 )
-                val daySummary =
-                    ScheduleImportAssessment.counts(candidates)
-                        .joinToString("  ·  ") { (day, count) -> "$day: $count" }
+                val dayCounts = ScheduleImportAssessment.counts(candidates)
+                val daySummary = dayCounts.joinToString("  ·  ") { (day, count) -> "$day: $count" }
                 Text(
                     daySummary,
                     style = MaterialTheme.typography.labelMedium,

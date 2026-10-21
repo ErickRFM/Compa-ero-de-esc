@@ -32,9 +32,8 @@ internal object ScheduleImportAssessment {
      * Conservative cross-check trigger, not a global requirement. The 9A
      * regression has 25 merged classes across all six scheduled weekdays.
      */
-    fun shouldCrossCheckNative(native: List<PersonalScheduleDraft>): Boolean {
-        return native.size < 25 || missingDays(native).isNotEmpty()
-    }
+    fun shouldCrossCheckNative(native: List<PersonalScheduleDraft>): Boolean =
+        native.size < 25 || missingDays(native).isNotEmpty()
 
     /**
      * Prefer OCR only when it adds days without removing known ones, or adds
@@ -67,17 +66,20 @@ internal object ScheduleImportAssessment {
         buildList {
             val missing = missingDays(candidates)
             if (missing.isNotEmpty()) {
-                val message = "Sin clases detectadas: " + missing.joinToString() +
-                    ". Verifica si son días libres o si faltan columnas del PDF."
+                val message =
+                    "Sin clases detectadas: " + missing.joinToString() +
+                        ". Verifica si son días libres o si faltan columnas del PDF."
                 add(message)
             }
             val saved = previous.filter { it.source == ScheduleSource.OCR_IMPORT }
-            val lostDays = saved.map { it.dayOfWeek }.toSet() -
-                candidates.map { it.dayOfWeek }.toSet()
+            val lostDays =
+                saved.map { it.dayOfWeek }.toSet() -
+                    candidates.map { it.dayOfWeek }.toSet()
             if (lostDays.isNotEmpty() || (saved.isNotEmpty() && candidates.size < saved.size)) {
-                val message = "Se reemplazarán las clases importadas: " + saved.size +
-                    " guardadas → " + candidates.size +
-                    " detectadas. Comprueba horarios y materias antes de confirmar."
+                val message =
+                    "Se reemplazarán las clases importadas: " + saved.size +
+                        " guardadas → " + candidates.size +
+                        " detectadas. Comprueba horarios y materias antes de confirmar."
                 add(message)
             }
         }

@@ -300,9 +300,9 @@ internal fun isPdfDocument(
     mime: String?,
     lastPathSegment: String?,
 ): Boolean {
-    val mimeIsPdf = mime?.substringBefore(';')?.trim()
-        ?.equals("application/pdf", ignoreCase = true) == true
-    val pathIsPdf = lastPathSegment?.substringBefore('?')
-        ?.lowercase()?.endsWith(".pdf") == true
+    val normalizedMime = mime?.substringBefore(';')?.trim()
+    val mimeIsPdf = normalizedMime?.equals("application/pdf", ignoreCase = true) == true
+    val path = lastPathSegment?.substringBefore('?')
+    val pathIsPdf = path?.lowercase()?.endsWith(".pdf") == true
     return mimeIsPdf || pathIsPdf
 }

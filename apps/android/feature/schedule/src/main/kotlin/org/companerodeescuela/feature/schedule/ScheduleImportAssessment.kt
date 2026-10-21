@@ -32,8 +32,7 @@ internal object ScheduleImportAssessment {
      * Conservative cross-check trigger, not a global requirement. The 9A
      * regression has 25 merged classes across all six scheduled weekdays.
      */
-    fun shouldCrossCheckNative(native: List<PersonalScheduleDraft>): Boolean =
-        native.size < 25 || missingDays(native).isNotEmpty()
+    fun shouldCrossCheckNative(native: List<PersonalScheduleDraft>) = native.size < 25 || missingDays(native).isNotEmpty()
 
     /**
      * Prefer OCR only when it adds days without removing known ones, or adds

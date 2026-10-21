@@ -54,7 +54,7 @@ class AttendanceDiscoveryBeforeCampusTest {
                     clock = clock,
                 )
             assertEquals(null, presence.activeFor("2020-10455"))
-            assertEquals(listOf(session.id), service.activeFor("2020-10455").map { it.id })
+            assertEquals(listOf(session.id), service.discoverActiveFor("2020-10455").map { it.id })
             assertEquals(0, repository.recordsForSession(session.id).size)
         }
 }

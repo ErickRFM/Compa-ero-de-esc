@@ -9,11 +9,34 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.matchParentSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
@@ -25,8 +48,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
-import org.companerodeescuela.core.designsystem.v8.*
-import org.companerodeescuela.core.motion.*
+import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
+import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
+import org.companerodeescuela.core.designsystem.v8.V8ColorScheme
+import org.companerodeescuela.core.designsystem.v8.V8RedColors
+import org.companerodeescuela.core.motion.CompaneroMotionPolicy
+import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
+import org.companerodeescuela.core.motion.MotionRole
 
 @Composable
 internal fun authDark(): Boolean = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -48,8 +76,7 @@ internal fun authMuted(): Color =
     }
 
 @Composable
-internal fun authAccent(): Color =
-    if (authDark()) V8RedColors.Crimson else V8RedColors.DeepCrimson
+internal fun authAccent(): Color = if (authDark()) V8RedColors.Crimson else V8RedColors.DeepCrimson
 
 /** Same campus, geometry and tokens; colors come from the existing CompaneroTheme. */
 @Composable
@@ -152,11 +179,8 @@ internal fun AuthV8PrimaryAction(
     modifier: Modifier = Modifier,
     submittingText: String? = null,
 ) {
-    val duration =
-        CompaneroMotionPolicy.resolve(
-            MotionRole.STATE_CHANGE,
-            LocalCompaneroMotionPreferences.current.reducedMotion,
-        ).durationMillis
+    val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
+    val duration = CompaneroMotionPolicy.resolve(MotionRole.STATE_CHANGE, reducedMotion).durationMillis
     Button(
         onClick = onClick,
         enabled = enabled,

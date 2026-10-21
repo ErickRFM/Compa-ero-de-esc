@@ -29,7 +29,6 @@ import org.companerodeescuela.core.ui.component.StatusNotice
 @Composable
 fun CoordinatorHomeScreen(
     onOpenSchedule: () -> Unit,
-    onOpenAttendance: () -> Unit,
     onOpenChannel: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CoordinatorHomeViewModel = hiltViewModel(),
@@ -107,13 +106,16 @@ fun CoordinatorHomeScreen(
             ) {
                 Text("Monitoreo de Asistencia", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "Revisa el cumplimiento de clases y pases de lista reportados por docentes.",
+                    "El reporte consolidado requiere una consulta institucional autorizada; " +
+                        "el pase de lista de alumno y docente no concede acceso a Coordinación.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Button(onClick = onOpenAttendance, modifier = Modifier.fillMaxWidth()) {
-                    Text("Ver reporte de asistencia")
-                }
+                StatusNotice(
+                    title = "Reporte aún no disponible",
+                    message = "Los indicadores de asistencia no están conectados todavía. " +
+                        "No se mostrará información de otros perfiles como si fuera un reporte.",
+                )
             }
         }
 

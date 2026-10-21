@@ -113,15 +113,20 @@ class TodayScheduleTest {
         assertEquals("Mañana", nextClassStatLabel(result))
     }
 
-    private fun entry(name: String, start: String, end: String) = ScheduleEntry(
-        courseId = name,
-        subjectCode = name,
-        subjectName = name,
-        groupName = "8-A",
-        teacherName = "Docente",
-        dayOfWeek = "MONDAY",
-        startsAt = start,
-        endsAt = end,
-        classroomName = "Aula 4",
-    )
+    private fun entry(
+        name: String,
+        start: String,
+        end: String,
+    ): ScheduleEntry =
+        ScheduleEntry(
+            courseId = name,
+            subjectCode = name,
+            subjectName = name,
+            groupName = "8-A",
+            teacherName = "Docente",
+            dayOfWeek = "MONDAY",
+            startsAt = start,
+            endsAt = end,
+            classroomName = "Aula 4",
+        )
 }

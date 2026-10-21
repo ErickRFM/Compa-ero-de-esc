@@ -246,18 +246,6 @@ class MainActivity : AppCompatActivity() {
                                             )
                                         }
                                     val navController = key(userId, roleConfig.experience, session.roles) { rememberNavController() }
-                                    SideEffect {
-                                        val isDark =
-                                            roleConfig.startDestination in setOf(Destination.Home, Destination.TeacherHome) || darkTheme
-                                        val style =
-                                            if (isDark) {
-                                                SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
-                                            } else {
-                                                SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
-                                            }
-                                        enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
-                                    }
-
                                     CompaneroScaffold(
                                         navController = navController,
                                         startDestination = roleConfig.startDestination,

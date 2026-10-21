@@ -560,7 +560,10 @@ class MainActivity : AppCompatActivity() {
 }
 
 @androidx.compose.runtime.Composable
-private fun RoleUnavailableScreen(experience: AppExperience, onLogout: () -> Unit) {
+private fun RoleUnavailableScreen(
+    experience: AppExperience,
+    onLogout: () -> Unit,
+) {
     val title =
         when (experience) {
             AppExperience.COORDINATOR -> "Coordinación"

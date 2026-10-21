@@ -29,9 +29,10 @@ class ScheduleImportAssessmentTest {
     @Test fun incompleteNativeTimetableRecoversMissingWeekdaysFromOcr() {
         val fixture = requireNotNull(javaClass.getResource("/fixtures/9A-ocr.txt")).readText()
         val complete = ScheduleOcrParser.parse(fixture)
-        val partial = complete.filterNot {
-            it.dayOfWeek in setOf("WEDNESDAY", "THURSDAY", "SATURDAY")
-        }
+        val partial =
+            complete.filterNot {
+                it.dayOfWeek in setOf("WEDNESDAY", "THURSDAY", "SATURDAY")
+            }
         assertTrue(ScheduleImportAssessment.shouldCrossCheckNative(partial))
         assertEquals(complete, ScheduleImportAssessment.select(partial, complete))
         val warnings = ScheduleImportAssessment.warnings(partial, emptyList())
@@ -54,9 +55,11 @@ class ScheduleImportAssessmentTest {
     }
 
     @Test fun incompleteWeekNeedsExplicitCoverageReview() {
-        val warnings = ScheduleImportAssessment.warnings(
-            listOf(entry("MONDAY"), entry("SATURDAY")), emptyList()
-        )
+        val warnings =
+            ScheduleImportAssessment.warnings(
+                listOf(entry("MONDAY"), entry("SATURDAY")),
+                emptyList(),
+            )
         assertTrue(warnings.isNotEmpty())
         assertTrue(warnings.first().contains("Mié"))
     }

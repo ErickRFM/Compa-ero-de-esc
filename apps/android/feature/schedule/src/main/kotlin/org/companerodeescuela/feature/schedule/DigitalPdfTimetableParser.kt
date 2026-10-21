@@ -54,9 +54,9 @@ internal object DigitalPdfTimetableParser {
         val boundaries = inferDayBoundaries(initial) ?: return initial
         val grouped =
             glyphs.groupBy { glyph ->
-            val center = glyph.x + glyph.width / 2f
-            boundaries.indexOfLast { it <= center }
-        }
+                val center = glyph.x + glyph.width / 2f
+                boundaries.indexOfLast { it <= center }
+            }
         return grouped.values.flatMap(::assembleLines)
     }
 

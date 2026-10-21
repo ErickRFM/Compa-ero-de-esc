@@ -99,9 +99,10 @@ fun V8DailyClassRow(
     isNext: Boolean,
     onClick: (String) -> Unit,
     modifier: Modifier = Modifier,
+    statusLabel: String? = null,
 ) {
     V8GlassCard(
-        modifier = modifier.fillMaxWidth().clickable { onClick(classInfo.id) },
+        modifier = modifier.fillMaxWidth().clickable(onClickLabel = "Abrir ${classInfo.title}") { onClick(classInfo.id) },
         highlighted = isNext,
         contentPadding = androidx.compose.foundation.layout.PaddingValues(13.dp),
     ) {
@@ -115,7 +116,16 @@ fun V8DailyClassRow(
                 Text(classInfo.title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(classInfo.room, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
-            if (isNext) Text("Siguiente", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp)
+            (statusLabel ?: if (isNext) "Siguiente" else null)?.let { label ->
+                Text(
+                    text = label,
+                    color =
+                        if (isNext) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

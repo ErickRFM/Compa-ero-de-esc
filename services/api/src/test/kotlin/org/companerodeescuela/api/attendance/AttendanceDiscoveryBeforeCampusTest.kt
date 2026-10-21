@@ -1,10 +1,5 @@
 package org.companerodeescuela.api.attendance
 
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneOffset
-import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlinx.coroutines.test.runTest
 import org.companerodeescuela.api.integrations.mock.MockAcademicProvider
 import org.companerodeescuela.api.presence.InMemorySchoolPresenceRepository
@@ -12,6 +7,11 @@ import org.companerodeescuela.api.presence.SchoolPresencePolicy
 import org.companerodeescuela.api.presence.SchoolPresenceService
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class AttendanceDiscoveryBeforeCampusTest {
     @Test

@@ -1,21 +1,22 @@
 package org.companerodeescuela.feature.schedule
 
+import org.companerodeescuela.core.academic.PersonalScheduleDraft
+import org.companerodeescuela.shared.contracts.ScheduleSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.companerodeescuela.core.academic.PersonalScheduleDraft
-import org.companerodeescuela.shared.contracts.ScheduleSource
 
 class ScheduleImportAssessmentTest {
-    private fun entry(day: String) = PersonalScheduleDraft(
-        subjectName = "Sistemas Embebidos",
-        teacherName = "Ivette Hernández",
-        dayOfWeek = day,
-        startsAt = "13:00",
-        endsAt = "14:00",
-        source = ScheduleSource.OCR_IMPORT,
-    )
+    private fun entry(day: String) =
+        PersonalScheduleDraft(
+            subjectName = "Sistemas Embebidos",
+            teacherName = "Ivette Hernández",
+            dayOfWeek = day,
+            startsAt = "13:00",
+            endsAt = "14:00",
+            source = ScheduleSource.OCR_IMPORT,
+        )
 
     @Test fun golden9AHasSixDaysAnd25MergedBlocks() {
         val fixture = requireNotNull(javaClass.getResource("/fixtures/9A-ocr.txt")).readText()

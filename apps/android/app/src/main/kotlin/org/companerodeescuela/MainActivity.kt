@@ -330,11 +330,6 @@ class MainActivity : AppCompatActivity() {
                                                         launchSingleTop = true
                                                     }
                                                 },
-                                                onOpenChannel = {
-                                                    navController.navigate(Destination.Channel.route) {
-                                                        launchSingleTop = true
-                                                    }
-                                                },
                                             )
                                         }
                                         composable(Destination.AdminHome.route) {

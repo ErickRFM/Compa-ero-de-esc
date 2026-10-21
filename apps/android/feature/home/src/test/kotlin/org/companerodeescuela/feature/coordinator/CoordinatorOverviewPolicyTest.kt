@@ -1,9 +1,9 @@
 package org.companerodeescuela.feature.coordinator
 
+import org.companerodeescuela.core.common.result.AppError
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.companerodeescuela.core.common.result.AppError
 
 class CoordinatorOverviewPolicyTest {
     @Test

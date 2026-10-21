@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.feature.home
 
 import androidx.compose.animation.AnimatedContent
@@ -84,12 +86,17 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
         ) {
             val firstName =
-                overview?.studentName?.trim()?.substringBefore(" ")?.takeIf { it.isNotBlank() }
+                overview
+                    ?.studentName
+                    ?.trim()
+                    ?.substringBefore(" ")
+                    ?.takeIf { it.isNotBlank() }
                     ?.replaceFirstChar {
                         if (it.isLowerCase()) it.titlecase(Locale("es", "MX")) else it.toString()
                     }
             Text(
-                text = buildAnnotatedString {
+                text =
+                    buildAnnotatedString {
                     append("Hola")
                     if (firstName != null) {
                         append(", ")
@@ -143,6 +150,10 @@ fun HomeScreen(
             }
 
             overview?.let { day ->
+                val distinctSubjectCount =
+                    day.classes
+                        .distinctBy(::scheduleSubjectKey)
+                        .size
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     V8DashboardStat(
                         label = "Clases hoy",
@@ -152,7 +163,7 @@ fun HomeScreen(
                     )
                     V8DashboardStat(
                         label = "Materias hoy",
-                        value = day.classes.distinctBy(::scheduleSubjectKey).size.toString(),
+                        value = distinctSubjectCount.toString(),
                         onClick = onOpenClassrooms,
                         modifier = Modifier.weight(1f),
                     )
@@ -167,7 +178,9 @@ fun HomeScreen(
                     !day.hasSchedule -> {
                         StatusNotice(
                             title = "Todavía no tienes horario",
-                            message = "Importa una imagen o PDF, crea tu agenda manualmente o conecta el sistema escolar desde Configuración.",
+                            message =
+                                "Importa una imagen o PDF, crea tu agenda manualmente o " +
+                                    "conecta el sistema escolar desde Configuración.",
                         )
                         Button(
                             onClick = onOpenSchedule,
@@ -176,7 +189,9 @@ fun HomeScreen(
                             Text("Preparar mi agenda")
                         }
                         Text(
-                            text = "La agenda local funciona sin integración escolar y conserva tus bloques personales, importaciones y recordatorios.",
+                            text =
+                                "La agenda local funciona sin integración escolar y conserva " +
+                                    "tus bloques personales, importaciones y recordatorios.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -196,8 +211,9 @@ fun HomeScreen(
                                 )
                                 AcademicClassCard(
                                     subject = upcoming.subjectName,
-                                    time = upcomingDayLabel(day.nextScheduledDaysAway) +
-                                        " · " + upcoming.startsAt + " – " + upcoming.endsAt,
+                                    time =
+                                        upcomingDayLabel(day.nextScheduledDaysAway) +
+                                            " · " + upcoming.startsAt + " – " + upcoming.endsAt,
                                     location = locationLabel(upcoming),
                                     teacher = upcoming.teacherName,
                                     subjectKey = scheduleSubjectKey(upcoming),
@@ -210,7 +226,12 @@ fun HomeScreen(
                     }
                 }
 
-                Text("Avisos", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                Text(
+                    "Avisos",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold,
+                )
                 V8GlassCard(modifier = Modifier.fillMaxWidth()) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
@@ -241,18 +262,22 @@ fun HomeScreen(
 }
 
 @Composable
-private fun DayTimeline(day: TodayOverview, onOpenSchedule: () -> Unit) {
+private fun DayTimeline(
+    day: TodayOverview,
+    onOpenSchedule: () -> Unit,
+) {
     org.companerodeescuela.core.designsystem.v8.V8SectionTitle("Horario de hoy")
     day.classes.forEach { entry ->
         val status = classStatus(entry, day.current, day.next)
         V8DailyClassRow(
-            classInfo = V8ClassSummary(
-                id = scheduleSubjectKey(entry) + ":" + entry.dayOfWeek + ":" + entry.startsAt,
-                title = entry.subjectName,
-                start = entry.startsAt,
-                end = entry.endsAt,
-                room = locationLabel(entry),
-            ),
+            classInfo =
+                V8ClassSummary(
+                    id = scheduleSubjectKey(entry) + ":" + entry.dayOfWeek + ":" + entry.startsAt,
+                    title = entry.subjectName,
+                    start = entry.startsAt,
+                    end = entry.endsAt,
+                    room = locationLabel(entry),
+                ),
             isNext = status.highlighted || status.label == "Siguiente",
             onClick = { onOpenSchedule() },
         )
@@ -290,20 +315,20 @@ private fun upcomingDayLabel(daysAway: Int?): String {
     if (daysAway == 0) return "Hoy"
     if (daysAway == 1) return "Mañana"
     val formatter = DateTimeFormatter.ofPattern("EEEE", Locale("es", "MX"))
-    return LocalDate.now()
-        .plusDays(daysAway.toLong())
-        .format(formatter)
-        .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale("es", "MX")) else it.toString() }
+    val date = LocalDate.now().plusDays(daysAway.toLong()).format(formatter)
+    return date.replaceFirstChar {
+        if (it.isLowerCase()) it.titlecase(Locale("es", "MX")) else it.toString()
+    }
 }
 
 private fun todayLabel(): String {
-    val formatter = DateTimeFormatter.ofPattern(
-        "EEEE d 'de' MMMM",
-        Locale("es", "MX"),
-    )
-    return LocalDate.now()
-        .format(formatter)
-        .replaceFirstChar {
+    val formatter =
+        DateTimeFormatter.ofPattern(
+            "EEEE d 'de' MMMM",
+            Locale("es", "MX"),
+        )
+    val date = LocalDate.now().format(formatter)
+    return date.replaceFirstChar {
             if (it.isLowerCase()) it.titlecase(Locale("es", "MX")) else it.toString()
         }
 }

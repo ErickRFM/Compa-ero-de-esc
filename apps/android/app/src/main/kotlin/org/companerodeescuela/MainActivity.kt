@@ -279,6 +279,11 @@ class MainActivity : AppCompatActivity() {
                                         }
                                         composable(Destination.TeacherHome.route) {
                                             TeacherHomeScreen(
+                                                onOpenAttendance = {
+                                                    navController.navigate(Destination.Attendance.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
                                                 onOpenChannel = {
                                                     navController.navigate(Destination.Channel.route) {
                                                         launchSingleTop = true
@@ -328,16 +333,6 @@ class MainActivity : AppCompatActivity() {
                                             CoordinatorHomeScreen(
                                                 onOpenSchedule = {
                                                     navController.navigate(Destination.Schedule.route) {
-                                                        launchSingleTop = true
-                                                    }
-                                                },
-                                                onOpenAttendance = {
-                                                    navController.navigate(Destination.Attendance.route) {
-                                                        launchSingleTop = true
-                                                    }
-                                                },
-                                                onOpenChannel = {
-                                                    navController.navigate(Destination.Channel.route) {
                                                         launchSingleTop = true
                                                     }
                                                 },

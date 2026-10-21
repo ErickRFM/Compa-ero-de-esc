@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.core.designsystem.v8
 
 import androidx.compose.foundation.background
@@ -83,8 +85,8 @@ fun V8RedPrimaryButton(
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier
-            .shadow(
+        modifier =
+            modifier.shadow(
                 if (enabled && glossy) 8.dp else 0.dp,
                 shape,
                 ambientColor = V8RedColors.Crimson.copy(alpha = 0.25f),
@@ -93,11 +95,12 @@ fun V8RedPrimaryButton(
             .background(Brush.horizontalGradient(fills), shape)
             .border(1.dp, if (glossy) V8RedColors.Crimson else solidAccent.copy(alpha = 0.45f), shape),
         shape = RoundedCornerShape(V8RedDimensions.ControlCorner),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = Color.Transparent,
-            contentColor = Color.White,
-            disabledContainerColor = Color.Transparent,
-        ),
+        colors =
+            ButtonDefaults.buttonColors(
+                containerColor = Color.Transparent,
+                contentColor = Color.White,
+                disabledContainerColor = Color.Transparent,
+            ),
         contentPadding = PaddingValues(horizontal = 22.dp, vertical = 16.dp),
     ) {
         Text(text = text, fontWeight = FontWeight.SemiBold)

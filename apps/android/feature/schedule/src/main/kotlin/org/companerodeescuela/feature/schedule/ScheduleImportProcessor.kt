@@ -18,21 +18,33 @@ class ScheduleImportProcessor(
     private val context: Context,
 ) {
     suspend fun extractCandidates(uri: Uri): List<org.companerodeescuela.core.academic.PersonalScheduleDraft> {
-        val isPdf = context.contentResolver.getType(uri) == "application/pdf"
-        if (isPdf) {
-            // The native path is deterministic for digital PDFs. The image
-            // recognition path is reserved for scanned or unsupported pages.
-            val direct = readNativePdfOrNull {
+        val isPdf = isPdfDocument(context.contentResolver.getType(uri), uri.lastPathSegment)
+        if (!isPdf) return ScheduleOcrParser.parse(extractText(uri))
+
+        // Digital-text-first; a partial native extraction can omit complete
+        // weekday columns while still returning a nonempty schedule.
+        val native =
+            readNativePdfOrNull {
                 DigitalPdfTimetableReader(context).extract(uri)
-            }
-            if (!direct.isNullOrEmpty()) return direct
+            }.orEmpty()
+        if (native.isNotEmpty() && !ScheduleImportAssessment.shouldCrossCheckNative(native)) {
+            return native
         }
-        return ScheduleOcrParser.parse(extractText(uri))
+        val ocr =
+            try {
+                ScheduleOcrParser.parse(extractPdf(uri))
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                if (native.isNotEmpty()) return native
+                throw failure
+            }
+        return ScheduleImportAssessment.select(native, ocr)
     }
 
     suspend fun extractText(uri: Uri): String {
-        val mime = context.contentResolver.getType(uri).orEmpty()
-        return if (mime == "application/pdf") {
+        val mime = context.contentResolver.getType(uri)
+        return if (isPdfDocument(mime, uri.lastPathSegment)) {
             extractPdf(uri)
         } else {
             recognize(InputImage.fromFilePath(context, uri))
@@ -281,4 +293,16 @@ internal object TimetableOcrReconstructor {
     private const val MIN_DAY_HEADERS = 4
     private const val MIN_TIME_ROWS = 3
     private const val DEFAULT_ROW_BAND = 60f
+}
+
+/** SAF providers occasionally omit the PDF content type entirely. */
+internal fun isPdfDocument(
+    mime: String?,
+    lastPathSegment: String?,
+): Boolean {
+    val normalizedMime = mime?.substringBefore(';')?.trim()
+    val mimeIsPdf = normalizedMime?.equals("application/pdf", ignoreCase = true) == true
+    val path = lastPathSegment?.substringBefore('?')
+    val pathIsPdf = path?.lowercase()?.endsWith(".pdf") == true
+    return mimeIsPdf || pathIsPdf
 }

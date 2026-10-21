@@ -40,7 +40,25 @@ internal object DigitalPdfTimetableParser {
     )
 
     fun parseGlyphs(glyphs: List<DigitalPdfGlyph>): List<PersonalScheduleDraft>? =
-        parseLines(assembleLines(glyphs))
+        parseLines(assembleColumnAwareLines(glyphs))
+
+    /**
+     * PDF cells can touch: the gap between two subjects printed on the same
+     * baseline can be smaller than the normal word-grouping threshold.
+     * Infer day dividers from the visible weekday headers FIRST, then group
+     * glyphs within each column. Otherwise adjacent cells get concatenated
+     * and assigned to the leftmost day, silently losing Wednesday/Thursday.
+     */
+    internal fun assembleColumnAwareLines(glyphs: List<DigitalPdfGlyph>): List<DigitalPdfLine> {
+        val initial = assembleLines(glyphs)
+        val boundaries = inferDayBoundaries(initial) ?: return initial
+        val grouped =
+            glyphs.groupBy { glyph ->
+                val center = glyph.x + glyph.width / 2f
+                boundaries.indexOfLast { it <= center }
+            }
+        return grouped.values.flatMap(::assembleLines)
+    }
 
     internal fun assembleLines(glyphs: List<DigitalPdfGlyph>): List<DigitalPdfLine> {
         val rows = mutableListOf<MutableList<DigitalPdfGlyph>>()
@@ -86,7 +104,7 @@ internal object DigitalPdfTimetableParser {
         }
     }
 
-    internal fun parseLines(lines: List<DigitalPdfLine>): List<PersonalScheduleDraft>? {
+    private fun inferDayBoundaries(lines: List<DigitalPdfLine>): List<Float>? {
         val headers = lines.mapNotNull { line ->
             val index = days.indexOfFirst { normalize(it) == normalize(line.text) }
             if (index == -1) null else index to line
@@ -102,10 +120,12 @@ internal object DigitalPdfTimetableParser {
         val step = consecutiveDistances.getOrNull(consecutiveDistances.size / 2) ?: return null
         val origins = centers.map { (index, x) -> x - index * step }.sorted()
         val origin = origins[origins.size / 2]
-        val boundaries = (0..7).map { origin + (it - 0.5f) * step }
-
-        // Reject wildly irregular "headers" from non-timetable documents.
         if (centers.any { (index, x) -> abs(x - (origin + index * step)) > step * 0.18f }) return null
+        return (0..7).map { origin + (it - 0.5f) * step }
+    }
+
+    internal fun parseLines(lines: List<DigitalPdfLine>): List<PersonalScheduleDraft>? {
+        val boundaries = inferDayBoundaries(lines) ?: return null
 
         data class TimeRow(val y: Float, val from: String, val to: String)
         val rows = lines.mapNotNull { line ->

@@ -29,9 +29,9 @@ import org.companerodeescuela.core.navigation.AppExperience
 fun LoginScreen(
     state: SessionUiState,
     onLogin: (String, String, AppExperience) -> Unit,
-    distribution: AppDistribution = AppDistribution.LEGACY,
     onCreateAccount: () -> Unit = {},
     modifier: Modifier = Modifier,
+    distribution: AppDistribution = AppDistribution.LEGACY,
 ) {
     var username by rememberSaveable { mutableStateOf("") }
     // Passwords never enter saved instance state; paging keeps this one form mounted.

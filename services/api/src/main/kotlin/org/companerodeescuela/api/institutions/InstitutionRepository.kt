@@ -10,6 +10,7 @@ import org.companerodeescuela.shared.contracts.InstitutionSummary
 
 interface InstitutionRepository {
     suspend fun findEnabled(id: String): InstitutionSummary?
+    suspend fun findConfigured(id: String): InstitutionSummary? = findEnabled(id)
     suspend fun listEnabled(): List<InstitutionSummary>
 }
 /** Empty unless explicitly populated by a test or authorized local setup; no demo seed. */
@@ -20,6 +21,8 @@ class InMemoryInstitutionRepository(initial: List<InstitutionSummary> = emptyLis
 }
 class MongoInstitutionRepository(database: MongoDatabase) : InstitutionRepository {
     private val directory = database.getCollection<Document>("platform_institutions")
+    override suspend fun findConfigured(id: String): InstitutionSummary? = directory.find(eq("_id", id))
+        .firstOrNull()?.summary()
     override suspend fun findEnabled(id: String): InstitutionSummary? = directory.find(
         com.mongodb.client.model.Filters.and(eq("_id", id), eq("registrationEnabled", true)))
         .firstOrNull()?.summary()

@@ -44,6 +44,7 @@ import org.companerodeescuela.api.integrations.push.InstitutionalSecretProtector
 import org.companerodeescuela.api.integrations.push.MongoInstitutionalIdentityLinkRepository
 import org.companerodeescuela.api.integrations.push.MongoInstitutionalPushRepository
 import org.companerodeescuela.api.integrations.push.SiiiPilotCredentialBootstrap
+import org.companerodeescuela.api.institutions.SiiiPilotInstitutionBootstrap
 import org.companerodeescuela.api.integrations.push.institutionalIdentityLinkRoutes
 import org.companerodeescuela.api.integrations.push.institutionalPushRoutes
 import org.companerodeescuela.api.plugins.configurePlugins
@@ -107,6 +108,17 @@ fun Application.module(
         } else {
             null
         }
+    // Explicit pilot metadata bootstrap: creates no accounts or registration access.
+    SiiiPilotInstitutionBootstrap.parse(System::getenv)?.let { desired ->
+        require(settings.mongo.isConfigured && settings.hasAuthentication) {
+            "Institution bootstrap requires configured MongoDB and institutional identity authority"
+        }
+        runBlocking {
+            withTimeout(15_000L) {
+                SiiiPilotInstitutionBootstrap.provision(mongoConnection.database(), desired)
+            }
+        }
+    }
     // One-time provisioning is an explicit operator action and blocks startup on mismatch.
     // Do not start an HTTP listener before the encrypted credential is persisted.
     SiiiPilotCredentialBootstrap.parse(System::getenv)?.let { desired ->
@@ -117,7 +129,7 @@ fun Application.module(
             runBlocking {
                 withTimeout(15_000L) {
                     SiiiPilotCredentialBootstrap.provision(repository, desired) { tenantId ->
-                        identityGraph.institutions.findEnabled(tenantId) != null
+                        identityGraph.institutions.findConfigured(tenantId) != null
                     }
                 }
             }

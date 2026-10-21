@@ -43,6 +43,30 @@ fun v8EffectiveColorScheme(highContrast: Boolean): ColorScheme =
         outlineVariant = Color(0xFFEEEEEE),
     )
 
-/** Honor the user's existing light/system scheme; V8's matte brand palette is for dark mode. */
+/**
+ * The V8 light edition is intentionally neutral, not the dim gray/pink surfaces
+ * of a dynamic wallpaper palette. Keep semantic error/secondary colors from the
+ * parent while enforcing readable ink on white cards and across Material surfaces.
+ */
 fun v8ResolvedColorScheme(parent: ColorScheme, highContrast: Boolean): ColorScheme =
-    if (parent.background.luminance() > 0.5f) parent else v8EffectiveColorScheme(highContrast)
+    if (parent.background.luminance() > 0.5f) {
+        parent.copy(
+            primary = Color(0xFF9B1C31),
+            onPrimary = Color.White,
+            background = Color.White,
+            onBackground = Color(0xFF141720),
+            surface = Color.White,
+            onSurface = Color(0xFF141720),
+            surfaceVariant = Color(0xFFF2F4F7),
+            onSurfaceVariant = if (highContrast) Color.Black else Color(0xFF373E4B),
+            surfaceContainerLowest = Color.White,
+            surfaceContainerLow = Color(0xFFFAFBFC),
+            surfaceContainer = Color(0xFFF5F6F8),
+            surfaceContainerHigh = Color(0xFFEFF1F4),
+            surfaceContainerHighest = Color(0xFFE8EBF0),
+            outline = if (highContrast) Color.Black else Color(0xFF727985),
+            outlineVariant = if (highContrast) Color.Black else Color(0xFFC9CDD5),
+        )
+    } else {
+        v8EffectiveColorScheme(highContrast)
+    }

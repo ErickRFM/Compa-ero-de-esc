@@ -11,6 +11,7 @@ import kotlin.test.assertNull
 
 class SiiiPilotCredentialBootstrapTest {
     private val clock = Clock.fixed(Instant.parse("2026-10-21T10:00:00Z"), ZoneOffset.UTC)
+    private val pilotExpiry = clock.instant().epochSecond + 86_400
 
     private fun settings(): Map<String, String> =
         mapOf(
@@ -19,7 +20,7 @@ class SiiiPilotCredentialBootstrapTest {
             "SIII_INBOUND_TENANT_ID" to "institution-pilot",
             "SIII_INBOUND_SECRET_BASE64" to
                 Base64.getEncoder().encodeToString(ByteArray(32) { (it + 19).toByte() }),
-            "SIII_INBOUND_EXPIRES_AT_EPOCH_SECONDS" to clock.instant().plusSeconds(86_400).epochSecond.toString(),
+            "SIII_INBOUND_EXPIRES_AT_EPOCH_SECONDS" to pilotExpiry.toString(),
         )
 
     @Test
@@ -40,7 +41,7 @@ class SiiiPilotCredentialBootstrapTest {
         assertEquals(setOf("group:write"), credential.scopes)
         assertEquals(true, credential.enabled)
         assertEquals(32, credential.secret.size)
-        assertEquals(clock.instant().plusSeconds(86_400).epochSecond, credential.expiresAtEpochSeconds)
+        assertEquals(pilotExpiry, credential.expiresAtEpochSeconds)
     }
 
     @Test
@@ -52,8 +53,8 @@ class SiiiPilotCredentialBootstrapTest {
                 SiiiPilotCredentialBootstrap.parse(vars::get, clock)
             }
         }
-        val invalid = original + ("SIII_INBOUND_EXPIRES_AT_EPOCH_SECONDS" to
-            clock.instant().plusSeconds(91L * 86_400).epochSecond.toString())
+        val lateExpiry = clock.instant().epochSecond + 91L * 86_400
+        val invalid = original + ("SIII_INBOUND_EXPIRES_AT_EPOCH_SECONDS" to lateExpiry.toString())
         assertFailsWith<IllegalArgumentException> {
             SiiiPilotCredentialBootstrap.parse(invalid::get, clock)
         }

@@ -2,15 +2,15 @@ package org.companerodeescuela.api.application
 
 import io.ktor.client.request.get
 import io.ktor.server.testing.testApplication
-import kotlin.test.assertContains
-import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
 import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.integrations.ProviderRegistry
 import org.companerodeescuela.api.test.FakeMongoConnection
 import org.companerodeescuela.api.test.TestFixtures
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import kotlin.test.assertContains
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 /**
  * Boots the real application module in every environment.
@@ -22,23 +22,25 @@ import org.junit.jupiter.api.Test
  * rule; only this test verifies the enforcement.
  */
 class ApplicationModuleBootTest {
-
     @Test
     @DisplayName("The application module refuses to boot in production with mock providers")
     fun productionBootRefusesMocks() {
-        val error = assertFailsWith<IllegalStateException> {
-            testApplication {
-                application {
-                    module(
-                        settings = TestFixtures.settings(
-                            environment = Environment.PRODUCTION,
-                            mongoUri = "mongodb://localhost:27017",
-                        ),
-                        mongoConnection = FakeMongoConnection(reachable = true),
-                    )
+        val error =
+            assertFailsWith<IllegalStateException> {
+                testApplication {
+                    application {
+                        module(
+                            settings =
+                                TestFixtures.settings(
+                                    environment = Environment.PRODUCTION,
+                                    mongoUri = "mongodb://localhost:27017",
+                                ),
+                            mongoConnection = FakeMongoConnection(reachable = true),
+                            providerRegistry = ProviderRegistry.mocks(),
+                        )
+                    }
                 }
             }
-        }
 
         assertContains(error.message!!, "PRODUCTION")
         assertContains(error.message!!, "mock-academic")
@@ -52,11 +54,13 @@ class ApplicationModuleBootTest {
             testApplication {
                 application {
                     module(
-                        settings = TestFixtures.settings(
-                            environment = Environment.STAGING,
-                            mongoUri = "mongodb://localhost:27017",
-                        ),
+                        settings =
+                            TestFixtures.settings(
+                                environment = Environment.STAGING,
+                                mongoUri = "mongodb://localhost:27017",
+                            ),
                         mongoConnection = FakeMongoConnection(reachable = true),
+                        providerRegistry = ProviderRegistry.mocks(),
                     )
                 }
             }
@@ -65,20 +69,22 @@ class ApplicationModuleBootTest {
 
     @Test
     @DisplayName("The application module boots in local with mock providers")
-    fun localBootAcceptsMocks() = testApplication {
-        application {
-            module(
-                settings = TestFixtures.settings(
-                    environment = Environment.LOCAL,
-                    mongoUri = "mongodb://localhost:27017",
-                ),
-                mongoConnection = FakeMongoConnection(reachable = true),
-            )
-        }
+    fun localBootAcceptsMocks() =
+        testApplication {
+            application {
+                module(
+                    settings =
+                        TestFixtures.settings(
+                            environment = Environment.LOCAL,
+                            mongoUri = "mongodb://localhost:27017",
+                        ),
+                    mongoConnection = FakeMongoConnection(reachable = true),
+                )
+            }
 
-        val response = client.get("/health")
-        assertTrue(response.status.value == 200, "local must serve health with mocks")
-    }
+            val response = client.get("/health")
+            assertTrue(response.status.value == 200, "local must serve health with mocks")
+        }
 
     @Test
     @DisplayName("The guard runs before any route is reachable")
@@ -90,10 +96,11 @@ class ApplicationModuleBootTest {
             testApplication {
                 application {
                     module(
-                        settings = TestFixtures.settings(
-                            environment = Environment.PRODUCTION,
-                            mongoUri = "mongodb://localhost:27017",
-                        ),
+                        settings =
+                            TestFixtures.settings(
+                                environment = Environment.PRODUCTION,
+                                mongoUri = "mongodb://localhost:27017",
+                            ),
                         mongoConnection = FakeMongoConnection(reachable = true),
                         providerRegistry = ProviderRegistry.mocks(),
                     )

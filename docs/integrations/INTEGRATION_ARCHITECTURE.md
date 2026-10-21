@@ -148,6 +148,7 @@ fabricated academic data to real students.
 actually enforces it, and the smoke test in the release checklist confirms the
 service still starts locally.
 
+The default registry uses mocks only in `local`/`development`. In `staging`/`production`, `ProviderRegistry.defaultsFor` selects `nativeOnly`: existing Mongo native features remain available while unconfigured institutional adapters explicitly fail unavailable (identity authentication/current authority deny). Explicitly supplied mocks are still rejected. Real adapters still require the `configured` seam; no integration is inferred from account IDs. See [native-only production composition](../architecture/NATIVE_ONLY_PRODUCTION.md) for scope, tests and existing configuration requirements.
 ## Adding a real provider
 
 1. Implement the capability interface.

@@ -50,6 +50,24 @@ class ProviderRegistry private constructor(
     companion object {
         private val log = LoggerFactory.getLogger(ProviderRegistry::class.java)
 
+        /** Environment defaults never make development fixtures reachable in a deployed production graph. */
+        fun defaultsFor(environment: Environment): ProviderRegistry =
+            when (environment) {
+                Environment.LOCAL, Environment.DEVELOPMENT -> mocks(environment)
+                Environment.STAGING, Environment.PRODUCTION -> nativeOnly()
+            }
+
+        /** Keep native Mongo features usable while unconfigured institutional integrations fail closed. */
+        fun nativeOnly(): ProviderRegistry =
+            ProviderRegistry(
+                academic = UnavailableAcademicProvider,
+                identity = UnavailableIdentityProvider,
+                learning = UnavailableLearningProvider,
+                library = UnavailableLibraryProvider,
+                events = UnavailableEventsProvider,
+                sync = listOf(UnavailableSyncProvider),
+            )
+
         /** Explicit composition seam; environment validation still rejects all remaining mocks. */
         fun configured(
             academic: AcademicProvider,

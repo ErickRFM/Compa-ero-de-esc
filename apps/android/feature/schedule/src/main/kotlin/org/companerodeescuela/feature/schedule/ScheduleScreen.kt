@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import org.companerodeescuela.core.designsystem.v8.V8GlassFilterChip
 import androidx.compose.material3.Icon
@@ -393,6 +394,7 @@ fun ScheduleScreen(
     if (state.importCandidates.isNotEmpty()) {
         ImportReviewDialog(
             candidates = state.importCandidates,
+            previous = state.entries,
             busy = state.actionInProgress,
             onEdit = { index ->
                 editingImportIndex = index
@@ -1217,11 +1219,16 @@ private fun MoveScheduleDialog(
 @Composable
 private fun ImportReviewDialog(
     candidates: List<PersonalScheduleDraft>,
+    previous: List<ScheduleEntry>,
     busy: Boolean,
     onEdit: (Int) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
+    val warnings = remember(candidates, previous) {
+        ScheduleImportAssessment.warnings(candidates, previous)
+    }
+    var acknowledged by remember(candidates, previous) { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
         title = { Text("Revisa tu horario") },
@@ -1231,8 +1238,33 @@ private fun ImportReviewDialog(
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
                 Text(
-                    "Detectamos " + candidates.size + " clases. Corrige cualquier dato antes de guardar.",
+                    "Detectamos " + candidates.size + " clases consolidadas. Corrige cualquier dato antes de guardar.",
                 )
+                Text(
+                    ScheduleImportAssessment.counts(candidates)
+                        .joinToString("  ·  ") { (day, count) -> day + ": " + count },
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                if (warnings.isNotEmpty()) {
+                    warnings.forEach { warning ->
+                        StatusNotice(
+                            title = "Revisa los días del PDF",
+                            message = warning,
+                            tone = NoticeTone.WARNING,
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = acknowledged,
+                            onCheckedChange = { acknowledged = it },
+                            enabled = !busy,
+                        )
+                        Text(
+                            "He comparado los días con mi PDF.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
                 candidates.forEachIndexed { index, draft ->
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
@@ -1261,7 +1293,7 @@ private fun ImportReviewDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onConfirm, enabled = !busy) {
+            TextButton(onClick = onConfirm, enabled = !busy && (warnings.isEmpty() || acknowledged)) {
                 Text(if (busy) "Guardando…" else "Confirmar horario")
             }
         },

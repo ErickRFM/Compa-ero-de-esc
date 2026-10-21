@@ -80,6 +80,27 @@ class DigitalPdfTimetableParserTest {
     }
 
     @Test
+    fun adjacentSameBaselineSubjectsAreSeparatedByWeekdayColumn() {
+        // Real 9A-style coordinates: the 9.7pt gap at the day divider is
+        // LESS than the native line join threshold (~10.8pt).
+        val headerGlyphs = headers.map { (left, right, index) ->
+            DigitalPdfGlyph(dayNames[index], left, 76.6f, right - left, 18.6f)
+        }
+        val adjacent = listOf(
+            DigitalPdfGlyph("Seguridad Informática", 93.8f, 547.1f, 89.0f, 9.04f),
+            DigitalPdfGlyph("Seguridad Informática", 192.5f, 547.1f, 89.0f, 9.04f),
+            DigitalPdfGlyph("Seguridad Informática", 291.2f, 547.1f, 89.0f, 9.04f),
+        )
+        val withoutColumnGuard = DigitalPdfTimetableParser.assembleLines(headerGlyphs + adjacent)
+        assertEquals(1, withoutColumnGuard.count { it.text.contains("Seguridad Informática") })
+
+        val split = DigitalPdfTimetableParser.assembleColumnAwareLines(headerGlyphs + adjacent)
+        assertEquals(3, split.count { it.text == "Seguridad Informática" })
+        assertTrue(split.any { it.left < 190f && it.text == "Seguridad Informática" })
+        assertTrue(split.any { it.left > 285f && it.text == "Seguridad Informática" })
+    }
+
+    @Test
     fun unrelatedTextDoesNotBecomeATimetable() {
         assertEquals(null, DigitalPdfTimetableParser.parseLines(listOf(
             DigitalPdfLine("Horario", 50f, 110f, 10f, 17f),

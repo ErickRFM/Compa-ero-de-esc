@@ -77,6 +77,42 @@ class TodayScheduleTest {
         assertEquals(0, result.classes.size)
     }
 
+    @Test
+    fun `personal placeholder code does not collapse different classes`() {
+        val subjects =
+            listOf(
+                entry("Expresión Oral y Escrita II", "14:00", "16:00").copy(subjectCode = "PERSONAL"),
+                entry("Negocios", "16:00", "17:00").copy(subjectCode = "PERSONAL"),
+                entry("Inglés IX", "17:00", "19:00").copy(subjectCode = "PERSONAL"),
+            )
+        assertEquals(3, subjects.distinctBy(::scheduleSubjectKey).size)
+        assertEquals(
+            scheduleSubjectKey(subjects.first()),
+            scheduleSubjectKey(subjects.first().copy(subjectName = "EXPRESIÓN ORAL Y ESCRITA II")),
+        )
+    }
+
+    @Test
+    fun `after last lesson next class stat shows next scheduled day`() {
+        val load =
+            AcademicLoadResponse(
+                student = AcademicProfile("student-1", "Ana"),
+                schedule =
+                    AcademicScheduleResponse(
+                        ownerId = "student-1",
+                        entries =
+                            listOf(
+                                entry("Negocios", "16:00", "17:00").copy(subjectCode = "PERSONAL"),
+                                entry("Redes", "09:00", "10:00").copy(dayOfWeek = "TUESDAY"),
+                            ),
+                    ),
+            )
+        val result = TodaySchedule.calculate(load, LocalDateTime.of(2026, 10, 5, 23, 6))
+        assertEquals(1, result.classes.size)
+        assertEquals(null, result.next)
+        assertEquals("Mañana", nextClassStatLabel(result))
+    }
+
     private fun entry(name: String, start: String, end: String) = ScheduleEntry(
         courseId = name,
         subjectCode = name,

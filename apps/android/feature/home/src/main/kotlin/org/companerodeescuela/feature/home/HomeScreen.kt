@@ -44,8 +44,8 @@ import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ScheduleEntry
 import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 import java.time.LocalTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -326,10 +326,11 @@ internal fun cacheStatusLabel(
     zone: ZoneId = ZoneId.systemDefault(),
     today: LocalDate = LocalDate.now(zone),
 ): String {
-    val lastUpdated = updatedAtEpochSeconds
-        ?.takeIf { it > 0L }
-        ?.let { Instant.ofEpochSecond(it).atZone(zone) }
-        ?: return "Agenda guardada"
+    val lastUpdated =
+        updatedAtEpochSeconds
+            ?.takeIf { it > 0L }
+            ?.let { Instant.ofEpochSecond(it).atZone(zone) }
+            ?: return "Agenda guardada"
     val pattern = if (lastUpdated.toLocalDate() == today) "HH:mm" else "d MMM · HH:mm"
     return "Agenda guardada · " +
         lastUpdated.format(DateTimeFormatter.ofPattern(pattern, Locale("es", "MX")))

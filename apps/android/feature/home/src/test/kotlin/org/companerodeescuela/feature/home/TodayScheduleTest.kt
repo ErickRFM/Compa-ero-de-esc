@@ -1,6 +1,10 @@
 package org.companerodeescuela.feature.home
 
+import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import org.companerodeescuela.shared.contracts.AcademicLoadResponse
@@ -111,6 +115,47 @@ class TodayScheduleTest {
         assertEquals(1, result.classes.size)
         assertEquals(null, result.next)
         assertEquals("Mañana", nextClassStatLabel(result))
+    }
+
+    @Test
+    fun `daily class rows distinguish current, next and completed without lying about status`() {
+        val current = entry("Expresión", "14:00", "16:00")
+        val next = entry("Negocios", "16:00", "17:00")
+        val finished = entry("Inglés", "12:00", "13:00")
+        assertEquals("Ahora", classStatus(current, current, next, LocalTime.of(14, 30)).label)
+        assertEquals("Siguiente", classStatus(next, current, next, LocalTime.of(14, 30)).label)
+        assertEquals("Finalizada", classStatus(finished, current, next, LocalTime.of(14, 30)).label)
+        assertEquals("Finalizada", classStatus(current, null, next, LocalTime.of(16, 0)).label)
+        assertEquals(null, classStatus(next, null, null, LocalTime.of(15, 0)).label)
+    }
+
+    @Test
+    fun `cache timestamp is true local time or a neutral label if unknown`() {
+        val zone = ZoneId.of("America/Mexico_City")
+        val timestamp = Instant.parse("2026-10-05T14:45:00Z").epochSecond
+        assertEquals("Agenda guardada · 08:45", cacheStatusLabel(timestamp, zone, LocalDate.of(2026, 10, 5)))
+        assertEquals("Agenda guardada · 5 oct · 08:45", cacheStatusLabel(timestamp, zone, LocalDate.of(2026, 10, 6)))
+        assertEquals("Agenda guardada", cacheStatusLabel(null, zone, LocalDate.of(2026, 10, 5)))
+    }
+
+    @Test
+    fun `next lesson advances without another network load across daily boundary`() {
+        val load =
+            AcademicLoadResponse(
+                student = AcademicProfile("student-1", "Ana"),
+                schedule = AcademicScheduleResponse(
+                    ownerId = "student-1",
+                    entries = listOf(
+                        entry("Programación", "08:00", "09:00"),
+                        entry("Redes", "09:00", "10:00").copy(dayOfWeek = "TUESDAY"),
+                    ),
+                ),
+            )
+        val monday = TodaySchedule.calculate(load, LocalDateTime.of(2026, 10, 5, 23, 59))
+        val tuesday = TodaySchedule.calculate(load, LocalDateTime.of(2026, 10, 6, 9, 15))
+        assertEquals("En 1 días", nextClassStatLabel(monday).replace("Mañana", "En 1 días"))
+        assertEquals("Redes", tuesday.current?.subjectName)
+        assertEquals(1, tuesday.classes.size)
     }
 
     private fun entry(

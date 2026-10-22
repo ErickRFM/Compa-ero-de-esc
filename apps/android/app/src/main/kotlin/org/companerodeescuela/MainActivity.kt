@@ -388,11 +388,12 @@ class MainActivity : AppCompatActivity() {
                                             )
                                         }
                                         composable(Destination.Grading.route) { entry ->
-                                            val selection by entry.savedStateHandle
-                                                .getStateFlow<TeacherClassContext?>(
-                                                    TeacherClassContext.STATE_KEY,
-                                                    null,
-                                                ).collectAsStateWithLifecycle()
+                                            val selection by
+                                                entry.savedStateHandle
+                                                    .getStateFlow<TeacherClassContext?>(
+                                                        TeacherClassContext.STATE_KEY,
+                                                        null,
+                                                    ).collectAsStateWithLifecycle()
                                             if (roleConfig.experience == AppExperience.STUDENT) {
                                                 StudentGradesScreen()
                                             } else {
@@ -400,19 +401,21 @@ class MainActivity : AppCompatActivity() {
                                             }
                                         }
                                         composable(Destination.Channel.route) { entry ->
-                                            val selection by entry.savedStateHandle
-                                                .getStateFlow<TeacherClassContext?>(
-                                                    TeacherClassContext.STATE_KEY,
-                                                    null,
-                                                ).collectAsStateWithLifecycle()
+                                            val selection by
+                                                entry.savedStateHandle
+                                                    .getStateFlow<TeacherClassContext?>(
+                                                        TeacherClassContext.STATE_KEY,
+                                                        null,
+                                                    ).collectAsStateWithLifecycle()
                                             ChannelScreen(requestedClassroom = selection)
                                         }
                                         composable(Destination.Attendance.route) { entry ->
-                                            val selection by entry.savedStateHandle
-                                                .getStateFlow<TeacherClassContext?>(
-                                                    TeacherClassContext.STATE_KEY,
-                                                    null,
-                                                ).collectAsStateWithLifecycle()
+                                            val selection by
+                                                entry.savedStateHandle
+                                                    .getStateFlow<TeacherClassContext?>(
+                                                        TeacherClassContext.STATE_KEY,
+                                                        null,
+                                                    ).collectAsStateWithLifecycle()
                                             AttendanceScreen(
                                                 requestedClassroom = selection,
                                                 requestedMode =

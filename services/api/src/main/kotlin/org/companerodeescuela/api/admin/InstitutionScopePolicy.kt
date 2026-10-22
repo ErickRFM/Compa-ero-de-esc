@@ -19,7 +19,7 @@ class InstitutionScopePolicy(private val accounts:PlatformAccountRepository,priv
         val current=live(actor)
         if(institutionId.isBlank() || institutionId!=institutionId.trim() || institutionId.length>128 || institutionId.any(Char::isISOControl)) throw ApiException.Forbidden("Actual institution scope is required")
         if(UserRole.SUPER_ADMIN in current.roles) return current
-        if(UserRole.ADMIN !in current.roles || current.institutionId!=institutionId || capability !in current.adminCapabilities) throw ApiException.Forbidden("Institutional capability is not granted")
+        if((UserRole.ADMIN !in current.roles && UserRole.PRINCIPAL !in current.roles) || current.institutionId!=institutionId || capability !in current.adminCapabilities) throw ApiException.Forbidden("Institutional capability is not granted")
         return current
     }
 }

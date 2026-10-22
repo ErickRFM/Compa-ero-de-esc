@@ -29,6 +29,7 @@ import org.companerodeescuela.shared.contracts.LoginRequest
 import org.companerodeescuela.shared.contracts.RefreshSessionRequest
 import org.companerodeescuela.shared.contracts.VerifyEmailRequest
 import org.companerodeescuela.shared.contracts.RegisterRequest
+import org.companerodeescuela.shared.contracts.UserCapabilitiesSummary
 
 /**
  * Platform authentication endpoints.
@@ -193,6 +194,11 @@ fun Route.authRoutes(
                     "Authentication is not configured",
                 )
             }
+            get("/capabilities") {
+                throw ApiException.DependencyUnavailable(
+                    "Authentication is not configured",
+                )
+            }
         } else {
             authenticate(
                 AuthTokenService.ACTIVE_PROVIDER_NAME,
@@ -237,6 +243,20 @@ fun Route.authRoutes(
                     // Re-resolving here would make institutional providers pay for a duplicate upstream read.
                     val claimed = tokenService.userFrom(payload)
                     call.respond(ApiResponse(claimed, call.requestId()))
+                }
+                get("/capabilities") {
+                    val payload = call.principal<JWTPrincipal>()?.payload ?: throw ApiException.Unauthorized()
+                    val claimed = tokenService.userFrom(payload)
+                    val account = accounts.findById(claimed.id)
+                    val capabilities = account?.adminCapabilities ?: emptySet()
+                    val granted = UserCapabilitiesSummary(
+                        userId = claimed.id,
+                        roles = claimed.roles,
+                        institutionId = claimed.institutionId,
+                        capabilities = capabilities,
+                        authRevision = claimed.authRevision,
+                    )
+                    call.respond(ApiResponse(granted, call.requestId()))
                 }
             }
         }

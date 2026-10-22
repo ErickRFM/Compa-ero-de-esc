@@ -101,12 +101,17 @@ internal val loginAccesses =
     )
 
 /**
- * Coordinator is intentionally absent from the original five-card carousel.
- * The management APK includes it without changing legacy navigation snapshots.
+ * Principal and Coordinator are management distribution experiences.
  */
 internal fun loginAccessesFor(distribution: AppDistribution): List<LoginAccess> =
     if (distribution == AppDistribution.MANAGEMENT) {
         listOf(
+            LoginAccess(
+                AppExperience.PRINCIPAL,
+                R.string.auth_role_principal,
+                R.string.auth_principal_description,
+                Icons.Filled.Business,
+            ),
             LoginAccess(
                 AppExperience.COORDINATOR,
                 R.string.auth_role_coordinator,
@@ -123,161 +128,261 @@ internal fun LoginAccessCarousel(
     pager: PagerState,
     enabled: Boolean,
     accesses: List<LoginAccess> = loginAccesses,
+    onPageSelected: (AppExperience) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
-    val reduced = LocalCompaneroMotionPreferences.current.reducedMotion
-    val policy = CompaneroMotionPolicy.resolve(MotionRole.STATE_CHANGE, reduced)
-    val ink = authInk()
-    val muted = authMuted()
-    val accent = authAccent()
-
-    fun select(index: Int) {
-        if (!enabled) return
-        scope.launch {
-            if (!policy.allowSpatialMotion) {
-                pager.scrollToPage(index)
-            } else {
-                pager.animateScrollToPage(index, animationSpec = tween(policy.durationMillis))
-            }
-        }
-    }
+    val motion = LocalCompaneroMotionPreferences.current
+    val currentAccess = accesses.getOrNull(pager.currentPage) ?: accesses.first()
 
     Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            IconButton(
-                onClick = { select(pager.currentPage - 1) },
-                enabled = enabled && pager.currentPage > 0,
-                modifier = Modifier.testTag("access_previous"),
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    stringResource(R.string.auth_previous_access),
-                    tint = muted,
-                )
-            }
-            Text(
-                text = stringResource(R.string.auth_access_position, pager.currentPage + 1, accesses.size),
-                color = muted,
-                fontSize = 13.sp,
-                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-            )
-            IconButton(
-                onClick = { select(pager.currentPage + 1) },
-                enabled = enabled && pager.currentPage < accesses.lastIndex,
-                modifier = Modifier.testTag("access_next"),
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowForward,
-                    stringResource(R.string.auth_next_access),
-                    tint = muted,
-                )
-            }
-        }
-
         HorizontalPager(
             state = pager,
             userScrollEnabled = enabled,
-            pageSpacing = 8.dp,
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height((172 * LocalDensity.current.fontScale.coerceAtLeast(1f)).dp)
-                    .testTag("role_pager"),
-        ) { index ->
-            val access = accesses[index]
+                    .testTag("auth_access_pager"),
+        ) { page ->
+            val access = accesses[page]
+            val isSelected = page == pager.currentPage
+
             V8FrostedGlassPanel(
                 modifier =
                     Modifier
-                        .fillMaxSize()
-                        .selectable(
-                            selected = pager.currentPage == index,
-                            enabled = enabled,
-                            role = Role.Tab,
-                            onClick = { select(index) },
-                        ),
-                emphasized = pager.currentPage == index,
-                themeAware = true,
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp)
+                        .testTag("auth_access_card_${access.experience.name.lowercase()}"),
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Icon(
-                            access.icon,
-                            contentDescription = null,
-                            tint = accent,
-                            modifier = Modifier.size(32.dp),
-                        )
-                        Text(
-                            text = stringResource(access.title),
-                            color = ink,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier =
-                                Modifier
-                                    .weight(1f)
-                                    .testTag("role_title_" + access.experience.name)
-                                    .semantics { heading() },
-                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .size(36.dp)
+                                        .background(
+                                            color =
+                                                if (isSelected) {
+                                                    V8FrostedGlassPanel.AccentCrimson.copy(
+                                                        alpha = 0.2f,
+                                                    )
+                                                } else {
+                                                    V8FrostedGlassPanel.BorderMuted
+                                                },
+                                            shape = RoundedCornerShape(10.dp),
+                                        ),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = access.icon,
+                                    contentDescription = null,
+                                    tint =
+                                        if (isSelected) {
+                                            V8FrostedGlassPanel.AccentCrimson
+                                        } else {
+                                            V8FrostedGlassPanel.TextMuted
+                                        },
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                            Text(
+                                text = stringResource(access.title),
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = V8FrostedGlassPanel.TextPrimary,
+                                modifier = Modifier.semantics { heading() },
+                            )
+                        }
+
+                        if (access.canRegister) {
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .background(
+                                            color = V8FrostedGlassPanel.AccentCrimson.copy(alpha = 0.15f),
+                                            shape = RoundedCornerShape(12.dp),
+                                        )
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.auth_create_account),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = V8FrostedGlassPanel.AccentCrimson,
+                                )
+                            }
+                        }
                     }
+
                     Text(
                         text = stringResource(access.description),
-                        color = muted,
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp,
+                        fontSize = 13.sp,
+                        color = V8FrostedGlassPanel.TextSecondary,
+                        lineHeight = 18.sp,
                     )
                 }
             }
         }
 
+        // Live region announcing current page for accessibility
+        val accessPositionText =
+            stringResource(
+                R.string.auth_access_position,
+                pager.currentPage + 1,
+                accesses.size,
+            )
+        val selectedAccessText =
+            stringResource(
+                R.string.auth_select_access,
+                stringResource(currentAccess.title),
+            )
+
+        Box(
+            modifier =
+                Modifier
+                    .semantics {
+                        liveRegion = LiveRegionMode.Polite
+                        contentDescription = "$selectedAccessText, $accessPositionText"
+                    },
+        )
+
         Row(
-            modifier = Modifier.fillMaxWidth().selectableGroup(),
-            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            accesses.forEachIndexed { index, access ->
-                val description = stringResource(R.string.auth_select_access, stringResource(access.title))
-                Box(
-                    modifier =
-                        Modifier
-                            .size(48.dp)
-                            .testTag("role_" + access.experience.name)
-                            .selectable(
-                                selected = pager.currentPage == index,
-                                enabled = enabled,
-                                role = Role.Tab,
-                                onClick = { select(index) },
-                            ).semantics { contentDescription = description },
-                    contentAlignment = Alignment.Center,
-                ) {
+            Row(
+                modifier =
+                    Modifier
+                        .selectableGroup()
+                        .testTag("auth_access_indicators"),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val density = LocalDensity.current
+                accesses.forEachIndexed { index, access ->
+                    val isSelected = index == pager.currentPage
+                    val accessTitle = stringResource(access.title)
+                    val selectAccessLabel =
+                        stringResource(
+                            R.string.auth_select_access,
+                            accessTitle,
+                        )
+
                     Box(
                         modifier =
                             Modifier
-                                .width(if (pager.currentPage == index) 22.dp else 8.dp)
                                 .height(6.dp)
+                                .width(if (isSelected) 24.dp else 6.dp)
                                 .background(
-                                    if (pager.currentPage == index) accent else muted.copy(alpha = 0.6f),
-                                    RoundedCornerShape(3.dp),
-                                ),
+                                    color =
+                                        if (isSelected) {
+                                            V8FrostedGlassPanel.AccentCrimson
+                                        } else {
+                                            V8FrostedGlassPanel.BorderMuted
+                                        },
+                                    shape = RoundedCornerShape(3.dp),
+                                )
+                                .selectable(
+                                    selected = isSelected,
+                                    role = Role.Tab,
+                                    onClick = {
+                                        if (enabled && index != pager.currentPage) {
+                                            scope.launch {
+                                                CompaneroMotionPolicy.animatePagerScroll(
+                                                    pagerState = pager,
+                                                    targetPage = index,
+                                                    motion = motion,
+                                                    density = density,
+                                                )
+                                                onPageSelected(accesses[index].experience)
+                                            }
+                                        }
+                                    },
+                                )
+                                .semantics {
+                                    contentDescription = selectAccessLabel
+                                },
+                    )
+                }
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                IconButton(
+                    onClick = {
+                        if (enabled && pager.currentPage > 0) {
+                            scope.launch {
+                                val prevPage = pager.currentPage - 1
+                                pager.animateScrollToPage(
+                                    prevPage,
+                                    animationSpec = tween(durationMillis = 200),
+                                )
+                                onPageSelected(accesses[prevPage].experience)
+                            }
+                        }
+                    },
+                    enabled = enabled && pager.currentPage > 0,
+                    modifier = Modifier.testTag("auth_access_prev_button"),
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(R.string.auth_previous_access),
+                        tint =
+                            if (pager.currentPage > 0) {
+                                V8FrostedGlassPanel.TextPrimary
+                            } else {
+                                V8FrostedGlassPanel.TextMuted
+                            },
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+
+                IconButton(
+                    onClick = {
+                        if (enabled && pager.currentPage < accesses.size - 1) {
+                            scope.launch {
+                                val nextPage = pager.currentPage + 1
+                                pager.animateScrollToPage(
+                                    nextPage,
+                                    animationSpec = tween(durationMillis = 200),
+                                )
+                                onPageSelected(accesses[nextPage].experience)
+                            }
+                        }
+                    },
+                    enabled = enabled && pager.currentPage < accesses.size - 1,
+                    modifier = Modifier.testTag("auth_access_next_button"),
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = stringResource(R.string.auth_next_access),
+                        tint =
+                            if (pager.currentPage < accesses.size - 1) {
+                                V8FrostedGlassPanel.TextPrimary
+                            } else {
+                                V8FrostedGlassPanel.TextMuted
+                            },
+                        modifier = Modifier.size(18.dp),
                     )
                 }
             }
         }
-        Text(
-            text = stringResource(R.string.auth_access_is_intention),
-            color = muted,
-            fontSize = 12.sp,
-            lineHeight = 17.sp,
-        )
     }
 }

@@ -2,7 +2,16 @@ package org.companerodeescuela.shared.contracts
 
 import kotlinx.serialization.Serializable
 
-@Serializable enum class AdminCapability { APPROVE_STAFF, MANAGE_USERS, MANAGE_ACADEMICS, REVIEW_WORKSHOPS, VIEW_AUDIT, VIEW_SESSIONS }
+@Serializable enum class AdminCapability {
+    APPROVE_STAFF,
+    MANAGE_USERS,
+    MANAGE_ACADEMICS,
+    REVIEW_WORKSHOPS,
+    VIEW_AUDIT,
+    VIEW_SESSIONS,
+    DIRECTIVE_SUPERVISION,
+    APPROVE_ACADEMIC_OVERRIDES,
+}
 @Serializable enum class StaffRole { TEACHER, TUTOR }
 @Serializable enum class StaffApplicationStatus { PENDING, APPROVED, REJECTED }
 @Serializable data class StaffApplication(val id:String,val role:StaffRole,val requestedInstitutionId:String,
@@ -27,3 +36,12 @@ import kotlinx.serialization.Serializable
 @Serializable data class AdminUserSummary(val user:UserSummary,val applications:List<StaffApplication>,val capabilities:Set<AdminCapability> = emptySet())
 @Serializable data class AdministrationMetrics(val totalUsers:Int,val pendingStaff:Int,val activeTeachers:Int,val activeTutors:Int,val suspended:Int)
 @Serializable data class AdministrationOverview(val users:List<AdminUserSummary>,val metrics:AdministrationMetrics)
+
+@Serializable
+data class UserCapabilitiesSummary(
+    val userId: String,
+    val roles: Set<UserRole>,
+    val institutionId: String? = null,
+    val capabilities: Set<AdminCapability> = emptySet(),
+    val authRevision: Long = 0,
+)

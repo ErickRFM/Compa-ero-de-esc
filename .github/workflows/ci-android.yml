@@ -267,11 +267,22 @@ jobs:
           tests = sum(int(suite.get('tests', 0)) for suite in suites)
           failures = sum(int(suite.get('failures', 0)) + int(suite.get('errors', 0)) for suite in suites)
           skipped = sum(int(suite.get('skipped', 0)) for suite in suites)
-          print(f'instrumentation tests={tests} failures={failures} skipped={skipped}')
-          if tests < 36 or failures != 0 or skipped != 0:
-              raise SystemExit('Instrumentation must execute all 36+ tests without failures or skips')
-          administration = [case for suite in suites for case in suite.findall('testcase') if case.get('classname') == 'org.companerodeescuela.V12AdministrationUiTest']
-          assert len(administration) == 5 and len({case.get('name') for case in administration}) == 5, 'All five distinct connected V12 administration tests must run'
+          flavor = '${{ matrix.flavor }}'
+          minimum = 36 if flavor == 'academic' else 15
+          print(f'{flavor} instrumentation tests={tests} failures={failures} skipped={skipped}')
+          if tests < minimum or failures != 0 or skipped != 0:
+              raise SystemExit(f'{flavor} instrumentation requires {minimum}+ executed tests with zero failures or skips')
+          cases = [case for suite in suites for case in suite.findall('testcase')]
+          def require_distinct(cls, count):
+              matching = [case for case in cases if case.get('classname') == cls]
+              assert len(matching) == count and len({case.get('name') for case in matching}) == count, (
+                  f'{flavor} expected {count} distinct tests in {cls}'
+              )
+          require_distinct('org.companerodeescuela.V12AdministrationUiTest', 5)
+          require_distinct('org.companerodeescuela.AppDistributionSmokeTest', 2)
+          if flavor == 'management':
+              require_distinct('org.companerodeescuela.DistributionLoginUiTest', 2)
+              require_distinct('org.companerodeescuela.V14RoleNavigationUiTest', 6)
           PY
 
       - name: Upload Android UI evidence

@@ -390,10 +390,10 @@ class MainActivity : AppCompatActivity() {
                                                     TeacherClassContext.STATE_KEY,
                                                     null,
                                                 ).collectAsStateWithLifecycle()
-                                            if (roleConfig.experience == AppExperience.STUDENT) {
-                                                StudentGradesScreen()
-                                            } else {
-                                                GradebookScreen(requestedClassroom = selection)
+                                            when (roleConfig.experience) {
+                                                AppExperience.STUDENT -> StudentGradesScreen()
+                                                AppExperience.TEACHER -> GradebookScreen(requestedClassroom = selection)
+                                                else -> RoleUnavailableScreen(roleConfig.experience)
                                             }
                                         }
                                         composable(Destination.Channel.route) { entry ->
@@ -410,15 +410,19 @@ class MainActivity : AppCompatActivity() {
                                                     TeacherClassContext.STATE_KEY,
                                                     null,
                                                 ).collectAsStateWithLifecycle()
-                                            AttendanceScreen(
-                                                requestedClassroom = selection,
-                                                requestedMode =
-                                                    when (roleConfig.experience) {
-                                                        AppExperience.STUDENT -> AttendanceMode.STUDENT
-                                                        AppExperience.TEACHER -> AttendanceMode.TEACHER
-                                                        else -> null
-                                                    },
-                                            )
+                                            when (roleConfig.experience) {
+                                                AppExperience.STUDENT ->
+                                                    AttendanceScreen(
+                                                        requestedClassroom = selection,
+                                                        requestedMode = AttendanceMode.STUDENT,
+                                                    )
+                                                AppExperience.TEACHER ->
+                                                    AttendanceScreen(
+                                                        requestedClassroom = selection,
+                                                        requestedMode = AttendanceMode.TEACHER,
+                                                    )
+                                                else -> RoleUnavailableScreen(roleConfig.experience)
+                                            }
                                         }
                                         composable(Destination.RoleUnavailable.route) {
                                             RoleUnavailableScreen(roleConfig.experience)
@@ -460,8 +464,9 @@ class MainActivity : AppCompatActivity() {
                                                     },
                                                 onTutorRequest = { navController.navigate(Destination.StaffApplication.route) },
                                                 onRepresentatives =
-                                                    if (org.companerodeescuela.shared.contracts.UserRole.STUDENT in
-                                                        session.roles
+                                                    if (
+                                                        roleConfig.experience == AppExperience.STUDENT &&
+                                                        org.companerodeescuela.shared.contracts.UserRole.STUDENT in session.roles
                                                     ) {
                                                         {
                                                             navController.navigate(Destination.RepresentativeInvitations.route) {

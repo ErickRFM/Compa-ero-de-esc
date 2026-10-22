@@ -43,19 +43,28 @@ class SmartRoleLoginUiTest {
     }
     @Test fun roleChangesPreserveOneFormAndOnlySendDesiredAccess() {
         var submitted: Triple<String, String, AppExperience>? = null
-        compose.setContent { LoginTestContent(onLogin = { u, p, role -> submitted = Triple(u, p, role) }) }
+        compose.setContent { loginTestContent(onLogin = { u, p, role -> submitted = Triple(u, p, role) }) }
         compose.onNodeWithTag("login_username").performScrollTo().performTextInput("qa.docente")
         compose.onNodeWithTag("login_password").performScrollTo().performTextInput("test-password")
         compose.onNodeWithTag("role_TUTOR").performScrollTo().performClick()
         // The keyboard may obscure the card; assert selected access and the retained shared form.
         compose.onNodeWithTag("role_TUTOR").assertIsSelected()
         compose.onNodeWithTag("login_registration").assertDoesNotExist()
-        compose.onNodeWithTag("login_submit").performScrollTo().performClick()
+        // The pager locks submission while the role transition is in progress.
+        // API 35 can deliver the click before the carousel finishes settling.
+        compose.waitUntil(timeoutMillis = 8_000) {
+            val submitNodes = compose.onAllNodesWithTag("login_submit").fetchSemanticsNodes()
+            submitNodes.firstOrNull()?.config?.contains(SemanticsProperties.Disabled) == false
+        }
+        compose.onNodeWithTag("login_submit").assertIsEnabled()
+        compose.onNodeWithTag("login_submit").performScrollTo()
+        compose.onNodeWithTag("login_submit").performClick()
+        compose.waitUntil(timeoutMillis = 5_000) { submitted != null }
         assertEquals(Triple("qa.docente", "test-password", AppExperience.TUTOR), submitted)
     }
 
     @Test fun swipeArrowAndIndicatorSelectAllFiveAccesses() {
-        compose.setContent { LoginTestContent() }
+        compose.setContent { loginTestContent() }
         compose.onNodeWithTag("role_pager").performScrollTo().performTouchInput { swipeLeft() }
         compose.onNodeWithTag("role_title_TEACHER", useUnmergedTree = true).assertIsDisplayed()
         captureAccess("teacher")
@@ -80,12 +89,16 @@ class SmartRoleLoginUiTest {
         val directory = File(InstrumentationRegistry.getInstrumentation().targetContext.filesDir, "v10-evidence")
         directory.mkdirs()
         File(directory, "access-" + name + ".png").outputStream().use {
-            org.junit.Assert.assertTrue(compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it))
+            val screenshot = compose.onRoot().captureToImage().asAndroidBitmap()
+            org.junit.Assert.assertTrue(
+                screenshot.compress(Bitmap.CompressFormat.PNG, 100, it),
+            )
         }
     }
+
     @Test fun rotationRestoresIdentifierAndAccessWithoutSavingPassword() {
         val restoration = StateRestorationTester(compose)
-        restoration.setContent { LoginTestContent() }
+        restoration.setContent { loginTestContent() }
         compose.onNodeWithTag("login_username").performScrollTo().performTextInput("qa.alumno")
         compose.onNodeWithTag("login_password").performScrollTo().performTextInput("test-password")
         compose.onNodeWithTag("role_SUPER_ADMIN").performScrollTo().performClick()
@@ -97,7 +110,7 @@ class SmartRoleLoginUiTest {
 
     @Test fun submittingDisablesFormAndAccessControls() {
         val state = mutableStateOf(SessionUiState(checking = false))
-        compose.setContent { LoginTestContent(state = state.value) }
+        compose.setContent { loginTestContent(state = state.value) }
         compose.onNodeWithTag("login_username").performScrollTo().performTextInput("qa.alumno")
         compose.onNodeWithTag("login_password").performScrollTo().performTextInput("test-password")
         compose.runOnIdle { state.value = state.value.copy(submitting = true) }
@@ -107,7 +120,7 @@ class SmartRoleLoginUiTest {
     }
 
     @Test fun englishHighContrastAndReducedMotionUseExistingPreferences() {
-        compose.setContent { LoginTestContent(language = "en", highContrast = true, reducedMotion = true, dark = false) }
+        compose.setContent { loginTestContent(language = "en", highContrast = true, reducedMotion = true, dark = false) }
         compose.onNodeWithTag("role_title_STUDENT", useUnmergedTree = true).assertTextEquals("Student")
         compose.onNodeWithTag("role_TUTOR").performScrollTo().performClick()
         compose.onNodeWithTag("role_title_TUTOR", useUnmergedTree = true).assertTextEquals("Tutor")
@@ -117,7 +130,7 @@ class SmartRoleLoginUiTest {
 }
 
 @Composable
-private fun LoginTestContent(
+private fun loginTestContent(
     state: SessionUiState = SessionUiState(checking = false),
     language: String = "es",
     dark: Boolean = true,
@@ -127,7 +140,10 @@ private fun LoginTestContent(
 ) {
     val context = LocalContext.current
     val configuration = Configuration(LocalConfiguration.current).apply { setLocale(Locale.forLanguageTag(language)) }
-    CompositionLocalProvider(LocalContext provides context.createConfigurationContext(configuration), LocalConfiguration provides configuration) {
+    CompositionLocalProvider(
+        LocalContext provides context.createConfigurationContext(configuration),
+        LocalConfiguration provides configuration,
+    ) {
         CompaneroTheme(darkTheme = dark, highContrast = highContrast) {
             ProvideCompaneroMotionPreferences(reducedMotion) {
                 LoginScreen(state, onLogin, {})

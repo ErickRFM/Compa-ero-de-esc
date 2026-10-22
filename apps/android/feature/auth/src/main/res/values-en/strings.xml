@@ -18,11 +18,13 @@
 <string name="auth_role_student">Student</string>
 <string name="auth_role_teacher">Teacher</string>
 <string name="auth_role_tutor">Tutor</string>
+<string name="auth_role_principal">Principal</string>
 <string name="auth_role_admin">Administrator</string>
 <string name="auth_role_super_admin">Superadministrator</string>
 <string name="auth_student_description">Your classes, schedule and attendance in one place.</string>
 <string name="auth_teacher_description">Organize your classes and support student learning.</string>
 <string name="auth_tutor_description">Support your group and follow up on their requests.</string>
+<string name="auth_principal_description">Supervise academic and executive management for your campus.</string>
 <string name="auth_admin_description">Manage institutional services with your authorized access.</string>
 <string name="auth_super_admin_description">Oversee the platform within your account permissions.</string>
 <string name="auth_access_position">Access %1$d of %2$d</string>

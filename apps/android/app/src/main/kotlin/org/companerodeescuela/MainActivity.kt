@@ -317,7 +317,10 @@ class MainActivity : AppCompatActivity() {
                                             TutorRequestsScreen()
                                         }
                                         composable(Destination.RepresentativeInvitations.route) {
-                                            if (org.companerodeescuela.shared.contracts.UserRole.STUDENT in session.roles) {
+                                            if (
+                                                roleConfig.experience == AppExperience.STUDENT &&
+                                                org.companerodeescuela.shared.contracts.UserRole.STUDENT in session.roles
+                                            ) {
                                                 StudentRepresentativesScreen()
                                             } else {
                                                 RoleUnavailableScreen(AppExperience.UNSUPPORTED)

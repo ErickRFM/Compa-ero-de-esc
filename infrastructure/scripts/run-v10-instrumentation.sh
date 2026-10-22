@@ -1,6 +1,21 @@
 #!/usr/bin/env bash
 # One shell: android-emulator-runner runs separate script lines in separate shells.
 set -uo pipefail
+# Variant-specific package for run-as evidence; never probe another package.
+case "${1:-academic}" in
+  academic)
+    variant=Academic
+    export COMPANERO_EVIDENCE_PACKAGE=org.companerodeescuela
+    ;;
+  management)
+    variant=Management
+    export COMPANERO_EVIDENCE_PACKAGE=org.companerodeescuela.gestion
+    ;;
+  *)
+    echo "Unsupported Compañero test variant" >&2
+    exit 2
+    ;;
+esac
 # Record host pressure without environment values, command arguments or user data.
 # A vanished emulator is distinct from an assertion failure in the app.
 mkdir -p build/v10-runner-diagnostics
@@ -68,12 +83,25 @@ finish_diagnostics() {
   fi
 }
 trap finish_diagnostics EXIT
-./gradlew :apps:android:app:connectedDebugAndroidTest --max-workers=2 --no-daemon \
+# Management cannot run the academic registration/login screenshot suites:
+# those tests deliberately assert an academic package and student access.
+# Verify real management package, role-select UX, scoped administration,
+# navigation and theme instead; no test failures or skips are hidden.
+runner_args=()
+if [[ "$variant" == Management ]]; then
+  runner_args+=(
+    "-Pandroid.testInstrumentationRunnerArguments.class=org.companerodeescuela.AppDistributionSmokeTest,org.companerodeescuela.DistributionLoginUiTest,org.companerodeescuela.V12AdministrationUiTest,org.companerodeescuela.V14RoleNavigationUiTest"
+  )
+fi
+./gradlew ":apps:android:app:connected${variant}DebugAndroidTest" --max-workers=2 --no-daemon \
+  "${runner_args[@]}" \
   -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
   -Dorg.gradle.jvmargs="-Xmx1536m -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8" --console=plain
 instrumentation_status=$?
-# UTP otherwise uninstalls the tested APK, deleting its private screenshots.
 set -e
-# Validate full tar/PNG integrity; retry only evidence transport, never tests.
-python3 infrastructure/scripts/export-v10-evidence.py
+# Only academic V10 suites produce the complete 19+ screenshot set.
+# Management must never claim academic screenshots as its own evidence.
+if [[ "$variant" == Academic ]]; then
+  python3 infrastructure/scripts/export-v10-evidence.py
+fi
 exit "$instrumentation_status"

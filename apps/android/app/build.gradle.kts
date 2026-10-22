@@ -123,6 +123,28 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Independent packages share domain modules, without sharing Android app data.
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("academic") {
+            dimension = "distribution"
+            applicationId = "org.companerodeescuela"
+            buildConfigField("String", "APP_DISTRIBUTION", "\"ACADEMIC\"")
+        }
+        create("management") {
+            dimension = "distribution"
+            applicationId = "org.companerodeescuela.gestion"
+            buildConfigField("String", "APP_DISTRIBUTION", "\"MANAGEMENT\"")
+            // Never reuse the academic package's Firebase app registration.
+            // Enable management FCM only after provisioning its own credentials.
+            buildConfigField("boolean", "FIREBASE_CONFIGURED", "false")
+            buildConfigField("String", "FIREBASE_APP_ID", "\"\"")
+            buildConfigField("String", "FIREBASE_PROJECT_ID", "\"\"")
+            buildConfigField("String", "FIREBASE_SENDER_ID", "\"\"")
+            buildConfigField("String", "FIREBASE_API_KEY", "\"\"")
+        }
+    }
+
     signingConfigs {
         if (signingMode == "distribution") {
             create("distribution") {

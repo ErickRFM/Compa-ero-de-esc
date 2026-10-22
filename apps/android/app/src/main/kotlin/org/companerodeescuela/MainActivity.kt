@@ -43,6 +43,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import org.companerodeescuela.core.attendance.AttendanceSyncScheduler
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
 import org.companerodeescuela.core.motion.ProvideCompaneroMotionPreferences
+import org.companerodeescuela.core.navigation.AppDistribution
 import org.companerodeescuela.core.navigation.AppExperience
 import org.companerodeescuela.core.navigation.CompaneroScaffold
 import org.companerodeescuela.core.navigation.Destination
@@ -95,6 +96,7 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         appearancePreferences.applySavedLanguage()
+        val appDistribution = AppDistribution.valueOf(BuildConfig.APP_DISTRIBUTION)
 
         setContent {
             val notificationsPermissionLauncher =
@@ -147,6 +149,7 @@ class MainActivity : AppCompatActivity() {
                             if (session.authenticated) {
                                 activatingAccess = false
                                 if (session.accountStatus == org.companerodeescuela.shared.contracts.AccountStatus.ACTIVE &&
+                                    appDistribution == AppDistribution.ACADEMIC &&
                                     org.companerodeescuela.shared.contracts.UserRole.STUDENT in session.roles
                                 ) {
                                     attendanceSyncScheduler.schedule()
@@ -174,6 +177,7 @@ class MainActivity : AppCompatActivity() {
                                 } else {
                                     LoginScreen(
                                         state = session,
+                                        distribution = appDistribution,
                                         onLogin = { username, password, experience ->
                                             loginExperienceName = experience.name
                                             sessionViewModel.login(username, password)
@@ -198,7 +202,7 @@ class MainActivity : AppCompatActivity() {
                             else -> {
                                 val availableExperiences =
                                     remember(session.roles) {
-                                        RoleExperienceResolver.available(session.roles)
+                                        RoleExperienceResolver.available(session.roles, appDistribution)
                                     }
                                 val userId = session.userId
                                 var preferredExperience by remember(userId, session.roles) {
@@ -207,6 +211,7 @@ class MainActivity : AppCompatActivity() {
                                             roles = session.roles,
                                             requested = AppExperience.entries.firstOrNull { it.name == loginExperienceName },
                                             saved = userId?.let(activeExperiencePreferences::read),
+                                            distribution = appDistribution,
                                         ),
                                     )
                                 }
@@ -243,6 +248,7 @@ class MainActivity : AppCompatActivity() {
                                             RoleExperienceResolver.resolve(
                                                 roles = session.roles,
                                                 preferredExperience = preferredExperience,
+                                                distribution = appDistribution,
                                             )
                                         }
                                     val navController = key(userId, roleConfig.experience, session.roles) { rememberNavController() }
@@ -320,7 +326,7 @@ class MainActivity : AppCompatActivity() {
                                             if (org.companerodeescuela.shared.contracts.UserRole.STUDENT in session.roles) {
                                                 StudentRepresentativesScreen()
                                             } else {
-                                                RoleUnavailableScreen(AppExperience.UNSUPPORTED)
+                                                RoleUnavailableScreen(AppExperience.UNSUPPORTED, onLogout = sessionViewModel::logout)
                                             }
                                         }
                                         composable(Destination.CoordinatorHome.route) {
@@ -418,7 +424,7 @@ class MainActivity : AppCompatActivity() {
                                             )
                                         }
                                         composable(Destination.RoleUnavailable.route) {
-                                            RoleUnavailableScreen(roleConfig.experience)
+                                            RoleUnavailableScreen(roleConfig.experience, onLogout = sessionViewModel::logout)
                                         }
                                         composable(Destination.Profile.route) {
                                             ProfileScreen(
@@ -455,10 +461,15 @@ class MainActivity : AppCompatActivity() {
                                                     } else {
                                                         null
                                                     },
-                                                onTutorRequest = { navController.navigate(Destination.StaffApplication.route) },
+                                                onTutorRequest =
+                                                    if (appDistribution == AppDistribution.ACADEMIC) {
+                                                        { navController.navigate(Destination.StaffApplication.route) }
+                                                    } else {
+                                                        null
+                                                    },
                                                 onRepresentatives =
-                                                    if (org.companerodeescuela.shared.contracts.UserRole.STUDENT in
-                                                        session.roles
+                                                    if (appDistribution == AppDistribution.ACADEMIC &&
+                                                        org.companerodeescuela.shared.contracts.UserRole.STUDENT in session.roles
                                                     ) {
                                                         {
                                                             navController.navigate(Destination.RepresentativeInvitations.route) {
@@ -527,7 +538,10 @@ class MainActivity : AppCompatActivity() {
 }
 
 @androidx.compose.runtime.Composable
-private fun RoleUnavailableScreen(experience: AppExperience) {
+private fun RoleUnavailableScreen(
+    experience: AppExperience,
+    onLogout: () -> Unit,
+) {
     val title =
         when (experience) {
             AppExperience.COORDINATOR -> "Coordinación"
@@ -555,7 +569,7 @@ private fun RoleUnavailableScreen(experience: AppExperience) {
         Text(
             text =
                 if (experience == AppExperience.UNSUPPORTED) {
-                    "Tu cuenta está creada, pero todavía no tiene un rol operativo habilitado."
+                    "Tu cuenta no tiene un perfil autorizado en esta aplicación. Usa la aplicación correspondiente o cierra sesión."
                 } else {
                     "Tu perfil está activo. Las herramientas para este rol se integrarán en el workspace V6 sin enviarte a pantallas de alumno."
                 },
@@ -563,6 +577,14 @@ private fun RoleUnavailableScreen(experience: AppExperience) {
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (experience == AppExperience.UNSUPPORTED) {
+            Button(
+                onClick = onLogout,
+                modifier = Modifier.padding(top = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.md),
+            ) {
+                Text(stringResource(R.string.role_unavailable_logout))
+            }
+        }
     }
 }
 

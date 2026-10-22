@@ -54,7 +54,7 @@ jobs:
           printf '%s' "$KEYSTORE_B64" | base64 --decode > "$COMPANERO_RELEASE_KEYSTORE_PATH"
           test -s "$COMPANERO_RELEASE_KEYSTORE_PATH"
       - name: Build signed production and comparison debug APK
-        run: ./gradlew :apps:android:app:assembleDebug :apps:android:app:assembleRelease --console=plain
+        run: ./gradlew :apps:android:app:assembleAcademicDebug :apps:android:app:assembleAcademicRelease :apps:android:app:assembleManagementDebug :apps:android:app:assembleManagementRelease --console=plain
       - name: Verify release signing identity
         shell: bash
         env:
@@ -65,39 +65,46 @@ jobs:
           test -n "$sdk_root"
           signer="$(find "$sdk_root/build-tools" -mindepth 2 -maxdepth 2 -type f -name apksigner | sort -V | tail -1)"
           test -x "$signer"
-          release=apps/android/app/build/outputs/apk/release/app-release.apk
-          debug=apps/android/app/build/outputs/apk/debug/app-debug.apk
-          "$signer" verify --verbose --print-certs "$release"
-          "$signer" verify --verbose --print-certs "$debug"
+          aapt="$(find "$sdk_root/build-tools" -mindepth 2 -maxdepth 2 -type f -name aapt | sort -V | tail -1)"
+          test -x "$aapt"
           fingerprint() {
             "$signer" verify --print-certs "$1" |
               sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1 | tr '[:upper:]' '[:lower:]'
           }
-          actual="$(fingerprint "$release")"
-          debug_cert="$(fingerprint "$debug")"
           expected="$(printf '%s' "$EXPECTED_CERT_SHA256" | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
-          test -n "$actual" && test -n "$expected" || {
-            echo "::error::Release certificate fingerprint must be pinned as android-release environment variable"; exit 1;
-          }
-          test "$actual" = "$expected" || {
-            echo "::error::Release signer does not match approved certificate"; exit 1;
-          }
-          test "$actual" != "$debug_cert" || {
-            echo "::error::Production APK uses debug certificate"; exit 1;
-          }
+          test -n "$expected" || { echo "::error::Pinned release certificate missing"; exit 1; }
           mkdir -p dist/distribution
-          cp "$release" "dist/distribution/companero-v${COMPANERO_VERSION_NAME}-signed.apk"
+          for flavor in academic management; do
+            release="apps/android/app/build/outputs/apk/$flavor/release/app-$flavor-release.apk"
+            debug="apps/android/app/build/outputs/apk/$flavor/debug/app-$flavor-debug.apk"
+            test -f "$release" && test -f "$debug" || { echo "::error::Missing $flavor APK"; exit 1; }
+            "$signer" verify --verbose --print-certs "$release"
+            "$signer" verify --verbose --print-certs "$debug"
+            actual="$(fingerprint "$release")"
+            debug_cert="$(fingerprint "$debug")"
+            test -n "$actual" && test "$actual" = "$expected" && test "$actual" != "$debug_cert" || {
+              echo "::error::$flavor release signing identity rejected"; exit 1;
+            }
+            expected_package=org.companerodeescuela
+            if [ "$flavor" = management ]; then expected_package=org.companerodeescuela.gestion; fi
+            "$aapt" dump badging "$release" | grep -F "package: name='$expected_package'" >/dev/null || {
+              echo "::error::$flavor release package ID mismatch"; exit 1;
+            }
+            cp "$release" "dist/distribution/companero-$flavor-v${COMPANERO_VERSION_NAME}-signed.apk"
+          done
           {
             echo "sha=$GITHUB_SHA"
             echo "version_code=$COMPANERO_VERSION_CODE"
             echo "version_name=$COMPANERO_VERSION_NAME"
-            echo "certificate_sha256=$actual"
+            echo "academic_package_id=org.companerodeescuela"
+            echo "management_package_id=org.companerodeescuela.gestion"
+            echo "certificate_sha256=$expected"
             echo "signing_mode=production_distribution"
           } > dist/distribution/PROVENANCE.txt
       - name: Upload verified APK and provenance
         uses: actions/upload-artifact@v4
         with:
-          name: companero-production-signed-${{ github.run_number }}
+          name: companero-dual-production-signed-${{ github.run_number }}
           path: dist/distribution/
           retention-days: 30
           if-no-files-found: error

@@ -44,4 +44,5 @@
     <string name="login_continue_super_admin">Continuar como administración general</string>
     <string name="login_continue_guest">Continuar como invitado</string>
     <string name="login_continue">Continuar</string>
+    <string name="role_unavailable_logout">Cerrar sesión</string>
 </resources>

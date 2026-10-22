@@ -44,4 +44,5 @@
     <string name="login_continue_super_admin">Continue as superadministrator</string>
     <string name="login_continue_guest">Continue as guest</string>
     <string name="login_continue">Continue</string>
+    <string name="role_unavailable_logout">Sign out</string>
 </resources>

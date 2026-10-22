@@ -2,6 +2,22 @@
 
 **Estado inicial: DESACTIVADO.** El receptor HMAC Ktor ya existía; este cambio agrega una manera explícita de registrar una credencial piloto cifrada en Mongo durante el arranque, sin acceder manualmente a colecciones ni crear una ruta HTTP para secretos.
 
+## Institución piloto (solo cuando no existe todavía)
+
+Compañero necesita una institución receptora explícita en `platform_institutions`. Si todavía no hay una, el operador puede autorizar **una sola creación controlada**, sin usar Atlas para insertar documentos ni abrir inscripción pública. El bootstrap está apagado por defecto y nunca crea alumnos, cuentas, roles ni permisos.
+
+Variables **temporales** de Render:
+
+| Nombre | Valor |
+| --- | --- |
+| `SIII_PILOT_TENANT_BOOTSTRAP_ENABLED` | `true` solo durante el despliegue aprobado, luego `false` |
+| `SIII_PILOT_TENANT_ID` | Identificador institucional elegido/validado para Compañero (puede ser el mismo UUID SIII si se ha aprobado ese mapeo) |
+| `SIII_PILOT_TENANT_DISPLAY_NAME` | Nombre institucional autorizado, de 2 a 128 caracteres |
+
+Al provisionar se crea únicamente `{_id, displayName, registrationEnabled:false}`. `registrationEnabled:false` impide ofrecer automáticamente registro público de alumnos. En otra ejecución con el mismo ID y nombre, no altera nada; si el nombre cambia, falla cerrado. La credencial HMAC puede provisionarse después, usando el mismo `tenantId`, **sin exigir que el registro público esté abierto**.
+
+**Secuencia:** aprobar ID/nombre, validar despliegue de esta funcionalidad, activar bootstrap de tenant en Render para un único despliegue, comprobar `platform_institutions`, desactivar la bandera y **eliminar las otras dos variables temporales**. Después activar el bootstrap HMAC existente de forma independiente, comprobar `institutional_integration_credentials`, apagar y retirar sus secretos temporales. No usar ambos bootstrap a la vez por conveniencia; facilitar la auditoría de cada uno.
+
 ## Render: variables del servidor Ktor
 
 Las cinco variables siguientes son **temporales** para aprovisionar una credencial, y solo tienen efecto si `SIII_INBOUND_BOOTSTRAP_ENABLED=true`.
@@ -20,7 +36,7 @@ Variables **permanentes** ya soportadas por Ktor: `INSTITUTION_INTEGRATION_ENCRY
 
 ## Comprobación indispensable del tenant receptor
 
-Antes de habilitar el bootstrap, la institución destino debe existir en `platform_institutions` del MongoDB configurado en Render y tener `registrationEnabled: true`, con `_id` igual a `SIII_INBOUND_TENANT_ID`. El backend consulta el repositorio institucional antes de guardar cualquier credencial. Si no existe o está deshabilitada, **el despliegue falla cerrado y no se provisiona el HMAC**.
+Antes de habilitar el bootstrap, la institución destino debe existir en `platform_institutions` del MongoDB configurado en Render y estar registrado con metadatos válidos (la inscripción pública puede permanecer desactivada), con `_id` igual a `SIII_INBOUND_TENANT_ID`. El backend consulta el repositorio institucional antes de guardar cualquier credencial. Si no existe o está deshabilitada, **el despliegue falla cerrado y no se provisiona el HMAC**.
 
 No uses automáticamente el UUID de SIII: puede ser distinto del identificador nativo de Compañero. Si falta la institución, detener el piloto y realizar un alta institucional autorizada, con revisión de identidad y procedencia. No insertar documentos ni secretos arbitrarios desde Atlas.
 

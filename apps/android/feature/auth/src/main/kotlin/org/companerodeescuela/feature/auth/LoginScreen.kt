@@ -237,7 +237,7 @@ fun LoginScreen(
                     text = stringResource(R.string.auth_submit),
                     onClick = ::submit,
                     enabled = canSubmit,
-                    loading = state.submitting,
+                    submitting = state.submitting,
                     modifier = Modifier.padding(top = 20.dp).testTag("login_submit"),
                     submittingText = stringResource(R.string.auth_submitting),
                 )

@@ -2,7 +2,6 @@
 
 package org.companerodeescuela.feature.auth
 
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,7 +51,6 @@ import kotlinx.coroutines.launch
 import org.companerodeescuela.core.designsystem.v8.V8FrostedGlassPanel
 import org.companerodeescuela.core.motion.CompaneroMotionPolicy
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
-import org.companerodeescuela.core.motion.MotionRole
 import org.companerodeescuela.core.navigation.AppDistribution
 import org.companerodeescuela.core.navigation.AppExperience
 

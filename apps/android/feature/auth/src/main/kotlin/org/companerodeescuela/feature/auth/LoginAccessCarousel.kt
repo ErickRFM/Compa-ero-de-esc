@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -138,26 +137,23 @@ internal fun LoginAccessCarousel(
         HorizontalPager(
             state = pager,
             userScrollEnabled = enabled,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .testTag("auth_access_pager"),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("auth_access_pager"),
         ) { page ->
             val access = accesses[page]
             val isSelected = page == pager.currentPage
 
             V8FrostedGlassPanel(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp)
-                        .testTag("auth_access_card_${access.experience.name.lowercase()}"),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp)
+                    .testTag("auth_access_card_${access.experience.name.lowercase()}"),
             ) {
                 Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(20.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Row(
@@ -170,31 +166,26 @@ internal fun LoginAccessCarousel(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Box(
-                                modifier =
-                                    Modifier
-                                        .size(36.dp)
-                                        .background(
-                                            color =
-                                                if (isSelected) {
-                                                    V8FrostedGlassPanel.AccentCrimson.copy(
-                                                        alpha = 0.2f,
-                                                    )
-                                                } else {
-                                                    V8FrostedGlassPanel.BorderMuted
-                                                },
-                                            shape = RoundedCornerShape(10.dp),
-                                        ),
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(
+                                        color = if (isSelected) {
+                                            V8FrostedGlassPanel.AccentCrimson.copy(alpha = 0.2f)
+                                        } else {
+                                            V8FrostedGlassPanel.BorderMuted
+                                        },
+                                        shape = RoundedCornerShape(10.dp),
+                                    ),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Icon(
                                     imageVector = access.icon,
                                     contentDescription = null,
-                                    tint =
-                                        if (isSelected) {
-                                            V8FrostedGlassPanel.AccentCrimson
-                                        } else {
-                                            V8FrostedGlassPanel.TextMuted
-                                        },
+                                    tint = if (isSelected) {
+                                        V8FrostedGlassPanel.AccentCrimson
+                                    } else {
+                                        V8FrostedGlassPanel.TextMuted
+                                    },
                                     modifier = Modifier.size(20.dp),
                                 )
                             }
@@ -209,13 +200,12 @@ internal fun LoginAccessCarousel(
 
                         if (access.canRegister) {
                             Box(
-                                modifier =
-                                    Modifier
-                                        .background(
-                                            color = V8FrostedGlassPanel.AccentCrimson.copy(alpha = 0.15f),
-                                            shape = RoundedCornerShape(12.dp),
-                                        )
-                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                modifier = Modifier
+                                    .background(
+                                        color = V8FrostedGlassPanel.AccentCrimson.copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(12.dp),
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
                             ) {
                                 Text(
                                     text = stringResource(R.string.auth_create_account),
@@ -251,12 +241,10 @@ internal fun LoginAccessCarousel(
             )
 
         Box(
-            modifier =
-                Modifier
-                    .semantics {
-                        liveRegion = LiveRegionMode.Polite
-                        contentDescription = "$selectedAccessText, $accessPositionText"
-                    },
+            modifier = Modifier.semantics {
+                liveRegion = LiveRegionMode.Polite
+                contentDescription = "$selectedAccessText, $accessPositionText"
+            },
         )
 
         Row(
@@ -265,10 +253,9 @@ internal fun LoginAccessCarousel(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(
-                modifier =
-                    Modifier
-                        .selectableGroup()
-                        .testTag("auth_access_indicators"),
+                modifier = Modifier
+                    .selectableGroup()
+                    .testTag("auth_access_indicators"),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -283,39 +270,37 @@ internal fun LoginAccessCarousel(
                         )
 
                     Box(
-                        modifier =
-                            Modifier
-                                .height(6.dp)
-                                .width(if (isSelected) 24.dp else 6.dp)
-                                .background(
-                                    color =
-                                        if (isSelected) {
-                                            V8FrostedGlassPanel.AccentCrimson
-                                        } else {
-                                            V8FrostedGlassPanel.BorderMuted
-                                        },
-                                    shape = RoundedCornerShape(3.dp),
-                                )
-                                .selectable(
-                                    selected = isSelected,
-                                    role = Role.Tab,
-                                    onClick = {
-                                        if (enabled && index != pager.currentPage) {
-                                            scope.launch {
-                                                CompaneroMotionPolicy.animatePagerScroll(
-                                                    pagerState = pager,
-                                                    targetPage = index,
-                                                    motion = motion,
-                                                    density = density,
-                                                )
-                                                onPageSelected(accesses[index].experience)
-                                            }
-                                        }
-                                    },
-                                )
-                                .semantics {
-                                    contentDescription = selectAccessLabel
+                        modifier = Modifier
+                            .height(6.dp)
+                            .width(if (isSelected) 24.dp else 6.dp)
+                            .background(
+                                color = if (isSelected) {
+                                    V8FrostedGlassPanel.AccentCrimson
+                                } else {
+                                    V8FrostedGlassPanel.BorderMuted
                                 },
+                                shape = RoundedCornerShape(3.dp),
+                            )
+                            .selectable(
+                                selected = isSelected,
+                                role = Role.Tab,
+                                onClick = {
+                                    if (enabled && index != pager.currentPage) {
+                                        scope.launch {
+                                            CompaneroMotionPolicy.animatePagerScroll(
+                                                pagerState = pager,
+                                                targetPage = index,
+                                                motion = motion,
+                                                density = density,
+                                            )
+                                            onPageSelected(accesses[index].experience)
+                                        }
+                                    }
+                                },
+                            )
+                            .semantics {
+                                contentDescription = selectAccessLabel
+                            },
                     )
                 }
             }
@@ -330,7 +315,7 @@ internal fun LoginAccessCarousel(
                                 val prevPage = pager.currentPage - 1
                                 pager.animateScrollToPage(
                                     prevPage,
-                                    animationSpec = tween(durationMillis = 200),
+                                    animationSpec = androidx.compose.animation.core.tween(durationMillis = 200),
                                 )
                                 onPageSelected(accesses[prevPage].experience)
                             }
@@ -342,12 +327,11 @@ internal fun LoginAccessCarousel(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = stringResource(R.string.auth_previous_access),
-                        tint =
-                            if (pager.currentPage > 0) {
-                                V8FrostedGlassPanel.TextPrimary
-                            } else {
-                                V8FrostedGlassPanel.TextMuted
-                            },
+                        tint = if (pager.currentPage > 0) {
+                            V8FrostedGlassPanel.TextPrimary
+                        } else {
+                            V8FrostedGlassPanel.TextMuted
+                        },
                         modifier = Modifier.size(18.dp),
                     )
                 }
@@ -359,7 +343,7 @@ internal fun LoginAccessCarousel(
                                 val nextPage = pager.currentPage + 1
                                 pager.animateScrollToPage(
                                     nextPage,
-                                    animationSpec = tween(durationMillis = 200),
+                                    animationSpec = androidx.compose.animation.core.tween(durationMillis = 200),
                                 )
                                 onPageSelected(accesses[nextPage].experience)
                             }
@@ -371,12 +355,11 @@ internal fun LoginAccessCarousel(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = stringResource(R.string.auth_next_access),
-                        tint =
-                            if (pager.currentPage < accesses.size - 1) {
-                                V8FrostedGlassPanel.TextPrimary
-                            } else {
-                                V8FrostedGlassPanel.TextMuted
-                            },
+                        tint = if (pager.currentPage < accesses.size - 1) {
+                            V8FrostedGlassPanel.TextPrimary
+                        } else {
+                            V8FrostedGlassPanel.TextMuted
+                        },
                         modifier = Modifier.size(18.dp),
                     )
                 }

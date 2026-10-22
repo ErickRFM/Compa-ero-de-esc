@@ -22,7 +22,8 @@ enum class AppDistribution {
                     experience == AppExperience.TEACHER ||
                     experience == AppExperience.TUTOR
             MANAGEMENT ->
-                experience == AppExperience.COORDINATOR ||
+                experience == AppExperience.PRINCIPAL ||
+                    experience == AppExperience.COORDINATOR ||
                     experience == AppExperience.ADMIN ||
                     experience == AppExperience.SUPER_ADMIN
         }

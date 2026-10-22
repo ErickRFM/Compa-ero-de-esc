@@ -93,6 +93,21 @@ class RoleExperienceResolverTest {
     }
 
     @Test
+    fun `principal gets direction management workspace`() {
+        val config = RoleExperienceResolver.resolve(setOf(UserRole.PRINCIPAL))
+
+        assertEquals(AppExperience.PRINCIPAL, config.experience)
+        assertEquals(Destination.CoordinatorHome, config.startDestination)
+        assertEquals(
+            listOf(
+                TopLevelDestination.CoordinatorHome,
+                TopLevelDestination.Schedule,
+            ),
+            config.topLevelDestinations,
+        )
+    }
+
+    @Test
     fun `coordinator gets coordinator workspace`() {
         val config = RoleExperienceResolver.resolve(setOf(UserRole.COORDINATOR))
 

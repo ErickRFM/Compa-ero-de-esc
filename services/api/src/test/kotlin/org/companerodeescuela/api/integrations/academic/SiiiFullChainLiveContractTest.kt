@@ -143,8 +143,10 @@ class SiiiFullChainLiveContractTest {
             projectThrough(inbox, snapshots, tenantId, sectionId, enrolledVersion)
 
             val scheduled = probe.action("schedule")
-            val scheduledVersion = scheduled.long("sourceVersion")
-            assertAccepted(probe.action("deliver"), scheduledVersion)
+            assertTrue(scheduled.string("occurrenceId").isNotBlank())
+            assertEquals("2026-10-22", scheduled.string("date"))
+            val scheduleDelivery = probe.action("deliver")
+            val scheduledVersion = scheduleDelivery.latestAcceptedVersionAfter(enrolledVersion)
             projectThrough(inbox, snapshots, tenantId, sectionId, scheduledVersion)
 
             val reader = identities.reader(snapshots)
@@ -408,6 +410,24 @@ class SiiiFullChainLiveContractTest {
                     .toLong() == version &&
                     it.getValue("state").jsonPrimitive.content == "accepted"
             }
+
+    private fun JsonObject.latestAcceptedVersionAfter(previousVersion: Long): Long {
+        val version =
+            getValue("events")
+                .jsonArray
+                .map { it.jsonObject }
+                .filter { it.getValue("state").jsonPrimitive.content == "accepted" }
+                .maxOfOrNull {
+                    it
+                        .getValue("sourceVersion")
+                        .jsonPrimitive
+                        .content
+                        .toLong()
+                }
+        assertNotNull(version, "outbox did not durably accept an event after source version $previousVersion")
+        assertTrue(version > previousVersion, "scheduled outbox version $version did not advance past $previousVersion")
+        return version
+    }
 
     private fun randomKey() = ByteArray(32) { (it + 31).toByte() }
 }

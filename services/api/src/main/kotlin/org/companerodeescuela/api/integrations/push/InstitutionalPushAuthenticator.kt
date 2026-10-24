@@ -60,7 +60,7 @@ class InstitutionalPushAuthenticator(
         val timestamp = request.timestamp.toLongOrNull() ?: return null
         val now = clock.instant().epochSecond
         if (timestamp < now - allowedClockSkewSeconds || timestamp > now + allowedClockSkewSeconds) return null
-        if (request.method != "POST" || request.path != EVENTS_PATH) return null
+        if (request.method != "POST" || request.path !in AUTHENTICATED_PATHS) return null
 
         val credential = credentials.findCredential(request.keyId) ?: return null
         if (!credential.enabled || credential.keyId != request.keyId || credential.tenantId.isBlank()) return null
@@ -101,6 +101,8 @@ class InstitutionalPushAuthenticator(
 
     companion object {
         const val EVENTS_PATH = "/integration/v1/events"
+        const val PROJECTION_STATUS_PATH = "/integration/v1/projection-status"
+        private val AUTHENTICATED_PATHS = setOf(EVENTS_PATH, PROJECTION_STATUS_PATH)
         const val DEFAULT_ALLOWED_CLOCK_SKEW_SECONDS = 300L
         const val MAX_ALLOWED_CLOCK_SKEW_SECONDS = 600L
         const val MIN_SECRET_BYTES = 32

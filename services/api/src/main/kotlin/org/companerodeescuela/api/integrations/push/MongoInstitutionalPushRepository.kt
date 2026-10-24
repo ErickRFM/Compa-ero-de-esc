@@ -19,6 +19,7 @@ import java.time.Instant
 import java.util.Date
 import java.util.UUID
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -32,6 +33,7 @@ class MongoInstitutionalPushRepository(
 ) : IntegrationCredentialRepository,
     IntegrationNonceRepository,
     InstitutionalEventRepository,
+    InstitutionalProjectionReceiptRepository,
     InstitutionalProjectionRepository,
     InstitutionalPushRateLimiter {
     private val credentials: MongoCollection<Document> = database.getCollection(CREDENTIALS_COLLECTION)
@@ -168,6 +170,28 @@ class MongoInstitutionalPushRepository(
             } else {
                 throw error
             }
+        }
+    }
+
+    override suspend fun findReceipts(tenantId: String, eventIds: List<String>): List<InstitutionalProjectionReceipt> {
+        require(tenantId.isNotBlank() && eventIds.size in 1..50)
+        ensureIndexes()
+        val documents =
+            events.find(Filters.and(Filters.eq("tenantId", tenantId), Filters.`in`("eventId", eventIds))).toList()
+        return documents.map { document ->
+            val appliedVersion =
+                findAppliedVersion(tenantId, document.getString("entityType"), document.getString("externalId"))
+            InstitutionalProjectionReceipt(
+                eventId = document.getString("eventId"),
+                sectionId = document.getString("externalId"),
+                sourceVersion = document.getLong("sourceVersion"),
+                status = document.getString("projectionStatus"),
+                attempts = document.getInteger("projectionAttemptCount", 0),
+                failureCode = document.getString("projectionFailureCode"),
+                receivedAtEpochSeconds = document.getDate("receivedAt").toInstant().epochSecond,
+                completedAtEpochSeconds = document.getDate("projectionCompletedAt")?.toInstant()?.epochSecond,
+                appliedSourceVersion = appliedVersion,
+            )
         }
     }
 

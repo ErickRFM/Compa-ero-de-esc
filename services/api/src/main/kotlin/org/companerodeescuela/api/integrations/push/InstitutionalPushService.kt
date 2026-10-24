@@ -1,6 +1,7 @@
 package org.companerodeescuela.api.integrations.push
 
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.companerodeescuela.shared.contracts.InstitutionalEventOperation
 import org.companerodeescuela.shared.contracts.InstitutionalPushEvent
@@ -22,6 +23,23 @@ enum class InstitutionalEventAcceptance { ACCEPTED, DUPLICATE, CONFLICT, STALE }
 
 interface InstitutionalEventRepository {
     suspend fun accept(record: InstitutionalEventRecord): InstitutionalEventAcceptance
+}
+
+@Serializable
+data class InstitutionalProjectionReceipt(
+    val eventId: String,
+    val sectionId: String,
+    val sourceVersion: Long,
+    val status: String,
+    val attempts: Int,
+    val failureCode: String?,
+    val receivedAtEpochSeconds: Long,
+    val completedAtEpochSeconds: Long?,
+    val appliedSourceVersion: Long?,
+)
+
+interface InstitutionalProjectionReceiptRepository {
+    suspend fun findReceipts(tenantId: String, eventIds: List<String>): List<InstitutionalProjectionReceipt>
 }
 
 enum class InstitutionalProjectionStatus {

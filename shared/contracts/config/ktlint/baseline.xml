@@ -1497,8 +1497,6 @@
         <error line="14" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="20" column="24" source="standard:multiline-expression-wrapping" />
         <error line="26" column="28" source="standard:multiline-expression-wrapping" />
-        <error line="61" column="1" source="standard:no-empty-first-line-in-class-body" />
-        <error line="84" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
     <file name="src/test/kotlin/org/companerodeescuela/shared/contracts/PrivilegedCommandDigestsTest.kt">
         <error line="3" column="1" source="standard:no-wildcard-imports" />

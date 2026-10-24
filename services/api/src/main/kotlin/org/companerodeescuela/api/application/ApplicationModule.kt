@@ -305,6 +305,7 @@ fun Application.module(
             institutionalPushAuthenticator,
             institutionalPushService,
             institutionalPushRepository,
+            institutionalPushRepository,
         )
         academicRoutes(
             settings = settings,

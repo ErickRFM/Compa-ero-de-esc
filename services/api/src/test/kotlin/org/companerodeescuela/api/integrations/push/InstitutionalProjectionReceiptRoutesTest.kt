@@ -43,68 +43,104 @@ class InstitutionalProjectionReceiptRoutesTest {
     private val tenantId = UUID.randomUUID().toString()
 
     @Test
-    fun `unsigned projection status requests are unauthorized`() = withMongo { db ->
-        val inbox = prepare(db)
-        application(inbox) {
-            val response = client.post(InstitutionalPushAuthenticator.PROJECTION_STATUS_PATH) {
-                contentType(ContentType.Application.Json)
-                setBody(requestBody(listOf(UUID.randomUUID().toString())))
+    fun `unsigned projection status requests are unauthorized`() =
+        withMongo { db ->
+            val inbox = prepare(db)
+            application(inbox) {
+                val response =
+                    client.post(InstitutionalPushAuthenticator.PROJECTION_STATUS_PATH) {
+                        contentType(ContentType.Application.Json)
+                        setBody(requestBody(listOf(UUID.randomUUID().toString())))
+                    }
+                assertEquals(HttpStatusCode.Unauthorized, response.status)
             }
-            assertEquals(HttpStatusCode.Unauthorized, response.status)
         }
-    }
 
     @Test
-    fun `receipt lookup is isolated to the credential tenant`() = withMongo { db ->
-        val inbox = prepare(db)
-        val otherTenantEvent = storeEvent(inbox, UUID.randomUUID().toString())
-        application(inbox) {
-            val response = signedRequest(listOf(otherTenantEvent))
-            assertEquals(HttpStatusCode.OK, response.status)
-            assertTrue(Json.parseToJsonElement(response.bodyAsText()).jsonObject.getValue("receipts").jsonArray.isEmpty())
+    fun `receipt lookup is isolated to the credential tenant`() =
+        withMongo { db ->
+            val inbox = prepare(db)
+            val otherTenantEvent = storeEvent(inbox, UUID.randomUUID().toString())
+            application(inbox) {
+                val response = signedRequest(listOf(otherTenantEvent))
+                assertEquals(HttpStatusCode.OK, response.status)
+                assertTrue(
+                    Json
+                        .parseToJsonElement(response.bodyAsText())
+                        .jsonObject
+                        .getValue("receipts")
+                        .jsonArray
+                        .isEmpty(),
+                )
+            }
         }
-    }
 
     @Test
-    fun `valid signed query returns the durable projection receipt`() = withMongo { db ->
-        val inbox = prepare(db)
-        val eventId = storeEvent(inbox, tenantId)
-        application(inbox) {
-            val response = signedRequest(listOf(eventId))
-            assertEquals(HttpStatusCode.OK, response.status)
-            val result = Json.parseToJsonElement(response.bodyAsText()).jsonObject
-            assertEquals("siii.projection_status.v1", result.getValue("contract").jsonPrimitive.content)
-            val receipt = result.getValue("receipts").jsonArray.single().jsonObject
-            assertEquals(eventId, receipt.getValue("eventId").jsonPrimitive.content)
-            assertEquals("pending", receipt.getValue("status").jsonPrimitive.content)
-            assertEquals(1, receipt.getValue("sourceVersion").jsonPrimitive.content.toInt())
-            assertEquals(0, receipt.getValue("attempts").jsonPrimitive.content.toInt())
-            assertEquals(now.epochSecond, receipt.getValue("receivedAtEpochSeconds").jsonPrimitive.content.toLong())
+    fun `valid signed query returns the durable projection receipt`() =
+        withMongo { db ->
+            val inbox = prepare(db)
+            val eventId = storeEvent(inbox, tenantId)
+            application(inbox) {
+                val response = signedRequest(listOf(eventId))
+                assertEquals(HttpStatusCode.OK, response.status)
+                val result = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+                assertEquals("siii.projection_status.v1", result.getValue("contract").jsonPrimitive.content)
+                val receipt =
+                    result
+                        .getValue("receipts")
+                        .jsonArray
+                        .single()
+                        .jsonObject
+                assertEquals(eventId, receipt.getValue("eventId").jsonPrimitive.content)
+                assertEquals("pending", receipt.getValue("status").jsonPrimitive.content)
+                assertEquals(
+                    1,
+                    receipt
+                        .getValue("sourceVersion")
+                        .jsonPrimitive.content
+                        .toInt(),
+                )
+                assertEquals(
+                    0,
+                    receipt
+                        .getValue("attempts")
+                        .jsonPrimitive.content
+                        .toInt(),
+                )
+                assertEquals(
+                    now.epochSecond,
+                    receipt
+                        .getValue("receivedAtEpochSeconds")
+                        .jsonPrimitive.content
+                        .toLong(),
+                )
+            }
         }
-    }
 
     @Test
-    fun `unknown event identifiers remain absent from the receipt result`() = withMongo { db ->
-        val inbox = prepare(db)
-        val unknownEvent = UUID.randomUUID().toString()
-        application(inbox) {
-            val response = signedRequest(listOf(unknownEvent))
-            assertEquals(HttpStatusCode.OK, response.status)
-            val result = Json.parseToJsonElement(response.bodyAsText()).jsonObject
-            assertTrue(result.getValue("receipts").jsonArray.isEmpty())
+    fun `unknown event identifiers remain absent from the receipt result`() =
+        withMongo { db ->
+            val inbox = prepare(db)
+            val unknownEvent = UUID.randomUUID().toString()
+            application(inbox) {
+                val response = signedRequest(listOf(unknownEvent))
+                assertEquals(HttpStatusCode.OK, response.status)
+                val result = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+                assertTrue(result.getValue("receipts").jsonArray.isEmpty())
+            }
         }
-    }
 
     @Test
-    fun `revoked integration credential cannot read projection receipts`() = withMongo { db ->
-        val inbox = prepare(db)
-        val eventId = storeEvent(inbox, tenantId)
-        assertTrue(inbox.revokeCredential(keyId, now))
-        application(inbox) {
-            val response = signedRequest(listOf(eventId))
-            assertEquals(HttpStatusCode.Unauthorized, response.status)
+    fun `revoked integration credential cannot read projection receipts`() =
+        withMongo { db ->
+            val inbox = prepare(db)
+            val eventId = storeEvent(inbox, tenantId)
+            assertTrue(inbox.revokeCredential(keyId, now))
+            application(inbox) {
+                val response = signedRequest(listOf(eventId))
+                assertEquals(HttpStatusCode.Unauthorized, response.status)
+            }
         }
-    }
 
     private suspend fun prepare(db: MongoDatabase): MongoInstitutionalPushRepository {
         val inbox = MongoInstitutionalPushRepository(db, InstitutionalSecretProtector(ByteArray(32) { it.toByte() }))
@@ -115,7 +151,10 @@ class InstitutionalProjectionReceiptRoutesTest {
         return inbox
     }
 
-    private suspend fun storeEvent(inbox: MongoInstitutionalPushRepository, tenant: String): String {
+    private suspend fun storeEvent(
+        inbox: MongoInstitutionalPushRepository,
+        tenant: String,
+    ): String {
         val eventId = UUID.randomUUID().toString()
         val event =
             InstitutionalPushEvent(
@@ -126,9 +165,10 @@ class InstitutionalProjectionReceiptRoutesTest {
                 sourceVersion = 1,
                 occurredAtEpochSeconds = now.epochSecond,
                 operation = InstitutionalEventOperation.UPSERT,
-                payload = kotlinx.serialization.json.buildJsonObject {
-                    put("contract", kotlinx.serialization.json.JsonPrimitive("fixture.v1"))
-                },
+                payload =
+                    kotlinx.serialization.json.buildJsonObject {
+                        put("contract", kotlinx.serialization.json.JsonPrimitive("fixture.v1"))
+                    },
             )
         val body = Json.encodeToString(InstitutionalPushEvent.serializer(), event).toByteArray()
         inbox.accept(
@@ -171,22 +211,24 @@ class InstitutionalProjectionReceiptRoutesTest {
             signed(requestBody(eventIds))
         }
 
-    private fun application(inbox: MongoInstitutionalPushRepository, block: suspend io.ktor.server.testing.ApplicationTestBuilder.() -> Unit) =
-        testApplication {
-            application {
-                install(ContentNegotiation) { json(ApiJson) }
-                routing {
-                    institutionalPushRoutes(
-                        InstitutionalPushAuthenticator(inbox, inbox, Clock.fixed(now, ZoneOffset.UTC)),
-                        InstitutionalPushService(inbox, Clock.fixed(now, ZoneOffset.UTC)),
-                        inbox,
-                        inbox,
-                        Clock.fixed(now, ZoneOffset.UTC),
-                    )
-                }
+    private fun application(
+        inbox: MongoInstitutionalPushRepository,
+        block: suspend io.ktor.server.testing.ApplicationTestBuilder.() -> Unit,
+    ) = testApplication {
+        application {
+            install(ContentNegotiation) { json(ApiJson) }
+            routing {
+                institutionalPushRoutes(
+                    InstitutionalPushAuthenticator(inbox, inbox, Clock.fixed(now, ZoneOffset.UTC)),
+                    InstitutionalPushService(inbox, Clock.fixed(now, ZoneOffset.UTC)),
+                    inbox,
+                    inbox,
+                    Clock.fixed(now, ZoneOffset.UTC),
+                )
             }
-            block()
         }
+        block()
+    }
 
     private fun withMongo(block: suspend (MongoDatabase) -> Unit) =
         runBlocking {

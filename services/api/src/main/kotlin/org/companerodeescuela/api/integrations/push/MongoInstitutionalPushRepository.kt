@@ -11,6 +11,12 @@ import com.mongodb.client.model.UpdateOptions
 import com.mongodb.client.model.Updates
 import com.mongodb.kotlin.client.coroutine.MongoCollection
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.bson.Document
 import org.companerodeescuela.shared.contracts.InstitutionalEventOperation
 import org.companerodeescuela.shared.contracts.InstitutionalPushEvent
@@ -18,12 +24,6 @@ import java.security.MessageDigest
 import java.time.Instant
 import java.util.Date
 import java.util.UUID
-import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
 /** Mongo persistence for credentials, replay nonces, and immutable inbound receipts. */
 class MongoInstitutionalPushRepository(
@@ -173,7 +173,10 @@ class MongoInstitutionalPushRepository(
         }
     }
 
-    override suspend fun findReceipts(tenantId: String, eventIds: List<String>): List<InstitutionalProjectionReceipt> {
+    override suspend fun findReceipts(
+        tenantId: String,
+        eventIds: List<String>,
+    ): List<InstitutionalProjectionReceipt> {
         require(tenantId.isNotBlank() && eventIds.size in 1..50)
         ensureIndexes()
         val documents =

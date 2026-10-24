@@ -37,8 +37,8 @@ import org.companerodeescuela.api.integrations.push.MongoInstitutionalIdentityLi
 import org.companerodeescuela.api.integrations.push.MongoInstitutionalPushRepository
 import org.companerodeescuela.api.integrations.push.institutionalPushRoutes
 import org.companerodeescuela.api.plugins.ApiJson
-import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
+import org.companerodeescuela.shared.contracts.UserRole
 import org.junit.jupiter.api.Timeout
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
 import java.io.BufferedReader
@@ -63,29 +63,36 @@ import kotlin.test.assertTrue
 @Timeout(300)
 class SiiiFullChainLiveContractTest {
     @Test
-    fun `postgres outbox is signed delivered projected authorized and revoked end to end`() = runBlocking {
-        val postgresUrl = requireNotNull(System.getenv("COMPANION_CHAIN_PROBE_DATABASE_URL"))
-        require(postgresUrl.startsWith("postgresql://postgres:postgres@127.0.0.1:55439/")) {
-            "Chain probe requires the disposable loopback PostgreSQL service"
-        }
-        require(System.getenv("V12_TEST_MONGODB_URI") == "mongodb://127.0.0.1:27017") {
-            "Chain probe requires the disposable loopback Mongo service"
-        }
-        val tenantId = UUID.randomUUID().toString()
-        val keyId = "chain-${UUID.randomUUID()}"
-        val secret = ByteArray(32).also(SecureRandom()::nextBytes)
-        MongoClient.create("mongodb://127.0.0.1:27017").use { client ->
-            val db = client.getDatabase("v12_test_${UUID.randomUUID().toString().replace("-", "")}")
-            try {
-                runChain(db, postgresUrl, tenantId, keyId, secret)
-            } finally {
-                db.drop()
-                secret.fill(0)
+    fun `postgres outbox is signed delivered projected authorized and revoked end to end`() =
+        runBlocking {
+            val postgresUrl = requireNotNull(System.getenv("COMPANION_CHAIN_PROBE_DATABASE_URL"))
+            require(postgresUrl.startsWith("postgresql://postgres:postgres@127.0.0.1:55439/")) {
+                "Chain probe requires the disposable loopback PostgreSQL service"
+            }
+            require(System.getenv("V12_TEST_MONGODB_URI") == "mongodb://127.0.0.1:27017") {
+                "Chain probe requires the disposable loopback Mongo service"
+            }
+            val tenantId = UUID.randomUUID().toString()
+            val keyId = "chain-${UUID.randomUUID()}"
+            val secret = ByteArray(32).also(SecureRandom()::nextBytes)
+            MongoClient.create("mongodb://127.0.0.1:27017").use { client ->
+                val db = client.getDatabase("v12_test_${UUID.randomUUID().toString().replace("-", "")}")
+                try {
+                    runChain(db, postgresUrl, tenantId, keyId, secret)
+                } finally {
+                    db.drop()
+                    secret.fill(0)
+                }
             }
         }
-    }
 
-    private suspend fun runChain(db: MongoDatabase, postgresUrl: String, tenantId: String, keyId: String, secret: ByteArray) {
+    private suspend fun runChain(
+        db: MongoDatabase,
+        postgresUrl: String,
+        tenantId: String,
+        keyId: String,
+        secret: ByteArray,
+    ) {
         val inbox = MongoInstitutionalPushRepository(db, InstitutionalSecretProtector(randomKey()))
         val snapshots = MongoSiiiSectionSnapshotRepository(db)
         val identities = readerGraph(db, tenantId)
@@ -102,7 +109,17 @@ class SiiiFullChainLiveContractTest {
                     )
                 }
             }.start(wait = false)
-        val probe = ChainProbe(postgresUrl, server.engine.resolvedConnectors().single().port, tenantId, keyId, secret)
+        val probe =
+            ChainProbe(
+                postgresUrl,
+                server.engine
+                    .resolvedConnectors()
+                    .single()
+                    .port,
+                tenantId,
+                keyId,
+                secret,
+            )
         try {
             val initialized = probe.start()
             val sectionId = initialized.string("sectionId")
@@ -186,19 +203,27 @@ class SiiiFullChainLiveContractTest {
         assertEquals(version, snapshots.find(tenantId, sectionId)?.sourceVersion)
     }
 
-    private fun worker(inbox: MongoInstitutionalPushRepository, snapshots: MongoSiiiSectionSnapshotRepository) =
-        InstitutionalEventProjectionWorker(
-            inbox,
-            InstitutionalProjectionIdentityResolver { _, _ -> error("SIII group snapshot must not invent native identity authority") },
-            SiiiSectionProjectionHandler(snapshots),
-            listOf(SiiiSectionEventAdapter()),
-        )
+    private fun worker(
+        inbox: MongoInstitutionalPushRepository,
+        snapshots: MongoSiiiSectionSnapshotRepository,
+    ) = InstitutionalEventProjectionWorker(
+        inbox,
+        InstitutionalProjectionIdentityResolver { _, _ -> error("SIII group snapshot must not invent native identity authority") },
+        SiiiSectionProjectionHandler(snapshots),
+        listOf(SiiiSectionEventAdapter()),
+    )
 
-    private fun assertAccepted(result: JsonObject, version: Long) {
+    private fun assertAccepted(
+        result: JsonObject,
+        version: Long,
+    ) {
         assertTrue(result.hasAcceptedVersion(version), "outbox source version $version was not durably accepted")
     }
 
-    private fun readerGraph(db: MongoDatabase, tenantId: String): ReaderGraph {
+    private fun readerGraph(
+        db: MongoDatabase,
+        tenantId: String,
+    ): ReaderGraph {
         val accounts = InMemoryPlatformAccountRepository()
         val institutions = MongoInstitutionRepository(db)
         val links = MongoInstitutionalIdentityLinkRepository(db)
@@ -214,11 +239,18 @@ class SiiiFullChainLiveContractTest {
         private val links: MongoInstitutionalIdentityLinkRepository,
         private val snapshots: MongoSiiiSectionSnapshotRepository,
     ) {
-        suspend fun link(tenant: String, kind: InstitutionalIdentityKind, externalId: String, role: UserRole): PlatformAccount {
+        suspend fun link(
+            tenant: String,
+            kind: InstitutionalIdentityKind,
+            externalId: String,
+            role: UserRole,
+        ): PlatformAccount {
             db.getCollection<Document>("platform_institutions").replaceOne(
                 Document("_id", tenant),
                 Document("_id", tenant).append("displayName", "Synthetic chain tenant").append("registrationEnabled", true),
-                com.mongodb.client.model.ReplaceOptions().upsert(true),
+                com.mongodb.client.model
+                    .ReplaceOptions()
+                    .upsert(true),
             )
             val account =
                 PlatformAccount(
@@ -247,19 +279,32 @@ class SiiiFullChainLiveContractTest {
         }
 
         fun reader(snapshots: MongoSiiiSectionSnapshotRepository) =
-            SiiiSectionReader(accounts, institutions, InstitutionalIdentityLinkService(
+            SiiiSectionReader(
                 accounts,
                 institutions,
-                links,
-                org.companerodeescuela.api.security.MfaService(
+                InstitutionalIdentityLinkService(
                     accounts,
-                    org.companerodeescuela.api.security.InMemoryMfaRepository(),
-                    org.companerodeescuela.api.security.MfaSecretCipher(randomKey()),
+                    institutions,
+                    links,
+                    org.companerodeescuela.api.security.MfaService(
+                        accounts,
+                        org.companerodeescuela.api.security
+                            .InMemoryMfaRepository(),
+                        org.companerodeescuela.api.security
+                            .MfaSecretCipher(randomKey()),
+                    ),
                 ),
-            ), snapshots)
+                snapshots,
+            )
     }
 
-    private class ChainProbe(postgresUrl: String, receiverPort: Int, tenantId: String, keyId: String, secret: ByteArray) {
+    private class ChainProbe(
+        postgresUrl: String,
+        receiverPort: Int,
+        tenantId: String,
+        keyId: String,
+        secret: ByteArray,
+    ) {
         private val project = Path.of(requireNotNull(System.getenv("COMPANION_CHAIN_PROBE_PROJECT_ROOT"))).toAbsolutePath().normalize()
         private val process: Process
         private val input: BufferedWriter
@@ -270,11 +315,14 @@ class SiiiFullChainLiveContractTest {
             val builder =
                 ProcessBuilder(
                     System.getenv("COMPANION_CHAIN_PROBE_NODE")?.takeIf(String::isNotBlank) ?: "node",
-                    "--import", "tsx", "tests/support/companion-chain-live-probe.ts",
+                    "--import",
+                    "tsx",
+                    "tests/support/companion-chain-live-probe.ts",
                 ).directory(project.toFile()).redirectError(ProcessBuilder.Redirect.DISCARD)
-            val pathEnvironment = builder.environment().filterKeys {
-                it.uppercase() in setOf("PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "USERPROFILE", "HOME")
-            }
+            val pathEnvironment =
+                builder.environment().filterKeys {
+                    it.uppercase() in setOf("PATH", "SYSTEMROOT", "WINDIR", "TEMP", "TMP", "USERPROFILE", "HOME")
+                }
             builder.environment().clear()
             builder.environment().putAll(pathEnvironment)
             val database = postgresUrl
@@ -300,9 +348,14 @@ class SiiiFullChainLiveContractTest {
         fun start(): JsonObject = readReport()
 
         fun action(name: String): JsonObject {
-            input.write(Json.encodeToString(JsonObject.serializer(), kotlinx.serialization.json.buildJsonObject {
-                put("action", kotlinx.serialization.json.JsonPrimitive(name))
-            }))
+            input.write(
+                Json.encodeToString(
+                    JsonObject.serializer(),
+                    kotlinx.serialization.json.buildJsonObject {
+                        put("action", kotlinx.serialization.json.JsonPrimitive(name))
+                    },
+                ),
+            )
             input.newLine()
             input.flush()
             return readReport()
@@ -312,7 +365,13 @@ class SiiiFullChainLiveContractTest {
             val line = output.readLine() ?: throw AssertionError("SIII chain probe exited before reporting")
             require(line.length <= 65_536) { "SIII chain probe report exceeded its bound" }
             val report = Json.parseToJsonElement(line).jsonObject
-            assertTrue(report.getValue("ok").jsonPrimitive.content.toBoolean(), "SIII chain probe reported a synthetic failure")
+            assertTrue(
+                report
+                    .getValue("ok")
+                    .jsonPrimitive.content
+                    .toBoolean(),
+                "SIII chain probe reported a synthetic failure",
+            )
             return report
         }
 
@@ -328,18 +387,27 @@ class SiiiFullChainLiveContractTest {
     }
 
     private fun JsonObject.string(name: String) = getValue(name).jsonPrimitive.content
+
     private fun JsonObject.long(name: String) = getValue(name).jsonPrimitive.content.toLong()
+
     private fun JsonObject.receiptState(sectionId: String): String {
         val events = getValue("events").jsonArray.map { it.jsonObject }
         val sectionEvent = events.lastOrNull { it.getValue("state").jsonPrimitive.content == "accepted" }
         assertNotNull(sectionEvent, "outbox event for synthetic section $sectionId was not durably accepted")
         return sectionEvent.getValue("state").jsonPrimitive.content
     }
-    private fun JsonObject.hasAcceptedVersion(version: Long) = getValue("events").jsonArray.map { it.jsonObject }
-        .any {
-            it.getValue("sourceVersion").jsonPrimitive.content.toLong() == version &&
-                it.getValue("state").jsonPrimitive.content == "accepted"
-        }
+
+    private fun JsonObject.hasAcceptedVersion(version: Long) =
+        getValue("events")
+            .jsonArray
+            .map { it.jsonObject }
+            .any {
+                it
+                    .getValue("sourceVersion")
+                    .jsonPrimitive.content
+                    .toLong() == version &&
+                    it.getValue("state").jsonPrimitive.content == "accepted"
+            }
 
     private fun randomKey() = ByteArray(32) { (it + 31).toByte() }
 }

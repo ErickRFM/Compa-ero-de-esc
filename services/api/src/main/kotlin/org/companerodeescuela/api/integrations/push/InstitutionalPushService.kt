@@ -1,7 +1,7 @@
 package org.companerodeescuela.api.integrations.push
 
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import org.companerodeescuela.shared.contracts.InstitutionalEventOperation
 import org.companerodeescuela.shared.contracts.InstitutionalPushEvent
@@ -39,7 +39,10 @@ data class InstitutionalProjectionReceipt(
 )
 
 interface InstitutionalProjectionReceiptRepository {
-    suspend fun findReceipts(tenantId: String, eventIds: List<String>): List<InstitutionalProjectionReceipt>
+    suspend fun findReceipts(
+        tenantId: String,
+        eventIds: List<String>,
+    ): List<InstitutionalProjectionReceipt>
 }
 
 enum class InstitutionalProjectionStatus {

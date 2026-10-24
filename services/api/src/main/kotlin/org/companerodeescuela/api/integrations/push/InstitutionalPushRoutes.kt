@@ -161,7 +161,10 @@ fun Route.institutionalPushRoutes(
 }
 
 @Serializable
-private data class ProjectionStatusRequest(val contract: String, val eventIds: List<String>)
+private data class ProjectionStatusRequest(
+    val contract: String,
+    val eventIds: List<String>,
+)
 
 @Serializable
 private data class ProjectionStatusResponse(
@@ -170,7 +173,11 @@ private data class ProjectionStatusResponse(
     val receipts: List<InstitutionalProjectionReceipt>,
 )
 
-private val ProjectionStatusJson = Json { ignoreUnknownKeys = false; explicitNulls = false }
+private val ProjectionStatusJson =
+    Json {
+        ignoreUnknownKeys = false
+        explicitNulls = false
+    }
 private val UUID_EVENT_ID = Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
 private const val PROJECTION_STATUS_REQUEST_CONTRACT = "siii.projection_status_request.v1"
 private const val PROJECTION_STATUS_CONTRACT = "siii.projection_status.v1"

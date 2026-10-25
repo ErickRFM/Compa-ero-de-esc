@@ -275,8 +275,11 @@ class V12AdministrationUiTest {
         }
     }
 
-    private fun waitTag(tag: String) {
-        compose.waitUntil(10000) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
+    private fun waitTag(
+        tag: String,
+        timeoutMillis: Long = 10000,
+    ) {
+        compose.waitUntil(timeoutMillis) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
     }
 
     private fun credentials() {
@@ -317,7 +320,7 @@ class V12AdministrationUiTest {
             }
             compose.onNodeWithTag("mfa_password").performScrollTo().performTextInput("test-only-password")
             compose.onNodeWithTag("mfa_enroll").assertIsEnabled().performClick()
-            compose.waitUntil(10000) {
+            compose.waitUntil(30000) {
                 f.mfa.state.value.enrollment != null || f.mfa.state.value.failure != null
             }
             val enrollmentState = f.mfa.state.value
@@ -326,10 +329,16 @@ class V12AdministrationUiTest {
                     "failure=${enrollmentState.failure}",
                 enrollmentState.enrollment,
             )
-            waitTag("mfa_setup_secret")
+            waitTag("mfa_setup_secret", timeoutMillis = 30000)
             compose.onNodeWithTag("mfa_otp").performScrollTo().performTextInput("123456")
             compose.onNodeWithTag("mfa_confirm").performScrollTo().performClick()
-            waitTag("mfa_enabled")
+            compose.waitUntil(30000) {
+                val state = f.mfa.state.value
+                (state.status?.enabled == true && state.enrollment == null && !state.working) || state.failure != null
+            }
+            val confirmedState = f.mfa.state.value
+            assertTrue("MFA confirmation did not complete: status=${confirmedState.status}, failure=${confirmedState.failure}", confirmedState.status?.enabled == true)
+            waitTag("mfa_enabled", timeoutMillis = 30000)
             assertTrue(compose.onAllNodesWithTag("mfa_setup_secret").fetchSemanticsNodes().isEmpty())
             assertEquals(original, f.store.token.value)
             compose.onNodeWithTag("security_back").performScrollTo().performClick()

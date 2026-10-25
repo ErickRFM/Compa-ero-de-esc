@@ -19,6 +19,12 @@ esac
 # Record host pressure without environment values, command arguments or user data.
 # A vanished emulator is distinct from an assertion failure in the app.
 mkdir -p build/v10-runner-diagnostics
+storage_log=build/v10-runner-diagnostics/storage.log
+{
+  echo "timestamp=$(date -u +%FT%TZ)"
+  df -h "$PWD" /tmp 2>&1 || true
+  df -i "$PWD" /tmp 2>&1 || true
+} > "$storage_log"
 monitor_pid=""
 trace_launcher_pid=""
 core_file=""
@@ -83,6 +89,35 @@ finish_diagnostics() {
   fi
 }
 trap finish_diagnostics EXIT
+# The emulator action signals readiness at boot completion, but package
+# manager/Binder services can still be settling on API 35. Confirm both system
+# boot and a responsive package manager before starting Compose instrumentation.
+adb wait-for-device
+boot_ready=false
+for attempt in $(seq 1 60); do
+  boot_completed=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)
+  boot_animation=$(adb shell getprop init.svc.bootanim 2>/dev/null | tr -d '\r' || true)
+  if [[ "$boot_completed" == "1" && "$boot_animation" == "stopped" ]] && \
+     adb shell cmd package list packages >/dev/null 2>&1; then
+    boot_ready=true
+    break
+  fi
+  sleep 2
+done
+if [[ "$boot_ready" != true ]]; then
+  echo "Android framework did not become responsive within 120 seconds" >&2
+  adb shell getprop sys.boot_completed >> "$storage_log" 2>&1 || true
+  adb shell getprop init.svc.bootanim >> "$storage_log" 2>&1 || true
+  adb shell df -h /data >> "$storage_log" 2>&1 || true
+  exit 1
+fi
+{
+  echo "emulator_ready_timestamp=$(date -u +%FT%TZ)"
+  adb shell getprop ro.build.version.sdk 2>&1 || true
+  adb shell getprop ro.build.version.release 2>&1 || true
+  adb shell df -h /data 2>&1 || true
+  adb shell df -i /data 2>&1 || true
+} >> "$storage_log"
 # Management cannot run the academic registration/login screenshot suites:
 # those tests deliberately assert an academic package and student access.
 # Verify real management package, role-select UX, scoped administration,
@@ -93,12 +128,23 @@ if [[ "$variant" == Management ]]; then
     "-Pandroid.testInstrumentationRunnerArguments.class=org.companerodeescuela.AppDistributionSmokeTest,org.companerodeescuela.DistributionLoginUiTest,org.companerodeescuela.V12AdministrationUiTest,org.companerodeescuela.V14RoleNavigationUiTest"
   )
 fi
-./gradlew ":apps:android:app:connected${variant}DebugAndroidTest" --max-workers=2 --no-daemon \
+./gradlew ":apps:android:app:connected${variant}DebugAndroidTest" --max-workers=1 --no-daemon \
   "${runner_args[@]}" \
   -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
   -Dorg.gradle.jvmargs="-Xmx1536m -XX:MaxMetaspaceSize=512m -Dfile.encoding=UTF-8" --console=plain
 instrumentation_status=$?
 set -e
+if [[ "$instrumentation_status" -ne 0 ]]; then
+  {
+    echo "failure_timestamp=$(date -u +%FT%TZ)"
+    adb shell getprop sys.boot_completed 2>&1 || true
+    adb shell getprop init.svc.bootanim 2>&1 || true
+    adb shell df -h /data 2>&1 || true
+    adb shell df -i /data 2>&1 || true
+  } >> "$storage_log"
+  adb shell dumpsys binder > build/v10-runner-diagnostics/device-binder.txt 2>&1 || true
+  adb shell dumpsys meminfo > build/v10-runner-diagnostics/device-memory.txt 2>&1 || true
+fi
 # Only academic V10 suites produce the complete 19+ screenshot set.
 # Management must never claim academic screenshots as its own evidence.
 if [[ "$variant" == Academic ]]; then

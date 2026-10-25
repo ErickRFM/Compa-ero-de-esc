@@ -69,8 +69,9 @@ class HomeViewModel
                                 )
                         }
                         is Outcome.Failure -> {
+                            latestAcademic = null
                             _state.update {
-                                it.copy(
+                                HomeUiState(
                                     loading = false,
                                     errorMessage = result.error.userMessage,
                                 )

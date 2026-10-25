@@ -6,7 +6,12 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.database.AcademicSnapshotCache
@@ -19,6 +24,9 @@ import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.shared.contracts.AcademicLoadResponse
 import org.companerodeescuela.shared.contracts.AcademicProfile
 import org.companerodeescuela.shared.contracts.AcademicScheduleResponse
+import org.companerodeescuela.shared.contracts.ApiResponse
+import org.companerodeescuela.shared.contracts.InstitutionalAcademicSection
+import org.companerodeescuela.shared.contracts.ScheduleEntry
 import org.companerodeescuela.shared.contracts.ScheduleRecurrence
 import org.companerodeescuela.shared.contracts.ScheduleSource
 import java.util.Base64
@@ -29,6 +37,112 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class AcademicRepositoryTest {
+    @Test
+    fun `source authority 503 cannot be replaced by a historical SIII cache`() =
+        runTest {
+            val historical = cached("student-1", "Ana").let { it.copy(value = it.value.copy(institutionalSource = "SIII")) }
+            val repo =
+                repository(
+                    MockEngine { respond("{}", HttpStatusCode.ServiceUnavailable) },
+                    FakeTokenStore(platformToken("student-1")),
+                    FakeCache(
+                        mapOf(
+                            "student-1" to historical,
+                        ),
+                    ),
+                )
+            val failure = assertIs<Outcome.Failure>(repo.load())
+            assertEquals(503, assertIs<AppError.Http>(failure.error).status)
+        }
+
+    @Test
+    fun `official catalog survives transport and overlapping personal imports remain separate`() =
+        runTest {
+            val official =
+                ScheduleEntry(
+                    "section-1",
+                    "SUB_A",
+                    "Official subject",
+                    "GROUP_A",
+                    "Official teacher",
+                    "MONDAY",
+                    "09:00",
+                    "10:00",
+                    effectiveDate = "2026-10-26",
+                    recurrence = ScheduleRecurrence.ONE_TIME,
+                )
+            val section =
+                InstitutionalAcademicSection(
+                    "section-1",
+                    "GROUP_A",
+                    "subject-1",
+                    "SUB_A",
+                    "Official subject",
+                    listOf("Official teacher"),
+                    "UTC",
+                    7,
+                    "2026-10-25T12:00:00Z",
+                    emptyList(),
+                )
+            val remote =
+                AcademicLoadResponse(
+                    AcademicProfile("student-1", "Ana"),
+                    AcademicScheduleResponse("student-1", listOf(official)),
+                    listOf(section),
+                    "SIII",
+                )
+            val personal =
+                PersonalScheduleItem(
+                    "import-1",
+                    "student-1",
+                    "SUB_A",
+                    "Official subject",
+                    "Personal group",
+                    "Personal teacher",
+                    "MONDAY",
+                    "09:00",
+                    "10:00",
+                    null,
+                    null,
+                    ScheduleSource.OCR_IMPORT,
+                    ScheduleRecurrence.WEEKLY,
+                    "import-series",
+                    null,
+                    100,
+                )
+            val store = FakePersonalScheduleStore(listOf(personal))
+            val cache = FakeCache(emptyMap())
+            val repo =
+                repository(
+                    MockEngine {
+                        respond(
+                            Json.encodeToString(ApiResponse(remote)),
+                            HttpStatusCode.OK,
+                            headersOf(HttpHeaders.ContentType, "application/json"),
+                        )
+                    },
+                    FakeTokenStore(platformToken("student-1")),
+                    cache,
+                    store,
+                )
+            val content = assertIs<Outcome.Success<AcademicContent>>(repo.load()).value
+            assertEquals(listOf(section), content.academic.institutionalSections)
+            assertEquals(2, content.academic.schedule.entries.size)
+            assertEquals(
+                setOf(ScheduleSource.INSTITUTIONAL, ScheduleSource.OCR_IMPORT),
+                content.academic.schedule.entries
+                    .map { it.source }
+                    .toSet(),
+            )
+            assertEquals(listOf(personal), store.list("student-1"))
+            assertEquals(
+                listOf(official),
+                cache.values
+                    .getValue("student-1")
+                    .value.schedule.entries,
+            )
+        }
+
     @Test
     fun `network failure falls back only to active student's cache`() =
         runTest {
@@ -44,7 +158,7 @@ class AcademicRepositoryTest {
                 repository(
                     engine =
                         MockEngine {
-                            respond(content = "{}", status = HttpStatusCode.ServiceUnavailable)
+                            throw java.io.IOException("Synthetic offline transport")
                         },
                     tokenStore = tokenStore,
                     cache = cache,
@@ -90,7 +204,7 @@ class AcademicRepositoryTest {
                 repository(
                     engine =
                         MockEngine {
-                            respond(content = "{}", status = HttpStatusCode.ServiceUnavailable)
+                            throw java.io.IOException("Synthetic offline transport")
                         },
                     tokenStore = tokenStore,
                     cache = cache,
@@ -127,7 +241,7 @@ class AcademicRepositoryTest {
                 repository(
                     engine =
                         MockEngine {
-                            respond(content = "{}", status = HttpStatusCode.ServiceUnavailable)
+                            throw java.io.IOException("Synthetic offline transport")
                         },
                     tokenStore = tokenStore,
                     cache = cache,
@@ -216,6 +330,57 @@ class AcademicRepositoryTest {
 
             val failure = assertIs<Outcome.Failure>(result)
             assertIs<AppError.Serialization>(failure.error)
+            assertTrue(cache.values.isEmpty())
+        }
+
+    @Test
+    fun `HTTP authority failures are explicit before first sync and with legacy caches`() =
+        runTest {
+            for (initial in listOf(emptyMap(), mapOf("student-1" to cached("student-1", "Ana")))) {
+                val cache = FakeCache(initial)
+                val repo =
+                    repository(
+                        MockEngine { respond("{}", HttpStatusCode.ServiceUnavailable) },
+                        FakeTokenStore(platformToken("student-1")),
+                        cache,
+                    )
+                val failure = assertIs<Outcome.Failure>(repo.load())
+                assertEquals(503, assertIs<AppError.Http>(failure.error).status)
+            }
+        }
+
+    @Test
+    fun `shared repository serializes cache writes before a later revocation`() =
+        runTest {
+            val started = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            var requests = 0
+            val cache = FakeCache(emptyMap())
+            val repo =
+                repository(
+                    MockEngine {
+                        requests++
+                        if (requests == 1) {
+                            started.complete(Unit)
+                            release.await()
+                            respond(
+                                Json.encodeToString(ApiResponse(cached("student-1", "Ana").value)),
+                                HttpStatusCode.OK,
+                                headersOf(HttpHeaders.ContentType, "application/json"),
+                            )
+                        } else {
+                            respond("{}", HttpStatusCode.Forbidden)
+                        }
+                    },
+                    FakeTokenStore(platformToken("student-1")),
+                    cache,
+                )
+            val initial = async(start = CoroutineStart.UNDISPATCHED) { repo.load() }
+            started.await()
+            val revoked = async(start = CoroutineStart.UNDISPATCHED) { repo.load() }
+            release.complete(Unit)
+            assertIs<Outcome.Success<AcademicContent>>(initial.await())
+            assertEquals(403, assertIs<AppError.Http>(assertIs<Outcome.Failure>(revoked.await()).error).status)
             assertTrue(cache.values.isEmpty())
         }
 

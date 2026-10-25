@@ -270,7 +270,7 @@ jobs:
           failures = sum(int(suite.get('failures', 0)) + int(suite.get('errors', 0)) for suite in suites)
           skipped = sum(int(suite.get('skipped', 0)) for suite in suites)
           flavor = '${{ matrix.flavor }}'
-          minimum = 36 if flavor == 'academic' else 15
+          minimum = 40 if flavor == 'academic' else 19
           print(f'{flavor} instrumentation tests={tests} failures={failures} skipped={skipped}')
           if tests < minimum or failures != 0 or skipped != 0:
               raise SystemExit(f'{flavor} instrumentation requires {minimum}+ executed tests with zero failures or skips')
@@ -282,6 +282,7 @@ jobs:
               )
           require_distinct('org.companerodeescuela.V12AdministrationUiTest', 5)
           require_distinct('org.companerodeescuela.AppDistributionSmokeTest', 2)
+          require_distinct('org.companerodeescuela.InstitutionalClassesUiTest', 4)
           if flavor == 'management':
               require_distinct('org.companerodeescuela.DistributionLoginUiTest', 2)
               require_distinct('org.companerodeescuela.V14RoleNavigationUiTest', 6)

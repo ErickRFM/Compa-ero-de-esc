@@ -24,6 +24,12 @@ enum class InstitutionalIdentityLinkAcceptance {
 }
 
 interface InstitutionalIdentityLinkRepository {
+    suspend fun findByNativeUserId(
+        institutionId: String,
+        entityType: InstitutionalIdentityKind,
+        nativeUserId: String,
+    ): InstitutionalIdentityLink? = null
+
     suspend fun findByExternalId(
         institutionId: String,
         entityType: InstitutionalIdentityKind,
@@ -36,6 +42,15 @@ interface InstitutionalIdentityLinkRepository {
 class InMemoryInstitutionalIdentityLinkRepository : InstitutionalIdentityLinkRepository {
     private val mutex = Mutex()
     private val links = ConcurrentHashMap<String, InstitutionalIdentityLink>()
+
+    override suspend fun findByNativeUserId(
+        institutionId: String,
+        entityType: InstitutionalIdentityKind,
+        nativeUserId: String,
+    ): InstitutionalIdentityLink? =
+        links.values.singleOrNull {
+            it.institutionId == institutionId && it.entityType == entityType && it.nativeUserId == nativeUserId
+        }
 
     override suspend fun findByExternalId(
         institutionId: String,

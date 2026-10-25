@@ -42,7 +42,7 @@ data class SiiiTeacherSectionView(
  * Internal service. HTTP callers must obtain actor from requireNativeActor and identitySource
  * from verifiedSessionSource after the existing session authority has validated the request.
  * UserSummary and a matching account ID alone do not prove a native or non-revoked session.
- * No HTTP/mobile route is exposed by this slice.
+ * SiiiAcademicService resolves identity and live source versions for HTTP/mobile callers.
  */
 class SiiiSectionReader(
     private val accounts: PlatformAccountRepository,
@@ -53,15 +53,32 @@ class SiiiSectionReader(
 ) {
     private val policy = InstitutionScopePolicy(accounts, clock)
 
+    internal suspend fun verifyIdentity(
+        actor: UserSummary,
+        institutionId: String,
+        externalId: String,
+        kind: InstitutionalIdentityKind,
+    ) {
+        authorize(
+            actor,
+            SessionIdentitySource.NATIVE,
+            institutionId,
+            externalId,
+            kind,
+            if (kind == InstitutionalIdentityKind.STUDENT) UserRole.STUDENT else UserRole.TEACHER,
+        )
+    }
+
     suspend fun student(
         actor: UserSummary,
         identitySource: SessionIdentitySource,
         institutionId: String,
         sectionId: String,
         externalId: String,
+        expectedSourceVersion: Long? = null,
     ): SiiiStudentSectionView {
         authorize(actor, identitySource, institutionId, externalId, InstitutionalIdentityKind.STUDENT, UserRole.STUDENT)
-        val stored = available(institutionId, sectionId)
+        val stored = available(institutionId, sectionId, expectedSourceVersion)
         val snapshot = checkNotNull(stored.snapshot)
         val own = snapshot.enrollments.singleOrNull { it.studentExternalId == externalId && it.status == "enrolled" }
         if (snapshot.status != "open" || own == null || own.studentStatus != "active") throw ApiException.Forbidden()
@@ -74,9 +91,10 @@ class SiiiSectionReader(
         institutionId: String,
         sectionId: String,
         externalId: String,
+        expectedSourceVersion: Long? = null,
     ): SiiiTeacherSectionView {
         authorize(actor, identitySource, institutionId, externalId, InstitutionalIdentityKind.TEACHER, UserRole.TEACHER)
-        val stored = available(institutionId, sectionId)
+        val stored = available(institutionId, sectionId, expectedSourceVersion)
         val snapshot = checkNotNull(stored.snapshot)
         if (snapshot.teachers.none { it.externalId == externalId }) throw ApiException.Forbidden()
         return SiiiTeacherSectionView(stored.details(), snapshot.enrollments)
@@ -105,8 +123,13 @@ class SiiiSectionReader(
     private suspend fun available(
         institutionId: String,
         sectionId: String,
+        expectedSourceVersion: Long? = null,
     ): StoredSiiiSection {
-        val stored = repository.find(institutionId, sectionId) ?: throw ApiException.NotFound()
+        val stored = repository.find(institutionId, sectionId)
+        if (expectedSourceVersion != null && (stored == null || stored.sourceVersion != expectedSourceVersion)) {
+            throw ApiException.DependencyUnavailable("Institutional snapshot is pending synchronization")
+        }
+        if (stored == null) throw ApiException.NotFound()
         if (stored.snapshot == null || stored.snapshot.status == "archived") throw ApiException.NotFound()
         return stored
     }

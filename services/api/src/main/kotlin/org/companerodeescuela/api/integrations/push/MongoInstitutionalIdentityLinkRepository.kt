@@ -21,6 +21,15 @@ class MongoInstitutionalIdentityLinkRepository(
     @Volatile
     private var indexesReady = false
 
+    override suspend fun findByNativeUserId(
+        institutionId: String,
+        entityType: InstitutionalIdentityKind,
+        nativeUserId: String,
+    ): InstitutionalIdentityLink? {
+        ensureIndexes()
+        return links.find(nativeFilter(institutionId, entityType, nativeUserId)).firstOrNull()?.toRecord()
+    }
+
     override suspend fun findByExternalId(
         institutionId: String,
         entityType: InstitutionalIdentityKind,

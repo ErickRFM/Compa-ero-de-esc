@@ -51,4 +51,21 @@ data class AcademicScheduleResponse(
 data class AcademicLoadResponse(
     val student: AcademicProfile,
     val schedule: AcademicScheduleResponse,
+    val institutionalSections: List<InstitutionalAcademicSection> = emptyList(),
+    val institutionalSource: String? = null,
+)
+
+/** Authorized institutional catalog; does not expose student rosters. */
+@Serializable
+data class InstitutionalAcademicSection(
+    val id: String,
+    val groupName: String,
+    val subjectId: String,
+    val subjectCode: String,
+    val subjectName: String,
+    val teacherNames: List<String>,
+    val timezone: String,
+    val sourceVersion: Long,
+    val syncedAt: String,
+    val occurrences: List<ClassOccurrenceContract>,
 )

@@ -127,7 +127,7 @@ class SiiiSectionProjectionHandler(
     }
 }
 
-/** Concrete institutional-only graph. The reader has no HTTP/mobile route in this slice. */
+/** Institutional projection graph; authorized HTTP reads reuse this reader. */
 class SiiiSectionProjectionFeature(
     database: MongoDatabase,
     accounts: PlatformAccountRepository,

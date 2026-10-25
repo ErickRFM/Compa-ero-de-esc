@@ -16,15 +16,25 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.bson.Document
+import org.companerodeescuela.api.academic.academicRoutes
+import org.companerodeescuela.api.auth.AuthTokenService
 import org.companerodeescuela.api.auth.InMemoryPlatformAccountRepository
+import org.companerodeescuela.api.auth.InMemoryRefreshSessionRepository
 import org.companerodeescuela.api.auth.PlatformAccount
+import org.companerodeescuela.api.auth.PlatformSessionAuthority
+import org.companerodeescuela.api.auth.RefreshSession
 import org.companerodeescuela.api.auth.SessionIdentitySource
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.institutions.MongoInstitutionRepository
 import org.companerodeescuela.api.integrations.academic.siii.MongoSiiiSectionSnapshotRepository
+import org.companerodeescuela.api.integrations.academic.siii.SiiiAcademicService
+import org.companerodeescuela.api.integrations.academic.siii.SiiiAuthorityTarget
+import org.companerodeescuela.api.integrations.academic.siii.SiiiHttpAcademicAuthority
 import org.companerodeescuela.api.integrations.academic.siii.SiiiSectionEventAdapter
 import org.companerodeescuela.api.integrations.academic.siii.SiiiSectionProjectionHandler
 import org.companerodeescuela.api.integrations.academic.siii.SiiiSectionReader
+import org.companerodeescuela.api.integrations.mock.MockAcademicProvider
+import org.companerodeescuela.api.integrations.mock.MockIdentityProvider
 import org.companerodeescuela.api.integrations.push.InstitutionalEventProjectionWorker
 import org.companerodeescuela.api.integrations.push.InstitutionalIdentityLink
 import org.companerodeescuela.api.integrations.push.InstitutionalIdentityLinkService
@@ -37,6 +47,10 @@ import org.companerodeescuela.api.integrations.push.MongoInstitutionalIdentityLi
 import org.companerodeescuela.api.integrations.push.MongoInstitutionalPushRepository
 import org.companerodeescuela.api.integrations.push.institutionalPushRoutes
 import org.companerodeescuela.api.plugins.ApiJson
+import org.companerodeescuela.api.plugins.configurePlugins
+import org.companerodeescuela.api.test.TestFixtures
+import org.companerodeescuela.shared.contracts.AcademicLoadResponse
+import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
 import org.companerodeescuela.shared.contracts.UserRole
 import org.junit.jupiter.api.Timeout
@@ -45,6 +59,8 @@ import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
+import java.net.HttpURLConnection
+import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.SecureRandom
@@ -120,6 +136,7 @@ class SiiiFullChainLiveContractTest {
                 keyId,
                 secret,
             )
+        var closeReads: (() -> Unit)? = null
         try {
             val initialized = probe.start()
             val sectionId = initialized.string("sectionId")
@@ -127,6 +144,63 @@ class SiiiFullChainLiveContractTest {
             val teacherExternal = initialized.string("teacherExternal")
             val student = identities.link(tenantId, InstitutionalIdentityKind.STUDENT, studentExternal, UserRole.STUDENT)
             val teacher = identities.link(tenantId, InstitutionalIdentityKind.TEACHER, teacherExternal, UserRole.TEACHER)
+            val settings = TestFixtures.settings().copy(jwtSecret = "synthetic-chain-signing-key-32-bytes".toCharArray())
+            val sessions = InMemoryRefreshSessionRepository()
+            val accessTokens =
+                listOf(student, teacher).associate { account ->
+                    val user = account.toUserSummary()
+                    val session = "chain-session-${account.id}"
+                    sessions.create(
+                        RefreshSession(
+                            session,
+                            "synthetic-hash",
+                            user,
+                            Instant.now(),
+                            Instant.now().plusSeconds(3600),
+                            identitySource = SessionIdentitySource.NATIVE,
+                        ),
+                    )
+                    account.id to AuthTokenService(settings).issue(user, session).value
+                }
+            val sourceOrigin = initialized.string("sourceOrigin")
+            require(sourceOrigin.matches(Regex("http://127\\.0\\.0\\.1:[0-9]+")))
+            val authority =
+                SiiiHttpAcademicAuthority(
+                    mapOf(
+                        tenantId to SiiiAuthorityTarget("https://synthetic-source.invalid", tenantId, keyId),
+                    ),
+                    inbox,
+                    endpoint = { URI(sourceOrigin + SiiiHttpAcademicAuthority.PATH) },
+                )
+            val academic =
+                SiiiAcademicService(identities.accounts, identities.links, identities.reader(snapshots), authority, setOf(tenantId))
+            val readServer =
+                embeddedServer(CIO, host = "127.0.0.1", port = 0) {
+                    configurePlugins(settings, sessions, PlatformSessionAuthority(identities.accounts, MockIdentityProvider()))
+                    routing { academicRoutes(settings, MockAcademicProvider(), institutionalAcademic = academic) }
+                }.start(wait = false)
+            closeReads = { readServer.stop(0, 5000) }
+            val readPort =
+                readServer.engine
+                    .resolvedConnectors()
+                    .single()
+                    .port
+
+            fun httpRead(
+                account: PlatformAccount,
+                suffix: String = "/load",
+            ): Pair<Int, String> {
+                val connection = URI("http://127.0.0.1:$readPort/academic$suffix").toURL().openConnection() as HttpURLConnection
+                try {
+                    connection.connectTimeout = 5000
+                    connection.readTimeout = 15000
+                    connection.setRequestProperty("Authorization", "Bearer ${accessTokens.getValue(account.id)}")
+                    val status = connection.responseCode
+                    return status to (if (status == 200) connection.inputStream.bufferedReader().use { it.readText() } else "")
+                } finally {
+                    connection.disconnect()
+                }
+            }
 
             val initial = probe.action("deliver")
             assertEquals("accepted", initial.receiptState(sectionId))
@@ -140,6 +214,7 @@ class SiiiFullChainLiveContractTest {
             val enrolled = probe.action("enroll")
             val enrolledVersion = enrolled.long("sourceVersion")
             assertAccepted(probe.action("deliver"), enrolledVersion)
+            assertEquals(503, httpRead(student).first, "Source version must be projected before HTTP can read it")
             projectThrough(inbox, snapshots, tenantId, sectionId, enrolledVersion)
 
             val scheduled = probe.action("schedule")
@@ -155,9 +230,23 @@ class SiiiFullChainLiveContractTest {
             assertEquals(studentExternal, studentView.enrollment.studentExternalId)
             assertTrue(teacherView.enrollments.any { it.studentExternalId == studentExternal })
             assertEquals(sectionId, studentView.section.sectionId)
+            val httpLoad = httpRead(student)
+            assertEquals(200, httpLoad.first)
+            val mobile = Json.decodeFromString<ApiResponse<AcademicLoadResponse>>(httpLoad.second).data
+            assertEquals("SIII", mobile.institutionalSource)
+            assertEquals("Synthetic subject", mobile.institutionalSections.single().subjectName)
+            assertEquals(listOf("Synthetic Teacher"), mobile.institutionalSections.single().teacherNames)
+            assertEquals(sectionId, mobile.institutionalSections.single().id)
+            assertTrue(mobile.schedule.entries.isNotEmpty())
+            assertEquals(200, httpRead(teacher).first)
 
             val withdrawn = probe.action("withdraw")
             val withdrawnVersion = withdrawn.long("sourceVersion")
+            assertEquals(
+                404,
+                httpRead(student, "/institutional/sections/$sectionId").first,
+                "Live source revocation must apply before outbox delivery",
+            )
             assertAccepted(probe.action("deliver"), withdrawnVersion)
             projectThrough(inbox, snapshots, tenantId, sectionId, withdrawnVersion)
             assertFailsWith<ApiException.Forbidden> {
@@ -166,6 +255,7 @@ class SiiiFullChainLiveContractTest {
 
             val unassigned = probe.action("unassign")
             val unassignedVersion = unassigned.long("sourceVersion")
+            assertEquals(404, httpRead(teacher, "/institutional/sections/$sectionId").first)
             assertAccepted(probe.action("deliver"), unassignedVersion)
             projectThrough(inbox, snapshots, tenantId, sectionId, unassignedVersion)
             assertFailsWith<ApiException.Forbidden> {
@@ -173,6 +263,7 @@ class SiiiFullChainLiveContractTest {
             }
             assertTrue(db.getCollection<Document>("institutional_integration_events").countDocuments(Document("tenantId", tenantId)) >= 6)
         } finally {
+            closeReads?.invoke()
             probe.close()
             server.stop(0, 5_000)
         }
@@ -236,9 +327,9 @@ class SiiiFullChainLiveContractTest {
     private inner class ReaderGraph(
         private val db: MongoDatabase,
         private val tenantId: String,
-        private val accounts: InMemoryPlatformAccountRepository,
+        val accounts: InMemoryPlatformAccountRepository,
         private val institutions: MongoInstitutionRepository,
-        private val links: MongoInstitutionalIdentityLinkRepository,
+        val links: MongoInstitutionalIdentityLinkRepository,
         private val snapshots: MongoSiiiSectionSnapshotRepository,
     ) {
         suspend fun link(

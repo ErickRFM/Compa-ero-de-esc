@@ -114,6 +114,19 @@ jobs:
             exit 1
           fi
 
+      - name: Require institutional HTTP authorization suites without skips
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          for name, count in [('SiiiAcademicRoutesTest', 5), ('SiiiHttpAcademicAuthorityTest', 1)]:
+              path = Path(f'services/api/build/test-results/test/TEST-org.companerodeescuela.api.academic.{name}.xml')
+              suite = ET.parse(path).getroot()
+              assert int(suite.get('tests', '0')) == count, f'{name}: expected {count} executed tests'
+              assert all(int(suite.get(k, '0')) == 0 for k in ('skipped', 'failures', 'errors')), name
+              print(f'{name}: {count} passed, zero skipped')
+          PY
+
       - name: Verify real Mongo lifecycle integration executed
         run: |
           python3 - <<'PY'

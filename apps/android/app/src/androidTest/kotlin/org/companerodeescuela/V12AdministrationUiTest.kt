@@ -3,10 +3,14 @@ package org.companerodeescuela
 import android.graphics.Bitmap
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -101,6 +105,7 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 class V12AdministrationUiTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+    private lateinit var inputFocusManager: FocusManager
 
     private class Store(
         role: UserRole,
@@ -311,15 +316,32 @@ class V12AdministrationUiTest {
         compose.onNodeWithTag("admin_confirm").performClick()
     }
 
+    @Composable
+    private fun recordInputFocus() {
+        val manager = LocalFocusManager.current
+        SideEffect { inputFocusManager = manager }
+    }
+
     private fun dismissKeyboardBeforeSubmit() {
         compose.runOnIdle {
+            inputFocusManager.clearFocus(force = true)
             WindowCompat
                 .getInsetsController(compose.activity.window, compose.activity.window.decorView)
                 .hide(WindowInsetsCompat.Type.ime())
         }
-        compose.waitUntil(10000) {
-            val insets = ViewCompat.getRootWindowInsets(compose.activity.window.decorView)
-            insets != null && !insets.isVisible(WindowInsetsCompat.Type.ime())
+        try {
+            compose.waitUntil(10000) {
+                val insets = ViewCompat.getRootWindowInsets(compose.activity.window.decorView)
+                insets != null && !insets.isVisible(WindowInsetsCompat.Type.ime())
+            }
+        } catch (timeout: ComposeTimeoutException) {
+            val view = compose.activity.window.decorView
+            val insets = ViewCompat.getRootWindowInsets(view)
+            throw AssertionError(
+                "IME dismissal timed out: insetsAvailable=${insets != null}, " +
+                    "imeVisible=${insets?.isVisible(WindowInsetsCompat.Type.ime())}, windowFocused=${view.hasWindowFocus()}",
+                timeout,
+            )
         }
         compose.waitForIdle()
     }
@@ -349,6 +371,7 @@ class V12AdministrationUiTest {
         val original = f.store.token.value
         try {
             compose.setContent {
+                recordInputFocus()
                 AuthTestLocale {
                     CompaneroTheme {
                         var destination by remember { mutableStateOf<Destination>(Destination.Profile) }
@@ -458,6 +481,7 @@ class V12AdministrationUiTest {
         val original = f.store.token.value
         try {
             compose.setContent {
+                recordInputFocus()
                 AuthTestLocale {
                     CompaneroTheme {
                         var destination by remember { mutableStateOf<Destination>(Destination.Profile) }

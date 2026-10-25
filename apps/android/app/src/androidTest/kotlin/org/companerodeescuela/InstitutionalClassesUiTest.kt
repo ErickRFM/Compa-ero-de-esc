@@ -58,10 +58,20 @@ class InstitutionalClassesUiTest {
         val f = Fixture(role)
         try {
             show(f, role)
-            compose.waitUntil(30000) { !f.model.state.value.institutionalLoading }
+            compose.waitUntil(30000) {
+                val state = f.model.state.value
+                !state.institutionalLoading && !state.loading
+            }
             compose.onNodeWithText("Materia oficial QA").performScrollTo().assertIsDisplayed()
             compose.onNodeWithText("Docente oficial QA").assertIsDisplayed()
             compose.onNodeWithText("QA_SUB · Grupo QA_GROUP").assertIsDisplayed()
+            if (role == UserRole.TEACHER) {
+                compose.onNodeWithText("No tienes espacios colaborativos asignados").assertExists()
+                compose.onNodeWithText("Todavía no tienes clases asignadas").assertDoesNotExist()
+            } else {
+                compose.onNodeWithText("No tienes espacios colaborativos vinculados a tu grupo.").assertExists()
+                compose.onNodeWithText("Control escolar todavía no ha vinculado clases a tu grupo.").assertDoesNotExist()
+            }
             capture("v19-institutional-$name")
         } finally {
             compose.runOnIdle { f.close() }

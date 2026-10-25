@@ -1,14 +1,32 @@
 package org.companerodeescuela.feature.attendance
 
+import org.companerodeescuela.core.common.result.AppError
+import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
+import org.companerodeescuela.shared.contracts.ClassOccurrenceStatusContract
 import java.time.LocalDateTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.companerodeescuela.core.common.result.AppError
-import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
-import org.companerodeescuela.shared.contracts.ClassOccurrenceStatusContract
 
 class TeacherPassOpenPolicyTest {
+    @Test
+    fun `SIII absolute times honor their instant across device timezones`() {
+        val occurrence = classAt(starts = "2026-10-22T15:00:00Z", ends = "2026-10-22T16:00:00Z")
+        val zone = java.time.ZoneId.systemDefault()
+        val before =
+            java.time.Instant
+                .parse("2026-10-22T15:59:59Z")
+                .atZone(zone)
+                .toLocalDateTime()
+        val ended =
+            java.time.Instant
+                .parse("2026-10-22T16:00:00Z")
+                .atZone(zone)
+                .toLocalDateTime()
+        assertEquals(TeacherPassOpenStatus.AVAILABLE, teacherPassOpenStatus(occurrence, before))
+        assertEquals(TeacherPassOpenStatus.ENDED, teacherPassOpenStatus(occurrence, ended))
+    }
+
     private fun classAt(
         date: String = "2026-10-08",
         starts: String = "09:00",

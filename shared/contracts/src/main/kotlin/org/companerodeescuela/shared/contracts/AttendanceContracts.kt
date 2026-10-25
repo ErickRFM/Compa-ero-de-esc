@@ -121,6 +121,7 @@ data class AttendanceSessionResponse(
     val institutionId: String? = null,
     val groupId: String? = null,
     val groupScopeRevision: Long = -1,
+    val academicSource: String? = null,
 )
 
 @Serializable

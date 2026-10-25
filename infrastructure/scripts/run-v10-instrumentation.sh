@@ -150,6 +150,30 @@ fi
 if [[ "$variant" == Academic ]]; then
   python3 infrastructure/scripts/export-v10-evidence.py
 fi
+if [[ "$instrumentation_status" -eq 0 ]]; then
+  # Both distributions execute the four synthetic institutional catalog cases.
+  # Keep these separate from the academic login screenshot collection.
+  institutional_output="build/v19-institutional-evidence"
+  mkdir -p "$institutional_output"
+  for state in student teacher revoked empty; do
+    adb exec-out run-as "$COMPANERO_EVIDENCE_PACKAGE" \
+      cat "files/v10-evidence/v19-institutional-${state}.png" \
+      > "${institutional_output}/${state}.png"
+  done
+  python3 - "$institutional_output" <<'PY'
+from pathlib import Path
+import struct
+import sys
+
+root = Path(sys.argv[1])
+for state in ('student', 'teacher', 'revoked', 'empty'):
+    data = (root / f'{state}.png').read_bytes()
+    assert data[:8] == b'\x89PNG\r\n\x1a\n', f'Missing PNG evidence: {state}'
+    width, height = struct.unpack('>II', data[16:24])
+    assert width > 0 and height > 0, f'Invalid PNG dimensions: {state}'
+print('Verified four synthetic institutional screenshots for this distribution')
+PY
+fi
 if [[ "$instrumentation_status" -eq 0 && "$variant" == Management ]]; then
   if ! api_level=$(adb shell getprop ro.build.version.sdk); then
     echo "Cannot verify emulator API before MFA stability executions" >&2

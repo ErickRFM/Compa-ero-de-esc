@@ -39,9 +39,19 @@ class AttendanceSessionService(
         val occurrenceDate =
             runCatching { LocalDate.parse(request.occurrenceDate) }
                 .getOrElse { throw ApiException.Validation("occurrenceDate must be YYYY-MM-DD") }
+        if (nativeActor != null && nativeActor.id != teacherId) throw ApiException.Forbidden("Actual teacher identity does not match")
 
+        val official =
+            nativeActor?.let { actor ->
+                nativeProjection
+                    ?.institutionalAttendance
+                    ?.takeIf { it.configured(actor) }
+                    ?.teacherMeeting(actor, occurrenceId, occurrenceDate)
+            }
         val occurrence =
-            if (nativeActor != null) {
+            if (official != null) {
+                null
+            } else if (nativeActor != null) {
                 if (nativeActor.id != teacherId) throw ApiException.Forbidden("Teacher does not match the actual native actor")
                 (
                     nativeProjection ?: throw ApiException.DependencyUnavailable(
@@ -55,13 +65,16 @@ class AttendanceSessionService(
                     occurrenceDate = occurrenceDate,
                 )
             }
-        if (occurrence.status == ClassOccurrenceStatus.CANCELLED) {
+        if (occurrence?.status == ClassOccurrenceStatus.CANCELLED ||
+            official?.occurrence?.status == org.companerodeescuela.shared.contracts.ClassOccurrenceStatusContract.CANCELLED
+        ) {
             throw ApiException.Conflict("Attendance cannot open for a cancelled class")
         }
 
         val now = clock.instant()
         val scheduledEnd =
-            occurrence.date
+            official?.occurrence?.endsAt?.let(java.time.Instant::parse) ?: occurrence!!
+                .date
                 .atTime(occurrence.endsAt)
                 .atZone(ZoneId.systemDefault())
                 .toInstant()
@@ -71,12 +84,14 @@ class AttendanceSessionService(
         val candidate =
             AttendanceSessionResponse(
                 id = newId(),
-                occurrenceId = occurrence.id.value,
-                courseId = occurrence.group.course.id.value,
-                groupName = occurrence.group.name,
-                occurrenceDate = occurrence.date.toString(),
-                scheduledStartsAt = occurrence.startsAt.toString(),
-                scheduledEndsAt = occurrence.endsAt.toString(),
+                occurrenceId = official?.occurrence?.id ?: occurrence!!.id.value,
+                courseId =
+                    official?.section?.id ?: occurrence!!
+                        .group.course.id.value,
+                groupName = official?.section?.groupName ?: occurrence!!.group.name,
+                occurrenceDate = official?.occurrence?.date ?: occurrence!!.date.toString(),
+                scheduledStartsAt = official?.occurrence?.startsAt ?: occurrence!!.startsAt.toString(),
+                scheduledEndsAt = official?.occurrence?.endsAt ?: occurrence!!.endsAt.toString(),
                 openedBy = teacherId,
                 openedAtEpochSeconds = now.epochSecond,
                 closesAtEpochSeconds =
@@ -85,7 +100,20 @@ class AttendanceSessionService(
                         .epochSecond,
                 status = AttendanceSessionStatus.OPEN,
                 identitySource = org.companerodeescuela.shared.contracts.AttendanceIdentitySource.INSTITUTIONAL,
-            ).let { candidate -> if (nativeActor == null) candidate else nativeProjection!!.bindSession(nativeActor, candidate) }
+            ).let { candidate ->
+                when {
+                    official != null ->
+                        candidate.copy(
+                            identitySource = AttendanceIdentitySource.NATIVE,
+                            institutionId = nativeActor!!.institutionId,
+                            groupId = official.section.id,
+                            groupScopeRevision = official.section.sourceVersion,
+                            academicSource = SiiiAttendanceAuthority.SOURCE,
+                        )
+                    nativeActor == null -> candidate
+                    else -> nativeProjection!!.bindSession(nativeActor, candidate)
+                }
+            }
 
         val session =
             when (val result = repository.createSession(candidate)) {
@@ -93,7 +121,8 @@ class AttendanceSessionService(
                 is SessionWriteResult.Existing -> {
                     if (result.session.identitySource != candidate.identitySource ||
                         result.session.institutionId != candidate.institutionId ||
-                        result.session.groupScopeRevision != candidate.groupScopeRevision
+                        result.session.groupScopeRevision != candidate.groupScopeRevision ||
+                        result.session.academicSource != candidate.academicSource
                     ) {
                         throw ApiException.Forbidden("Existing attendance belongs to a different identity source or scope")
                     }
@@ -152,7 +181,9 @@ class AttendanceSessionService(
             return 0
         }
         val projection = nativeProjection ?: return 0
+        projection.requireSession(actor, session)
         val recipients = projection.activeStudentIdsForTeacher(actor, session.courseId).distinct()
+        projection.requireSession(actor, session)
         val data =
             mapOf(
                 "type" to AttendancePushContract.TYPE,

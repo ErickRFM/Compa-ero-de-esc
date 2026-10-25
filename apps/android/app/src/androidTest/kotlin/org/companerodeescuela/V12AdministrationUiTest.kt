@@ -316,7 +316,16 @@ class V12AdministrationUiTest {
                 )
             }
             compose.onNodeWithTag("mfa_password").performScrollTo().performTextInput("test-only-password")
-            compose.onNodeWithTag("mfa_enroll").performScrollTo().performClick()
+            compose.onNodeWithTag("mfa_enroll").assertIsEnabled().performClick()
+            compose.waitUntil(10000) {
+                f.mfa.state.value.enrollment != null || f.mfa.state.value.failure != null
+            }
+            val enrollmentState = f.mfa.state.value
+            assertNotNull(
+                "MFA enrollment did not complete: status=${enrollmentState.status}, " +
+                    "failure=${enrollmentState.failure}",
+                enrollmentState.enrollment,
+            )
             waitTag("mfa_setup_secret")
             compose.onNodeWithTag("mfa_otp").performScrollTo().performTextInput("123456")
             compose.onNodeWithTag("mfa_confirm").performScrollTo().performClick()

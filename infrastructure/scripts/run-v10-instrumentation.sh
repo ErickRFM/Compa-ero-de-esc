@@ -174,4 +174,35 @@ for state in ('student', 'teacher', 'revoked', 'empty'):
 print('Verified four synthetic institutional screenshots for this distribution')
 PY
 fi
+if [[ "$instrumentation_status" -eq 0 && "$variant" == Management ]]; then
+  if ! api_level=$(adb shell getprop ro.build.version.sdk); then
+    echo "Cannot verify emulator API before MFA stability executions" >&2
+    exit 1
+  fi
+  api_level="${api_level//$'\r'/}"
+  if [[ ! "$api_level" =~ ^[0-9]+$ ]]; then
+    echo "Invalid emulator API before MFA stability executions" >&2
+    exit 1
+  fi
+  if [[ "$api_level" == 35 ]]; then
+  # Require two additional real MFA executions after the complete suite passed.
+  runner_component=$(adb shell pm list instrumentation | tr -d '\r' | \
+    awk -v target="(target=$COMPANERO_EVIDENCE_PACKAGE)" '$2 == target { sub(/^instrumentation:/, "", $1); print $1 }')
+  test -n "$runner_component"
+  for iteration in 1 2; do
+    stability_log="build/v10-runner-diagnostics/mfa-stability-api35-${iteration}.log"
+    if ! adb shell am instrument -w -r \
+      -e class org.companerodeescuela.V12AdministrationUiTest\#profileNavigatesToRealMfaRepositoryAndConfirmationClearsSetupMaterial \
+      "$runner_component" > "$stability_log" 2>&1; then
+      instrumentation_status=1
+      break
+    fi
+    cat "$stability_log"
+    if ! grep -Fq 'OK (1 test)' "$stability_log" || ! grep -Fq 'INSTRUMENTATION_CODE: -1' "$stability_log"; then
+      instrumentation_status=1
+      break
+    fi
+  done
+  fi
+fi
 exit "$instrumentation_status"

@@ -87,6 +87,7 @@ class SiiiHttpAcademicAuthorityTest {
                 assertFailsWith<ApiException.Forbidden> { authority.current("native-tenant", InstitutionalIdentityKind.STUDENT, "STUDENT") }
                 responseCode.set(404)
                 assertFailsWith<ApiException.NotFound> { authority.current("native-tenant", InstitutionalIdentityKind.STUDENT, "STUDENT") }
+                Unit
             } finally {
                 server.stop(0)
             }

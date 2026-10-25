@@ -1,6 +1,7 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.feature.classroom
 
-import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -8,15 +9,16 @@ import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material3.Button
-import org.companerodeescuela.core.ui.component.CompaneroSurface
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -24,36 +26,36 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MenuBook
-import org.companerodeescuela.core.designsystem.v8.V8IconTile
-import androidx.compose.ui.text.font.FontWeight
-import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
-import org.companerodeescuela.core.designsystem.v8.V8GlassCard
-import org.companerodeescuela.core.designsystem.v8.V8RedColors
-import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
-import org.companerodeescuela.core.ui.component.StatusNotice
-import org.companerodeescuela.shared.contracts.ClassroomStatus
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.companerodeescuela.core.designsystem.theme.CompaneroSize
+import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
+import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8IconTile
+import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
+import org.companerodeescuela.core.designsystem.v8.V8RedColors
+import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
+import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
+import org.companerodeescuela.core.ui.component.CompaneroSurface
+import org.companerodeescuela.core.ui.component.StatusNotice
+import org.companerodeescuela.shared.contracts.ClassInvite
+import org.companerodeescuela.shared.contracts.ClassroomStatus
+import org.companerodeescuela.shared.contracts.ClassroomSummary
+import org.companerodeescuela.shared.contracts.UserRole
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import org.companerodeescuela.core.designsystem.theme.CompaneroSize
-import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
-import org.companerodeescuela.shared.contracts.ClassInvite
-import org.companerodeescuela.shared.contracts.ClassroomSummary
-import org.companerodeescuela.shared.contracts.UserRole
 
 @Composable
 fun ClassroomScreen(
@@ -67,11 +69,11 @@ fun ClassroomScreen(
     onOpenStudentGrades: () -> Unit = {},
     viewModel: ClassroomViewModel? = null,
 ) {
-    if(!teacherExperience && roles.any { it==UserRole.ADMIN || it==UserRole.SUPER_ADMIN }) {
-        ClassroomAdministrationEditor(onOpenChannel={ onOpenChannel(null) },modifier=modifier)
+    if (!teacherExperience && roles.any { it == UserRole.ADMIN || it == UserRole.SUPER_ADMIN }) {
+        ClassroomAdministrationEditor(onOpenChannel = { onOpenChannel(null) }, modifier = modifier)
         return
     }
-    val model=viewModel ?: hiltViewModel<ClassroomViewModel>()
+    val model = viewModel ?: hiltViewModel<ClassroomViewModel>()
     val state by model.state.collectAsStateWithLifecycle()
     if (teacherExperience && UserRole.TEACHER in roles) {
         TeacherAssignedClassrooms(
@@ -92,14 +94,15 @@ fun ClassroomScreen(
     var joinCode by remember { mutableStateOf("") }
 
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .widthIn(max = CompaneroSize.homeContentMaxWidth)
-            .verticalScroll(rememberScrollState())
-            .padding(
-                horizontal = CompaneroSpacing.page,
-                vertical = CompaneroSpacing.sm,
-            ),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .widthIn(max = CompaneroSize.homeContentMaxWidth)
+                .verticalScroll(rememberScrollState())
+                .padding(
+                    horizontal = CompaneroSpacing.page,
+                    vertical = CompaneroSpacing.sm,
+                ),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
         V8ScreenHeader {
@@ -152,17 +155,19 @@ fun ClassroomScreen(
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
-                        text = "Usa un código de incorporación emitido por control escolar cuando tu grupo todavía no se haya sincronizado automáticamente.",
+                        text =
+                            "Usa un código de incorporación emitido por control escolar cuando tu grupo todavía no se haya sincronizado automáticamente.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     OutlinedTextField(
                         value = joinCode,
                         onValueChange = { raw ->
-                            joinCode = raw
-                                .uppercase()
-                                .filter { it.isLetterOrDigit() || it == '-' }
-                                .take(9)
+                            joinCode =
+                                raw
+                                    .uppercase()
+                                    .filter { it.isLetterOrDigit() || it == '-' }
+                                    .take(9)
                         },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
@@ -214,7 +219,8 @@ fun ClassroomScreen(
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
-                        text = "Cuando control escolar verifique tu perfil y te asigne grupos, tus clases y horarios aparecerán aquí automáticamente.",
+                        text =
+                            "Cuando control escolar verifique tu perfil y te asigne grupos, tus clases y horarios aparecerán aquí automáticamente.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -238,11 +244,12 @@ fun ClassroomScreen(
 
         if (!state.loading && state.classrooms.isEmpty()) {
             Text(
-                text = when {
-                    pendingTeacher -> "Todavía no tienes clases. Tu perfil docente sigue pendiente de verificación."
-                    isStudent -> "Control escolar todavía no ha vinculado clases a tu grupo."
-                    else -> "Todavía no hay clases académicas asignadas."
-                },
+                text =
+                    when {
+                        pendingTeacher -> "Todavía no tienes clases. Tu perfil docente sigue pendiente de verificación."
+                        isStudent -> "Control escolar todavía no ha vinculado clases a tu grupo."
+                        else -> "Todavía no hay clases académicas asignadas."
+                    },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -261,7 +268,6 @@ fun ClassroomScreen(
     }
 }
 
-
 /**
  * Teacher experience is read-only with respect to academic assignments:
  * control escolar creates groups; teachers operate only assigned active classes.
@@ -276,18 +282,22 @@ private fun TeacherAssignedClassrooms(
     onOpenGrading: (ClassroomSummary) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val assigned = state.classrooms.filter {
-        it.canManage && it.status == ClassroomStatus.ACTIVE && it.teacherId == teacherUserId
-    }
+    val assigned =
+        state.classrooms.filter {
+            it.canManage && it.status == ClassroomStatus.ACTIVE && it.teacherId == teacherUserId
+        }
     Box(modifier = modifier.fillMaxSize()) {
         if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current) {
             V8MatteBackdrop(modifier = Modifier.matchParentSize())
         }
         Column(
-            modifier = Modifier.align(Alignment.TopCenter)
-                .widthIn(max = CompaneroSize.homeContentMaxWidth).fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
+            modifier =
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .widthIn(max = CompaneroSize.homeContentMaxWidth)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
         ) {
             V8ScreenHeader {
@@ -320,8 +330,13 @@ private fun TeacherAssignedClassrooms(
                             style = MaterialTheme.typography.titleLarge,
                         )
                         Text(
-                            text = assigned.mapNotNull { it.groupName }.distinct().size.toString() +
-                                " grupos vinculados · permisos de docente",
+                            text =
+                                assigned
+                                    .mapNotNull { it.groupName }
+                                    .distinct()
+                                    .size
+                                    .toString() +
+                                    " grupos vinculados · permisos de docente",
                             color = V8RedColors.TextSecondary,
                             style = MaterialTheme.typography.bodySmall,
                         )
@@ -333,20 +348,21 @@ private fun TeacherAssignedClassrooms(
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 V8IconTile(Icons.Filled.MenuBook)
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(
-                                text = classroom.name,
-                                color = V8RedColors.TextPrimary,
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                )
-                            Text(
-                                text = listOfNotNull(
-                                    classroom.groupName?.takeIf(String::isNotBlank),
-                                    classroom.room?.takeIf(String::isNotBlank)?.let { "Aula $it" },
-                                ).joinToString(" · ").ifBlank { "Clase asignada" },
-                                color = V8RedColors.TextSecondary,
-                                style = MaterialTheme.typography.bodyMedium,
-                                )
+                                    Text(
+                                        text = classroom.name,
+                                        color = V8RedColors.TextPrimary,
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                    Text(
+                                        text =
+                                            listOfNotNull(
+                                                classroom.groupName?.takeIf(String::isNotBlank),
+                                                classroom.room?.takeIf(String::isNotBlank)?.let { "Aula $it" },
+                                            ).joinToString(" · ").ifBlank { "Clase asignada" },
+                                        color = V8RedColors.TextSecondary,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
                                 }
                             }
                             V8RedPrimaryButton(
@@ -369,8 +385,11 @@ private fun TeacherAssignedClassrooms(
                     }
                 }
             }
-            OutlinedButton(onClick = onRefresh, enabled = !state.loading && !state.submitting,
-                modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                onClick = onRefresh,
+                enabled = !state.loading && !state.submitting,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Text("Actualizar clases")
             }
         }
@@ -393,17 +412,18 @@ internal fun ClassroomCard(
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
-                text = buildString {
-                    classroom.groupName?.let {
-                        append(it)
-                        append(" · ")
-                    }
-                    append(classroom.teacherDisplayName)
-                    classroom.room?.let {
-                        append(" · ")
-                        append(it)
-                    }
-                },
+                text =
+                    buildString {
+                        classroom.groupName?.let {
+                            append(it)
+                            append(" · ")
+                        }
+                        append(classroom.teacherDisplayName)
+                        classroom.room?.let {
+                            append(" · ")
+                            append(it)
+                        }
+                    },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -483,7 +503,10 @@ internal fun InviteCard(
     }
 }
 
-internal fun copyInvite(context: Context, invite: ClassInvite) {
+internal fun copyInvite(
+    context: Context,
+    invite: ClassInvite,
+) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(
         ClipData.newPlainText(
@@ -493,19 +516,25 @@ internal fun copyInvite(context: Context, invite: ClassInvite) {
     )
 }
 
-internal fun shareInvite(context: Context, invite: ClassInvite) {
-    val text = "Control escolar te invita a vincular una clase en Compañero con el código " +
-        invite.code +
-        ". El código es temporal."
-    val intent = Intent(Intent.ACTION_SEND)
-        .setType("text/plain")
-        .putExtra(Intent.EXTRA_TEXT, text)
+internal fun shareInvite(
+    context: Context,
+    invite: ClassInvite,
+) {
+    val text =
+        "Control escolar te invita a vincular una clase en Compañero con el código " +
+            invite.code +
+            ". El código es temporal."
+    val intent =
+        Intent(Intent.ACTION_SEND)
+            .setType("text/plain")
+            .putExtra(Intent.EXTRA_TEXT, text)
     context.startActivity(Intent.createChooser(intent, "Compartir clave"))
 }
 
 private fun expiryLabel(epochSeconds: Long): String {
     val formatter = DateTimeFormatter.ofPattern("HH:mm")
-    return Instant.ofEpochSecond(epochSeconds)
+    return Instant
+        .ofEpochSecond(epochSeconds)
         .atZone(ZoneId.systemDefault())
         .format(formatter)
 }

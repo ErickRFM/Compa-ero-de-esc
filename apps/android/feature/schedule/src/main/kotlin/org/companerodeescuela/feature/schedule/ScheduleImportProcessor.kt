@@ -10,9 +10,9 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import kotlinx.coroutines.suspendCancellableCoroutine
 
 class ScheduleImportProcessor(
     private val context: Context,
@@ -52,8 +52,9 @@ class ScheduleImportProcessor(
     }
 
     private suspend fun extractPdf(uri: Uri): String {
-        val descriptor = context.contentResolver.openFileDescriptor(uri, "r")
-            ?: error("No se pudo abrir el PDF")
+        val descriptor =
+            context.contentResolver.openFileDescriptor(uri, "r")
+                ?: error("No se pudo abrir el PDF")
         descriptor.use { fd ->
             PdfRenderer(fd).use { renderer ->
                 val pages = minOf(renderer.pageCount, MAX_PAGES)
@@ -63,11 +64,12 @@ class ScheduleImportProcessor(
                             // A timetable fits seven narrow columns on one PDF page.
                             // Rendering at native 72 DPI leaves glyphs too small for ML Kit.
                             val scale = minOf(3f, MAX_RENDER_DIMENSION / maxOf(page.width, page.height).toFloat())
-                            val bitmap = Bitmap.createBitmap(
-                                (page.width * scale).toInt().coerceAtLeast(1),
-                                (page.height * scale).toInt().coerceAtLeast(1),
-                                Bitmap.Config.ARGB_8888,
-                            )
+                            val bitmap =
+                                Bitmap.createBitmap(
+                                    (page.width * scale).toInt().coerceAtLeast(1),
+                                    (page.height * scale).toInt().coerceAtLeast(1),
+                                    Bitmap.Config.ARGB_8888,
+                                )
                             bitmap.eraseColor(Color.WHITE)
                             page.render(
                                 bitmap,
@@ -78,13 +80,14 @@ class ScheduleImportProcessor(
                             try {
                                 // Use the seven real grid cells, not OCR header centers.
                                 // Text from two neighboring classes may be only 2px apart.
-                                val columns = detectWeeklyPdfGrid(bitmap.width, bitmap.height) { x, y ->
-                                    val pixel = bitmap.getPixel(x, y)
-                                    val red = pixel shr 16 and 0xFF
-                                    val green = pixel shr 8 and 0xFF
-                                    val blue = pixel and 0xFF
-                                    red + green + blue < 630
-                                }
+                                val columns =
+                                    detectWeeklyPdfGrid(bitmap.width, bitmap.height) { x, y ->
+                                        val pixel = bitmap.getPixel(x, y)
+                                        val red = pixel shr 16 and 0xFF
+                                        val green = pixel shr 8 and 0xFF
+                                        val blue = pixel and 0xFF
+                                        red + green + blue < 630
+                                    }
                                 add(recognize(InputImage.fromBitmap(bitmap, 0), columns))
                             } finally {
                                 bitmap.recycle()
@@ -103,15 +106,15 @@ class ScheduleImportProcessor(
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
         return try {
             suspendCancellableCoroutine { continuation ->
-                recognizer.process(image)
+                recognizer
+                    .process(image)
                     .addOnSuccessListener { result ->
                         if (continuation.isActive) {
                             continuation.resume(
                                 TimetableOcrReconstructor.reconstruct(result, pdfColumns) ?: result.text,
                             )
                         }
-                    }
-                    .addOnFailureListener { error ->
+                    }.addOnFailureListener { error ->
                         if (continuation.isActive) continuation.resumeWithException(error)
                     }
             }
@@ -134,20 +137,22 @@ class ScheduleImportProcessor(
  * assigning Wednesday/Thursday cells to Friday when OCR misses their labels.
  */
 internal object TimetableOcrReconstructor {
-    private val dayNames = linkedMapOf(
-        "Lunes" to listOf("lunes"),
-        "Martes" to listOf("martes"),
-        "Miércoles" to listOf("miércoles", "miercoles"),
-        "Jueves" to listOf("jueves"),
-        "Viernes" to listOf("viernes"),
-        "Sábado" to listOf("sábado", "sabado"),
-        "Domingo" to listOf("domingo"),
-    )
+    private val dayNames =
+        linkedMapOf(
+            "Lunes" to listOf("lunes"),
+            "Martes" to listOf("martes"),
+            "Miércoles" to listOf("miércoles", "miercoles"),
+            "Jueves" to listOf("jueves"),
+            "Viernes" to listOf("viernes"),
+            "Sábado" to listOf("sábado", "sabado"),
+            "Domingo" to listOf("domingo"),
+        )
 
-    private val timeRange = Regex(
-        """\b([01]?\d|2[0-3])[:.]([0-5]\d)\s*(?:-|–|—|a)\s*([01]?\d|2[0-3])[:.]([0-5]\d)\b""",
-        RegexOption.IGNORE_CASE,
-    )
+    private val timeRange =
+        Regex(
+            """\b([01]?\d|2[0-3])[:.]([0-5]\d)\s*(?:-|–|—|a)\s*([01]?\d|2[0-3])[:.]([0-5]\d)\b""",
+            RegexOption.IGNORE_CASE,
+        )
 
     internal data class PositionedLine(
         val text: String,
@@ -156,22 +161,27 @@ internal object TimetableOcrReconstructor {
         val left: Int,
     )
 
-    fun reconstruct(result: Text, pdfColumns: List<Pair<Float, Float>>? = null): String? {
+    fun reconstruct(
+        result: Text,
+        pdfColumns: List<Pair<Float, Float>>? = null,
+    ): String? {
         val lines = result.textBlocks.flatMap { it.lines }
-        val positionedLines = lines.mapNotNull { line ->
-            val box = line.boundingBox ?: return@mapNotNull null
-            val value = line.text.trim().takeIf(String::isNotBlank) ?: return@mapNotNull null
-            PositionedLine(value, box.exactCenterX(), box.exactCenterY(), box.left)
-        }
-        // OCR text line boxes may encompass portions of adjacent timetable
-        // columns. Individual word boxes must be classified separately.
-        val positionedWords = lines.flatMap { line ->
-            line.elements.mapNotNull { word ->
-                val box = word.boundingBox ?: return@mapNotNull null
-                val value = word.text.trim().takeIf(String::isNotBlank) ?: return@mapNotNull null
+        val positionedLines =
+            lines.mapNotNull { line ->
+                val box = line.boundingBox ?: return@mapNotNull null
+                val value = line.text.trim().takeIf(String::isNotBlank) ?: return@mapNotNull null
                 PositionedLine(value, box.exactCenterX(), box.exactCenterY(), box.left)
             }
-        }
+        // OCR text line boxes may encompass portions of adjacent timetable
+        // columns. Individual word boxes must be classified separately.
+        val positionedWords =
+            lines.flatMap { line ->
+                line.elements.mapNotNull { word ->
+                    val box = word.boundingBox ?: return@mapNotNull null
+                    val value = word.text.trim().takeIf(String::isNotBlank) ?: return@mapNotNull null
+                    PositionedLine(value, box.exactCenterX(), box.exactCenterY(), box.left)
+                }
+            }
         return reconstructLines(
             positionedLines,
             pdfColumns,
@@ -184,54 +194,71 @@ internal object TimetableOcrReconstructor {
         pdfColumns: List<Pair<Float, Float>>? = null,
         tokens: List<PositionedLine> = lines,
     ): String? {
-        val observed = dayNames.entries.mapIndexedNotNull { index, (name, aliases) ->
-            lines.firstOrNull { line ->
-                val normalized = line.text.lowercase()
-                aliases.any { alias -> normalized == alias || normalized.startsWith("$alias ") }
-            }?.let { Triple(index, name, it) }
-        }.sortedBy { it.first }
+        val observed =
+            dayNames.entries
+                .mapIndexedNotNull { index, (name, aliases) ->
+                    lines
+                        .firstOrNull { line ->
+                            val normalized = line.text.lowercase()
+                            aliases.any { alias -> normalized == alias || normalized.startsWith("$alias ") }
+                        }?.let { Triple(index, name, it) }
+                }.sortedBy { it.first }
 
-        val anchors = lines.mapNotNull { line ->
-            val match = timeRange.find(line.text) ?: return@mapNotNull null
-            Triple(normalizeRange(match), line.centerY, line.centerX)
-        }.distinctBy { it.first + "@" + it.second.toInt() }.sortedBy { it.second }
+        val anchors =
+            lines
+                .mapNotNull { line ->
+                    val match = timeRange.find(line.text) ?: return@mapNotNull null
+                    Triple(normalizeRange(match), line.centerY, line.centerX)
+                }.distinctBy { it.first + "@" + it.second.toInt() }
+                .sortedBy { it.second }
 
         if (anchors.size < MIN_TIME_ROWS) return null
         val gridPresent = pdfColumns?.size == 7
-        if (!gridPresent && (
+        if (!gridPresent &&
+            (
                 observed.size < MIN_DAY_HEADERS ||
                     !timetableHeadersShareRow(
                         observed.map { it.third.centerX to it.third.centerY },
                         rowBand(anchors) * 2,
                     )
-                )
-        ) return null
-
-        val dayBounds = if (gridPresent) {
-            checkNotNull(pdfColumns)
-        } else {
-            // Fallback only for pages where the seven grid dividers are absent.
-            val spacing = observed.zipWithNext { a, b ->
-                (b.third.centerX - a.third.centerX) / (b.first - a.first)
-            }.filter { it > 0f }.sorted()
-            val step = spacing.getOrNull(spacing.size / 2) ?: return null
-            val origin = observed.map { it.third.centerX - it.first * step }.average().toFloat()
-            (0..6).map { i ->
-                (origin + (i - 0.5f) * step) to (origin + (i + 0.5f) * step)
-            }
+            )
+        ) {
+            return null
         }
 
-        val timeRows = anchors.filter { it.third < dayBounds.first().first }
-            .ifEmpty { anchors }.sortedBy { it.second }
+        val dayBounds =
+            if (gridPresent) {
+                checkNotNull(pdfColumns)
+            } else {
+                // Fallback only for pages where the seven grid dividers are absent.
+                val spacing =
+                    observed
+                        .zipWithNext { a, b ->
+                            (b.third.centerX - a.third.centerX) / (b.first - a.first)
+                        }.filter { it > 0f }
+                        .sorted()
+                val step = spacing.getOrNull(spacing.size / 2) ?: return null
+                val origin = observed.map { it.third.centerX - it.first * step }.average().toFloat()
+                (0..6).map { i ->
+                    (origin + (i - 0.5f) * step) to (origin + (i + 0.5f) * step)
+                }
+            }
+
+        val timeRows =
+            anchors
+                .filter { it.third < dayBounds.first().first }
+                .ifEmpty { anchors }
+                .sortedBy { it.second }
         if (timeRows.size < MIN_TIME_ROWS) return null
 
         val observedHeaders = observed.map { it.third }.toSet()
         val excluded = lines.filter { it in observedHeaders || timeRange.containsMatchIn(it.text) }.toSet()
-        val contentWords = tokens.filterNot { token ->
-            token in excluded ||
-                timeRange.containsMatchIn(token.text) ||
-                dayNames.values.flatten().any { alias -> token.text.equals(alias, ignoreCase = true) }
-        }
+        val contentWords =
+            tokens.filterNot { token ->
+                token in excluded ||
+                    timeRange.containsMatchIn(token.text) ||
+                    dayNames.values.flatten().any { alias -> token.text.equals(alias, ignoreCase = true) }
+            }
         return buildString {
             dayNames.keys.forEachIndexed { dayIndex, day ->
                 if (dayIndex > 0) appendLine()
@@ -240,36 +267,45 @@ internal object TimetableOcrReconstructor {
                 timeRows.forEachIndexed { rowIndex, row ->
                     val previousY = timeRows.getOrNull(rowIndex - 1)?.second
                     val nextY = timeRows.getOrNull(rowIndex + 1)?.second
-                    val top = previousY?.let { (it + row.second) / 2f }
-                        ?: row.second - rowBand(timeRows)
-                    val bottom = nextY?.let { (it + row.second) / 2f }
-                        ?: row.second + rowBand(timeRows)
+                    val top =
+                        previousY?.let { (it + row.second) / 2f }
+                            ?: row.second - rowBand(timeRows)
+                    val bottom =
+                        nextY?.let { (it + row.second) / 2f }
+                            ?: row.second + rowBand(timeRows)
 
-                    val cell = contentWords.asSequence()
-                        .filter { it.centerY >= top && it.centerY < bottom }
-                        .filter {
-                            // Exact cell boundaries distinguish Tuesday from
-                            // Wednesday even when a word starts at the divider.
-                            val x = it.centerX
-                            x >= dayBounds[dayIndex].first && x < dayBounds[dayIndex].second
-                        }
-                        .sortedWith(compareBy<PositionedLine>({ it.centerY }, { it.left }))
-                        .toList()
+                    val cell =
+                        contentWords
+                            .asSequence()
+                            .filter { it.centerY >= top && it.centerY < bottom }
+                            .filter {
+                                // Exact cell boundaries distinguish Tuesday from
+                                // Wednesday even when a word starts at the divider.
+                                val x = it.centerX
+                                x >= dayBounds[dayIndex].first && x < dayBounds[dayIndex].second
+                            }.sortedWith(compareBy<PositionedLine>({ it.centerY }, { it.left }))
+                            .toList()
 
                     // Timetable subjects sit above the printed time label's
                     // center; teacher names sit below it. Keep multi-line
                     // subjects together, and never turn an orphaned teacher
                     // line into its own class.
-                    val subject = cell.filter { it.centerY < row.second }
-                        .joinToString(" ") { it.text.trim() }
-                        .replace(Regex("""\s+"""), " ").trim()
+                    val subject =
+                        cell
+                            .filter { it.centerY < row.second }
+                            .joinToString(" ") { it.text.trim() }
+                            .replace(Regex("""\s+"""), " ")
+                            .trim()
                     if (subject.isNotBlank()) {
                         append(row.first)
                         append(' ')
                         appendLine(subject)
-                        val teacher = cell.filter { it.centerY >= row.second }
-                            .joinToString(" ") { it.text.trim() }
-                            .replace(Regex("""\s+"""), " ").trim()
+                        val teacher =
+                            cell
+                                .filter { it.centerY >= row.second }
+                                .joinToString(" ") { it.text.trim() }
+                                .replace(Regex("""\s+"""), " ")
+                                .trim()
                         if (teacher.isNotBlank()) appendLine(teacher)
                     }
                 }
@@ -278,14 +314,18 @@ internal object TimetableOcrReconstructor {
     }
 
     private fun rowBand(rows: List<Triple<String, Float, Float>>): Float {
-        val deltas = rows.zipWithNext { a, b -> kotlin.math.abs(b.second - a.second) }
-            .filter { it > 0f }
+        val deltas =
+            rows
+                .zipWithNext { a, b -> kotlin.math.abs(b.second - a.second) }
+                .filter { it > 0f }
         return (deltas.sorted().getOrNull(deltas.size / 2) ?: DEFAULT_ROW_BAND) / 2f
     }
 
     private fun normalizeRange(match: MatchResult): String {
-        fun time(hour: String, minute: String): String =
-            hour.toInt().toString().padStart(2, '0') + ":" + minute
+        fun time(
+            hour: String,
+            minute: String,
+        ): String = hour.toInt().toString().padStart(2, '0') + ":" + minute
         return time(match.groupValues[1], match.groupValues[2]) + "-" +
             time(match.groupValues[3], match.groupValues[4])
     }

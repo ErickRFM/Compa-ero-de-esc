@@ -49,8 +49,8 @@ import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
-import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8ColorScheme
+import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.motion.CompaneroMotionPolicy
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences

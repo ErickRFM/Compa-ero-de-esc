@@ -17,15 +17,17 @@ internal fun detectWeeklyPdfGrid(
     val firstY = (height * 0.21f).toInt()
     val lastY = (height * 0.88f).toInt()
     val sampleCount = 52
-    val sampleYs = (0 until sampleCount).map { i ->
-        firstY + (lastY - firstY) * i / (sampleCount - 1)
-    }
+    val sampleYs =
+        (0 until sampleCount).map { i ->
+            firstY + (lastY - firstY) * i / (sampleCount - 1)
+        }
 
     // Border lines are continuous across most rows. Ordinary printed text
     // never occupies 75% of these distant sample points at a fixed x.
-    val inkColumns = (1 until width - 1).filter { x ->
-        sampleYs.count { y -> isDarkPixel(x, y) } >= sampleCount * 3 / 4
-    }
+    val inkColumns =
+        (1 until width - 1).filter { x ->
+            sampleYs.count { y -> isDarkPixel(x, y) } >= sampleCount * 3 / 4
+        }
     if (inkColumns.isEmpty()) return null
 
     val runs = mutableListOf<MutableList<Int>>()

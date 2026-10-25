@@ -74,4 +74,8 @@ class MfaViewModel @Inject constructor(private val repository:MfaRepository):Vie
         generation++;statusJob?.cancel();operationJob?.cancel()
         mutable.value=mutable.value.copy(loading=false,working=false,enrollment=null,failure=null)
     }
+
+    fun onEnter() {
+        if (!mutable.value.loading) refresh()
+    }
 }

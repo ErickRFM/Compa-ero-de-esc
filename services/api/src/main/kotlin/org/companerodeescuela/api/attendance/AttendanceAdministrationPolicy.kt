@@ -40,8 +40,12 @@ class AttendanceAdministrationPolicy(
                 throw ApiException.Forbidden("Current assigned teacher is required")
             }
             val teacher = accounts.findById(session.openedBy) ?: throw ApiException.Forbidden("Assigned teacher is unavailable")
-            (projection ?: throw ApiException.DependencyUnavailable("Institutional attendance authority is unavailable"))
-                .requireSession(teacher.toUserSummary(), session)
+            try {
+                (projection ?: throw ApiException.DependencyUnavailable("Institutional attendance authority is unavailable"))
+                    .requireSession(teacher.toUserSummary(), session)
+            } catch (_: ApiException.Unauthorized) {
+                throw ApiException.Forbidden("Attendance teacher identity is no longer active")
+            }
             return
         }
         if (session.identitySource != AttendanceIdentitySource.NATIVE ||

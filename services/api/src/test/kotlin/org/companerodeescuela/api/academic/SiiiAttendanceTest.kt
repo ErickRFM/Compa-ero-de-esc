@@ -226,6 +226,24 @@ class SiiiAttendanceTest {
             assertEquals(emptyList(), students.discoverActiveFor(student.id, student))
             assertFailsWith<ApiException.Forbidden> { sessions.roster(teacher.id, session.id, nativeActor = teacher) }
             assertEquals(HttpStatusCode.Forbidden, get("/attendance/sessions/${session.id}/roster", "teacher").status)
+            f.sections =
+                listOf(
+                    org.companerodeescuela.api.integrations.academic.siii
+                        .SiiiAuthoritySection(f.sectionId, 1),
+                )
+            f.accounts.changeIdentity(
+                teacher.id,
+                0,
+                org.companerodeescuela.api.auth.AccountIdentityChange(
+                    "synthetic-suspend",
+                    "global",
+                    org.companerodeescuela.shared.contracts.AccountStatus.SUSPENDED,
+                    setOf(UserRole.TEACHER),
+                    "tenant-a",
+                    f.now,
+                ),
+            )
+            assertFailsWith<ApiException.Forbidden> { sessions.roster("global", session.id, true, superAccount.toUserSummary()) }
             Unit
         }
 }

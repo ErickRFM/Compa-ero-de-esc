@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -116,6 +117,8 @@ fun ClassroomScreen(
                 Text("Calificaciones")
             }
         }
+        InstitutionalSections(state)
+        TextButton(onClick = model::refresh) { Text("Actualizar clases") }
         OutlinedButton(onClick = { onOpenChannel(null) }, modifier = Modifier.fillMaxWidth()) {
             Text("Canal de clase")
         }
@@ -144,7 +147,7 @@ fun ClassroomScreen(
             )
         }
 
-        if (isStudent && state.groups.isEmpty()) {
+        if (isStudent && state.groups.isEmpty() && state.institutionalSource != "SIII") {
             CompaneroSurface(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(CompaneroSpacing.md),
@@ -192,7 +195,7 @@ fun ClassroomScreen(
                     verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
                 ) {
                     Text(
-                        text = "Grupo sincronizado",
+                        text = "Grupos de Compañero",
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
@@ -200,7 +203,9 @@ fun ClassroomScreen(
                         style = MaterialTheme.typography.bodyLarge,
                     )
                     Text(
-                        text = "Las materias y cambios de horario publicados por control escolar se reflejan automáticamente.",
+                        text =
+                            "Estos grupos colaborativos conservan permisos propios; " +
+                                "tus inscripciones oficiales aparecen en el catálogo institucional.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -308,6 +313,7 @@ private fun TeacherAssignedClassrooms(
                     color = V8RedColors.TextPrimary,
                 )
             }
+            InstitutionalSections(state)
             Text(
                 text = "Tus materias y grupos asignados por control escolar. Desde aquí puedes pasar lista, publicar avisos y evaluar.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -391,6 +397,39 @@ private fun TeacherAssignedClassrooms(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Actualizar clases")
+            }
+        }
+    }
+}
+
+@Composable
+internal fun InstitutionalSections(state: ClassroomUiState) {
+    if (state.institutionalLoading) CircularProgressIndicator()
+    state.institutionalErrorMessage?.let {
+        StatusNotice(title = "Datos institucionales sin actualizar", message = it)
+    }
+    if (state.institutionalSource != "SIII") return
+    Column(Modifier.fillMaxWidth().testTag("institutional_sections"), verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
+        Text("Clases institucionales · SIII", style = MaterialTheme.typography.titleMedium)
+        if (state.institutionalFromCache) {
+            Text(
+                "Última sincronización guardada. Requiere conexión para confirmar vigencia.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        if (state.institutionalSections.isEmpty()) Text("No hay inscripciones o asignaciones institucionales vigentes.")
+        state.institutionalSections.forEach { section ->
+            Column(
+                Modifier.fillMaxWidth().testTag("institutional_section_${section.id}"),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(section.subjectName, style = MaterialTheme.typography.titleMedium)
+                Text("${section.subjectCode} · Grupo ${section.groupName}", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    section.teacherNames.joinToString(" · ").ifBlank { "Docente pendiente de asignación" },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text("Fuente institucional · versión ${section.sourceVersion}", style = MaterialTheme.typography.bodySmall)
             }
         }
     }

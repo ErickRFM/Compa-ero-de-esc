@@ -8,10 +8,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.companerodeescuela.core.academic.AcademicRepository
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.shared.contracts.AcademicGroupSummary
 import org.companerodeescuela.shared.contracts.ClassInvite
 import org.companerodeescuela.shared.contracts.ClassroomSummary
+import org.companerodeescuela.shared.contracts.InstitutionalAcademicSection
 import javax.inject.Inject
 
 data class ClassroomUiState(
@@ -22,6 +24,11 @@ data class ClassroomUiState(
     val activeInvite: ClassInvite? = null,
     val errorMessage: String? = null,
     val successMessage: String? = null,
+    val institutionalLoading: Boolean = true,
+    val institutionalSections: List<InstitutionalAcademicSection> = emptyList(),
+    val institutionalSource: String? = null,
+    val institutionalErrorMessage: String? = null,
+    val institutionalFromCache: Boolean = false,
 )
 
 @HiltViewModel
@@ -30,6 +37,7 @@ class ClassroomViewModel
     constructor(
         private val repository: ClassroomRepository,
         private val groupRepository: AcademicGroupRepository,
+        private val academicRepository: AcademicRepository,
     ) : ViewModel() {
         private val _state = MutableStateFlow(ClassroomUiState())
         val state: StateFlow<ClassroomUiState> = _state.asStateFlow()
@@ -40,7 +48,35 @@ class ClassroomViewModel
 
         fun refresh() {
             viewModelScope.launch {
-                _state.update { it.copy(loading = true, errorMessage = null) }
+                _state.update {
+                    it.copy(
+                        loading = true,
+                        errorMessage = null,
+                        institutionalLoading = true,
+                        institutionalErrorMessage = null,
+                    )
+                }
+                when (val academic = academicRepository.load()) {
+                    is Outcome.Success ->
+                        _state.update {
+                            it.copy(
+                                institutionalLoading = false,
+                                institutionalSections = academic.value.academic.institutionalSections,
+                                institutionalSource = academic.value.academic.institutionalSource,
+                                institutionalFromCache = academic.value.fromCache,
+                            )
+                        }
+                    is Outcome.Failure ->
+                        _state.update {
+                            it.copy(
+                                institutionalLoading = false,
+                                institutionalSections = emptyList(),
+                                institutionalSource = null,
+                                institutionalErrorMessage = academic.error.userMessage,
+                                institutionalFromCache = false,
+                            )
+                        }
+                }
                 when (val outcome = repository.classrooms()) {
                     is Outcome.Success ->
                         _state.update {
@@ -54,6 +90,7 @@ class ClassroomViewModel
                         _state.update {
                             it.copy(
                                 loading = false,
+                                classrooms = emptyList(),
                                 errorMessage = outcome.error.userMessage,
                             )
                         }
@@ -63,7 +100,14 @@ class ClassroomViewModel
                         _state.update {
                             it.copy(groups = outcome.value)
                         }
-                    is Outcome.Failure -> Unit
+                    is Outcome.Failure ->
+                        _state.update {
+                            it.copy(
+                                groups = emptyList(),
+                                errorMessage =
+                                    it.errorMessage ?: outcome.error.userMessage,
+                            )
+                        }
                 }
             }
         }

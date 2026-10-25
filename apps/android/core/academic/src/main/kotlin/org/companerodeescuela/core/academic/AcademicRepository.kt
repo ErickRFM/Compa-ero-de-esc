@@ -109,10 +109,15 @@ class AcademicRepository(
                 // Authority and contract responses must remain visible. Cached
                 // schedules must never make a revoked or out-of-scope account look valid.
                 if (error is AppError.Http && error.status in 400..499) {
+                    runCatching { cache.clear(claims.userId) }
                     remote
                 } else {
                     val cached = runCatching { cache.read(claims.userId) }.getOrNull()
-                    if (cached != null) {
+                    if (error is AppError.Http && cached?.value?.institutionalSource == "SIII") {
+                        // An authority/projection failure must remain visible even
+                        // when an older official catalog was cached successfully.
+                        remote
+                    } else if (cached != null) {
                         Outcome.Success(
                             AcademicContent(
                                 academic = mergePersonal(cached.value, claims.userId),
@@ -206,9 +211,9 @@ class AcademicRepository(
     private fun mergeEntries(
         institutional: List<ScheduleEntry>,
         personal: List<ScheduleEntry>,
-    ): List<ScheduleEntry> {
-        val institutionalKeys = institutional.map(::scheduleKey).toSet()
-        return (institutional + personal.filter { scheduleKey(it) !in institutionalKeys })
+    ): List<ScheduleEntry> =
+        (institutional + personal)
+            .distinctBy(::scheduleKey)
             .sortedWith(
                 compareBy<ScheduleEntry>(
                     { dayOrder(it.dayOfWeek) },
@@ -216,7 +221,6 @@ class AcademicRepository(
                     { it.subjectName },
                 ),
             )
-    }
 
     private suspend fun activeSession(): Pair<String, PlatformSessionClaims>? {
         val token =
@@ -253,6 +257,10 @@ private fun PersonalScheduleItem.toScheduleEntry(): ScheduleEntry =
 
 private fun scheduleKey(entry: ScheduleEntry): String =
     listOf(
+        entry.source.name,
+        entry.courseId,
+        entry.effectiveDate.orEmpty(),
+        entry.recurrence.name,
         entry.dayOfWeek.trim().uppercase(),
         entry.startsAt.trim(),
         entry.endsAt.trim(),

@@ -7,6 +7,8 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.database.AcademicSnapshotCache
@@ -66,7 +68,11 @@ class AcademicRepository(
         }
     }
 
-    suspend fun load(): Outcome<AcademicContent> {
+    private val loadMutex = Mutex()
+
+    suspend fun load(): Outcome<AcademicContent> = loadMutex.withLock { loadCurrent() }
+
+    private suspend fun loadCurrent(): Outcome<AcademicContent> {
         val session = activeSession() ?: return Outcome.Failure(AppError.Http(status = 401))
         val (token, claims) = session
 
@@ -108,16 +114,12 @@ class AcademicRepository(
                 val error = remote.error
                 // Authority and contract responses must remain visible. Cached
                 // schedules must never make a revoked or out-of-scope account look valid.
-                if (error is AppError.Http && error.status in 400..499) {
+                if (error !is AppError.Network) {
                     runCatching { cache.clear(claims.userId) }
                     remote
                 } else {
                     val cached = runCatching { cache.read(claims.userId) }.getOrNull()
-                    if (error is AppError.Http && cached?.value?.institutionalSource == "SIII") {
-                        // An authority/projection failure must remain visible even
-                        // when an older official catalog was cached successfully.
-                        remote
-                    } else if (cached != null) {
+                    if (cached != null) {
                         Outcome.Success(
                             AcademicContent(
                                 academic = mergePersonal(cached.value, claims.userId),

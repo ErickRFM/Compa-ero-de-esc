@@ -3,6 +3,9 @@ package org.companerodeescuela.feature.classroom
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,74 +45,84 @@ class ClassroomViewModel
         private val _state = MutableStateFlow(ClassroomUiState())
         val state: StateFlow<ClassroomUiState> = _state.asStateFlow()
 
+        private var refreshJob: Job? = null
+
         init {
             refresh()
         }
 
         fun refresh() {
-            viewModelScope.launch {
-                _state.update {
-                    it.copy(
-                        loading = true,
-                        errorMessage = null,
-                        institutionalLoading = true,
-                        institutionalErrorMessage = null,
-                    )
+            refreshJob?.cancel()
+            refreshJob =
+                viewModelScope.launch {
+                    _state.update {
+                        it.copy(
+                            loading = true,
+                            errorMessage = null,
+                            institutionalLoading = true,
+                            institutionalErrorMessage = null,
+                        )
+                    }
+                    val academic = academicRepository.load()
+                    currentCoroutineContext().ensureActive()
+                    when (academic) {
+                        is Outcome.Success ->
+                            _state.update {
+                                it.copy(
+                                    institutionalLoading = false,
+                                    institutionalSections = academic.value.academic.institutionalSections,
+                                    institutionalSource = academic.value.academic.institutionalSource,
+                                    institutionalFromCache = academic.value.fromCache,
+                                )
+                            }
+                        is Outcome.Failure ->
+                            _state.update {
+                                it.copy(
+                                    institutionalLoading = false,
+                                    institutionalSections = emptyList(),
+                                    institutionalSource = null,
+                                    institutionalErrorMessage = academic.error.userMessage,
+                                    institutionalFromCache = false,
+                                )
+                            }
+                    }
+                    val outcome = repository.classrooms()
+                    currentCoroutineContext().ensureActive()
+                    when (outcome) {
+                        is Outcome.Success ->
+                            _state.update {
+                                it.copy(
+                                    loading = false,
+                                    classrooms = outcome.value,
+                                    errorMessage = null,
+                                )
+                            }
+                        is Outcome.Failure ->
+                            _state.update {
+                                it.copy(
+                                    loading = false,
+                                    classrooms = emptyList(),
+                                    errorMessage = outcome.error.userMessage,
+                                )
+                            }
+                    }
+                    val groupOutcome = groupRepository.groups()
+                    currentCoroutineContext().ensureActive()
+                    when (groupOutcome) {
+                        is Outcome.Success ->
+                            _state.update {
+                                it.copy(groups = groupOutcome.value)
+                            }
+                        is Outcome.Failure ->
+                            _state.update {
+                                it.copy(
+                                    groups = emptyList(),
+                                    errorMessage =
+                                        it.errorMessage ?: groupOutcome.error.userMessage,
+                                )
+                            }
+                    }
                 }
-                when (val academic = academicRepository.load()) {
-                    is Outcome.Success ->
-                        _state.update {
-                            it.copy(
-                                institutionalLoading = false,
-                                institutionalSections = academic.value.academic.institutionalSections,
-                                institutionalSource = academic.value.academic.institutionalSource,
-                                institutionalFromCache = academic.value.fromCache,
-                            )
-                        }
-                    is Outcome.Failure ->
-                        _state.update {
-                            it.copy(
-                                institutionalLoading = false,
-                                institutionalSections = emptyList(),
-                                institutionalSource = null,
-                                institutionalErrorMessage = academic.error.userMessage,
-                                institutionalFromCache = false,
-                            )
-                        }
-                }
-                when (val outcome = repository.classrooms()) {
-                    is Outcome.Success ->
-                        _state.update {
-                            it.copy(
-                                loading = false,
-                                classrooms = outcome.value,
-                                errorMessage = null,
-                            )
-                        }
-                    is Outcome.Failure ->
-                        _state.update {
-                            it.copy(
-                                loading = false,
-                                classrooms = emptyList(),
-                                errorMessage = outcome.error.userMessage,
-                            )
-                        }
-                }
-                when (val outcome = groupRepository.groups()) {
-                    is Outcome.Success ->
-                        _state.update {
-                            it.copy(groups = outcome.value)
-                        }
-                    is Outcome.Failure ->
-                        _state.update {
-                            it.copy(
-                                groups = emptyList(),
-                                errorMessage =
-                                    it.errorMessage ?: outcome.error.userMessage,
-                            )
-                        }
-                }
-            }
         }
 
         fun join(code: String) {

@@ -8,8 +8,16 @@ plugins {
 
 android {
     namespace = "org.companerodeescuela.feature.schedule"
-    compileSdk = libs.versions.compileSdk.get().toInt()
-    defaultConfig { minSdk = libs.versions.minSdk.get().toInt() }
+    compileSdk =
+        libs.versions.compileSdk
+            .get()
+            .toInt()
+    defaultConfig {
+        minSdk =
+            libs.versions.minSdk
+                .get()
+                .toInt()
+    }
     buildFeatures { compose = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -47,6 +55,10 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
+    testImplementation(project(":apps:android:core:network"))
+    testImplementation(project(":apps:android:core:security"))
+    testImplementation(platform(libs.ktor.bom))
+    testImplementation(libs.ktor.client.mock)
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.kotlinx.coroutines.test)

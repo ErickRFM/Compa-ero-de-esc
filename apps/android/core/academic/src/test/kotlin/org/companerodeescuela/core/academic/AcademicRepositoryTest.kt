@@ -6,6 +6,9 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -155,7 +158,7 @@ class AcademicRepositoryTest {
                 repository(
                     engine =
                         MockEngine {
-                            respond(content = "{}", status = HttpStatusCode.ServiceUnavailable)
+                            throw java.io.IOException("Synthetic offline transport")
                         },
                     tokenStore = tokenStore,
                     cache = cache,
@@ -201,7 +204,7 @@ class AcademicRepositoryTest {
                 repository(
                     engine =
                         MockEngine {
-                            respond(content = "{}", status = HttpStatusCode.ServiceUnavailable)
+                            throw java.io.IOException("Synthetic offline transport")
                         },
                     tokenStore = tokenStore,
                     cache = cache,
@@ -238,7 +241,7 @@ class AcademicRepositoryTest {
                 repository(
                     engine =
                         MockEngine {
-                            respond(content = "{}", status = HttpStatusCode.ServiceUnavailable)
+                            throw java.io.IOException("Synthetic offline transport")
                         },
                     tokenStore = tokenStore,
                     cache = cache,
@@ -327,6 +330,57 @@ class AcademicRepositoryTest {
 
             val failure = assertIs<Outcome.Failure>(result)
             assertIs<AppError.Serialization>(failure.error)
+            assertTrue(cache.values.isEmpty())
+        }
+
+    @Test
+    fun `HTTP authority failures are explicit before first sync and with legacy caches`() =
+        runTest {
+            for (initial in listOf(emptyMap(), mapOf("student-1" to cached("student-1", "Ana")))) {
+                val cache = FakeCache(initial)
+                val repo =
+                    repository(
+                        MockEngine { respond("{}", HttpStatusCode.ServiceUnavailable) },
+                        FakeTokenStore(platformToken("student-1")),
+                        cache,
+                    )
+                val failure = assertIs<Outcome.Failure>(repo.load())
+                assertEquals(503, assertIs<AppError.Http>(failure.error).status)
+            }
+        }
+
+    @Test
+    fun `shared repository serializes cache writes before a later revocation`() =
+        runTest {
+            val started = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            var requests = 0
+            val cache = FakeCache(emptyMap())
+            val repo =
+                repository(
+                    MockEngine {
+                        requests++
+                        if (requests == 1) {
+                            started.complete(Unit)
+                            release.await()
+                            respond(
+                                Json.encodeToString(ApiResponse(cached("student-1", "Ana").value)),
+                                HttpStatusCode.OK,
+                                headersOf(HttpHeaders.ContentType, "application/json"),
+                            )
+                        } else {
+                            respond("{}", HttpStatusCode.Forbidden)
+                        }
+                    },
+                    FakeTokenStore(platformToken("student-1")),
+                    cache,
+                )
+            val initial = async(start = CoroutineStart.UNDISPATCHED) { repo.load() }
+            started.await()
+            val revoked = async(start = CoroutineStart.UNDISPATCHED) { repo.load() }
+            release.complete(Unit)
+            assertIs<Outcome.Success<AcademicContent>>(initial.await())
+            assertEquals(403, assertIs<AppError.Http>(assertIs<Outcome.Failure>(revoked.await()).error).status)
             assertTrue(cache.values.isEmpty())
         }
 

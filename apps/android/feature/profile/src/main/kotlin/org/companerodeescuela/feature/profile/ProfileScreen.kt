@@ -35,7 +35,7 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
-import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
+import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
@@ -65,7 +65,7 @@ fun ProfileScreen(
             MaterialTheme.colorScheme.background.luminance() < 0.5f &&
             !LocalCompaneroHighContrast.current
         ) {
-            V8CampusBackdrop(modifier = Modifier.matchParentSize())
+            V8MatteBackdrop(modifier = Modifier.matchParentSize())
         }
         Column(
             modifier =

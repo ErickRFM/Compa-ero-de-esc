@@ -58,7 +58,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
-import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
+import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.v8GlassSurface
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
@@ -84,7 +84,7 @@ fun ChannelScreen(
 
     Box(Modifier.fillMaxSize()) {
         if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current) {
-            V8CampusBackdrop(Modifier.matchParentSize())
+            V8MatteBackdrop(Modifier.matchParentSize())
         }
         LazyColumn(
             modifier = Modifier.align(Alignment.TopCenter).widthIn(max = CompaneroSize.homeContentMaxWidth)

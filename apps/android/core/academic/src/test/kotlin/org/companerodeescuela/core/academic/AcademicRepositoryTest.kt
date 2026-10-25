@@ -145,6 +145,21 @@ class AcademicRepositoryTest {
     }
 
     @Test
+    fun forbidden_and_missing_authority_responses_do_not_fall_back_to_stale_cache() = runTest {
+        listOf(HttpStatusCode.Forbidden, HttpStatusCode.NotFound).forEach { status ->
+            val cache = FakeCache(mapOf("student-1" to cached("student-1", "Ana")))
+            val repository = repository(
+                engine = MockEngine { respond(content = "{}", status = status) },
+                tokenStore = FakeTokenStore(platformToken("student-1")),
+                cache = cache,
+            )
+            val result = repository.load()
+            val failure = assertIs<Outcome.Failure>(result)
+            assertEquals(status.value, assertIs<AppError.Http>(failure.error).status)
+            assertNull(cache.lastReadOwner)
+        }
+    }
+    @Test
     fun `remote academic identity must match authenticated subject`() = runTest {
         val tokenStore = FakeTokenStore(platformToken("student-1"))
         val cache = FakeCache(emptyMap())

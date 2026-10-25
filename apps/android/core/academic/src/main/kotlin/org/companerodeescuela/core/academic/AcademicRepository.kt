@@ -91,7 +91,9 @@ class AcademicRepository(
             }
             is Outcome.Failure -> {
                 val error = remote.error
-                if (error is AppError.Http && error.status == 401) {
+                // Authority and contract responses must remain visible. Cached
+                // schedules must never make a revoked or out-of-scope account look valid.
+                if (error is AppError.Http && error.status in 400..499) {
                     remote
                 } else {
                     val cached = runCatching { cache.read(claims.userId) }.getOrNull()

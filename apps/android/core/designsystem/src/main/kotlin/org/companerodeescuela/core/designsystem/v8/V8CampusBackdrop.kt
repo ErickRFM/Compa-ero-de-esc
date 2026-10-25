@@ -18,6 +18,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.R
 
+/** Matte theme surface for secondary screens. Institutional photography belongs on Home only. */
+@Composable
+fun V8MatteBackdrop(modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxSize().background(androidx.compose.material3.MaterialTheme.colorScheme.background))
+}
 /**
  * V8 backdrop: one campus hero at the top, an opaque ink surface below.
  * It must never tile or bleed through the content cards / attendance QR area.

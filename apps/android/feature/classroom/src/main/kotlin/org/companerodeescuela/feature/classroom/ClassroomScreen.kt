@@ -23,11 +23,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MenuBook
 import org.companerodeescuela.core.designsystem.v8.V8IconTile
 import androidx.compose.ui.text.font.FontWeight
-import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
+import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
@@ -63,6 +64,7 @@ fun ClassroomScreen(
     onOpenAttendance: (ClassroomSummary) -> Unit = {},
     onOpenChannel: (ClassroomSummary?) -> Unit = {},
     onOpenGrading: (ClassroomSummary) -> Unit = {},
+    onOpenStudentGrades: () -> Unit = {},
     viewModel: ClassroomViewModel? = null,
 ) {
     if(!teacherExperience && roles.any { it==UserRole.ADMIN || it==UserRole.SUPER_ADMIN }) {
@@ -106,11 +108,16 @@ fun ClassroomScreen(
                 style = MaterialTheme.typography.headlineSmall,
             )
         }
+        if (isStudent) {
+            TextButton(onClick = onOpenStudentGrades, modifier = Modifier.fillMaxWidth()) {
+                Text("Calificaciones")
+            }
+        }
         OutlinedButton(onClick = { onOpenChannel(null) }, modifier = Modifier.fillMaxWidth()) {
             Text("Canal de clase")
         }
         Text(
-            text = "Tus materias, grupo, docente, aula y acceso académico en un solo lugar.",
+            text = "Espacios colaborativos de Compañero. No sustituyen tus inscripciones oficiales de SIII.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -274,7 +281,7 @@ private fun TeacherAssignedClassrooms(
     }
     Box(modifier = modifier.fillMaxSize()) {
         if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current) {
-            V8CampusBackdrop(modifier = Modifier.matchParentSize())
+            V8MatteBackdrop(modifier = Modifier.matchParentSize())
         }
         Column(
             modifier = Modifier.align(Alignment.TopCenter)

@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import org.companerodeescuela.core.academic.AcademicRepository
 import org.companerodeescuela.core.academic.PersonalScheduleDraft
 import org.companerodeescuela.core.academic.PersonalScheduleRepository
+import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.shared.contracts.ScheduleEntry
 import org.companerodeescuela.shared.contracts.ScheduleRecurrence
@@ -59,6 +60,14 @@ class ScheduleViewModel @Inject constructor(
                     )
                 }
                 is Outcome.Failure -> {
+                    val httpError = result.error as? AppError.Http
+                    if (httpError != null && httpError.status in 400..499) {
+                        _state.value = _state.value.copy(
+                            loading = false,
+                            errorMessage = httpError.userMessage,
+                        )
+                        return@launch
+                    }
                     when (val local = repository.readWeeklySchedule()) {
                         is Outcome.Success -> {
                             _state.value = _state.value.copy(

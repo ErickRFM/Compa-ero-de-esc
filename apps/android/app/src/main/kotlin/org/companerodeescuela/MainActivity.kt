@@ -411,6 +411,11 @@ class MainActivity : AppCompatActivity() {
                                                         TeacherClassContext.from(classroom),
                                                     )
                                                 },
+                                                onOpenStudentGrades = {
+                                                    navController.navigate(Destination.Grading.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
                                             )
                                         }
                                         composable(Destination.Grading.route) { entry ->

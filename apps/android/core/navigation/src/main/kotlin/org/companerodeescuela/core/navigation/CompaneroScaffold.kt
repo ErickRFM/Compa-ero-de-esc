@@ -91,7 +91,7 @@ fun CompaneroScaffold(
             LocalContentColor provides v9Colors.onSurface,
         ) {
             Box(Modifier.fillMaxSize()) {
-                if (lightTheme || highContrast || !showCampusBackdrop) {
+                if (lightTheme || highContrast || !showCampusBackdrop || onSecondaryScreen) {
                     Box(Modifier.matchParentSize().background(v9Colors.background))
                 } else {
                     V8CampusBackdrop(Modifier.matchParentSize())

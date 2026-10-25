@@ -23,7 +23,7 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.feature.admin.AdminOperation
-import org.companerodeescuela.feature.admin.ProtectedAdminDialog
+import org.companerodeescuela.feature.admin.protectedAdminDialog
 import org.companerodeescuela.shared.contracts.*
 
 /** Administrative body of ClassroomScreen; existing teacher/student bodies and enrollment cards are reused. */
@@ -105,7 +105,7 @@ fun ClassroomAdministrationEditor(state:ClassroomAdministrationState,onRefresh:(
     }
     state.operationId?.let { operation ->
         val resource=state.operationResource.orEmpty()
-        ProtectedAdminDialog(AdminOperation(operation,resource,StepUpAction.MANAGE_ACADEMICS,state.groups.find { it.id==resource }?.name ?: resource),state.working,state.failure,onCancel,onAuthorize)
+        protectedAdminDialog(AdminOperation(operation,resource,StepUpAction.MANAGE_ACADEMICS,state.groups.find { it.id==resource }?.name ?: resource),state.working,state.failure,onCancel,onAuthorize)
     }
 }
 @Composable private fun AcademicCard(title:Int,content:@Composable ColumnScope.()->Unit) {

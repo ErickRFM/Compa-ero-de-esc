@@ -1,5 +1,6 @@
 package org.companerodeescuela.api.application
 
+import org.companerodeescuela.api.academic.groups.AcademicGroupRepository
 import org.companerodeescuela.api.attendance.AttendanceAccessPolicy
 import org.companerodeescuela.api.attendance.AttendanceEnrollmentResolver
 import org.companerodeescuela.api.attendance.AttendanceQrService
@@ -9,11 +10,11 @@ import org.companerodeescuela.api.attendance.AttendanceStudentService
 import org.companerodeescuela.api.attendance.InMemoryAttendanceRepository
 import org.companerodeescuela.api.attendance.MongoAttendanceRepository
 import org.companerodeescuela.api.attendance.ProviderAttendanceOccurrenceResolver
-import org.companerodeescuela.api.academic.groups.AcademicGroupRepository
 import org.companerodeescuela.api.attendance.TeacherCampusRosterService
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.database.MongoConnection
+import org.companerodeescuela.api.devices.PushOutboxService
 import org.companerodeescuela.api.integrations.academic.AcademicProvider
 import org.companerodeescuela.api.presence.SchoolPresenceService
 
@@ -31,49 +32,63 @@ fun buildAttendanceFeatureGraph(
     academicProvider: AcademicProvider,
     schoolPresenceService: SchoolPresenceService?,
     groupRepository: AcademicGroupRepository,
-    accounts:org.companerodeescuela.api.auth.PlatformAccountRepository,
-    classrooms:org.companerodeescuela.api.classroom.ClassroomService,
-    nativeProjection:org.companerodeescuela.api.academic.NativeAcademicProjection,
+    accounts: org.companerodeescuela.api.auth.PlatformAccountRepository,
+    classrooms: org.companerodeescuela.api.classroom.ClassroomService,
+    nativeProjection: org.companerodeescuela.api.academic.NativeAcademicProjection,
+    pushService: PushOutboxService? = null,
 ): AttendanceFeatureGraph {
-    val repository = when {
-        !settings.hasAuthentication -> InMemoryAttendanceRepository()
-        settings.mongo.isConfigured -> MongoAttendanceRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemoryAttendanceRepository()
-        else -> error("Attendance requires MONGODB_URI outside local development")
-    }
+    val repository =
+        when {
+            !settings.hasAuthentication -> InMemoryAttendanceRepository()
+            settings.mongo.isConfigured -> MongoAttendanceRepository(mongoConnection.database())
+            settings.environment == Environment.LOCAL -> InMemoryAttendanceRepository()
+            else -> error("Attendance requires MONGODB_URI outside local development")
+        }
     val occurrenceResolver = ProviderAttendanceOccurrenceResolver(academicProvider)
-    val accessPolicy = AttendanceAccessPolicy(repository, occurrenceResolver,org.companerodeescuela.api.attendance.AttendanceAdministrationPolicy(accounts,classrooms,nativeProjection))
-    val qrService = settings.attendanceQrSecret?.let { secret ->
-        AttendanceQrService(
-            secret = secret,
-            repository = repository,
-            accessPolicy = accessPolicy,
+    val accessPolicy =
+        AttendanceAccessPolicy(
+            repository,
+            occurrenceResolver,
+            org.companerodeescuela.api.attendance
+                .AttendanceAdministrationPolicy(accounts, classrooms, nativeProjection),
         )
-    }
+    val qrService =
+        settings.attendanceQrSecret?.let { secret ->
+            AttendanceQrService(
+                secret = secret,
+                repository = repository,
+                accessPolicy = accessPolicy,
+            )
+        }
     return AttendanceFeatureGraph(
-        sessionService = AttendanceSessionService(
-            repository = repository,
-            occurrenceResolver = occurrenceResolver,
-            accessPolicy = accessPolicy,
-            nativeProjection=nativeProjection,
-        ),
-        studentService = AttendanceStudentService(
-            repository = repository,
-            enrollmentResolver = AttendanceEnrollmentResolver(academicProvider,classrooms),
-            qrService = qrService,
-            schoolPresenceService = schoolPresenceService,
-            nativeProjection=nativeProjection,
-            lateSyncReviewWindowSeconds = settings.lateSyncReviewWindowSeconds,
-            qrNonceReuseStudentThreshold = settings.attendanceQrNonceReuseThreshold,
-            environment = settings.environment,
-        ),
-        reviewService = AttendanceReviewService(
-            repository = repository,
-            accessPolicy = accessPolicy,
-        ),
+        sessionService =
+            AttendanceSessionService(
+                repository = repository,
+                occurrenceResolver = occurrenceResolver,
+                accessPolicy = accessPolicy,
+                nativeProjection = nativeProjection,
+                pushService = pushService,
+            ),
+        studentService =
+            AttendanceStudentService(
+                repository = repository,
+                enrollmentResolver = AttendanceEnrollmentResolver(academicProvider, classrooms),
+                qrService = qrService,
+                schoolPresenceService = schoolPresenceService,
+                nativeProjection = nativeProjection,
+                lateSyncReviewWindowSeconds = settings.lateSyncReviewWindowSeconds,
+                qrNonceReuseStudentThreshold = settings.attendanceQrNonceReuseThreshold,
+                environment = settings.environment,
+            ),
+        reviewService =
+            AttendanceReviewService(
+                repository = repository,
+                accessPolicy = accessPolicy,
+            ),
         qrService = qrService,
-        campusRoster = schoolPresenceService?.let { presence ->
-            TeacherCampusRosterService(occurrenceResolver, groupRepository, presence, repository,nativeProjection,accounts)
-        },
+        campusRoster =
+            schoolPresenceService?.let { presence ->
+                TeacherCampusRosterService(occurrenceResolver, groupRepository, presence, repository, nativeProjection, accounts)
+            },
     )
 }

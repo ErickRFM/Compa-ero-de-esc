@@ -13,7 +13,6 @@ import androidx.core.app.NotificationManagerCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -22,6 +21,9 @@ import org.companerodeescuela.MainActivity
 import org.companerodeescuela.R
 import org.companerodeescuela.core.security.SessionTokenInspector
 import org.companerodeescuela.core.security.SessionTokenStore
+import org.companerodeescuela.shared.contracts.AttendancePushContract
+import java.util.UUID
+import javax.inject.Inject
 
 /**
  * Foreground FCM surface. Never displays arbitrary server text or PII from a
@@ -38,34 +40,69 @@ class CompaneroFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
-        if (!BuildConfig.FIREBASE_CONFIGURED || message.notification == null) return
-        val hasSession = runBlocking(Dispatchers.IO) {
-            withTimeoutOrNull(1500) {
-                SessionTokenInspector.isUsable(sessions.readAccessToken())
-            }
-        } == true
+        if (!BuildConfig.FIREBASE_CONFIGURED) return
+        val sessionId =
+            message.data[AttendancePushContract.SESSION_ID]
+                ?.let { raw ->
+                    runCatching { UUID.fromString(raw).toString() }
+                        .getOrNull()
+                        ?.takeIf { it.equals(raw, ignoreCase = true) }
+                }
+        val attendanceNotice = message.data["type"] == AttendancePushContract.TYPE && sessionId != null
+        if (message.notification == null && !attendanceNotice) return
+        val hasSession =
+            runBlocking(Dispatchers.IO) {
+                withTimeoutOrNull(1500) {
+                    SessionTokenInspector.isUsable(sessions.readAccessToken())
+                }
+            } == true
         if (!hasSession) return
         if (Build.VERSION.SDK_INT >= 33 &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
         val manager = getSystemService(NotificationManager::class.java)
         val channelId = "companero_academic_updates"
         if (Build.VERSION.SDK_INT >= 26) {
             manager.createNotificationChannel(
-                NotificationChannel(channelId, "Avisos académicos", NotificationManager.IMPORTANCE_DEFAULT))
+                NotificationChannel(channelId, "Avisos académicos", NotificationManager.IMPORTANCE_DEFAULT),
+            )
         }
-        val activity = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
-        val pending = PendingIntent.getActivity(this, 0, activity,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val notification = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("Compañero de Clase")
-            .setContentText("Tienes una nueva actualización académica.")
-            .setAutoCancel(true)
-            .setContentIntent(pending)
-            .build()
+        val activity =
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                if (attendanceNotice) {
+                    action = AttendancePushContract.CLICK_ACTION
+                    putExtra(AttendancePushContract.SESSION_ID, sessionId)
+                }
+            }
+        val pending =
+            PendingIntent.getActivity(
+                this,
+                sessionId?.hashCode() ?: 0,
+                activity,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        val contentText =
+            if (attendanceNotice) {
+                "Tu docente abrió el pase de lista. Toca para revisarlo."
+            } else {
+                "Tienes una nueva actualización académica."
+            }
+        val notification =
+            NotificationCompat
+                .Builder(this, channelId)
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setContentTitle("Compañero de Clase")
+                .setContentText(contentText)
+                .setAutoCancel(true)
+                .setContentIntent(pending)
+                .build()
         NotificationManagerCompat.from(this).notify(
-            message.messageId?.hashCode() ?: SystemClock.uptimeMillis().toInt(), notification)
+            sessionId?.hashCode()
+                ?: message.messageId?.hashCode() ?: SystemClock.uptimeMillis().toInt(),
+            notification,
+        )
     }
 }

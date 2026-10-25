@@ -2,19 +2,20 @@ package org.companerodeescuela.api.attendance
 
 import com.mongodb.MongoWriteException
 import com.mongodb.client.model.Filters.and
+import com.mongodb.client.model.Filters.elemMatch
 import com.mongodb.client.model.Filters.eq
+import com.mongodb.client.model.Filters.exists
 import com.mongodb.client.model.Filters.gt
 import com.mongodb.client.model.Filters.lt
-import com.mongodb.client.model.Filters.exists
-import com.mongodb.client.model.Filters.elemMatch
-import com.mongodb.client.model.FindOneAndReplaceOptions
-import com.mongodb.client.model.FindOneAndUpdateOptions
 import com.mongodb.client.model.Filters.ne
 import com.mongodb.client.model.Filters.or
+import com.mongodb.client.model.FindOneAndReplaceOptions
+import com.mongodb.client.model.FindOneAndUpdateOptions
 import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
-import com.mongodb.client.model.ReturnDocument
 import com.mongodb.client.model.ReplaceOptions
+import com.mongodb.client.model.ReturnDocument
+import com.mongodb.client.model.Sorts
 import com.mongodb.client.model.UpdateOptions
 import com.mongodb.client.model.Updates
 import com.mongodb.kotlin.client.coroutine.MongoCollection
@@ -23,18 +24,18 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import org.bson.Document
-import java.util.Date
-import java.util.concurrent.TimeUnit
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import org.companerodeescuela.shared.contracts.AttendanceReviewEntry
+import org.bson.Document
 import org.companerodeescuela.shared.contracts.AttendanceDisposition
 import org.companerodeescuela.shared.contracts.AttendanceReasonCode
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
+import org.companerodeescuela.shared.contracts.AttendanceReviewEntry
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
 import org.companerodeescuela.shared.contracts.AttendanceStatus
+import java.util.Date
+import java.util.concurrent.TimeUnit
 
 class MongoAttendanceRepository(
     database: MongoDatabase,
@@ -55,7 +56,8 @@ class MongoAttendanceRepository(
     override suspend fun createSession(session: AttendanceSessionResponse): SessionWriteResult {
         ensureIndexes()
 
-        sessions.find(eq("occurrenceId", session.occurrenceId))
+        sessions
+            .find(eq("occurrenceId", session.occurrenceId))
             .firstOrNull()
             ?.toSession()
             ?.let { return SessionWriteResult.Existing(it) }
@@ -64,10 +66,12 @@ class MongoAttendanceRepository(
             sessions.insertOne(session.toDocument())
             SessionWriteResult.Created(session)
         } catch (error: MongoWriteException) {
-            val existing = sessions.find(eq("occurrenceId", session.occurrenceId))
-                .firstOrNull()
-                ?.toSession()
-                ?: throw error
+            val existing =
+                sessions
+                    .find(eq("occurrenceId", session.occurrenceId))
+                    .firstOrNull()
+                    ?.toSession()
+                    ?: throw error
             SessionWriteResult.Existing(existing)
         }
     }
@@ -77,9 +81,7 @@ class MongoAttendanceRepository(
         return sessions.find(eq("_id", id)).firstOrNull()?.toSession()
     }
 
-    override suspend fun findSessionByOccurrence(
-        occurrenceId: String,
-    ): AttendanceSessionResponse? {
+    override suspend fun findSessionByOccurrence(occurrenceId: String): AttendanceSessionResponse? {
         ensureIndexes()
         return sessions.find(eq("occurrenceId", occurrenceId)).firstOrNull()?.toSession()
     }
@@ -88,6 +90,19 @@ class MongoAttendanceRepository(
         ensureIndexes()
         return sessions
             .find(eq("status", AttendanceSessionStatus.OPEN.name))
+            .toList()
+            .map { it.toSession() }
+    }
+
+    override suspend fun findSessionsOpenedBy(
+        teacherId: String,
+        limit: Int,
+    ): List<AttendanceSessionResponse> {
+        ensureIndexes()
+        return sessions
+            .find(eq("openedBy", teacherId))
+            .sort(Sorts.descending("openedAtEpochSeconds"))
+            .limit(limit.coerceIn(1, 100))
             .toList()
             .map { it.toSession() }
     }
@@ -104,19 +119,24 @@ class MongoAttendanceRepository(
             return emptyList()
         }
 
-        val filters = mutableListOf(
-            eq("status", AttendanceSessionStatus.OPEN.name),
-            eq("institutionId", institutionId),
-            gt("closesAtEpochSeconds", afterEpochSeconds),
-            or(*courseGroups.map { (courseId, groupName) ->
-                and(eq("courseId", courseId), eq("groupName", groupName))
-            }.toTypedArray()),
-        )
-        if (unscopedInstitutionalOnly) {
-            filters += ne(
-                "identitySource",
-                org.companerodeescuela.shared.contracts.AttendanceIdentitySource.NATIVE.name,
+        val filters =
+            mutableListOf(
+                eq("status", AttendanceSessionStatus.OPEN.name),
+                eq("institutionId", institutionId),
+                gt("closesAtEpochSeconds", afterEpochSeconds),
+                or(
+                    *courseGroups
+                        .map { (courseId, groupName) ->
+                            and(eq("courseId", courseId), eq("groupName", groupName))
+                        }.toTypedArray(),
+                ),
             )
+        if (unscopedInstitutionalOnly) {
+            filters +=
+                ne(
+                    "identitySource",
+                    org.companerodeescuela.shared.contracts.AttendanceIdentitySource.NATIVE.name,
+                )
             filters += eq("groupId", null)
         }
         return sessions
@@ -138,9 +158,11 @@ class MongoAttendanceRepository(
     override suspend fun writeAttempt(record: AttendanceRecordResponse): AttemptWriteResult {
         ensureIndexes()
 
-        val byOperation = records.find(eq("operationId", record.operationId))
-            .firstOrNull()
-            ?.toRecord()
+        val byOperation =
+            records
+                .find(eq("operationId", record.operationId))
+                .firstOrNull()
+                ?.toRecord()
         if (byOperation != null) {
             return if (
                 byOperation.sessionId == record.sessionId &&
@@ -161,8 +183,7 @@ class MongoAttendanceRepository(
             records
                 .find(
                     and(eq("sessionId", record.sessionId), eq("studentId", record.studentId)),
-                )
-                .firstOrNull()
+                ).firstOrNull()
                 ?.toRecord()
         if (byStudentSession != null) {
             return AttemptWriteResult.Existing(byStudentSession)
@@ -172,13 +193,16 @@ class MongoAttendanceRepository(
             records.insertOne(record.toDocument())
             AttemptWriteResult.Created(record)
         } catch (error: MongoWriteException) {
-            val afterRace = records.find(eq("_id", record.id))
-                .firstOrNull()
-                ?.toRecord()
-                ?: records.find(eq("operationId", record.operationId))
+            val afterRace =
+                records
+                    .find(eq("_id", record.id))
                     .firstOrNull()
                     ?.toRecord()
-                ?: throw error
+                    ?: records
+                        .find(eq("operationId", record.operationId))
+                        .firstOrNull()
+                        ?.toRecord()
+                    ?: throw error
 
             if (
                 afterRace.sessionId == record.sessionId &&
@@ -216,73 +240,81 @@ class MongoAttendanceRepository(
         }
 
         val currentOperations = Document("\$ifNull", listOf("\$operationIds", emptyList<Document>()))
-        val matchingOperations = Document(
-            "\$filter",
-            Document("input", currentOperations).append(
-                "as",
-                "attempt",
-            ).append(
-                "cond",
-                Document(
-                    "\$and",
-                    listOf(
-                        Document("\$eq", listOf("\$\$attempt.operationId", operationId)),
-                        Document("\$eq", listOf("\$\$attempt.fingerprint", requestFingerprint)),
+        val matchingOperations =
+            Document(
+                "\$filter",
+                Document("input", currentOperations)
+                    .append(
+                        "as",
+                        "attempt",
+                    ).append(
+                        "cond",
+                        Document(
+                            "\$and",
+                            listOf(
+                                Document("\$eq", listOf("\$\$attempt.operationId", operationId)),
+                                Document("\$eq", listOf("\$\$attempt.fingerprint", requestFingerprint)),
+                            ),
+                        ),
                     ),
-                ),
-            ),
-        )
+            )
         val alreadyReserved = Document("\$gt", listOf(Document("\$size", matchingOperations), 0))
         val operationEntry = Document("operationId", operationId).append("fingerprint", requestFingerprint)
-        val updatePipeline = listOf(
-            Document(
-                "\$set",
+        val updatePipeline =
+            listOf(
                 Document(
-                    "operationIds",
+                    "\$set",
                     Document(
-                        "\$cond",
-                        listOf(
-                            alreadyReserved,
-                            currentOperations,
-                            Document("\$concatArrays", listOf(currentOperations, listOf(operationEntry))),
+                        "operationIds",
+                        Document(
+                            "\$cond",
+                            listOf(
+                                alreadyReserved,
+                                currentOperations,
+                                Document("\$concatArrays", listOf(currentOperations, listOf(operationEntry))),
+                            ),
                         ),
-                    ),
-                ).append(
-                    "attemptCount",
-                    Document(
-                        "\$cond",
-                        listOf(
-                            alreadyReserved,
-                            Document("\$ifNull", listOf("\$attemptCount", 0)),
-                            Document("\$add", listOf(Document("\$ifNull", listOf("\$attemptCount", 0)), 1)),
+                    ).append(
+                        "attemptCount",
+                        Document(
+                            "\$cond",
+                            listOf(
+                                alreadyReserved,
+                                Document("\$ifNull", listOf("\$attemptCount", 0)),
+                                Document("\$add", listOf(Document("\$ifNull", listOf("\$attemptCount", 0)), 1)),
+                            ),
                         ),
                     ),
                 ),
-            ),
-        )
-        return try {
-            val reserved = attemptReservations.findOneAndUpdate(
-                and(
-                    ownerFilter,
-                    or(
-                        elemMatch(
-                            "operationIds",
-                            and(eq("operationId", operationId), eq("fingerprint", requestFingerprint)),
-                        ),
-                        lt("attemptCount", maxAttempts),
-                    ),
-                ),
-                updatePipeline,
-                FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
             )
+        return try {
+            val reserved =
+                attemptReservations.findOneAndUpdate(
+                    and(
+                        ownerFilter,
+                        or(
+                            elemMatch(
+                                "operationIds",
+                                and(eq("operationId", operationId), eq("fingerprint", requestFingerprint)),
+                            ),
+                            lt("attemptCount", maxAttempts),
+                        ),
+                    ),
+                    updatePipeline,
+                    FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
+                )
             if (reserved != null) {
                 AttemptReservationResult.ACCEPTED
             } else {
                 val operationOwner = attemptReservations.find(eq("operationIds.operationId", operationId)).firstOrNull()
                 if (operationOwner != null &&
-                    (operationOwner.getString("sessionId") != sessionId || operationOwner.getString("studentId") != studentId ||
-                        operationOwner.getList("operationIds", Document::class.java)
-                            .none { it.getString("operationId") == operationId && it.getString("fingerprint") == requestFingerprint })
+                    (
+                        operationOwner.getString("sessionId") != sessionId ||
+                            operationOwner.getString("studentId") != studentId ||
+                            operationOwner
+                                .getList("operationIds", Document::class.java)
+                                .none { it.getString("operationId") == operationId && it.getString("fingerprint") == requestFingerprint }
+                    )
                 ) {
                     AttemptReservationResult.OPERATION_CONFLICT
                 } else {
@@ -293,8 +325,10 @@ class MongoAttendanceRepository(
             if (error.error.code != 11000) throw error
             val operationOwner = attemptReservations.find(eq("operationIds.operationId", operationId)).firstOrNull()
             if (operationOwner != null &&
-                operationOwner.getString("sessionId") == sessionId && operationOwner.getString("studentId") == studentId &&
-                operationOwner.getList("operationIds", Document::class.java)
+                operationOwner.getString("sessionId") == sessionId &&
+                operationOwner.getString("studentId") == studentId &&
+                operationOwner
+                    .getList("operationIds", Document::class.java)
                     .any { it.getString("operationId") == operationId && it.getString("fingerprint") == requestFingerprint }
             ) {
                 AttemptReservationResult.ACCEPTED
@@ -306,15 +340,17 @@ class MongoAttendanceRepository(
 
     override suspend fun replaceRejectedRecord(record: AttendanceRecordResponse): AttendanceRecordResponse {
         ensureIndexes()
-        val replaced = records.findOneAndReplace(
-            and(
-                eq("_id", record.id),
-                eq("status", AttendanceStatus.REJECTED.name),
-                or(exists("reviewedBy", false), eq("reviewedBy", null)),
-            ),
-            record.toDocument(),
-            FindOneAndReplaceOptions().returnDocument(ReturnDocument.AFTER),
-        )?.toRecord()
+        val replaced =
+            records
+                .findOneAndReplace(
+                    and(
+                        eq("_id", record.id),
+                        eq("status", AttendanceStatus.REJECTED.name),
+                        or(exists("reviewedBy", false), eq("reviewedBy", null)),
+                    ),
+                    record.toDocument(),
+                    FindOneAndReplaceOptions().returnDocument(ReturnDocument.AFTER),
+                )?.toRecord()
         return replaced ?: records.find(eq("_id", record.id)).firstOrNull()?.toRecord() ?: record
     }
 
@@ -392,6 +428,10 @@ class MongoAttendanceRepository(
                 Indexes.ascending("status", "institutionId", "courseId", "groupName"),
                 IndexOptions().name("ix_attendance_open_scope"),
             )
+            sessions.createIndex(
+                Indexes.compoundIndex(Indexes.ascending("openedBy"), Indexes.descending("openedAtEpochSeconds")),
+                IndexOptions().name("ix_attendance_teacher_history"),
+            )
             records.createIndex(
                 Indexes.ascending("operationId"),
                 IndexOptions().unique(true).name("uq_attendance_operation_id"),
@@ -424,23 +464,24 @@ class MongoAttendanceRepository(
         }
     }
 
-    private fun AttendanceSessionResponse.toDocument(): Document = Document()
-        .append("_id", id)
-        .append("occurrenceId", occurrenceId)
-        .append("courseId", courseId)
-        .append("groupName", groupName)
-        .append("occurrenceDate", occurrenceDate)
-        .append("scheduledStartsAt", scheduledStartsAt)
-        .append("scheduledEndsAt", scheduledEndsAt)
-        .append("openedBy", openedBy)
-        .append("openedAtEpochSeconds", openedAtEpochSeconds)
-        .append("closesAtEpochSeconds", closesAtEpochSeconds)
-        .append("closedAtEpochSeconds", closedAtEpochSeconds)
-        .append("status", status.name)
-        .append("identitySource",identitySource?.name)
-        .append("institutionId",institutionId)
-        .append("groupId",groupId)
-        .append("groupScopeRevision",groupScopeRevision)
+    private fun AttendanceSessionResponse.toDocument(): Document =
+        Document()
+            .append("_id", id)
+            .append("occurrenceId", occurrenceId)
+            .append("courseId", courseId)
+            .append("groupName", groupName)
+            .append("occurrenceDate", occurrenceDate)
+            .append("scheduledStartsAt", scheduledStartsAt)
+            .append("scheduledEndsAt", scheduledEndsAt)
+            .append("openedBy", openedBy)
+            .append("openedAtEpochSeconds", openedAtEpochSeconds)
+            .append("closesAtEpochSeconds", closesAtEpochSeconds)
+            .append("closedAtEpochSeconds", closedAtEpochSeconds)
+            .append("status", status.name)
+            .append("identitySource", identitySource?.name)
+            .append("institutionId", institutionId)
+            .append("groupId", groupId)
+            .append("groupScopeRevision", groupScopeRevision)
 
     private fun Document.toSession(): AttendanceSessionResponse =
         AttendanceSessionResponse(
@@ -456,28 +497,39 @@ class MongoAttendanceRepository(
             closesAtEpochSeconds = requireLong("closesAtEpochSeconds"),
             closedAtEpochSeconds = numberAsLong("closedAtEpochSeconds"),
             status = AttendanceSessionStatus.valueOf(getString("status")),
-            identitySource=(get("identitySource") as? String)?.let { raw -> org.companerodeescuela.shared.contracts.AttendanceIdentitySource.entries.firstOrNull { it.name==raw } },
-            institutionId=get("institutionId") as? String,
-            groupId=get("groupId") as? String,
-            groupScopeRevision=when(val scope=get("groupScopeRevision")) { is Long -> scope;is Int -> scope.toLong();else -> -1 },
+            identitySource =
+                (get("identitySource") as? String)?.let { raw ->
+                    org.companerodeescuela.shared.contracts.AttendanceIdentitySource.entries.firstOrNull {
+                        it.name ==
+                            raw
+                    }
+                },
+            institutionId = get("institutionId") as? String,
+            groupId = get("groupId") as? String,
+            groupScopeRevision =
+                when (val scope = get("groupScopeRevision")) {
+                    is Long -> scope
+                    is Int -> scope.toLong()else -> -1
+                },
         )
 
-    private fun AttendanceRecordResponse.toDocument(): Document = Document()
-        .append("_id", id)
-        .append("operationId", operationId)
-        .append("sessionId", sessionId)
-        .append("occurrenceId", occurrenceId)
-        .append("studentId", studentId)
-        .append("status", status.name)
-        .append("reasonCode", reasonCode.name)
-        .append("attemptedAtEpochSeconds", attemptedAtEpochSeconds)
-        .append("receivedAtEpochSeconds", receivedAtEpochSeconds)
-        .append("reviewedBy", reviewedBy)
-        .append("reviewedAtEpochSeconds", reviewedAtEpochSeconds)
-        .append("disposition", disposition?.name)
-        .append("originalStatus", originalStatus?.name)
-        .append("originalReasonCode", originalReasonCode?.name)
-        .append("reviewHistory", Json.encodeToString(reviewHistory))
+    private fun AttendanceRecordResponse.toDocument(): Document =
+        Document()
+            .append("_id", id)
+            .append("operationId", operationId)
+            .append("sessionId", sessionId)
+            .append("occurrenceId", occurrenceId)
+            .append("studentId", studentId)
+            .append("status", status.name)
+            .append("reasonCode", reasonCode.name)
+            .append("attemptedAtEpochSeconds", attemptedAtEpochSeconds)
+            .append("receivedAtEpochSeconds", receivedAtEpochSeconds)
+            .append("reviewedBy", reviewedBy)
+            .append("reviewedAtEpochSeconds", reviewedAtEpochSeconds)
+            .append("disposition", disposition?.name)
+            .append("originalStatus", originalStatus?.name)
+            .append("originalReasonCode", originalReasonCode?.name)
+            .append("reviewHistory", Json.encodeToString(reviewHistory))
 
     private fun Document.toRecord(): AttendanceRecordResponse =
         AttendanceRecordResponse(
@@ -498,11 +550,9 @@ class MongoAttendanceRepository(
             reviewHistory = getString("reviewHistory")?.let { Json.decodeFromString<List<AttendanceReviewEntry>>(it) }.orEmpty(),
         )
 
-    private fun Document.requireLong(name: String): Long =
-        numberAsLong(name) ?: error("Missing numeric field: $name")
+    private fun Document.requireLong(name: String): Long = numberAsLong(name) ?: error("Missing numeric field: $name")
 
-    private fun Document.numberAsLong(name: String): Long? =
-        (get(name) as? Number)?.toLong()
+    private fun Document.numberAsLong(name: String): Long? = (get(name) as? Number)?.toLong()
 
     private companion object {
         const val SESSIONS_COLLECTION = "attendance_sessions"

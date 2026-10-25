@@ -48,10 +48,10 @@ import org.companerodeescuela.core.navigation.AppExperience
 import org.companerodeescuela.core.navigation.CompaneroScaffold
 import org.companerodeescuela.core.navigation.Destination
 import org.companerodeescuela.core.navigation.RoleExperienceResolver
-import org.companerodeescuela.feature.admin.AdminHomeScreen
+import org.companerodeescuela.feature.admin.adminHomeScreen
 import org.companerodeescuela.feature.attendance.AttendanceMode
-import org.companerodeescuela.feature.attendance.AttendanceScreen
 import org.companerodeescuela.feature.attendance.TeacherHomeScreen
+import org.companerodeescuela.feature.attendance.attendanceScreen
 import org.companerodeescuela.feature.auth.AccountOnboardingScreen
 import org.companerodeescuela.feature.auth.AuthDraftViewModel
 import org.companerodeescuela.feature.auth.LoginScreen
@@ -78,11 +78,16 @@ import org.companerodeescuela.feature.tutoring.TutorGroupsScreen
 import org.companerodeescuela.feature.tutoring.TutorHomeScreen
 import org.companerodeescuela.feature.tutoring.TutorRequestsScreen
 import org.companerodeescuela.notifications.PushRegistrationSchedule
+import org.companerodeescuela.notifications.parseAttendanceSessionId
+import org.companerodeescuela.shared.contracts.AttendancePushContract
 import org.companerodeescuela.shared.contracts.TeacherClassContext
+import org.companerodeescuela.shared.contracts.UserRole
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
+    private var pendingAttendanceSessionId by mutableStateOf<String?>(null)
+
     @Inject
     lateinit var attendanceSyncScheduler: AttendanceSyncScheduler
 
@@ -95,6 +100,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        pendingAttendanceSessionId = attendanceSessionId(intent)
         appearancePreferences.applySavedLanguage()
         val appDistribution = AppDistribution.valueOf(BuildConfig.APP_DISTRIBUTION)
 
@@ -252,6 +258,21 @@ class MainActivity : AppCompatActivity() {
                                             )
                                         }
                                     val navController = key(userId, roleConfig.experience, session.roles) { rememberNavController() }
+                                    LaunchedEffect(pendingAttendanceSessionId, roleConfig.experience, session.roles) {
+                                        val requestedSession = pendingAttendanceSessionId ?: return@LaunchedEffect
+                                        if (UserRole.STUDENT !in session.roles || appDistribution != AppDistribution.ACADEMIC) {
+                                            pendingAttendanceSessionId = null
+                                        } else if (roleConfig.experience != AppExperience.STUDENT) {
+                                            preferredExperience = AppExperience.STUDENT
+                                        } else {
+                                            navController.navigate(Destination.Attendance.route) { launchSingleTop = true }
+                                            navController.currentBackStackEntry?.savedStateHandle?.set(
+                                                AttendancePushContract.SESSION_ID,
+                                                requestedSession,
+                                            )
+                                            pendingAttendanceSessionId = null
+                                        }
+                                    }
                                     CompaneroScaffold(
                                         navController = navController,
                                         startDestination = roleConfig.startDestination,
@@ -260,6 +281,9 @@ class MainActivity : AppCompatActivity() {
                                     ) {
                                         composable(Destination.Home.route) {
                                             HomeScreen(
+                                                onOpenAttendance = {
+                                                    navController.navigate(Destination.Attendance.route) { launchSingleTop = true }
+                                                },
                                                 onOpenSchedule = {
                                                     navController.navigate(Destination.Schedule.route) {
                                                         launchSingleTop = true
@@ -339,7 +363,7 @@ class MainActivity : AppCompatActivity() {
                                             )
                                         }
                                         composable(Destination.AdminHome.route) {
-                                            AdminHomeScreen(
+                                            adminHomeScreen(
                                                 onOpenSecurity = { navController.navigate(Destination.Mfa.route) },
                                                 onOpenSchedule = {
                                                     navController.navigate(Destination.Classrooms.route) {
@@ -368,7 +392,9 @@ class MainActivity : AppCompatActivity() {
                                                     navController.navigate(Destination.Attendance.route) { launchSingleTop = true }
                                                     navController.currentBackStackEntry?.savedStateHandle?.set(
                                                         TeacherClassContext.STATE_KEY,
-                                                        TeacherClassContext.from(classroom),
+                                                        TeacherClassContext.from(
+                                                            classroom,
+                                                        ),
                                                     )
                                                 },
                                                 onOpenChannel = { classroom ->
@@ -416,8 +442,15 @@ class MainActivity : AppCompatActivity() {
                                                         TeacherClassContext.STATE_KEY,
                                                         null,
                                                     ).collectAsStateWithLifecycle()
-                                            AttendanceScreen(
+                                            val requestedSessionId by entry.savedStateHandle
+                                                .getStateFlow<String?>(AttendancePushContract.SESSION_ID, null)
+                                                .collectAsStateWithLifecycle()
+                                            attendanceScreen(
                                                 requestedClassroom = selection,
+                                                requestedSessionId = requestedSessionId,
+                                                onConsumeRequestedSession = {
+                                                    entry.savedStateHandle.remove<String>(AttendancePushContract.SESSION_ID)
+                                                },
                                                 requestedMode =
                                                     when (roleConfig.experience) {
                                                         AppExperience.STUDENT -> AttendanceMode.STUDENT
@@ -538,6 +571,18 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingAttendanceSessionId = attendanceSessionId(intent)
+    }
+
+    private fun attendanceSessionId(intent: android.content.Intent?): String? =
+        parseAttendanceSessionId(
+            intent?.action,
+            intent?.getStringExtra(AttendancePushContract.SESSION_ID),
+        )
 }
 
 @androidx.compose.runtime.Composable

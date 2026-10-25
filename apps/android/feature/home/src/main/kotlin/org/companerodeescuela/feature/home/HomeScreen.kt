@@ -55,6 +55,7 @@ fun HomeScreen(
     onOpenSchedule: () -> Unit = {},
     onOpenClassrooms: () -> Unit = {},
     onOpenChannel: () -> Unit = {},
+    onOpenAttendance: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -106,6 +107,9 @@ fun HomeScreen(
                 lineHeight = 22.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            TextButton(onClick = onOpenAttendance, modifier = Modifier.align(Alignment.Start)) {
+                Text("Abrir pase de lista  ›", color = MaterialTheme.colorScheme.primary)
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

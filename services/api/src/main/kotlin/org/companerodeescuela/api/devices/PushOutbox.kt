@@ -13,12 +13,6 @@ import com.mongodb.client.model.ReturnDocument
 import com.mongodb.client.model.Sorts
 import com.mongodb.client.model.Updates
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
-import java.security.MessageDigest
-import java.time.Clock
-import java.time.Instant
-import java.util.Date
-import java.util.UUID
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -26,6 +20,12 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.bson.Document
 import org.companerodeescuela.api.errors.ApiException
+import java.security.MessageDigest
+import java.time.Clock
+import java.time.Instant
+import java.util.Date
+import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 data class PushOutboxItem(
     val id: String,
@@ -35,43 +35,72 @@ data class PushOutboxItem(
     val body: String,
     val attempts: Int = 0,
     val leaseId: String? = null,
+    val data: Map<String, String> = emptyMap(),
 )
 
 interface PushOutboxRepository {
     suspend fun enqueue(item: PushOutboxItem): Boolean
+
     suspend fun claim(now: Instant): PushOutboxItem?
-    suspend fun finish(item: PushOutboxItem, result: PushDeliveryResult, now: Instant): Boolean
+
+    suspend fun finish(
+        item: PushOutboxItem,
+        result: PushDeliveryResult,
+        now: Instant,
+    ): Boolean
 }
 
 /** Atomic leases across independent API replicas; completed/dropped rows retained for 30 days. */
-class MongoPushOutboxRepository(database: MongoDatabase) : PushOutboxRepository {
+class MongoPushOutboxRepository(
+    database: MongoDatabase,
+) : PushOutboxRepository {
     private val collection = database.getCollection<Document>("push_outbox")
     private val indexMutex = Mutex()
     private var indexed = false
 
-    private suspend fun ensureIndexes() = indexMutex.withLock {
-        if (indexed) return@withLock
-        collection.createIndex(Indexes.compoundIndex(Indexes.ascending("status"), Indexes.ascending("nextAttemptAt")),
-            IndexOptions().name("ix_push_due"))
-        collection.createIndex(Indexes.ascending("expiresAt"),
-            IndexOptions().name("ttl_push_outbox").expireAfter(0L, TimeUnit.SECONDS))
-        indexed = true
-    }
+    private suspend fun ensureIndexes() =
+        indexMutex.withLock {
+            if (indexed) return@withLock
+            collection.createIndex(
+                Indexes.compoundIndex(Indexes.ascending("status"), Indexes.ascending("nextAttemptAt")),
+                IndexOptions().name("ix_push_due"),
+            )
+            collection.createIndex(
+                Indexes.ascending("expiresAt"),
+                IndexOptions().name("ttl_push_outbox").expireAfter(0L, TimeUnit.SECONDS),
+            )
+            indexed = true
+        }
 
     override suspend fun enqueue(item: PushOutboxItem): Boolean {
         ensureIndexes()
-        require(item.id.matches(Regex("[0-9a-f]{64}")) && item.owner.length in 2..512 &&
-            item.token.length in 16..4096 && item.title.length in 1..160 && item.body.length <= 2000)
+        require(
+            item.id.matches(Regex("[0-9a-f]{64}")) &&
+                item.owner.length in 2..512 &&
+                item.token.length in 16..4096 &&
+                item.title.length in 1..160 &&
+                item.body.length <= 2000,
+        )
+        require(
+            item.data.size <= 16 &&
+                item.data.all { (key, value) ->
+                    key.matches(Regex("[A-Za-z][A-Za-z0-9_.-]{0,63}")) &&
+                        value.length <= 512 &&
+                        value.none(Char::isISOControl)
+                },
+        )
         val now = Instant.now()
-        val row = Document("_id", item.id)
-            .append("owner", item.owner)
-            .append("token", item.token)
-            .append("title", item.title)
-            .append("body", item.body)
-            .append("status", "PENDING")
-            .append("attempts", 0)
-            .append("nextAttemptAt", Date.from(now))
-            .append("expiresAt", Date.from(now.plusSeconds(30L * 86400)))
+        val row =
+            Document("_id", item.id)
+                .append("owner", item.owner)
+                .append("token", item.token)
+                .append("title", item.title)
+                .append("body", item.body)
+                .append("data", Document(item.data))
+                .append("status", "PENDING")
+                .append("attempts", 0)
+                .append("nextAttemptAt", Date.from(now))
+                .append("expiresAt", Date.from(now.plusSeconds(30L * 86400)))
         return try {
             collection.insertOne(row)
             true
@@ -84,20 +113,27 @@ class MongoPushOutboxRepository(database: MongoDatabase) : PushOutboxRepository 
         ensureIndexes()
         val leaseId = UUID.randomUUID().toString()
         val due = Date.from(now)
-        val filter = and(gt("expiresAt", due), or(
-            and(eq("status", "PENDING"), lte("nextAttemptAt", due)),
-            and(eq("status", "SENDING"), lte("leaseUntil", due)),
-        ))
-        val updated = collection.findOneAndUpdate(filter,
-            Updates.combine(
-                Updates.set("status", "SENDING"),
-                Updates.set("leaseId", leaseId),
-                Updates.set("leaseUntil", Date.from(now.plusSeconds(90))),
-                Updates.inc("attempts", 1),
-            ),
-            FindOneAndUpdateOptions().sort(Sorts.ascending("nextAttemptAt"))
-                .returnDocument(ReturnDocument.AFTER),
-        ) ?: return null
+        val filter =
+            and(
+                gt("expiresAt", due),
+                or(
+                    and(eq("status", "PENDING"), lte("nextAttemptAt", due)),
+                    and(eq("status", "SENDING"), lte("leaseUntil", due)),
+                ),
+            )
+        val updated =
+            collection.findOneAndUpdate(
+                filter,
+                Updates.combine(
+                    Updates.set("status", "SENDING"),
+                    Updates.set("leaseId", leaseId),
+                    Updates.set("leaseUntil", Date.from(now.plusSeconds(90))),
+                    Updates.inc("attempts", 1),
+                ),
+                FindOneAndUpdateOptions()
+                    .sort(Sorts.ascending("nextAttemptAt"))
+                    .returnDocument(ReturnDocument.AFTER),
+            ) ?: return null
         return PushOutboxItem(
             id = updated.getString("_id"),
             owner = updated.getString("owner"),
@@ -106,67 +142,113 @@ class MongoPushOutboxRepository(database: MongoDatabase) : PushOutboxRepository 
             body = updated.getString("body"),
             attempts = (updated.get("attempts") as Number).toInt(),
             leaseId = leaseId,
+            data =
+                (updated.get("data") as? Document)
+                    ?.entries
+                    ?.associate { (key, value) -> key to value.toString() }
+                    .orEmpty(),
         )
     }
 
-    override suspend fun finish(item: PushOutboxItem, result: PushDeliveryResult, now: Instant): Boolean {
-        val status = when {
-            result == PushDeliveryResult.ACCEPTED -> "SENT"
-            result == PushDeliveryResult.INVALID_TOKEN -> "DROPPED"
-            result == PushDeliveryResult.REJECTED -> "REJECTED"
-            item.attempts >= 7 -> "DEAD"
-            else -> "PENDING"
-        }
-        val delaySeconds = when (result) {
-            PushDeliveryResult.CONFIGURATION_ERROR -> 3600L
-            else -> (15L * (1L shl item.attempts.coerceIn(0, 10))).coerceAtMost(21600L)
-        }
-        val update = Updates.combine(
-            Updates.set("status", status),
-            Updates.set("nextAttemptAt", Date.from(now.plusSeconds(delaySeconds))),
-            Updates.unset("leaseId"),
-            Updates.unset("leaseUntil"),
-            Updates.set("lastResult", result.name),
-        )
-        return collection.updateOne(and(eq("_id", item.id), eq("status", "SENDING"),
-            eq("leaseId", item.leaseId)), update).modifiedCount == 1L
+    override suspend fun finish(
+        item: PushOutboxItem,
+        result: PushDeliveryResult,
+        now: Instant,
+    ): Boolean {
+        val status =
+            when {
+                result == PushDeliveryResult.ACCEPTED -> "SENT"
+                result == PushDeliveryResult.INVALID_TOKEN -> "DROPPED"
+                result == PushDeliveryResult.REJECTED -> "REJECTED"
+                item.attempts >= 7 -> "DEAD"
+                else -> "PENDING"
+            }
+        val delaySeconds =
+            when (result) {
+                PushDeliveryResult.CONFIGURATION_ERROR -> 3600L
+                else -> (15L * (1L shl item.attempts.coerceIn(0, 10))).coerceAtMost(21600L)
+            }
+        val update =
+            Updates.combine(
+                Updates.set("status", status),
+                Updates.set("nextAttemptAt", Date.from(now.plusSeconds(delaySeconds))),
+                Updates.unset("leaseId"),
+                Updates.unset("leaseUntil"),
+                Updates.set("lastResult", result.name),
+            )
+        return collection
+            .updateOne(
+                and(
+                    eq("_id", item.id),
+                    eq("status", "SENDING"),
+                    eq("leaseId", item.leaseId),
+                ),
+                update,
+            ).modifiedCount == 1L
     }
 }
 
 /** In-memory analogue is intentionally for unit tests and local development only. */
 class InMemoryPushOutboxRepository : PushOutboxRepository {
     private val mutex = Mutex()
-    private data class Row(val item: PushOutboxItem, val due: Instant, val state: String)
+
+    private data class Row(
+        val item: PushOutboxItem,
+        val due: Instant,
+        val state: String,
+    )
+
     private val records = linkedMapOf<String, Row>()
-    override suspend fun enqueue(item: PushOutboxItem): Boolean = mutex.withLock {
-        if (records.containsKey(item.id)) false else {
-            records[item.id] = Row(item, Instant.EPOCH, "PENDING")
+
+    override suspend fun enqueue(item: PushOutboxItem): Boolean =
+        mutex.withLock {
+            if (records.containsKey(item.id)) {
+                false
+            } else {
+                records[item.id] = Row(item, Instant.EPOCH, "PENDING")
+                true
+            }
+        }
+
+    override suspend fun claim(now: Instant): PushOutboxItem? =
+        mutex.withLock {
+            val row =
+                records.entries.firstOrNull { (_, row) ->
+                    (row.state == "PENDING" || row.state == "SENDING") && !row.due.isAfter(now)
+                } ?: return@withLock null
+            val claimed =
+                row.value.item.copy(
+                    attempts = row.value.item.attempts + 1,
+                    leaseId = UUID.randomUUID().toString(),
+                )
+            records[row.key] = Row(claimed, now.plusSeconds(90), "SENDING")
+            claimed
+        }
+
+    override suspend fun finish(
+        item: PushOutboxItem,
+        result: PushDeliveryResult,
+        now: Instant,
+    ): Boolean =
+        mutex.withLock {
+            val existing = records[item.id] ?: return@withLock false
+            if (existing.state != "SENDING" || existing.item.leaseId != item.leaseId) return@withLock false
+            val status =
+                when {
+                    result == PushDeliveryResult.ACCEPTED -> "SENT"
+                    result in setOf(PushDeliveryResult.INVALID_TOKEN, PushDeliveryResult.REJECTED) -> "DROPPED"
+                    item.attempts >= 7 -> "DEAD"
+                    else -> "PENDING"
+                }
+            val delaySeconds =
+                if (result == PushDeliveryResult.CONFIGURATION_ERROR) {
+                    3600L
+                } else {
+                    (15L * (1L shl item.attempts.coerceIn(0, 10))).coerceAtMost(21600L)
+                }
+            records[item.id] = Row(item, now.plusSeconds(delaySeconds), status)
             true
         }
-    }
-    override suspend fun claim(now: Instant): PushOutboxItem? = mutex.withLock {
-        val row = records.entries.firstOrNull { (_, row) ->
-            (row.state == "PENDING" || row.state == "SENDING") && !row.due.isAfter(now)
-        } ?: return@withLock null
-        val claimed = row.value.item.copy(attempts = row.value.item.attempts + 1,
-            leaseId = UUID.randomUUID().toString())
-        records[row.key] = Row(claimed, now.plusSeconds(90), "SENDING")
-        claimed
-    }
-    override suspend fun finish(item: PushOutboxItem, result: PushDeliveryResult, now: Instant): Boolean = mutex.withLock {
-        val existing = records[item.id] ?: return@withLock false
-        if (existing.state != "SENDING" || existing.item.leaseId != item.leaseId) return@withLock false
-        val status = when {
-            result == PushDeliveryResult.ACCEPTED -> "SENT"
-            result in setOf(PushDeliveryResult.INVALID_TOKEN, PushDeliveryResult.REJECTED) -> "DROPPED"
-            item.attempts >= 7 -> "DEAD"
-            else -> "PENDING"
-        }
-        val delaySeconds = if (result == PushDeliveryResult.CONFIGURATION_ERROR) 3600L else
-            (15L * (1L shl item.attempts.coerceIn(0, 10))).coerceAtMost(21600L)
-        records[item.id] = Row(item, now.plusSeconds(delaySeconds), status)
-        true
-    }
 }
 
 /** No public notification creation endpoint. Only trusted, already-scoped business services may enqueue. */
@@ -180,15 +262,25 @@ class PushOutboxService(
     /** A device must still belong to a non-revoked refresh session. */
     private val authorizeSession: suspend (String, String) -> Boolean = { _, _ -> false },
 ) {
-    suspend fun enqueueForOwner(eventId: String, owner: String, title: String, body: String): Int {
-        if (eventId.length !in 1..256 || owner.length !in 2..512 ||
+    suspend fun enqueueForOwner(
+        eventId: String,
+        owner: String,
+        title: String,
+        body: String,
+        data: Map<String, String> = emptyMap(),
+    ): Int {
+        if (eventId.length !in 1..256 ||
+            owner.length !in 2..512 ||
             !(owner.startsWith("NATIVE:") || owner.startsWith("INSTITUTIONAL:")) ||
-            title.length !in 1..160 || body.length > 2000)
+            title.length !in 1..160 ||
+            body.length > 2000
+        ) {
             throw ApiException.Validation("Invalid notification request")
+        }
         var created = 0
         for (token in devices.listTokens(setOf(owner))) {
             val id = digest("$eventId\u0000$owner\u0000$token")
-            if (outbox.enqueue(PushOutboxItem(id, owner, token, title, body))) created++
+            if (outbox.enqueue(PushOutboxItem(id, owner, token, title, body, data = data))) created++
         }
         return created
     }
@@ -196,24 +288,37 @@ class PushOutboxService(
     /** One leased destination only; never exposes secrets or provider responses to clients. */
     suspend fun dispatchNext(): Boolean {
         val item = outbox.claim(clock.instant()) ?: return false
-        val permitted = try {
-            authorizeRecipient(item.owner) && authorizeSession(item.owner, item.token)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            // Temporary identity provider failure: do not send or permanently drop.
-            val ack = outbox.finish(item, PushDeliveryResult.RETRYABLE, clock.instant())
-            return ack
-        }
+        val permitted =
+            try {
+                authorizeRecipient(item.owner) && authorizeSession(item.owner, item.token)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Temporary identity provider failure: do not send or permanently drop.
+                val ack = outbox.finish(item, PushDeliveryResult.RETRYABLE, clock.instant())
+                return ack
+            }
         val current = devices.listTokens(setOf(item.owner))
-        val result = if (!permitted) PushDeliveryResult.REJECTED
-            else if (item.token !in current) PushDeliveryResult.INVALID_TOKEN
-            else try { sender.send(item.token, item.title, item.body) }
-            catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { PushDeliveryResult.RETRYABLE }
+        val result =
+            if (!permitted) {
+                PushDeliveryResult.REJECTED
+            } else if (item.token !in current) {
+                PushDeliveryResult.INVALID_TOKEN
+            } else {
+                try {
+                    sender.send(item.token, item.title, item.body, item.data)
+                } catch (
+                    cancelled: CancellationException,
+                ) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    PushDeliveryResult.RETRYABLE
+                }
+            }
         val ack = outbox.finish(item, result, clock.instant())
-        if (ack && result == PushDeliveryResult.INVALID_TOKEN && item.token in current)
+        if (ack && result == PushDeliveryResult.INVALID_TOKEN && item.token in current) {
             devices.deactivateInvalid(item.token)
+        }
         return true
     }
 
@@ -232,5 +337,8 @@ class PushOutboxService(
     }
 }
 
-private fun digest(value: String): String = MessageDigest.getInstance("SHA-256")
-    .digest(value.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+private fun digest(value: String): String =
+    MessageDigest
+        .getInstance("SHA-256")
+        .digest(value.toByteArray(Charsets.UTF_8))
+        .joinToString("") { "%02x".format(it) }

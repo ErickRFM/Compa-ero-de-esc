@@ -6,6 +6,7 @@ import org.companerodeescuela.api.auth.SessionIdentitySource
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.integrations.academic.siii.SiiiAcademicService
 import org.companerodeescuela.api.integrations.academic.siii.SiiiSectionReader
+import org.companerodeescuela.api.integrations.academic.siii.SiiiTeacherSectionView
 import org.companerodeescuela.api.integrations.push.InstitutionalIdentityLinkRepository
 import org.companerodeescuela.api.integrations.push.InstitutionalIdentityLinkService
 import org.companerodeescuela.shared.contracts.AttendanceIdentitySource
@@ -41,11 +42,35 @@ class SiiiAttendanceAuthority(
         date: LocalDate,
     ): Meeting {
         val load = academic.load(actor, InstitutionalIdentityKind.TEACHER)
-        return load.institutionalSections.firstNotNullOfOrNull { section ->
-            section.occurrences
-                .singleOrNull { it.id == occurrenceId && it.date == date.toString() }
-                ?.let { Meeting(section, it) }
-        } ?: throw ApiException.NotFound("Current institutional teaching occurrence was not found")
+        val meeting =
+            load.institutionalSections.firstNotNullOfOrNull { section ->
+                section.occurrences
+                    .singleOrNull { it.id == occurrenceId && it.date == date.toString() }
+                    ?.let { Meeting(section, it) }
+            } ?: throw ApiException.NotFound("Current institutional teaching occurrence was not found")
+        if (teacherView(actor, meeting.section).section.status != "open") {
+            throw ApiException.Conflict("Attendance cannot open for a closed institutional section")
+        }
+        return meeting
+    }
+
+    private suspend fun teacherView(
+        actor: UserSummary,
+        section: InstitutionalAcademicSection,
+    ): SiiiTeacherSectionView {
+        val current = policy.live(actor)
+        val institution = current.institutionId ?: throw ApiException.Forbidden()
+        val link =
+            links.findByNativeUserId(institution, InstitutionalIdentityKind.TEACHER, current.id)
+                ?: throw ApiException.Forbidden("Current institutional teacher link is required")
+        return reader.teacher(
+            current.toUserSummary(),
+            SessionIdentitySource.NATIVE,
+            institution,
+            section.id,
+            link.externalId,
+            section.sourceVersion,
+        )
     }
 
     suspend fun studentGroups(actor: UserSummary): Set<Pair<String, String>> =
@@ -129,6 +154,17 @@ class SiiiAttendanceAuthority(
             }.institutionalSections
                 .singleOrNull { it.id == section.id }
         if (assigned != section) throw ApiException.Forbidden("The opener is no longer assigned to this institutional section")
+        val teacherStatus =
+            try {
+                teacherView(teacher.toUserSummary(), section).section.status
+            } catch (
+                _: ApiException.Unauthorized,
+            ) {
+                throw ApiException.Forbidden("The assigned teacher is no longer active")
+            }
+        if (teacherStatus != "open") {
+            throw ApiException.Forbidden("The institutional section is no longer open")
+        }
     }
 
     companion object {

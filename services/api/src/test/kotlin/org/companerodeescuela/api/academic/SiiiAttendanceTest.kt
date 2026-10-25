@@ -222,6 +222,10 @@ class SiiiAttendanceTest {
             assertFailsWith<ApiException.Forbidden> { sessions.openSession(student.id, request, student) }
             assertFailsWith<ApiException.Forbidden> { sessions.roster(student.id, session.id, nativeActor = student) }
             assertFailsWith<ApiException.Unauthorized> { projection.requireSession(student.copy(institutionId = "tenant-b"), session) }
+            val openSnapshot = f.stored
+            f.stored = f.stored.copy(snapshot = checkNotNull(f.stored.snapshot).copy(status = "closed"))
+            assertEquals(HttpStatusCode.Conflict, post("/attendance/sessions", "teacher", Json.encodeToString(request)).status)
+            f.stored = openSnapshot
             f.sections = emptyList()
             assertEquals(emptyList(), students.discoverActiveFor(student.id, student))
             assertFailsWith<ApiException.Forbidden> { sessions.roster(teacher.id, session.id, nativeActor = teacher) }

@@ -243,7 +243,7 @@ fun ClassroomScreen(
         }
 
         Text(
-            text = "Tus clases",
+            text = "Tus espacios colaborativos",
             style = MaterialTheme.typography.titleMedium,
         )
 
@@ -251,9 +251,9 @@ fun ClassroomScreen(
             Text(
                 text =
                     when {
-                        pendingTeacher -> "Todavía no tienes clases. Tu perfil docente sigue pendiente de verificación."
-                        isStudent -> "Control escolar todavía no ha vinculado clases a tu grupo."
-                        else -> "Todavía no hay clases académicas asignadas."
+                        pendingTeacher -> "No tienes espacios colaborativos. Tu perfil docente sigue pendiente de verificación."
+                        isStudent -> "No tienes espacios colaborativos vinculados a tu grupo."
+                        else -> "Todavía no hay espacios colaborativos asignados."
                     },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -315,7 +315,7 @@ private fun TeacherAssignedClassrooms(
             }
             InstitutionalSections(state)
             Text(
-                text = "Tus materias y grupos asignados por control escolar. Desde aquí puedes pasar lista, publicar avisos y evaluar.",
+                text = "Espacios colaborativos de Compañero. Sus permisos y herramientas son independientes del catálogo institucional.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = V8RedColors.TextSecondary,
             )
@@ -323,15 +323,15 @@ private fun TeacherAssignedClassrooms(
             state.errorMessage?.let { StatusNotice(title = "Datos sin actualizar", message = it) }
             if (!state.loading && state.errorMessage == null && assigned.isEmpty()) {
                 StatusNotice(
-                    title = "Todavía no tienes clases asignadas",
-                    message = "Cuando control escolar te asigne materias activas, aparecerán aquí automáticamente.",
+                    title = "No tienes espacios colaborativos asignados",
+                    message = "Las asignaciones oficiales están en el catálogo institucional; estos espacios tienen permisos propios.",
                 )
             }
             if (assigned.isNotEmpty()) {
                 V8GlassCard(modifier = Modifier.fillMaxWidth()) {
                     Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
                         Text(
-                            text = "${assigned.size} materias activas",
+                            text = "${assigned.size} espacios colaborativos activos",
                             color = V8RedColors.TextPrimary,
                             style = MaterialTheme.typography.titleLarge,
                         )

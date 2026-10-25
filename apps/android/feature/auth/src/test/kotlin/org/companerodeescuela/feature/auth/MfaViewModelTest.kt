@@ -72,4 +72,48 @@ class MfaViewModelTest {
             assertNull(vm.state.value.enrollment);assertFalse(vm.state.value.toString().contains("OLDSECRET"))
         } finally { release.complete(Unit);vm.viewModelScope.cancel();client.close();Dispatchers.resetMain() }
     }
+
+    @Test
+    fun `retained view model reloads cancelled status on screen reentry without duplicate initial request`() =
+        runTest {
+            Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+            val store = Store()
+            val started = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val requests = MutableStateFlow(0)
+            val client =
+                createApiClient(
+                    ApiEnvironment("https://example.test/", "test"),
+                    MockEngine {
+                        requests.value += 1
+                        if (requests.value == 1) {
+                            started.complete(Unit)
+                            release.await()
+                        }
+                        respond(
+                            """{"data":{"enabled":true,"available":true}}""",
+                            HttpStatusCode.OK,
+                            headersOf(HttpHeaders.ContentType, "application/json"),
+                        )
+                    },
+                )
+            val vm = MfaViewModel(MfaRepository(client, store))
+            try {
+                awaitReal { started.await() }
+                vm.onEnter()
+                assertEquals(1, requests.value)
+                vm.clearSensitive()
+                assertNull(vm.state.value.status)
+                vm.onEnter()
+                val state = awaitReal { vm.state.first { !it.loading && it.status?.enabled == true } }
+                assertEquals(2, requests.value)
+                assertTrue(state.status?.enabled == true)
+                assertNull(state.enrollment)
+            } finally {
+                release.complete(Unit)
+                vm.viewModelScope.cancel()
+                client.close()
+                Dispatchers.resetMain()
+            }
+        }
 }

@@ -249,7 +249,9 @@ jobs:
           arch: x86_64
           # Stable 36.4.9: make the native emulator runtime reproducible.
           emulator-build: "14788078"
-          ram-size: 2048M
+          # API 35 Google APIs plus Compose instrumentation was exhausting
+          # Binder-side service headroom at 2 GiB in Management runs.
+          ram-size: 3072M
           # Supported software GLES/Vulkan path through ANGLE; retain KVM.
           # Runs with the legacy indirect mode ended in native QEMU SIGSEGV on API35.
           emulator-options: -no-window -gpu swangle -no-snapshot -noaudio -no-boot-anim -show-kernel

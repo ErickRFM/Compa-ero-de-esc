@@ -149,7 +149,9 @@ class SiiiAcademicRoutesTest {
                     header(HttpHeaders.Authorization, "Bearer ${f.tokens.getValue(who)}")
                 }
             f.sections = listOf(SiiiAuthoritySection(f.sectionId, 2))
+            f.stored = f.stored.copy(snapshot = f.snapshot.copy(enrollments = emptyList(), teachers = emptyList()))
             assertEquals(HttpStatusCode.ServiceUnavailable, read().status)
+            assertEquals(HttpStatusCode.ServiceUnavailable, read("teacher").status)
             f.stored =
                 f.stored.copy(
                     sourceVersion = 2,
@@ -180,7 +182,38 @@ class SiiiAcademicRoutesTest {
         }
     }
 
-    private class Fixture {
+    @Test
+    fun `dual roles resolve valid teacher identity and combine both links without duplicate sections`() =
+        testApplication {
+            val f = Fixture(dualTeacher = true).also { it.initialize() }
+            application {
+                configurePlugins(f.settings, f.sessions, PlatformSessionAuthority(f.accounts, MockIdentityProvider()))
+                routing { academicRoutes(f.settings, MockAcademicProvider(), institutionalAcademic = f.service) }
+            }
+
+            suspend fun read() =
+                client.get("/academic/load") { header(HttpHeaders.Authorization, "Bearer ${f.tokens.getValue("teacher")}") }
+            assertEquals(HttpStatusCode.OK, read().status)
+            f.links.createIfAbsent(
+                InstitutionalIdentityLink(
+                    "tenant-a",
+                    InstitutionalIdentityKind.STUDENT,
+                    "STUDENT",
+                    "teacher",
+                    "qa-admin",
+                    "dual-student-link",
+                    "a".repeat(64),
+                    f.now,
+                ),
+            )
+            val load = Json.decodeFromString<ApiResponse<AcademicLoadResponse>>(read().bodyAsText()).data
+            assertEquals(1, load.institutionalSections.size)
+            assertEquals(1, load.schedule.entries.size)
+        }
+
+    private class Fixture(
+        private val dualTeacher: Boolean = false,
+    ) {
         val settings = TestFixtures.settings().copy(jwtSecret = "0123456789abcdef0123456789abcdef".toCharArray())
         val accounts = InMemoryPlatformAccountRepository()
         val sessions = InMemoryRefreshSessionRepository()
@@ -293,7 +326,7 @@ class SiiiAcademicRoutesTest {
                         "QA $id",
                         "$id@example.test",
                         "fixture-hash",
-                        setOf(role),
+                        if (dualTeacher && id == "teacher") setOf(UserRole.STUDENT, UserRole.TEACHER) else setOf(role),
                         institutionId =
                             if (id ==
                                 "outsider"
@@ -322,6 +355,7 @@ class SiiiAcademicRoutesTest {
                 Triple(InstitutionalIdentityKind.STUDENT, "STUDENT", "student"),
                 Triple(InstitutionalIdentityKind.TEACHER, "TEACHER", "teacher"),
             )) {
+                if (dualTeacher && kind == InstitutionalIdentityKind.STUDENT) continue
                 links.createIfAbsent(
                     InstitutionalIdentityLink("tenant-a", kind, external, native, "qa-admin", "link-$native", "a".repeat(64), now),
                 )

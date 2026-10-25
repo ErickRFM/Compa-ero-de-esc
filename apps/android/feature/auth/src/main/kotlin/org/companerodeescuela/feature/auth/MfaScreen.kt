@@ -19,7 +19,7 @@ import org.companerodeescuela.core.designsystem.v8.V8FrostedGlassPanel
 @Composable
 fun MfaScreen(onBack:()->Unit,modifier:Modifier=Modifier,viewModel:MfaViewModel=hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    LaunchedEffect(viewModel) { viewModel.refresh() }
+    LaunchedEffect(viewModel) { viewModel.onEnter() }
     DisposableEffect(viewModel) { onDispose { viewModel.clearSensitive() } }
     MfaScreen(state,viewModel::enroll,viewModel::confirm,viewModel::refresh,onBack,modifier)
 }

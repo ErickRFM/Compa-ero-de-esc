@@ -59,7 +59,83 @@ class SiiiAcademicService(
 
     fun configured(actor: UserSummary): Boolean = actor.institutionId in configuredInstitutions
 
-    suspend fun load(actor: UserSummary): AcademicLoadResponse {
+    suspend fun load(
+        actor: UserSummary,
+        kind: InstitutionalIdentityKind? = null,
+    ): AcademicLoadResponse {
+        val current = policy.live(actor)
+        val institution = current.institutionId ?: throw ApiException.Forbidden("Institutional membership is required")
+        if (institution !in
+            configuredInstitutions
+        ) {
+            throw ApiException.DependencyUnavailable("Institutional academic delivery is not configured")
+        }
+        val granted =
+            InstitutionalIdentityKind.entries.filter {
+                (
+                    if (it ==
+                        InstitutionalIdentityKind.STUDENT
+                    ) {
+                        UserRole.STUDENT
+                    } else {
+                        UserRole.TEACHER
+                    }
+                ) in
+                    current.roles
+            }
+        if (granted.isEmpty() ||
+            (kind != null && kind !in granted)
+        ) {
+            throw ApiException.Forbidden("An institutional student or teacher role is required")
+        }
+        val identities =
+            (kind?.let(::listOf) ?: granted).mapNotNull { candidate ->
+                links.findByNativeUserId(institution, candidate, current.id)?.let {
+                    candidate to
+                        it
+                }
+            }
+        if (identities.isEmpty()) throw ApiException.NotFound("Institutional identity is not linked")
+        val loads = identities.map { (candidate, _) -> loadForKind(actor, candidate) }
+        val sections =
+            loads
+                .flatMap { it.institutionalSections }
+                .groupBy { it.id }
+                .map { (_, copies) ->
+                    if (copies.distinct().size !=
+                        1
+                    ) {
+                        throw ApiException.DependencyUnavailable("Institutional authority changed during the read")
+                    }
+                    copies.first()
+                }.sortedBy { it.id }
+        identities.zip(loads).forEach { (identity, load) ->
+            val (candidate, link) = identity
+            val expected = load.institutionalSections.map { SiiiAuthoritySection(it.id, it.sourceVersion) }.sortedBy { it.sectionId }
+            if (manifest(institution, candidate, link.externalId).sections.sortedBy { it.sectionId } != expected ||
+                links.findByNativeUserId(institution, candidate, current.id) != link
+            ) {
+                throw ApiException.DependencyUnavailable("Institutional authority changed during the read")
+            }
+        }
+        policy.live(actor)
+        return loads.first().copy(
+            institutionalSections = sections,
+            schedule =
+                AcademicScheduleResponse(
+                    current.id,
+                    loads
+                        .flatMap {
+                            it.schedule.entries
+                        }.distinct(),
+                ),
+        )
+    }
+
+    private suspend fun loadForKind(
+        actor: UserSummary,
+        kind: InstitutionalIdentityKind,
+    ): AcademicLoadResponse {
         val current = policy.live(actor)
         val institutionId = current.institutionId ?: throw ApiException.Forbidden("Institutional membership is required")
         if (institutionId !in
@@ -67,12 +143,11 @@ class SiiiAcademicService(
         ) {
             throw ApiException.DependencyUnavailable("Institutional academic delivery is not configured")
         }
-        val kind =
-            when {
-                UserRole.STUDENT in current.roles -> InstitutionalIdentityKind.STUDENT
-                UserRole.TEACHER in current.roles -> InstitutionalIdentityKind.TEACHER
-                else -> throw ApiException.Forbidden("An institutional student or teacher role is required")
-            }
+        if ((if (kind == InstitutionalIdentityKind.STUDENT) UserRole.STUDENT else UserRole.TEACHER) !in
+            current.roles
+        ) {
+            throw ApiException.Forbidden()
+        }
         val link =
             links.findByNativeUserId(institutionId, kind, current.id)
                 ?: throw ApiException.NotFound("Institutional identity is not linked")
@@ -91,6 +166,7 @@ class SiiiAcademicService(
                                         institutionId,
                                         expected.sectionId,
                                         link.externalId,
+                                        expected.sourceVersion,
                                     ).section
                             InstitutionalIdentityKind.TEACHER ->
                                 reader
@@ -100,6 +176,7 @@ class SiiiAcademicService(
                                         institutionId,
                                         expected.sectionId,
                                         link.externalId,
+                                        expected.sourceVersion,
                                     ).section
                         }
                     } catch (

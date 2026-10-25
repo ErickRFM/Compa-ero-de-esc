@@ -75,9 +75,10 @@ class SiiiSectionReader(
         institutionId: String,
         sectionId: String,
         externalId: String,
+        expectedSourceVersion: Long? = null,
     ): SiiiStudentSectionView {
         authorize(actor, identitySource, institutionId, externalId, InstitutionalIdentityKind.STUDENT, UserRole.STUDENT)
-        val stored = available(institutionId, sectionId)
+        val stored = available(institutionId, sectionId, expectedSourceVersion)
         val snapshot = checkNotNull(stored.snapshot)
         val own = snapshot.enrollments.singleOrNull { it.studentExternalId == externalId && it.status == "enrolled" }
         if (snapshot.status != "open" || own == null || own.studentStatus != "active") throw ApiException.Forbidden()
@@ -90,9 +91,10 @@ class SiiiSectionReader(
         institutionId: String,
         sectionId: String,
         externalId: String,
+        expectedSourceVersion: Long? = null,
     ): SiiiTeacherSectionView {
         authorize(actor, identitySource, institutionId, externalId, InstitutionalIdentityKind.TEACHER, UserRole.TEACHER)
-        val stored = available(institutionId, sectionId)
+        val stored = available(institutionId, sectionId, expectedSourceVersion)
         val snapshot = checkNotNull(stored.snapshot)
         if (snapshot.teachers.none { it.externalId == externalId }) throw ApiException.Forbidden()
         return SiiiTeacherSectionView(stored.details(), snapshot.enrollments)
@@ -121,8 +123,13 @@ class SiiiSectionReader(
     private suspend fun available(
         institutionId: String,
         sectionId: String,
+        expectedSourceVersion: Long? = null,
     ): StoredSiiiSection {
-        val stored = repository.find(institutionId, sectionId) ?: throw ApiException.NotFound()
+        val stored = repository.find(institutionId, sectionId)
+        if (expectedSourceVersion != null && (stored == null || stored.sourceVersion != expectedSourceVersion)) {
+            throw ApiException.DependencyUnavailable("Institutional snapshot is pending synchronization")
+        }
+        if (stored == null) throw ApiException.NotFound()
         if (stored.snapshot == null || stored.snapshot.status == "archived") throw ApiException.NotFound()
         return stored
     }

@@ -50,6 +50,9 @@ class TeacherAttendanceScopeUiTest {
         compose.onNodeWithText("Motivo del ajuste").assertExists()
         compose.runOnIdle { current.value = current.value.copy(teacherScopeGeneration = 1) }
         compose.onNodeWithText("Motivo del ajuste").assertDoesNotExist()
+        compose
+            .onNode(hasScrollToNodeAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange))
+            .performScrollToNode(hasText("Revisar registro"))
         compose.onNodeWithText("Revisar registro").performScrollTo().performClick()
         compose.onNodeWithText("Validar por excepción docente").performScrollTo().performClick()
         compose.onNodeWithText("QA private draft").assertDoesNotExist()

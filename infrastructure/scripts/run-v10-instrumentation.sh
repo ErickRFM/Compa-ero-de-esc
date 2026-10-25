@@ -125,7 +125,7 @@ fi
 runner_args=()
 if [[ "$variant" == Management ]]; then
   runner_args+=(
-    "-Pandroid.testInstrumentationRunnerArguments.class=org.companerodeescuela.AppDistributionSmokeTest,org.companerodeescuela.DistributionLoginUiTest,org.companerodeescuela.V12AdministrationUiTest,org.companerodeescuela.V14RoleNavigationUiTest"
+    "-Pandroid.testInstrumentationRunnerArguments.class=org.companerodeescuela.AppDistributionSmokeTest,org.companerodeescuela.DistributionLoginUiTest,org.companerodeescuela.V12AdministrationUiTest,org.companerodeescuela.V14RoleNavigationUiTest,org.companerodeescuela.InstitutionalClassesUiTest"
   )
 fi
 ./gradlew ":apps:android:app:connected${variant}DebugAndroidTest" --max-workers=1 --no-daemon \

@@ -3,6 +3,9 @@ package org.companerodeescuela.feature.schedule
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,72 +44,88 @@ class ScheduleViewModel
         private val _state = MutableStateFlow(ScheduleUiState())
         val state: StateFlow<ScheduleUiState> = _state.asStateFlow()
 
+        private var loadJob: Job? = null
+
         init {
             load()
         }
 
         fun load() {
-            viewModelScope.launch {
-                _state.value =
-                    _state.value.copy(
-                        loading = true,
-                        syncMessage = null,
-                        errorMessage = null,
-                    )
-                when (val result = repository.load()) {
-                    is Outcome.Success -> {
-                        _state.value =
-                            _state.value.copy(
-                                loading = false,
-                                entries = WeeklySchedule.order(result.value.academic.schedule.entries),
-                                fromCache = result.value.fromCache,
-                                lastUpdatedAtEpochSeconds = result.value.updatedAtEpochSeconds,
-                                syncMessage = null,
-                                errorMessage = null,
-                            )
-                    }
-                    is Outcome.Failure -> {
-                        val httpError = result.error as? AppError.Http
-                        if (httpError != null && httpError.status in 400..499) {
+            loadJob?.cancel()
+            loadJob =
+                viewModelScope.launch {
+                    _state.value =
+                        _state.value.copy(
+                            loading = true,
+                            syncMessage = null,
+                            errorMessage = null,
+                        )
+                    val result = repository.load()
+                    currentCoroutineContext().ensureActive()
+                    when (result) {
+                        is Outcome.Success -> {
                             _state.value =
                                 _state.value.copy(
                                     loading = false,
-                                    errorMessage = httpError.userMessage,
+                                    entries = WeeklySchedule.order(result.value.academic.schedule.entries),
+                                    fromCache = result.value.fromCache,
+                                    lastUpdatedAtEpochSeconds = result.value.updatedAtEpochSeconds,
+                                    syncMessage = null,
+                                    errorMessage = null,
                                 )
-                            return@launch
                         }
-                        when (val local = repository.readWeeklySchedule()) {
-                            is Outcome.Success -> {
+                        is Outcome.Failure -> {
+                            if (result.error !is AppError.Network) {
+                                val personal = personalRepository.list()
+                                currentCoroutineContext().ensureActive()
                                 _state.value =
                                     _state.value.copy(
                                         loading = false,
-                                        entries = WeeklySchedule.order(local.value),
-                                        fromCache = true,
-                                        syncMessage =
-                                            if (local.value.isEmpty()) {
-                                                null
-                                            } else {
-                                                "La integración escolar no respondió. Estás usando tu horario guardado."
+                                        entries =
+                                            when (personal) {
+                                                is Outcome.Success -> WeeklySchedule.order(personal.value)
+                                                is Outcome.Failure -> emptyList()
                                             },
-                                        errorMessage =
-                                            if (local.value.isEmpty()) {
-                                                "Todavía no hay un horario guardado. Puedes importarlo o crearlo manualmente."
-                                            } else {
-                                                null
-                                            },
-                                    )
-                            }
-                            is Outcome.Failure -> {
-                                _state.value =
-                                    _state.value.copy(
-                                        loading = false,
+                                        fromCache = false,
+                                        lastUpdatedAtEpochSeconds = null,
                                         errorMessage = result.error.userMessage,
                                     )
+                                return@launch
+                            }
+                            val local = repository.readWeeklySchedule()
+                            currentCoroutineContext().ensureActive()
+                            when (local) {
+                                is Outcome.Success -> {
+                                    _state.value =
+                                        _state.value.copy(
+                                            loading = false,
+                                            entries = WeeklySchedule.order(local.value),
+                                            fromCache = true,
+                                            syncMessage =
+                                                if (local.value.isEmpty()) {
+                                                    null
+                                                } else {
+                                                    "La integración escolar no respondió. Estás usando tu horario guardado."
+                                                },
+                                            errorMessage =
+                                                if (local.value.isEmpty()) {
+                                                    "Todavía no hay un horario guardado. Puedes importarlo o crearlo manualmente."
+                                                } else {
+                                                    null
+                                                },
+                                        )
+                                }
+                                is Outcome.Failure -> {
+                                    _state.value =
+                                        _state.value.copy(
+                                            loading = false,
+                                            errorMessage = result.error.userMessage,
+                                        )
+                                }
                             }
                         }
                     }
                 }
-            }
         }
 
         fun savePersonal(draft: PersonalScheduleDraft) {

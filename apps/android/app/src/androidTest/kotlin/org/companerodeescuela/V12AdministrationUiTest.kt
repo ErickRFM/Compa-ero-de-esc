@@ -337,7 +337,10 @@ class V12AdministrationUiTest {
                 (state.status?.enabled == true && state.enrollment == null && !state.working) || state.failure != null
             }
             val confirmedState = f.mfa.state.value
-            assertTrue("MFA confirmation did not complete: status=${confirmedState.status}, failure=${confirmedState.failure}", confirmedState.status?.enabled == true)
+            assertTrue(
+                "MFA confirmation did not complete: status=${confirmedState.status}, failure=${confirmedState.failure}",
+                confirmedState.status?.enabled == true,
+            )
             waitTag("mfa_enabled", timeoutMillis = 30000)
             assertTrue(compose.onAllNodesWithTag("mfa_setup_secret").fetchSemanticsNodes().isEmpty())
             assertEquals(original, f.store.token.value)

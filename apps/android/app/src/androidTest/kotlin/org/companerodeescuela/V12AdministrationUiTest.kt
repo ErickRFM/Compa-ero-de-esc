@@ -478,8 +478,25 @@ class V12AdministrationUiTest {
             waitTag("staff_identity")
             compose.onNodeWithTag("staff_identity").performScrollTo().performTextInput("TEST-REFERENCE")
             compose.onNodeWithTag("staff_preference").performScrollTo().performTextInput("QA Group preference")
-            compose.onNodeWithTag("staff_submit").performScrollTo().performClick()
-            waitTag("staff_application_status")
+            dismissKeyboardBeforeSubmit()
+            compose
+                .onNodeWithTag("staff_submit")
+                .performScrollTo()
+                .assertIsDisplayed()
+                .assertIsEnabled()
+                .performClick()
+            try {
+                waitTag("staff_application_status")
+            } catch (timeout: ComposeTimeoutException) {
+                val state = f.staff.state.value
+                throw AssertionError(
+                    "Tutor application timed out: loading=${state.loading}, working=${state.working}, " +
+                        "canRequest=${state.canRequest}, submitted=${state.submitted}, " +
+                        "ownerPresent=${state.ownerKey != null}, applicationCount=${state.applications.size}, " +
+                        "requestCount=${f.tutorRequests.size}, failureType=${state.failure?.javaClass?.simpleName}",
+                    timeout,
+                )
+            }
             assertEquals(7, f.tutorRequests.single().expectedAuthRevision)
             assertEquals(
                 setOf(UserRole.TEACHER),

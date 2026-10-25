@@ -42,7 +42,7 @@ data class SiiiTeacherSectionView(
  * Internal service. HTTP callers must obtain actor from requireNativeActor and identitySource
  * from verifiedSessionSource after the existing session authority has validated the request.
  * UserSummary and a matching account ID alone do not prove a native or non-revoked session.
- * No HTTP/mobile route is exposed by this slice.
+ * SiiiAcademicService resolves identity and live source versions for HTTP/mobile callers.
  */
 class SiiiSectionReader(
     private val accounts: PlatformAccountRepository,
@@ -52,6 +52,22 @@ class SiiiSectionReader(
     private val clock: Clock = Clock.systemUTC(),
 ) {
     private val policy = InstitutionScopePolicy(accounts, clock)
+
+    internal suspend fun verifyIdentity(
+        actor: UserSummary,
+        institutionId: String,
+        externalId: String,
+        kind: InstitutionalIdentityKind,
+    ) {
+        authorize(
+            actor,
+            SessionIdentitySource.NATIVE,
+            institutionId,
+            externalId,
+            kind,
+            if (kind == InstitutionalIdentityKind.STUDENT) UserRole.STUDENT else UserRole.TEACHER,
+        )
+    }
 
     suspend fun student(
         actor: UserSummary,

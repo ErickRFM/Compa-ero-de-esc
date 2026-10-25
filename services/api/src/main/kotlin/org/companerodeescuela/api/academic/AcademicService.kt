@@ -1,6 +1,5 @@
 package org.companerodeescuela.api.academic
 
-import java.time.LocalDate
 import org.companerodeescuela.api.academic.groups.AcademicGroupRepository
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.integrations.IntegrationException
@@ -17,6 +16,7 @@ import org.companerodeescuela.shared.contracts.ScheduleSource
 import org.companerodeescuela.shared.model.ClassOccurrence
 import org.companerodeescuela.shared.model.ClassOccurrenceStatus
 import org.companerodeescuela.shared.model.PersonId
+import java.time.LocalDate
 
 /**
  * Converts institution-specific academic data into stable platform contracts.
@@ -29,61 +29,81 @@ class AcademicService(
     private val provider: AcademicProvider,
     private val scheduleOverrides: AcademicScheduleOverrideRepository? = null,
     private val groupRepository: AcademicGroupRepository? = null,
-    private val nativeProjection:NativeAcademicProjection?=null,
+    private val nativeProjection: NativeAcademicProjection? = null,
+    private val institutionalAcademic: org.companerodeescuela.api.integrations.academic.siii.SiiiAcademicService? = null,
 ) {
-    suspend fun loadFor(externalId: String,nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null): AcademicLoadResponse {
-        if(nativeActor!=null) {
-            if(nativeActor.id!=externalId) throw ApiException.Forbidden("Academic identity does not match the native actor")
-            return (nativeProjection ?: throw ApiException.DependencyUnavailable("Native academic projection is unavailable")).load(nativeActor)
+    suspend fun loadFor(
+        externalId: String,
+        nativeActor: org.companerodeescuela.shared.contracts.UserSummary? = null,
+    ): AcademicLoadResponse {
+        if (nativeActor != null) {
+            if (nativeActor.id != externalId) throw ApiException.Forbidden("Academic identity does not match the native actor")
+            institutionalAcademic?.takeIf { it.configured(nativeActor) }?.let { return it.load(nativeActor) }
+            return (
+                nativeProjection ?: throw ApiException.DependencyUnavailable(
+                    "Native academic projection is unavailable",
+                )
+            ).load(nativeActor)
         }
         val inheritedEntries = inheritedGroupEntries(externalId)
         return try {
             val load = provider.getAcademicLoad(externalId)
             val student = AcademicMappers.toStudent(load.student)
-            val coursesById = load.enrollments.associate { enrollment ->
-                enrollment.course.externalId to enrollment.course
-            }
-            val schedule = AcademicMappers.toSchedule(
-                ownerId = PersonId(externalId),
-                slots = load.schedule,
-                coursesById = coursesById,
-            )
-
-            val institutionalEntries = schedule.slots
-                .sortedWith(compareBy({ it.dayOfWeek.value }, { it.startsAt }))
-                .map { slot ->
-                    ScheduleEntry(
-                        courseId = slot.group.course.id.value,
-                        subjectCode = slot.group.course.subject.code,
-                        subjectName = slot.group.course.subject.name,
-                        groupName = slot.group.name,
-                        teacherName = slot.group.course.teacher.person.displayName,
-                        dayOfWeek = slot.dayOfWeek.name,
-                        startsAt = slot.startsAt.toString(),
-                        endsAt = slot.endsAt.toString(),
-                        classroomName = slot.classroom?.name,
-                        buildingName = slot.classroom?.building?.name,
-                        campusName = slot.classroom?.building?.campus?.name,
-                    )
+            val coursesById =
+                load.enrollments.associate { enrollment ->
+                    enrollment.course.externalId to enrollment.course
                 }
-            val personalEntries = scheduleOverrides
-                ?.listForOwner(externalId)
-                .orEmpty()
-                .map(::managedToEntry)
+            val schedule =
+                AcademicMappers.toSchedule(
+                    ownerId = PersonId(externalId),
+                    slots = load.schedule,
+                    coursesById = coursesById,
+                )
+
+            val institutionalEntries =
+                schedule.slots
+                    .sortedWith(compareBy({ it.dayOfWeek.value }, { it.startsAt }))
+                    .map { slot ->
+                        ScheduleEntry(
+                            courseId = slot.group.course.id.value,
+                            subjectCode = slot.group.course.subject.code,
+                            subjectName = slot.group.course.subject.name,
+                            groupName = slot.group.name,
+                            teacherName = slot.group.course.teacher.person.displayName,
+                            dayOfWeek = slot.dayOfWeek.name,
+                            startsAt = slot.startsAt.toString(),
+                            endsAt = slot.endsAt.toString(),
+                            classroomName = slot.classroom?.name,
+                            buildingName = slot.classroom?.building?.name,
+                            campusName =
+                                slot.classroom
+                                    ?.building
+                                    ?.campus
+                                    ?.name,
+                        )
+                    }
+            val personalEntries =
+                scheduleOverrides
+                    ?.listForOwner(externalId)
+                    .orEmpty()
+                    .map(::managedToEntry)
 
             AcademicLoadResponse(
-                student = AcademicProfile(
-                    id = student.person.id.value,
-                    displayName = student.person.displayName,
-                    email = student.person.institutionalEmail,
-                ),
-                schedule = AcademicScheduleResponse(
-                    ownerId = schedule.ownerId.value,
-                    entries = mergeForPresentation(
-                        institutionalEntries,
-                        personalEntries + inheritedEntries,
+                student =
+                    AcademicProfile(
+                        id = student.person.id.value,
+                        displayName = student.person.displayName,
+                        email = student.person.institutionalEmail,
                     ),
-                ),
+                schedule =
+                    AcademicScheduleResponse(
+                        ownerId = schedule.ownerId.value,
+                        entries =
+                            mergeForPresentation(
+                                institutionalEntries,
+                                personalEntries + inheritedEntries,
+                            ),
+                    ),
             )
         } catch (error: IntegrationException) {
             if (
@@ -91,14 +111,16 @@ class AcademicService(
                 inheritedEntries.isNotEmpty()
             ) {
                 AcademicLoadResponse(
-                    student = AcademicProfile(
-                        id = externalId,
-                        displayName = externalId,
-                    ),
-                    schedule = AcademicScheduleResponse(
-                        ownerId = externalId,
-                        entries = mergeForPresentation(emptyList(), inheritedEntries),
-                    ),
+                    student =
+                        AcademicProfile(
+                            id = externalId,
+                            displayName = externalId,
+                        ),
+                    schedule =
+                        AcademicScheduleResponse(
+                            ownerId = externalId,
+                            entries = mergeForPresentation(emptyList(), inheritedEntries),
+                        ),
                 )
             } else {
                 throw integrationApiException(error)
@@ -106,7 +128,7 @@ class AcademicService(
         }
     }
 
-    suspend fun loadInstitutional(externalId:String):AcademicLoadResponse=AcademicService(provider).loadFor(externalId)
+    suspend fun loadInstitutional(externalId: String): AcademicLoadResponse = AcademicService(provider).loadFor(externalId)
 
     private suspend fun inheritedGroupEntries(userId: String): List<ScheduleEntry> {
         val groups = groupRepository?.listGroupsForUser(userId).orEmpty()
@@ -157,44 +179,68 @@ class AcademicService(
             entry.subjectName.trim().lowercase(),
         ).joinToString("|")
 
-    private fun dayOrder(day: String): Int = when (day) {
-        "MONDAY" -> 1
-        "TUESDAY" -> 2
-        "WEDNESDAY" -> 3
-        "THURSDAY" -> 4
-        "FRIDAY" -> 5
-        "SATURDAY" -> 6
-        "SUNDAY" -> 7
-        else -> 8
-    }
+    private fun dayOrder(day: String): Int =
+        when (day) {
+            "MONDAY" -> 1
+            "TUESDAY" -> 2
+            "WEDNESDAY" -> 3
+            "THURSDAY" -> 4
+            "FRIDAY" -> 5
+            "SATURDAY" -> 6
+            "SUNDAY" -> 7
+            else -> 8
+        }
 
-    suspend fun scheduleFor(externalId: String,nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null): AcademicScheduleResponse =
-        loadFor(externalId,nativeActor).schedule
+    suspend fun scheduleFor(
+        externalId: String,
+        nativeActor: org.companerodeescuela.shared.contracts.UserSummary? = null,
+    ): AcademicScheduleResponse = loadFor(externalId, nativeActor).schedule
 
     suspend fun scheduleWeekFor(
         externalId: String,
         weekOf: LocalDate,
-        nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null,
+        nativeActor: org.companerodeescuela.shared.contracts.UserSummary? = null,
     ): AcademicWeekResponse =
-        if(nativeActor!=null) {
-            if(nativeActor.id!=externalId) throw ApiException.Forbidden("Native actor does not match the academic identity")
-            (nativeProjection ?: throw ApiException.DependencyUnavailable("Native academic projection is unavailable")).week(nativeActor,weekOf)
-        } else translateIntegrationFailure {
-            val coursesById = provider.listCourses().associateBy { it.externalId }
-            val schedule = AcademicMappers.toSchedule(
-                ownerId = PersonId(externalId),
-                slots = provider.getSchedule(externalId, weekOf),
-                coursesById = coursesById,
-            )
-            val weekStart = AcademicOccurrenceProjection.weekStart(weekOf)
-            val occurrences = AcademicOccurrenceProjection.project(schedule, weekOf)
+        if (nativeActor != null) {
+            if (nativeActor.id != externalId) throw ApiException.Forbidden("Native actor does not match the academic identity")
+            if (institutionalAcademic?.configured(nativeActor) == true) {
+                val load = institutionalAcademic.load(nativeActor)
+                val start = AcademicOccurrenceProjection.weekStart(weekOf)
+                AcademicWeekResponse(
+                    externalId,
+                    start.toString(),
+                    start.plusDays(6).toString(),
+                    load.institutionalSections.flatMap { it.occurrences }.filter {
+                        LocalDate.parse(it.date) in
+                            start..start.plusDays(6)
+                    },
+                )
+            } else {
+                (
+                    nativeProjection ?: throw ApiException.DependencyUnavailable(
+                        "Native academic projection is unavailable",
+                    )
+                ).week(nativeActor, weekOf)
+            }
+        } else {
+            translateIntegrationFailure {
+                val coursesById = provider.listCourses().associateBy { it.externalId }
+                val schedule =
+                    AcademicMappers.toSchedule(
+                        ownerId = PersonId(externalId),
+                        slots = provider.getSchedule(externalId, weekOf),
+                        coursesById = coursesById,
+                    )
+                val weekStart = AcademicOccurrenceProjection.weekStart(weekOf)
+                val occurrences = AcademicOccurrenceProjection.project(schedule, weekOf)
 
-            AcademicWeekResponse(
-                ownerId = externalId,
-                weekStartsOn = weekStart.toString(),
-                weekEndsOn = weekStart.plusDays(6).toString(),
-                occurrences = occurrences.map(::toContract),
-            )
+                AcademicWeekResponse(
+                    ownerId = externalId,
+                    weekStartsOn = weekStart.toString(),
+                    weekEndsOn = weekStart.plusDays(6).toString(),
+                    occurrences = occurrences.map(::toContract),
+                )
+            }
         }
 
     private fun toContract(occurrence: ClassOccurrence): ClassOccurrenceContract =
@@ -209,15 +255,20 @@ class AcademicService(
             date = occurrence.date.toString(),
             startsAt = occurrence.startsAt.toString(),
             endsAt = occurrence.endsAt.toString(),
-            status = when (occurrence.status) {
-                ClassOccurrenceStatus.SCHEDULED -> ClassOccurrenceStatusContract.SCHEDULED
-                ClassOccurrenceStatus.CANCELLED -> ClassOccurrenceStatusContract.CANCELLED
-                ClassOccurrenceStatus.RESCHEDULED -> ClassOccurrenceStatusContract.RESCHEDULED
-                ClassOccurrenceStatus.ONLINE -> ClassOccurrenceStatusContract.ONLINE
-            },
+            status =
+                when (occurrence.status) {
+                    ClassOccurrenceStatus.SCHEDULED -> ClassOccurrenceStatusContract.SCHEDULED
+                    ClassOccurrenceStatus.CANCELLED -> ClassOccurrenceStatusContract.CANCELLED
+                    ClassOccurrenceStatus.RESCHEDULED -> ClassOccurrenceStatusContract.RESCHEDULED
+                    ClassOccurrenceStatus.ONLINE -> ClassOccurrenceStatusContract.ONLINE
+                },
             classroomName = occurrence.classroom?.name,
             buildingName = occurrence.classroom?.building?.name,
-            campusName = occurrence.classroom?.building?.campus?.name,
+            campusName =
+                occurrence.classroom
+                    ?.building
+                    ?.campus
+                    ?.name,
         )
 
     private suspend fun <T> translateIntegrationFailure(block: suspend () -> T): T =
@@ -235,15 +286,17 @@ class AcademicService(
                 ApiException.Unauthorized("Institutional session is no longer valid")
             IntegrationException.Category.UNAVAILABLE,
             IntegrationException.Category.TIMEOUT,
-            -> ApiException.DependencyUnavailable(
-                "The academic system is temporarily unavailable",
-                error,
-            )
+            ->
+                ApiException.DependencyUnavailable(
+                    "The academic system is temporarily unavailable",
+                    error,
+                )
             IntegrationException.Category.BAD_REQUEST,
             IntegrationException.Category.MALFORMED_RESPONSE,
-            -> ApiException.Internal(
-                "The academic system returned data we could not use",
-                error,
-            )
+            ->
+                ApiException.Internal(
+                    "The academic system returned data we could not use",
+                    error,
+                )
         }
 }

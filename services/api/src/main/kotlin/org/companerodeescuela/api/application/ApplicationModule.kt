@@ -164,16 +164,41 @@ fun Application.module(
             institutionalIdentityLinkRepository,
             identityGraph.mfa,
         )
+    val institutionalSections =
+        if (settings.hasAuthentication && institutionalPushRepository != null) {
+            SiiiSectionProjectionFeature(
+                mongoConnection.database(),
+                identityGraph.accounts,
+                identityGraph.institutions,
+                institutionalIdentityLinkService,
+            )
+        } else {
+            null
+        }
+    val institutionalAuthorityTargets =
+        org.companerodeescuela.api.integrations.academic.siii.SiiiHttpAcademicAuthority.targetsFromJson(
+            System.getenv("SIII_ACADEMIC_AUTHORITY_TARGETS_JSON"),
+        )
+    require(institutionalAuthorityTargets.isEmpty() || institutionalSections != null) {
+        "Institutional academic reads require authenticated MongoDB and encrypted integration credentials"
+    }
+    val institutionalAcademic =
+        institutionalSections?.let { sections ->
+            org.companerodeescuela.api.integrations.academic.siii.SiiiAcademicService(
+                identityGraph.accounts,
+                institutionalIdentityLinkRepository,
+                sections.reader,
+                org.companerodeescuela.api.integrations.academic.siii.SiiiHttpAcademicAuthority(
+                    institutionalAuthorityTargets,
+                    institutionalPushRepository!!,
+                ),
+                institutionalAuthorityTargets.keys,
+            )
+        }
     val institutionalProjectionWorker =
         if (settings.hasAuthentication) {
             institutionalPushRepository?.let { repository ->
-                val sections =
-                    SiiiSectionProjectionFeature(
-                        mongoConnection.database(),
-                        identityGraph.accounts,
-                        identityGraph.institutions,
-                        institutionalIdentityLinkService,
-                    )
+                val sections = checkNotNull(institutionalSections)
                 InstitutionalEventProjectionWorker(
                     repository = repository,
                     identityResolver =
@@ -314,6 +339,7 @@ fun Application.module(
             scheduleOverrides = academicGraph.scheduleOverrides,
             groupRepository = academicGraph.groupRepository,
             nativeProjection = nativeAcademic,
+            institutionalAcademic = institutionalAcademic,
         )
         attendanceRoutes(
             settings = settings,

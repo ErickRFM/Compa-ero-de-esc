@@ -13,7 +13,6 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
-import java.util.Base64
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.encodeToString
@@ -27,11 +26,17 @@ import org.companerodeescuela.feature.tutoring.TutorGroupsScreen
 import org.companerodeescuela.feature.tutoring.TutorRepository
 import org.companerodeescuela.feature.tutoring.TutorRequestsScreen
 import org.companerodeescuela.feature.tutoring.TutorViewModel
-import org.companerodeescuela.shared.contracts.*
+import org.companerodeescuela.shared.contracts.AcademicGroupSummary
+import org.companerodeescuela.shared.contracts.ApiResponse
+import org.companerodeescuela.shared.contracts.ExcuseRequestSummary
+import org.companerodeescuela.shared.contracts.ExcuseStatus
+import org.companerodeescuela.shared.contracts.TutorScopeSummary
+import org.companerodeescuela.shared.contracts.TutorStudentSummary
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import java.util.Base64
 
 /** Real Compose screens and ViewModel; all identities/data are isolated test fixtures. */
 class TutorPrivacyUiTest {
@@ -52,7 +57,10 @@ class TutorPrivacyUiTest {
         compose.onNodeWithText("Aprobar").performClick()
         compose.onNodeWithText("Comentario de revisión (opcional)").performTextInput("PRIVATE_REVIEW_DRAFT")
         compose.onNodeWithText("PRIVATE_REVIEW_DRAFT").assertExists()
-        compose.runOnIdle { fixture.scopeStatus = HttpStatusCode.Forbidden; fixture.model.refresh() }
+        compose.runOnIdle {
+            fixture.scopeStatus = HttpStatusCode.Forbidden
+            fixture.model.refresh()
+        }
         compose.waitUntil(10_000) { !fixture.model.state.value.loading }
         compose.waitForIdle()
         compose.onNodeWithText("Aprobar justificación").assertDoesNotExist()
@@ -82,37 +90,87 @@ class TutorPrivacyUiTest {
 
     private class Store : SessionTokenStore {
         val token = MutableStateFlow<String?>(token("tutor-1", "session-1"))
+
         override suspend fun readAccessToken() = token.value
-        override suspend fun writeAccessToken(token: String) { this.token.value = token }
-        override suspend fun clear() { token.value = null }
+
+        override suspend fun writeAccessToken(token: String) {
+            this.token.value = token
+        }
+
+        override suspend fun clear() {
+            token.value = null
+        }
+
         override fun observeAccessToken() = token
     }
 
     private class Fixture {
         val store = Store()
+
         @Volatile var scopeStatus = HttpStatusCode.OK
+
         @Volatile var scopeRequests = 0
+
         @Volatile var reviewRequests = 0
-        private val excuse = ExcuseRequestSummary("request-1", "student-1", "9A", "2026-10-09", "QA request reason", status = ExcuseStatus.PENDING, submittedAtEpochSeconds = 1)
-        val client = createApiClient(ApiEnvironment("https://example.test/", "test"), MockEngine { request ->
-            val path = request.url.encodedPath
-            val status = if (path == "/tutoring/me") { scopeRequests++; scopeStatus } else HttpStatusCode.OK
-            val body = when {
-                status != HttpStatusCode.OK -> """{"code":"forbidden","message":"Unavailable"}"""
-                path == "/tutoring/me" -> Json.encodeToString(ApiResponse(TutorScopeSummary("tutor-1", listOf(AcademicGroupSummary("9A", "9 A", true)))))
-                path == "/excuses" -> Json.encodeToString(ApiResponse(listOf(excuse)))
-                path.endsWith("/review") -> { reviewRequests++; Json.encodeToString(ApiResponse(excuse)) }
-                path.endsWith("/students") -> Json.encodeToString(ApiResponse(listOf(TutorStudentSummary("student-1", "9A", "QA Student"))))
-                else -> """{"data":[]}"""
-            }
-            respond(body, status, headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()))
-        })
-        val model = TutorViewModel(TutorRepository(client, store), GroupRepresentativeRepository(client, org.companerodeescuela.core.network.SessionRefreshCoordinator(client, store)))
+        private val excuse =
+            ExcuseRequestSummary(
+                "request-1",
+                "student-1",
+                "9A",
+                "2026-10-09",
+                "QA request reason",
+                status = ExcuseStatus.PENDING,
+                submittedAtEpochSeconds = 1,
+            )
+        val client =
+            createApiClient(
+                ApiEnvironment("https://example.test/", "test"),
+                MockEngine { request ->
+                    val path = request.url.encodedPath
+                    val status =
+                        if (path == "/tutoring/me") {
+                            scopeRequests++
+                            scopeStatus
+                        } else {
+                            HttpStatusCode.OK
+                        }
+                    val body =
+                        when {
+                            status != HttpStatusCode.OK -> """{"code":"forbidden","message":"Unavailable"}"""
+                            path == "/tutoring/me" ->
+                                Json.encodeToString(
+                                    ApiResponse(TutorScopeSummary("tutor-1", listOf(AcademicGroupSummary("9A", "9 A", true)))),
+                                )
+                            path == "/excuses" -> Json.encodeToString(ApiResponse(listOf(excuse)))
+                            path.endsWith("/review") -> {
+                                reviewRequests++
+                                Json.encodeToString(ApiResponse(excuse))
+                            }
+                            path.endsWith(
+                                "/students",
+                            ) -> Json.encodeToString(ApiResponse(listOf(TutorStudentSummary("student-1", "9A", "QA Student"))))
+                            else -> """{"data":[]}"""
+                        }
+                    respond(body, status, headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()))
+                },
+            )
+        val model =
+            TutorViewModel(
+                TutorRepository(client, store),
+                GroupRepresentativeRepository(
+                    client,
+                    org.companerodeescuela.core.network
+                        .SessionRefreshCoordinator(client, store),
+                ),
+            )
     }
 
     companion object {
-        private fun token(owner: String, session: String): String {
-            val payload = """{"sub":"$owner","session_id":"$session","exp":${System.currentTimeMillis()/1000+3600},"roles":["TUTOR"]}"""
+        private fun token(
+            owner: String,
+            session: String,
+        ): String {
+            val payload = """{"sub":"$owner","session_id":"$session","exp":${System.currentTimeMillis() / 1000 + 3600},"roles":["TUTOR"]}"""
             return "e30." + Base64.getUrlEncoder().withoutPadding().encodeToString(payload.toByteArray()) + ".test"
         }
     }

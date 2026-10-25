@@ -233,18 +233,6 @@ fun Application.module(
             mfa = identityGraph.mfa,
             institutions = identityGraph.institutions,
         )
-    val attendanceGraph =
-        buildAttendanceFeatureGraph(
-            settings = settings,
-            mongoConnection = mongoConnection,
-            academicProvider = providerRegistry.academic,
-            schoolPresenceService = presenceGraph?.service,
-            groupRepository = academicGraph.groupRepository,
-            accounts = identityGraph.accounts,
-            classrooms = classroomGraph.classroomService,
-            nativeProjection = nativeAcademic,
-        )
-
     val operationsGraph =
         buildOperationsFeatureGraph(
             settings = settings,
@@ -256,6 +244,18 @@ fun Application.module(
             institutions = identityGraph.institutions,
             mfa = identityGraph.mfa,
             refreshSessions = identityGraph.refreshSessions,
+        )
+    val attendanceGraph =
+        buildAttendanceFeatureGraph(
+            settings = settings,
+            mongoConnection = mongoConnection,
+            academicProvider = providerRegistry.academic,
+            schoolPresenceService = presenceGraph?.service,
+            groupRepository = academicGraph.groupRepository,
+            accounts = identityGraph.accounts,
+            classrooms = classroomGraph.classroomService,
+            nativeProjection = nativeAcademic,
+            pushService = operationsGraph.pushService,
         )
 
     // Only a fully configured, authenticated Mongo deployment starts the durable worker.

@@ -1,20 +1,20 @@
 package org.companerodeescuela
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
-import org.junit.Rule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.uiautomator.*
+import androidx.test.uiautomator.UiDevice
 import org.companerodeescuela.feature.settings.AppLanguage
 import org.companerodeescuela.feature.settings.AppThemeMode
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -23,6 +23,7 @@ import java.io.File
 @RunWith(AndroidJUnit4::class)
 class LoginVisualEvidenceTest {
     @get:Rule val compose = createEmptyComposeRule()
+
     @Test fun actualLoginFitsPhoneAndTabletViewports() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val device = UiDevice.getInstance(instrumentation)
@@ -86,6 +87,7 @@ class LoginVisualEvidenceTest {
             device.executeShellCommand("wm density reset")
         }
     }
+
     @Test fun actualRegistrationUsesCampusOnPhoneTabletLightAndLargeText() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val device = UiDevice.getInstance(instrumentation)
@@ -95,7 +97,7 @@ class LoginVisualEvidenceTest {
             device.executeShellCommand("wm density 320")
             device.executeShellCommand("settings put system font_scale 1.0")
             listOf(360 to 800, 390 to 844, 430 to 932, 768 to 1024).forEach { (width, height) ->
-                device.executeShellCommand("wm size " + width*2 + "x" + height*2)
+                device.executeShellCommand("wm size " + width * 2 + "x" + height * 2)
                 ActivityScenario.launch(MainActivity::class.java).use { scenario ->
                     scenario.onActivity {
                         it.appearancePreferences.setLanguage(AppLanguage.SPANISH)
@@ -107,7 +109,8 @@ class LoginVisualEvidenceTest {
                     openRegistration()
                     assertTrue(device.takeScreenshot(File(directory, "registration-dark-" + width + "-top.png")))
                     compose.onNodeWithTag("registration_submit").performScrollTo().assertIsDisplayed()
-                    compose.waitForIdle(); device.waitForIdle()
+                    compose.waitForIdle()
+                    device.waitForIdle()
                     assertTrue(device.takeScreenshot(File(directory, "registration-dark-" + width + "-form.png")))
                 }
             }
@@ -121,7 +124,8 @@ class LoginVisualEvidenceTest {
                 openRegistration()
                 assertTrue(device.takeScreenshot(File(directory, "registration-light-en-contrast-390-top.png")))
                 compose.onNodeWithTag("registration_submit").performScrollTo().assertIsDisplayed()
-                compose.waitForIdle(); device.waitForIdle()
+                compose.waitForIdle()
+                device.waitForIdle()
                 assertTrue(device.takeScreenshot(File(directory, "registration-light-en-contrast-390-form.png")))
                 scenario.onActivity {
                     it.appearancePreferences.setLanguage(AppLanguage.SPANISH)
@@ -133,10 +137,12 @@ class LoginVisualEvidenceTest {
                 scenario.recreate()
                 // Saved navigation returns to the same registration form.
                 compose.onNodeWithTag("registration_type_TUTOR").performScrollTo().assertIsDisplayed()
-                compose.waitForIdle(); device.waitForIdle()
+                compose.waitForIdle()
+                device.waitForIdle()
                 assertTrue(device.takeScreenshot(File(directory, "registration-dark-large-text-390-profiles.png")))
                 compose.onNodeWithTag("registration_submit").performScrollTo().assertIsDisplayed()
-                compose.waitForIdle(); device.waitForIdle()
+                compose.waitForIdle()
+                device.waitForIdle()
                 assertTrue(device.takeScreenshot(File(directory, "registration-dark-large-text-390-form.png")))
                 scenario.onActivity {
                     it.appearancePreferences.setTextScale(1f)
@@ -150,12 +156,17 @@ class LoginVisualEvidenceTest {
             device.executeShellCommand("wm density reset")
         }
     }
+
     private fun openRegistration() {
-        compose.waitUntil(timeoutMillis = 10_000) { compose.onAllNodesWithText("universitaria,", substring = true).fetchSemanticsNodes().isNotEmpty() ||
-            compose.onAllNodesWithText("university life,", substring = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onAllNodesWithText("universitaria,", substring = true).fetchSemanticsNodes().isNotEmpty() ||
+                compose.onAllNodesWithText("university life,", substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
         compose.onNodeWithTag("login_registration").performScrollTo().performClick()
-        compose.waitUntil(timeoutMillis = 10_000) { compose.onAllNodesWithText("Tipo de cuenta").fetchSemanticsNodes().isNotEmpty() ||
-            compose.onAllNodesWithText("Account type").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onAllNodesWithText("Tipo de cuenta").fetchSemanticsNodes().isNotEmpty() ||
+                compose.onAllNodesWithText("Account type").fetchSemanticsNodes().isNotEmpty()
+        }
         compose.waitForIdle()
         UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).waitForIdle()
     }
@@ -179,5 +190,4 @@ class LoginVisualEvidenceTest {
         compose.onNodeWithTag("login_submit").assertIsDisplayed()
         compose.waitForIdle()
     }
-
 }

@@ -61,7 +61,7 @@ data class ApiSettings(
     val jwtAudience: String,
     val attendanceQrSecret: CharArray? = null,
     val schoolPresenceQrSha256: String = "",
-    val schoolPresenceInstitutionId:String?=null,
+    val schoolPresenceInstitutionId: String? = null,
     val schoolWifiSsids: Set<String> = emptySet(),
     val schoolWifiBssids: Set<String> = emptySet(),
     val attendanceGraceMinutes: Int = 5,
@@ -121,7 +121,8 @@ data class ApiSettings(
             currentUserCacheTtlMillis == other.currentUserCacheTtlMillis &&
             lateSyncReviewWindowSeconds == other.lateSyncReviewWindowSeconds &&
             attendanceQrNonceReuseThreshold == other.attendanceQrNonceReuseThreshold &&
-            hasVerificationEmail == other.hasVerificationEmail && verificationEmailSender == other.verificationEmailSender &&
+            hasVerificationEmail == other.hasVerificationEmail &&
+            verificationEmailSender == other.verificationEmailSender &&
             (mfaEncryptionKey != null) == (other.mfaEncryptionKey != null) &&
             (institutionIntegrationEncryptionKey != null) == (other.institutionIntegrationEncryptionKey != null) &&
             hasFirebasePush == other.hasFirebasePush
@@ -203,12 +204,46 @@ class SettingsLoader(
     fun load(): ApiSettings {
         val environment = Environment.parse(env("APP_ENV"))
 
-        val trustedProxy = when (env("TRUSTED_PROXY")?.trim()?.lowercase()) {
-            null, "false" -> false
-            "true" -> true
-            else -> throw ConfigurationException("TRUSTED_PROXY must be true or false")
+        val attendancePilotMode =
+            when (env("ATTENDANCE_PILOT_MODE")?.trim()?.lowercase()) {
+                null, "false" -> false
+                "true" -> true
+                else -> throw ConfigurationException("ATTENDANCE_PILOT_MODE must be true or false")
+            }
+        if (attendancePilotMode && environment.isProduction) {
+            throw ConfigurationException("ATTENDANCE_PILOT_MODE cannot be enabled when APP_ENV=production")
         }
-        fun progressiveDelaySeconds(name: String, default: Long): Long {
+        val pilotPresenceVariables =
+            listOf(
+                "ATTENDANCE_PILOT_ENTRY_QR_SHA256",
+                "ATTENDANCE_PILOT_INSTITUTION_ID",
+                "ATTENDANCE_PILOT_WIFI_SSIDS",
+            )
+        if (!attendancePilotMode && pilotPresenceVariables.any { !env(it).isNullOrBlank() }) {
+            throw ConfigurationException("ATTENDANCE_PILOT_* presence settings require ATTENDANCE_PILOT_MODE=true")
+        }
+        if (attendancePilotMode &&
+            listOf(
+                "SCHOOL_PRESENCE_QR_SHA256",
+                "SCHOOL_PRESENCE_INSTITUTION_ID",
+                "SCHOOL_WIFI_SSIDS",
+                "SCHOOL_WIFI_BSSIDS",
+            ).any { !env(it).isNullOrBlank() }
+        ) {
+            throw ConfigurationException("Pilot presence settings cannot be mixed with production school-presence settings")
+        }
+
+        val trustedProxy =
+            when (env("TRUSTED_PROXY")?.trim()?.lowercase()) {
+                null, "false" -> false
+                "true" -> true
+                else -> throw ConfigurationException("TRUSTED_PROXY must be true or false")
+            }
+
+        fun progressiveDelaySeconds(
+            name: String,
+            default: Long,
+        ): Long {
             val raw = env(name) ?: return default
             return raw.trim().toLongOrNull()?.takeIf { it in 1..30 }
                 ?: throw ConfigurationException("$name must be between 1 and 30 seconds")
@@ -218,7 +253,12 @@ class SettingsLoader(
         if (loginProgressiveDelayMaxSeconds < loginProgressiveDelayBaseSeconds) {
             throw ConfigurationException("LOGIN_PROGRESSIVE_DELAY_MAX_SECONDS must be at least LOGIN_PROGRESSIVE_DELAY_BASE_SECONDS")
         }
-        fun boundedLong(name: String, default: Long, range: LongRange): Long {
+
+        fun boundedLong(
+            name: String,
+            default: Long,
+            range: LongRange,
+        ): Long {
             val raw = env(name) ?: return default
             return raw.trim().toLongOrNull()?.takeIf { it in range }
                 ?: throw ConfigurationException("$name must be between ${range.first} and ${range.last}")
@@ -234,46 +274,73 @@ class SettingsLoader(
         val jwtIssuer = env("JWT_ISSUER")?.trim().orEmpty().ifEmpty { DEFAULT_JWT_ISSUER }
         val jwtAudience = env("JWT_AUDIENCE")?.trim().orEmpty().ifEmpty { DEFAULT_JWT_AUDIENCE }
         val attendanceQrSecret = env("ATTENDANCE_QR_SECRET")?.takeIf { it.isNotBlank() }
-        val schoolPresenceQrSha256 = env("SCHOOL_PRESENCE_QR_SHA256")?.trim().orEmpty().lowercase()
-        val schoolPresenceInstitutionId=env("SCHOOL_PRESENCE_INSTITUTION_ID")?.takeIf(String::isNotEmpty)
-        if(schoolPresenceInstitutionId!=null && (schoolPresenceInstitutionId.isBlank() || schoolPresenceInstitutionId!=schoolPresenceInstitutionId.trim() || schoolPresenceInstitutionId.length>128 || schoolPresenceInstitutionId.any(Char::isISOControl))) throw ConfigurationException("SCHOOL_PRESENCE_INSTITUTION_ID must be an explicit bounded institution identifier")
-        val schoolWifiSsids = parseCsv(env("SCHOOL_WIFI_SSIDS"))
+        val schoolPresenceQrSha256 =
+            env(
+                if (attendancePilotMode) "ATTENDANCE_PILOT_ENTRY_QR_SHA256" else "SCHOOL_PRESENCE_QR_SHA256",
+            )?.trim().orEmpty().lowercase()
+        val schoolPresenceInstitutionId =
+            env(
+                if (attendancePilotMode) "ATTENDANCE_PILOT_INSTITUTION_ID" else "SCHOOL_PRESENCE_INSTITUTION_ID",
+            )?.takeIf(String::isNotEmpty)
+        val institutionSettingName = if (attendancePilotMode) "ATTENDANCE_PILOT_INSTITUTION_ID" else "SCHOOL_PRESENCE_INSTITUTION_ID"
+        if (schoolPresenceInstitutionId != null &&
+            (
+                schoolPresenceInstitutionId.isBlank() ||
+                    schoolPresenceInstitutionId != schoolPresenceInstitutionId.trim() ||
+                    schoolPresenceInstitutionId.length > 128 ||
+                    schoolPresenceInstitutionId.any(Char::isISOControl)
+            )
+        ) {
+            throw ConfigurationException("$institutionSettingName must be an explicit bounded institution identifier")
+        }
+        val schoolWifiSsids = parseCsv(env(if (attendancePilotMode) "ATTENDANCE_PILOT_WIFI_SSIDS" else "SCHOOL_WIFI_SSIDS"))
+        if (attendancePilotMode &&
+            (schoolPresenceQrSha256.isBlank() || schoolPresenceInstitutionId.isNullOrBlank() || schoolWifiSsids.isEmpty())
+        ) {
+            throw ConfigurationException("Pilot presence requires a synthetic QR hash, institution ID and Wi-Fi SSID")
+        }
         val schoolWifiBssids = parseCsv(env("SCHOOL_WIFI_BSSIDS")).map { it.lowercase() }.toSet()
         val attendanceGraceMinutes = intSetting("ATTENDANCE_GRACE_MINUTES", default = 5, range = 0..15)
-        val mongoConnectTimeoutMs = intSetting(
-            "MONGODB_CONNECT_TIMEOUT_MS",
-            default = MongoSettings.DEFAULT_CONNECT_TIMEOUT_MS,
-            range = 1..MAX_MONGODB_TIMEOUT_MS,
-        )
-        val mongoServerSelectionTimeoutMs = intSetting(
-            "MONGODB_SERVER_SELECTION_TIMEOUT_MS",
-            default = MongoSettings.DEFAULT_SERVER_SELECTION_TIMEOUT_MS,
-            range = 1..MAX_MONGODB_TIMEOUT_MS,
-        )
-        val lateSyncReviewWindowSeconds = boundedLongSetting(
-            "LATE_SYNC_REVIEW_WINDOW_SECONDS",
-            env("LATE_SYNC_REVIEW_WINDOW_SECONDS"),
-            ApiSettings.DEFAULT_LATE_SYNC_REVIEW_WINDOW_SECONDS,
-            1L..24L * 60L * 60L,
-        )
-        val attendanceQrNonceReuseThreshold = boundedIntSetting(
-            "ATTENDANCE_QR_NONCE_REUSE_THRESHOLD",
-            env("ATTENDANCE_QR_NONCE_REUSE_THRESHOLD"),
-            ApiSettings.DEFAULT_ATTENDANCE_QR_NONCE_REUSE_THRESHOLD,
-            1..1_000,
-        )
+        val mongoConnectTimeoutMs =
+            intSetting(
+                "MONGODB_CONNECT_TIMEOUT_MS",
+                default = MongoSettings.DEFAULT_CONNECT_TIMEOUT_MS,
+                range = 1..MAX_MONGODB_TIMEOUT_MS,
+            )
+        val mongoServerSelectionTimeoutMs =
+            intSetting(
+                "MONGODB_SERVER_SELECTION_TIMEOUT_MS",
+                default = MongoSettings.DEFAULT_SERVER_SELECTION_TIMEOUT_MS,
+                range = 1..MAX_MONGODB_TIMEOUT_MS,
+            )
+        val lateSyncReviewWindowSeconds =
+            boundedLongSetting(
+                "LATE_SYNC_REVIEW_WINDOW_SECONDS",
+                env("LATE_SYNC_REVIEW_WINDOW_SECONDS"),
+                ApiSettings.DEFAULT_LATE_SYNC_REVIEW_WINDOW_SECONDS,
+                1L..24L * 60L * 60L,
+            )
+        val attendanceQrNonceReuseThreshold =
+            boundedIntSetting(
+                "ATTENDANCE_QR_NONCE_REUSE_THRESHOLD",
+                env("ATTENDANCE_QR_NONCE_REUSE_THRESHOLD"),
+                ApiSettings.DEFAULT_ATTENDANCE_QR_NONCE_REUSE_THRESHOLD,
+                1..1_000,
+            )
         val currentUserCacheRaw = env("CURRENT_USER_CACHE_TTL_MILLIS")
-        val currentUserCacheTtlMillis = if (currentUserCacheRaw == null) {
-            0
-        } else {
-            currentUserCacheRaw.trim().toIntOrNull()?.takeIf { it in 0..5_000 }
-                ?: throw ConfigurationException("CURRENT_USER_CACHE_TTL_MILLIS must be an integer between 0 and 5000")
-        }
+        val currentUserCacheTtlMillis =
+            if (currentUserCacheRaw == null) {
+                0
+            } else {
+                currentUserCacheRaw.trim().toIntOrNull()?.takeIf { it in 0..5_000 }
+                    ?: throw ConfigurationException("CURRENT_USER_CACHE_TTL_MILLIS must be an integer between 0 and 5000")
+            }
 
-        val results = listOf(
-            Validators.port(ENV_API_PORT, portText),
-            Validators.notBlank(ENV_MONGODB_DATABASE, databaseName),
-        )
+        val results =
+            listOf(
+                Validators.port(ENV_API_PORT, portText),
+                Validators.notBlank(ENV_MONGODB_DATABASE, databaseName),
+            )
 
         val invalid = results.filterNot { it.isValid }
         if (invalid.isNotEmpty()) {
@@ -284,48 +351,68 @@ class SettingsLoader(
 
         val verificationEmailKey = env("VERIFICATION_EMAIL_API_KEY")?.takeIf { it.isNotBlank() }
         val verificationEmailSender = env("VERIFICATION_EMAIL_SENDER")?.trim()?.takeIf { it.isNotEmpty() }
-        if ((verificationEmailKey == null) != (verificationEmailSender == null)) throw ConfigurationException("Configure both VERIFICATION_EMAIL_API_KEY and VERIFICATION_EMAIL_SENDER")
-        if (verificationEmailKey != null && (verificationEmailKey.length < 20 || verificationEmailKey.any { it.isISOControl() }))
+        if ((verificationEmailKey == null) !=
+            (verificationEmailSender == null)
+        ) {
+            throw ConfigurationException("Configure both VERIFICATION_EMAIL_API_KEY and VERIFICATION_EMAIL_SENDER")
+        }
+        if (verificationEmailKey != null && (verificationEmailKey.length < 20 || verificationEmailKey.any { it.isISOControl() })) {
             throw ConfigurationException("Invalid VERIFICATION_EMAIL_API_KEY")
-        if (verificationEmailSender != null && (verificationEmailSender.length > 128 ||
-            !Regex("^[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Za-z]{2,}$").matches(verificationEmailSender)))
+        }
+        if (verificationEmailSender != null &&
+            (
+                verificationEmailSender.length > 128 ||
+                    !Regex("^[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Za-z]{2,}$").matches(verificationEmailSender)
+            )
+        ) {
             throw ConfigurationException("Invalid VERIFICATION_EMAIL_SENDER")
+        }
 
-        val firebaseJson = env("FIREBASE_SERVICE_ACCOUNT_JSON_B64")?.takeIf { it.isNotBlank() }?.let { encoded ->
-            if (encoded.length > 24_000 || !encoded.matches(Regex("[A-Za-z0-9+/]+={0,2}")))
-                throw ConfigurationException("Invalid Firebase credentials encoding")
-            val decoded = runCatching { Base64.getDecoder().decode(encoded) }.getOrNull()
-                ?: throw ConfigurationException("Invalid Firebase credentials encoding")
-            val json = runCatching { decoded.toString(Charsets.UTF_8) }.getOrElse {
-                throw ConfigurationException("Invalid Firebase credentials encoding")
+        val firebaseJson =
+            env("FIREBASE_SERVICE_ACCOUNT_JSON_B64")?.takeIf { it.isNotBlank() }?.let { encoded ->
+                if (encoded.length > 24_000 || !encoded.matches(Regex("[A-Za-z0-9+/]+={0,2}"))) {
+                    throw ConfigurationException("Invalid Firebase credentials encoding")
+                }
+                val decoded =
+                    runCatching { Base64.getDecoder().decode(encoded) }.getOrNull()
+                        ?: throw ConfigurationException("Invalid Firebase credentials encoding")
+                val json =
+                    runCatching { decoded.toString(Charsets.UTF_8) }.getOrElse {
+                        throw ConfigurationException("Invalid Firebase credentials encoding")
+                    }
+                org.companerodeescuela.api.devices.FirebaseServiceAccount
+                    .parse(json)
+                json
             }
-            org.companerodeescuela.api.devices.FirebaseServiceAccount.parse(json)
-            json
-        }
-        val mfaKey = env("MFA_ENCRYPTION_KEY")?.let { encoded ->
-            val decoded = runCatching { Base64.getUrlDecoder().decode(encoded) }.getOrNull()
-            if (!Regex("[A-Za-z0-9_-]{43}").matches(encoded) || decoded?.size != 32 ||
-                Base64.getUrlEncoder().withoutPadding().encodeToString(decoded) != encoded)
-                throw ConfigurationException("Invalid MFA_ENCRYPTION_KEY; require canonical unpadded base64url of 32 random bytes")
-            decoded
-        }
-        val institutionIntegrationKey = env("INSTITUTION_INTEGRATION_ENCRYPTION_KEY")?.let { encoded ->
-            val decoded = runCatching { Base64.getUrlDecoder().decode(encoded) }.getOrNull()
-            if (
-                !Regex("[A-Za-z0-9_-]{43}").matches(encoded) ||
+        val mfaKey =
+            env("MFA_ENCRYPTION_KEY")?.let { encoded ->
+                val decoded = runCatching { Base64.getUrlDecoder().decode(encoded) }.getOrNull()
+                if (!Regex("[A-Za-z0-9_-]{43}").matches(encoded) ||
                     decoded?.size != 32 ||
                     Base64.getUrlEncoder().withoutPadding().encodeToString(decoded) != encoded
-            ) {
-                throw ConfigurationException(
-                    "Invalid INSTITUTION_INTEGRATION_ENCRYPTION_KEY; require canonical unpadded base64url of 32 random bytes",
-                )
+                ) {
+                    throw ConfigurationException("Invalid MFA_ENCRYPTION_KEY; require canonical unpadded base64url of 32 random bytes")
+                }
+                decoded
             }
-            decoded
-        }
+        val institutionIntegrationKey =
+            env("INSTITUTION_INTEGRATION_ENCRYPTION_KEY")?.let { encoded ->
+                val decoded = runCatching { Base64.getUrlDecoder().decode(encoded) }.getOrNull()
+                if (
+                    !Regex("[A-Za-z0-9_-]{43}").matches(encoded) ||
+                    decoded?.size != 32 ||
+                    Base64.getUrlEncoder().withoutPadding().encodeToString(decoded) != encoded
+                ) {
+                    throw ConfigurationException(
+                        "Invalid INSTITUTION_INTEGRATION_ENCRYPTION_KEY; require canonical unpadded base64url of 32 random bytes",
+                    )
+                }
+                decoded
+            }
         if (
             mfaKey != null &&
-                institutionIntegrationKey != null &&
-                mfaKey.contentEquals(institutionIntegrationKey)
+            institutionIntegrationKey != null &&
+            mfaKey.contentEquals(institutionIntegrationKey)
         ) {
             throw ConfigurationException(
                 "INSTITUTION_INTEGRATION_ENCRYPTION_KEY must be different from MFA_ENCRYPTION_KEY",
@@ -355,18 +442,19 @@ class SettingsLoader(
             port = portText!!.trim().toInt(),
             version = env("APP_VERSION")?.trim().orEmpty().ifEmpty { UNKNOWN_VERSION },
             apiVersion = env("API_VERSION")?.trim().orEmpty().ifEmpty { DEFAULT_API_VERSION },
-            mongo = MongoSettings(
-                uri = mongoUri,
-                databaseName = databaseName,
-                connectTimeoutMs = mongoConnectTimeoutMs,
-                serverSelectionTimeoutMs = mongoServerSelectionTimeoutMs,
-            ),
+            mongo =
+                MongoSettings(
+                    uri = mongoUri,
+                    databaseName = databaseName,
+                    connectTimeoutMs = mongoConnectTimeoutMs,
+                    serverSelectionTimeoutMs = mongoServerSelectionTimeoutMs,
+                ),
             jwtSecret = jwtSecret?.toCharArray(),
             jwtIssuer = jwtIssuer,
             jwtAudience = jwtAudience,
             attendanceQrSecret = attendanceQrSecret?.toCharArray(),
             schoolPresenceQrSha256 = schoolPresenceQrSha256,
-            schoolPresenceInstitutionId=schoolPresenceInstitutionId,
+            schoolPresenceInstitutionId = schoolPresenceInstitutionId,
             schoolWifiSsids = schoolWifiSsids,
             schoolWifiBssids = schoolWifiBssids,
             attendanceGraceMinutes = attendanceGraceMinutes,
@@ -381,33 +469,51 @@ class SettingsLoader(
         )
     }
 
-    private fun boundedLongSetting(name: String, raw: String?, default: Long, range: LongRange): Long {
+    private fun boundedLongSetting(
+        name: String,
+        raw: String?,
+        default: Long,
+        range: LongRange,
+    ): Long {
         if (raw == null) return default
-        val value = raw.trim().toLongOrNull()
-            ?: throw ConfigurationException("$name must be an integer between ${range.first} and ${range.last}")
+        val value =
+            raw.trim().toLongOrNull()
+                ?: throw ConfigurationException("$name must be an integer between ${range.first} and ${range.last}")
         if (value !in range) throw ConfigurationException("$name must be an integer between ${range.first} and ${range.last}")
         return value
     }
 
-    private fun boundedIntSetting(name: String, raw: String?, default: Int, range: IntRange): Int {
+    private fun boundedIntSetting(
+        name: String,
+        raw: String?,
+        default: Int,
+        range: IntRange,
+    ): Int {
         if (raw == null) return default
-        val value = raw.trim().toIntOrNull()
-            ?: throw ConfigurationException("$name must be an integer between ${range.first} and ${range.last}")
+        val value =
+            raw.trim().toIntOrNull()
+                ?: throw ConfigurationException("$name must be an integer between ${range.first} and ${range.last}")
         if (value !in range) throw ConfigurationException("$name must be an integer between ${range.first} and ${range.last}")
         return value
     }
 
     private fun parseCsv(raw: String?): Set<String> =
-        raw.orEmpty()
+        raw
+            .orEmpty()
             .split(',')
             .map(String::trim)
             .filter(String::isNotEmpty)
             .toSet()
 
-    private fun intSetting(name: String, default: Int, range: IntRange): Int {
+    private fun intSetting(
+        name: String,
+        default: Int,
+        range: IntRange,
+    ): Int {
         val raw = env(name) ?: return default
-        val value = raw.trim().toIntOrNull()
-            ?: throw ConfigurationException("$name must be an integer between ${range.first} and ${range.last}")
+        val value =
+            raw.trim().toIntOrNull()
+                ?: throw ConfigurationException("$name must be an integer between ${range.first} and ${range.last}")
         if (value !in range) {
             throw ConfigurationException("$name must be an integer between ${range.first} and ${range.last}")
         }
@@ -432,13 +538,19 @@ class SettingsLoader(
         }
     }
 
-    private fun validateOptionalSecret(name: String, secret: String?) {
+    private fun validateOptionalSecret(
+        name: String,
+        secret: String?,
+    ) {
         if (!secret.isNullOrBlank() && secret.length < MIN_SECRET_LENGTH) {
             throw ConfigurationException("$name must be at least $MIN_SECRET_LENGTH characters long")
         }
     }
 
-    private fun validateSecret(environment: Environment, jwtSecret: String?) {
+    private fun validateSecret(
+        environment: Environment,
+        jwtSecret: String?,
+    ) {
         if (environment.isProduction && jwtSecret.isNullOrBlank()) {
             throw ConfigurationException(
                 "JWT_SECRET is required when APP_ENV=production",

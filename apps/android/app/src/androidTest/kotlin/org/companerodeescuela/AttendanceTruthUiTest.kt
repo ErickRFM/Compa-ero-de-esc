@@ -11,13 +11,13 @@ import org.companerodeescuela.core.database.LocalAttendanceSyncState
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
 import org.companerodeescuela.feature.attendance.AttendanceMode
 import org.companerodeescuela.feature.attendance.AttendanceUiState
-import org.companerodeescuela.feature.attendance.StudentAttendanceContent
+import org.companerodeescuela.feature.attendance.studentAttendanceContent
 import org.companerodeescuela.shared.contracts.*
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-/** The same stateless V8 content used by AttendanceScreen; fixtures never grant API authority. */
+/** The same stateless V8 content used by attendanceScreen; fixtures never grant API authority. */
 class AttendanceTruthUiTest {
     @get:Rule val compose = createComposeRule()
 
@@ -58,7 +58,7 @@ class AttendanceTruthUiTest {
     private fun render(state: AttendanceUiState, onConfirm: (String) -> Unit = {}) {
         compose.setContent {
             CompaneroTheme {
-                StudentAttendanceContent(state, {}, {}, {}, {}, onConfirm, {}, {}, {}, Modifier)
+                studentAttendanceContent(state, {}, {}, {}, {}, onConfirm, {}, {}, {}, Modifier)
             }
         }
     }

@@ -13,144 +13,156 @@ import androidx.work.WorkerParameters
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.time.Clock
-import java.util.concurrent.TimeUnit
-import javax.inject.Inject
-import javax.inject.Singleton
 import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.database.AttendanceLocalStore
 import org.companerodeescuela.core.security.SessionTokenInspector
 import org.companerodeescuela.shared.contracts.ApiErrorCode
 import org.companerodeescuela.shared.contracts.AttendanceReasonCode
+import java.time.Clock
+import java.util.concurrent.TimeUnit
+import javax.inject.Inject
+import javax.inject.Singleton
 
 interface AttendanceSyncEnqueuer {
     fun schedule()
 }
 
 @Singleton
-class AttendanceSyncScheduler @Inject constructor(
-    @ApplicationContext context: Context,
-) : AttendanceSyncEnqueuer {
-    private val workManager = WorkManager.getInstance(context)
+class AttendanceSyncScheduler
+    @Inject
+    constructor(
+        @ApplicationContext context: Context,
+    ) : AttendanceSyncEnqueuer {
+        private val workManager = WorkManager.getInstance(context)
 
-    override fun schedule() {
-        val request = OneTimeWorkRequestBuilder<AttendanceSyncWorker>()
-            .setConstraints(
-                Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED)
-                    .build(),
+        override fun schedule() {
+            val request =
+                OneTimeWorkRequestBuilder<AttendanceSyncWorker>()
+                    .setConstraints(
+                        Constraints
+                            .Builder()
+                            .setRequiredNetworkType(NetworkType.CONNECTED)
+                            .build(),
+                    ).setBackoffCriteria(
+                        BackoffPolicy.EXPONENTIAL,
+                        MIN_WORK_BACKOFF_SECONDS,
+                        TimeUnit.SECONDS,
+                    ).build()
+
+            workManager.enqueueUniqueWork(
+                UNIQUE_WORK_NAME,
+                ExistingWorkPolicy.KEEP,
+                request,
             )
-            .setBackoffCriteria(
-                BackoffPolicy.EXPONENTIAL,
-                MIN_WORK_BACKOFF_SECONDS,
-                TimeUnit.SECONDS,
-            )
-            .build()
+        }
 
-        workManager.enqueueUniqueWork(
-            UNIQUE_WORK_NAME,
-            ExistingWorkPolicy.KEEP,
-            request,
-        )
+        private companion object {
+            const val UNIQUE_WORK_NAME = "attendance-outbox-sync"
+            const val MIN_WORK_BACKOFF_SECONDS = 15L
+        }
     }
-
-    private companion object {
-        const val UNIQUE_WORK_NAME = "attendance-outbox-sync"
-        const val MIN_WORK_BACKOFF_SECONDS = 15L
-    }
-}
 
 @HiltWorker
-class AttendanceSyncWorker @AssistedInject constructor(
-    @Assisted appContext: Context,
-    @Assisted params: WorkerParameters,
-    private val localStore: AttendanceLocalStore,
-    private val remoteClient: AttendanceRemoteClient,
-) : CoroutineWorker(appContext, params) {
+class AttendanceSyncWorker
+    @AssistedInject
+    constructor(
+        @Assisted appContext: Context,
+        @Assisted params: WorkerParameters,
+        private val localStore: AttendanceLocalStore,
+        private val remoteClient: AttendanceRemoteClient,
+    ) : CoroutineWorker(appContext, params) {
+        private val clock: Clock = Clock.systemUTC()
 
-    private val clock: Clock = Clock.systemUTC()
-
-    override suspend fun doWork(): Result {
-        repeat(MAX_BATCH_SIZE) {
-            val token = when (val access = remoteClient.currentAccessToken()) {
-                is Outcome.Success -> access.value
-                is Outcome.Failure -> {
-                    val error = access.error
-                    // No authenticated owner: do not select or modify another
-                    // account's pending evidence. Login schedules delivery again.
-                    if (error is AppError.Http && error.status == 401) return Result.success()
-                    return if (error is AppError.Network || error is AppError.Http &&
-                        AttendanceRetryPolicy.isRetryableHttp(error.status)
-                    ) Result.retry() else Result.failure()
+        override suspend fun doWork(): Result {
+            repeat(MAX_BATCH_SIZE) {
+                val token =
+                    when (val access = remoteClient.currentAccessToken()) {
+                        is Outcome.Success -> access.value
+                        is Outcome.Failure -> {
+                            val error = access.error
+                            // No authenticated owner: do not select or modify another
+                            // account's pending evidence. Login schedules delivery again.
+                            if (error is AppError.Http && error.status == 401) return Result.success()
+                            return if (error is AppError.Network ||
+                                error is AppError.Http &&
+                                AttendanceRetryPolicy.isRetryableHttp(error.status)
+                            ) {
+                                Result.retry()
+                            } else {
+                                Result.failure()
+                            }
+                        }
+                    }
+                val claims = SessionTokenInspector.inspect(token) ?: return Result.failure()
+                val operation =
+                    localStore.nextReady(clock.instant().epochSecond, claims.userId)
+                        ?: return Result.success()
+                if (
+                    claims.userId != operation.ownerId
+                ) {
+                    localStore.markAuthRequired(operation.operationId)
+                    return Result.success()
                 }
-            }
-            val claims = SessionTokenInspector.inspect(token) ?: return Result.failure()
-            val operation = localStore.nextReady(clock.instant().epochSecond, claims.userId)
-                ?: return Result.success()
-            if (
-                claims.userId != operation.ownerId
-            ) {
-                localStore.markAuthRequired(operation.operationId)
-                return Result.success()
-            }
 
-            when (val result = remoteClient.submit(token, operation)) {
-                is Outcome.Success -> {
-                    localStore.markSynced(operation.operationId, result.value)
-                }
-                is Outcome.Failure -> {
-                    val error = result.error
-                    if (error is AppError.Http && error.status == 401) {
-                        localStore.markAuthRequired(operation.operationId)
-                        return Result.success()
+                when (val result = remoteClient.submit(token, operation)) {
+                    is Outcome.Success -> {
+                        localStore.markSynced(operation.operationId, result.value)
                     }
+                    is Outcome.Failure -> {
+                        val error = result.error
+                        if (error is AppError.Http && error.status == 401) {
+                            localStore.markAuthRequired(operation.operationId)
+                            return Result.success()
+                        }
 
-                    val apiCode = AttendanceRemoteClient.apiErrorCode(error)
-                    val terminalReason = when (apiCode) {
-                        ApiErrorCode.ATTENDANCE_SESSION_CLOSED ->
-                            AttendanceReasonCode.SESSION_CLOSED
-                        ApiErrorCode.ATTENDANCE_OPERATION_CONFLICT ->
-                            AttendanceReasonCode.DUPLICATE
-                        ApiErrorCode.ATTENDANCE_NOT_ENROLLED ->
-                            AttendanceReasonCode.NOT_ENROLLED
-                        else -> null
-                    }
-                    if (terminalReason != null) {
-                        localStore.markRejected(operation.operationId, terminalReason)
-                        return@repeat
-                    }
+                        val apiCode = AttendanceRemoteClient.apiErrorCode(error)
+                        val terminalReason =
+                            when (apiCode) {
+                                ApiErrorCode.ATTENDANCE_SESSION_CLOSED ->
+                                    AttendanceReasonCode.SESSION_CLOSED
+                                ApiErrorCode.ATTENDANCE_OPERATION_CONFLICT ->
+                                    AttendanceReasonCode.DUPLICATE
+                                ApiErrorCode.ATTENDANCE_NOT_ENROLLED ->
+                                    AttendanceReasonCode.NOT_ENROLLED
+                                else -> null
+                            }
+                        if (terminalReason != null) {
+                            localStore.markRejected(operation.operationId, terminalReason)
+                            return@repeat
+                        }
 
-                    val retryable = when (error) {
-                        is AppError.Network -> true
-                        is AppError.Http -> AttendanceRetryPolicy.isRetryableHttp(error.status)
-                        is AppError.Serialization,
-                        is AppError.Storage,
-                        is AppError.Unknown,
-                        -> false
-                    }
-                    if (!retryable) {
-                        localStore.markRejected(
-                            operation.operationId,
-                            AttendanceReasonCode.WRONG_SESSION,
+                        val retryable =
+                            when (error) {
+                                is AppError.Network -> true
+                                is AppError.Http -> AttendanceRetryPolicy.isRetryableHttp(error.status)
+                                is AppError.Serialization,
+                                is AppError.Storage,
+                                is AppError.Unknown,
+                                -> false
+                            }
+                        if (!retryable) {
+                            localStore.markRejected(
+                                operation.operationId,
+                                AttendanceReasonCode.WRONG_SESSION,
+                            )
+                            return@repeat
+                        }
+
+                        val delay = AttendanceRetryPolicy.nextDelaySeconds(operation.attemptCount)
+                        localStore.recordRetry(
+                            operationId = operation.operationId,
+                            nextAttemptAtEpochSeconds = clock.instant().epochSecond + delay,
+                            errorCode = AttendanceRemoteClient.errorCode(error),
                         )
-                        return@repeat
+                        return Result.retry()
                     }
-
-                    val delay = AttendanceRetryPolicy.nextDelaySeconds(operation.attemptCount)
-                    localStore.recordRetry(
-                        operationId = operation.operationId,
-                        nextAttemptAtEpochSeconds = clock.instant().epochSecond + delay,
-                        errorCode = AttendanceRemoteClient.errorCode(error),
-                    )
-                    return Result.retry()
                 }
             }
+            return Result.retry()
         }
-        return Result.retry()
-    }
 
-    private companion object {
-        const val MAX_BATCH_SIZE = 25
+        private companion object {
+            const val MAX_BATCH_SIZE = 25
+        }
     }
-}

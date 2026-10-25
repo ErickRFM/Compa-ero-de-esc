@@ -8,8 +8,14 @@ import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
 
 sealed interface AttemptWriteResult {
-    data class Created(val record: AttendanceRecordResponse) : AttemptWriteResult
-    data class Existing(val record: AttendanceRecordResponse) : AttemptWriteResult
+    data class Created(
+        val record: AttendanceRecordResponse,
+    ) : AttemptWriteResult
+
+    data class Existing(
+        val record: AttendanceRecordResponse,
+    ) : AttemptWriteResult
+
     data object OperationConflict : AttemptWriteResult
 }
 
@@ -20,15 +26,29 @@ enum class AttemptReservationResult {
 }
 
 sealed interface SessionWriteResult {
-    data class Created(val session: AttendanceSessionResponse) : SessionWriteResult
-    data class Existing(val session: AttendanceSessionResponse) : SessionWriteResult
+    data class Created(
+        val session: AttendanceSessionResponse,
+    ) : SessionWriteResult
+
+    data class Existing(
+        val session: AttendanceSessionResponse,
+    ) : SessionWriteResult
 }
 
 interface AttendanceRepository {
     suspend fun createSession(session: AttendanceSessionResponse): SessionWriteResult
+
     suspend fun findSession(id: String): AttendanceSessionResponse?
+
     suspend fun findSessionByOccurrence(occurrenceId: String): AttendanceSessionResponse?
+
     suspend fun findOpenSessions(): List<AttendanceSessionResponse>
+
+    suspend fun findSessionsOpenedBy(
+        teacherId: String,
+        limit: Int = 100,
+    ): List<AttendanceSessionResponse>
+
     suspend fun findOpenSessions(
         courseGroups: Set<Pair<String, String>>,
         institutionId: String?,
@@ -36,8 +56,11 @@ interface AttendanceRepository {
         unscopedInstitutionalOnly: Boolean = false,
         limit: Int = MAX_OPEN_SESSION_RESULTS,
     ): List<AttendanceSessionResponse>
+
     suspend fun replaceSession(session: AttendanceSessionResponse)
+
     suspend fun writeAttempt(record: AttendanceRecordResponse): AttemptWriteResult
+
     suspend fun reserveAttempt(
         sessionId: String,
         studentId: String,
@@ -45,14 +68,20 @@ interface AttendanceRepository {
         requestFingerprint: String,
         maxAttempts: Int,
     ): AttemptReservationResult
+
     suspend fun replaceRejectedRecord(record: AttendanceRecordResponse): AttendanceRecordResponse
+
     suspend fun recordsForSession(sessionId: String): List<AttendanceRecordResponse>
+
     suspend fun replaceRecord(record: AttendanceRecordResponse)
+
     suspend fun findRecord(id: String): AttendanceRecordResponse?
+
     suspend fun findStudentSessionRecord(
         sessionId: String,
         studentId: String,
     ): AttendanceRecordResponse?
+
     suspend fun recordQrNonceUse(
         sessionId: String,
         nonce: String,
@@ -83,8 +112,7 @@ class InMemoryAttendanceRepository : AttendanceRepository {
             SessionWriteResult.Created(session)
         }
 
-    override suspend fun findSession(id: String): AttendanceSessionResponse? =
-        mutex.withLock { sessions[id] }
+    override suspend fun findSession(id: String): AttendanceSessionResponse? = mutex.withLock { sessions[id] }
 
     override suspend fun findSessionByOccurrence(occurrenceId: String): AttendanceSessionResponse? =
         mutex.withLock { occurrenceToSession[occurrenceId]?.let(sessions::get) }
@@ -94,26 +122,40 @@ class InMemoryAttendanceRepository : AttendanceRepository {
             sessions.values.filter { it.status == AttendanceSessionStatus.OPEN }
         }
 
+    override suspend fun findSessionsOpenedBy(
+        teacherId: String,
+        limit: Int,
+    ): List<AttendanceSessionResponse> =
+        mutex.withLock {
+            sessions.values
+                .asSequence()
+                .filter { it.openedBy == teacherId }
+                .sortedByDescending { it.openedAtEpochSeconds }
+                .take(limit.coerceIn(1, 100))
+                .toList()
+        }
+
     override suspend fun findOpenSessions(
         courseGroups: Set<Pair<String, String>>,
         institutionId: String?,
         afterEpochSeconds: Long,
         unscopedInstitutionalOnly: Boolean,
         limit: Int,
-    ): List<AttendanceSessionResponse> = mutex.withLock {
-        if (courseGroups.isEmpty()) return@withLock emptyList()
-        sessions.values.asSequence()
-            .filter { it.status == AttendanceSessionStatus.OPEN }
-            .filter { (it.courseId to it.groupName) in courseGroups }
-            .filter { it.institutionId == institutionId }
-            .filter { it.closesAtEpochSeconds > afterEpochSeconds }
-            .filter {
-                !unscopedInstitutionalOnly
-                    || (it.identitySource != AttendanceIdentitySource.NATIVE && it.groupId == null)
-            }
-            .take(limit.coerceIn(1, MAX_OPEN_SESSION_RESULTS))
-            .toList()
-    }
+    ): List<AttendanceSessionResponse> =
+        mutex.withLock {
+            if (courseGroups.isEmpty()) return@withLock emptyList()
+            sessions.values
+                .asSequence()
+                .filter { it.status == AttendanceSessionStatus.OPEN }
+                .filter { (it.courseId to it.groupName) in courseGroups }
+                .filter { it.institutionId == institutionId }
+                .filter { it.closesAtEpochSeconds > afterEpochSeconds }
+                .filter {
+                    !unscopedInstitutionalOnly ||
+                        (it.identitySource != AttendanceIdentitySource.NATIVE && it.groupId == null)
+                }.take(limit.coerceIn(1, MAX_OPEN_SESSION_RESULTS))
+                .toList()
+        }
 
     override suspend fun replaceSession(session: AttendanceSessionResponse) {
         mutex.withLock {
@@ -124,8 +166,9 @@ class InMemoryAttendanceRepository : AttendanceRepository {
 
     override suspend fun writeAttempt(record: AttendanceRecordResponse): AttemptWriteResult =
         mutex.withLock {
-            val existingByOperation = operationToRecord[record.operationId]
-                ?.let(records::get)
+            val existingByOperation =
+                operationToRecord[record.operationId]
+                    ?.let(records::get)
             if (existingByOperation != null) {
                 return@withLock if (
                     existingByOperation.sessionId == record.sessionId &&
@@ -161,19 +204,23 @@ class InMemoryAttendanceRepository : AttendanceRepository {
         operationId: String,
         requestFingerprint: String,
         maxAttempts: Int,
-    ): AttemptReservationResult = mutex.withLock {
-        val key = sessionId to studentId
-        val owner = attemptOperationOwners[operationId]
-        if (owner != null) {
-            return@withLock if (owner == (key to requestFingerprint)) AttemptReservationResult.ACCEPTED
-            else AttemptReservationResult.OPERATION_CONFLICT
+    ): AttemptReservationResult =
+        mutex.withLock {
+            val key = sessionId to studentId
+            val owner = attemptOperationOwners[operationId]
+            if (owner != null) {
+                return@withLock if (owner == (key to requestFingerprint)) {
+                    AttemptReservationResult.ACCEPTED
+                } else {
+                    AttemptReservationResult.OPERATION_CONFLICT
+                }
+            }
+            val operations = attemptsByStudent.getOrPut(key) { linkedSetOf() }
+            if (operations.size >= maxAttempts) return@withLock AttemptReservationResult.LIMIT_REACHED
+            operations += operationId
+            attemptOperationOwners[operationId] = key to requestFingerprint
+            AttemptReservationResult.ACCEPTED
         }
-        val operations = attemptsByStudent.getOrPut(key) { linkedSetOf() }
-        if (operations.size >= maxAttempts) return@withLock AttemptReservationResult.LIMIT_REACHED
-        operations += operationId
-        attemptOperationOwners[operationId] = key to requestFingerprint
-        AttemptReservationResult.ACCEPTED
-    }
 
     override suspend fun replaceRejectedRecord(record: AttendanceRecordResponse): AttendanceRecordResponse =
         mutex.withLock {
@@ -199,14 +246,12 @@ class InMemoryAttendanceRepository : AttendanceRepository {
         }
     }
 
-    override suspend fun findRecord(id: String): AttendanceRecordResponse? =
-        mutex.withLock { records[id] }
+    override suspend fun findRecord(id: String): AttendanceRecordResponse? = mutex.withLock { records[id] }
 
     override suspend fun findStudentSessionRecord(
         sessionId: String,
         studentId: String,
-    ): AttendanceRecordResponse? =
-        mutex.withLock { records.values.firstOrNull { it.sessionId == sessionId && it.studentId == studentId } }
+    ): AttendanceRecordResponse? = mutex.withLock { records.values.firstOrNull { it.sessionId == sessionId && it.studentId == studentId } }
 
     override suspend fun recordQrNonceUse(
         sessionId: String,
@@ -214,14 +259,15 @@ class InMemoryAttendanceRepository : AttendanceRepository {
         studentId: String,
         expiresAtEpochSeconds: Long,
         nowEpochSeconds: Long,
-    ): Long = mutex.withLock {
-        val key = sessionId to nonce
-        val students = qrNonceUses.getOrPut(key) { linkedMapOf() }
-        students.entries.removeIf { it.value <= nowEpochSeconds }
-        if (expiresAtEpochSeconds > nowEpochSeconds) students.putIfAbsent(studentId, expiresAtEpochSeconds)
-        if (students.isEmpty()) qrNonceUses.remove(key)
-        students.size.toLong()
-    }
+    ): Long =
+        mutex.withLock {
+            val key = sessionId to nonce
+            val students = qrNonceUses.getOrPut(key) { linkedMapOf() }
+            students.entries.removeIf { it.value <= nowEpochSeconds }
+            if (expiresAtEpochSeconds > nowEpochSeconds) students.putIfAbsent(studentId, expiresAtEpochSeconds)
+            if (students.isEmpty()) qrNonceUses.remove(key)
+            students.size.toLong()
+        }
 }
 
 const val MAX_OPEN_SESSION_RESULTS = 100

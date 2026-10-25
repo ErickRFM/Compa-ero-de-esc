@@ -3,6 +3,13 @@ package org.companerodeescuela.shared.contracts
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+/** Minimal, non-authoritative routing metadata carried by an attendance push. */
+object AttendancePushContract {
+    const val TYPE = "attendance_session_opened"
+    const val SESSION_ID = "sessionId"
+    const val CLICK_ACTION = "org.companerodeescuela.OPEN_ATTENDANCE"
+}
+
 @Serializable
 enum class AttendanceStatus {
     @SerialName("verified")
@@ -89,8 +96,11 @@ data class CreateAttendanceSessionRequest(
 )
 
 @Serializable enum class AttendanceIdentitySource {
-    @SerialName("native") NATIVE,
-    @SerialName("institutional") INSTITUTIONAL,
+    @SerialName("native")
+    NATIVE,
+
+    @SerialName("institutional")
+    INSTITUTIONAL,
 }
 
 @Serializable
@@ -107,10 +117,10 @@ data class AttendanceSessionResponse(
     val closesAtEpochSeconds: Long,
     val closedAtEpochSeconds: Long? = null,
     val status: AttendanceSessionStatus,
-    val identitySource:AttendanceIdentitySource?=null,
-    val institutionId:String?=null,
-    val groupId:String?=null,
-    val groupScopeRevision:Long=-1,
+    val identitySource: AttendanceIdentitySource? = null,
+    val institutionId: String? = null,
+    val groupId: String? = null,
+    val groupScopeRevision: Long = -1,
 )
 
 @Serializable
@@ -195,6 +205,11 @@ data class AttendanceReviewEntry(
 data class AttendanceRosterResponse(
     val session: AttendanceSessionResponse,
     val records: List<AttendanceRecordResponse>,
+)
+
+@Serializable
+data class AttendanceNotificationEnqueueResponse(
+    val queuedDevices: Int,
 )
 
 @Serializable

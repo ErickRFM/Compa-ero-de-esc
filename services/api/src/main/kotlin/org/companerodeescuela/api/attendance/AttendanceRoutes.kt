@@ -23,6 +23,7 @@ import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
+import org.companerodeescuela.shared.contracts.AttendanceNotificationEnqueueResponse
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
 import org.companerodeescuela.shared.contracts.ClassCallConfirmationRequest
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
@@ -125,6 +126,17 @@ fun Route.attendanceRoutes(
                 )
             }
 
+            get("/sessions/history") {
+                val principal = call.requirePlatformPrincipal()
+                principal.requireRole(UserRole.TEACHER)
+                call.respond(
+                    ApiResponse(
+                        data = sessionService.historyForTeacher(principal.subjectId(), nativeActor(call)),
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
+
             post("/sessions") {
                 val principal = call.requirePlatformPrincipal()
                 principal.requireRole(UserRole.TEACHER)
@@ -135,6 +147,28 @@ fun Route.attendanceRoutes(
                                 teacherId = principal.subjectId(),
                                 request = call.boundedBody(CreateAttendanceSessionRequest.serializer()),
                                 nativeActor = nativeActor(call),
+                            ),
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
+
+            post("/sessions/{sessionId}/reminders") {
+                val principal = call.requirePlatformPrincipal()
+                principal.requireRole(UserRole.TEACHER)
+                val sessionId =
+                    call.parameters["sessionId"]
+                        ?: throw ApiException.Validation("sessionId is required")
+                call.respond(
+                    ApiResponse(
+                        data =
+                            AttendanceNotificationEnqueueResponse(
+                                queuedDevices =
+                                    sessionService.resendSessionNotice(
+                                        actorId = principal.subjectId(),
+                                        sessionId = sessionId,
+                                        nativeActor = nativeActor(call),
+                                    ),
                             ),
                         requestId = call.requestId(),
                     ),
@@ -219,7 +253,12 @@ fun Route.attendanceRoutes(
                         ?: throw ApiException.Validation("sessionId is required")
                 call.respond(
                     ApiResponse(
-                        data = studentService.myClassRecord(principal.subjectId(), sessionId, nativeActor(call)),
+                        data =
+                            studentService.myClassRecord(
+                                principal.subjectId(),
+                                sessionId,
+                                nativeActor(call),
+                            ),
                         requestId = call.requestId(),
                     ),
                 )

@@ -258,7 +258,8 @@ class SiiiFullChainLiveContractTest {
                             return PushDeliveryResult.ACCEPTED
                         }
                     },
-                    attendanceClock,
+                    // Mongo enqueue timestamps use wall time; its delivery lease must use the same clock.
+                    java.time.Clock.systemUTC(),
                     authorizeRecipient = { it == "NATIVE:${student.id}" },
                     authorizeSession = { owner, token -> owner == "NATIVE:${student.id}" && token == deviceToken },
                 )

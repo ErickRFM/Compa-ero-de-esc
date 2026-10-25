@@ -3,14 +3,32 @@ package org.companerodeescuela
 import android.graphics.Bitmap
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
-import androidx.compose.runtime.*
-import androidx.compose.ui.test.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.ComposeTimeoutException
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.viewModelScope
 import androidx.test.platform.app.InstrumentationRegistry
-import io.ktor.client.engine.mock.*
-import io.ktor.http.*
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.TextContent
+import io.ktor.http.headersOf
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,17 +51,17 @@ import org.companerodeescuela.feature.auth.MfaScreen
 import org.companerodeescuela.feature.auth.MfaViewModel
 import org.companerodeescuela.feature.auth.StaffApplicationScreen
 import org.companerodeescuela.feature.auth.StaffApplicationViewModel
+import org.companerodeescuela.feature.classroom.AcademicGroupRepository
 import org.companerodeescuela.feature.classroom.ClassroomAdministrationEditor
 import org.companerodeescuela.feature.classroom.ClassroomAdministrationViewModel
 import org.companerodeescuela.feature.classroom.ClassroomRepository
-import org.companerodeescuela.feature.classroom.AcademicGroupRepository
 import org.companerodeescuela.feature.profile.ProfileScreen
 import org.companerodeescuela.shared.contracts.AcademicGroupMembership
 import org.companerodeescuela.shared.contracts.AcademicGroupSummary
 import org.companerodeescuela.shared.contracts.AcademicLoadResponse
+import org.companerodeescuela.shared.contracts.AdminUserSummary
 import org.companerodeescuela.shared.contracts.AdministrationMetrics
 import org.companerodeescuela.shared.contracts.AdministrationOverview
-import org.companerodeescuela.shared.contracts.AdminUserSummary
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.ApproveStaffRequest
 import org.companerodeescuela.shared.contracts.AssignAcademicGroupMemberRequest
@@ -75,6 +93,7 @@ import java.io.File
 import java.time.Clock
 import java.util.Base64
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicInteger
 
 /** Real Compose/ViewModels/repositories with an explicitly test-only HTTP transport.
  * Crypto, live authority, tenant and Mongo correctness are separately exercised by actual Ktor tests.
@@ -160,6 +179,8 @@ class V12AdministrationUiTest {
         val approvals = CopyOnWriteArrayList<ApproveStaffRequest>()
         val tutorRequests = CopyOnWriteArrayList<TutorApplicationRequest>()
         val memberships = CopyOnWriteArrayList<AssignAcademicGroupMemberRequest>()
+        val enrollmentRequests = AtomicInteger()
+        val confirmationRequests = AtomicInteger()
         var deny = false
         var enabled = false
         var approved = false
@@ -174,6 +195,7 @@ class V12AdministrationUiTest {
                             "/auth/me" -> Json.encodeToString(ApiResponse(user))
                             "/auth/mfa/status" -> Json.encodeToString(ApiResponse(MfaStatus(enabled, true)))
                             "/auth/mfa/enrollment" -> {
+                                enrollmentRequests.incrementAndGet()
                                 val payload = Json.decodeFromString<MfaEnrollmentRequest>((request.body as TextContent).text)
                                 assertEquals("test-only-password", payload.password)
                                 Json.encodeToString(
@@ -188,6 +210,7 @@ class V12AdministrationUiTest {
                                 )
                             }
                             "/auth/mfa/confirmation" -> {
+                                confirmationRequests.incrementAndGet()
                                 val payload = Json.decodeFromString<MfaConfirmationRequest>((request.body as TextContent).text)
                                 assertEquals("qa-enrollment", payload.enrollmentId)
                                 assertEquals("123456", payload.otp)
@@ -288,6 +311,39 @@ class V12AdministrationUiTest {
         compose.onNodeWithTag("admin_confirm").performClick()
     }
 
+    private fun dismissKeyboardBeforeSubmit() {
+        compose.runOnIdle {
+            WindowCompat
+                .getInsetsController(compose.activity.window, compose.activity.window.decorView)
+                .hide(WindowInsetsCompat.Type.ime())
+        }
+        compose.waitUntil(10000) {
+            val insets = ViewCompat.getRootWindowInsets(compose.activity.window.decorView)
+            insets != null && !insets.isVisible(WindowInsetsCompat.Type.ime())
+        }
+        compose.waitForIdle()
+    }
+
+    private fun waitForMfaTransition(
+        fixture: Fixture,
+        stage: String,
+        condition: () -> Boolean,
+    ) {
+        try {
+            compose.waitUntil(30000, condition)
+        } catch (timeout: ComposeTimeoutException) {
+            val state = fixture.mfa.state.value
+            throw AssertionError(
+                "MFA $stage timed out: loading=${state.loading}, working=${state.working}, " +
+                    "enabled=${state.status?.enabled}, available=${state.status?.available}, " +
+                    "ownerPresent=${state.ownerKey != null}, enrollmentPresent=${state.enrollment != null}, " +
+                    "failureType=${state.failure?.javaClass?.simpleName}, " +
+                    "enrollmentRequests=${fixture.enrollmentRequests.get()}, confirmationRequests=${fixture.confirmationRequests.get()}",
+                timeout,
+            )
+        }
+    }
+
     @Test fun profileNavigatesToRealMfaRepositoryAndConfirmationClearsSetupMaterial() {
         val f = Fixture()
         val original = f.store.token.value
@@ -319,8 +375,14 @@ class V12AdministrationUiTest {
                 )
             }
             compose.onNodeWithTag("mfa_password").performScrollTo().performTextInput("test-only-password")
-            compose.onNodeWithTag("mfa_enroll").assertIsEnabled().performClick()
-            compose.waitUntil(30000) {
+            dismissKeyboardBeforeSubmit()
+            compose
+                .onNodeWithTag("mfa_enroll")
+                .performScrollTo()
+                .assertIsDisplayed()
+                .assertIsEnabled()
+                .performClick()
+            waitForMfaTransition(f, "enrollment") {
                 f.mfa.state.value.enrollment != null || f.mfa.state.value.failure != null
             }
             val enrollmentState = f.mfa.state.value
@@ -329,10 +391,17 @@ class V12AdministrationUiTest {
                     "failure=${enrollmentState.failure}",
                 enrollmentState.enrollment,
             )
+            assertEquals(1, f.enrollmentRequests.get())
             waitTag("mfa_setup_secret", timeoutMillis = 30000)
             compose.onNodeWithTag("mfa_otp").performScrollTo().performTextInput("123456")
-            compose.onNodeWithTag("mfa_confirm").performScrollTo().performClick()
-            compose.waitUntil(30000) {
+            dismissKeyboardBeforeSubmit()
+            compose
+                .onNodeWithTag("mfa_confirm")
+                .performScrollTo()
+                .assertIsDisplayed()
+                .assertIsEnabled()
+                .performClick()
+            waitForMfaTransition(f, "confirmation") {
                 val state = f.mfa.state.value
                 (state.status?.enabled == true && state.enrollment == null && !state.working) || state.failure != null
             }
@@ -341,6 +410,7 @@ class V12AdministrationUiTest {
                 "MFA confirmation did not complete: status=${confirmedState.status}, failure=${confirmedState.failure}",
                 confirmedState.status?.enabled == true,
             )
+            assertEquals(1, f.confirmationRequests.get())
             waitTag("mfa_enabled", timeoutMillis = 30000)
             assertTrue(compose.onAllNodesWithTag("mfa_setup_secret").fetchSemanticsNodes().isEmpty())
             assertEquals(original, f.store.token.value)

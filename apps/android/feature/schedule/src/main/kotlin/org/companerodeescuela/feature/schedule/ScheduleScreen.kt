@@ -1,6 +1,7 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.feature.schedule
 
-import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -13,12 +14,9 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
-import org.companerodeescuela.core.designsystem.v8.V8DaySelector
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,10 +26,10 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Description
@@ -39,27 +37,22 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import org.companerodeescuela.core.designsystem.v8.V8GlassFilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.ui.text.font.FontWeight
-import org.companerodeescuela.core.designsystem.v8.V8RedColors
-import org.companerodeescuela.core.designsystem.v8.V8HeroTitle
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
@@ -68,19 +61,19 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import java.time.Duration
-import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
 import org.companerodeescuela.core.academic.PersonalScheduleDraft
-import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
+import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
+import org.companerodeescuela.core.designsystem.v8.V8DaySelector
+import org.companerodeescuela.core.designsystem.v8.V8GlassFilterChip
+import org.companerodeescuela.core.designsystem.v8.V8HeroTitle
+import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
+import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.motion.CompaneroMotionDuration
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 import org.companerodeescuela.core.ui.component.AcademicTimelineItem
@@ -91,6 +84,12 @@ import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ScheduleEntry
 import org.companerodeescuela.shared.contracts.ScheduleSource
+import java.time.Duration
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 private enum class AgendaMode {
     DAY,
@@ -115,18 +114,19 @@ fun ScheduleScreen(
     var moveProposal by remember { mutableStateOf<AgendaMoveProposal?>(null) }
     var deleteTarget by remember { mutableStateOf<ScheduleEntry?>(null) }
 
-    val documentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
-    ) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            importBusy = true
-            runCatching { importProcessor.extractCandidates(uri) }
-                .onSuccess(viewModel::stageImportCandidates)
-                .onFailure { viewModel.reportImportFailure() }
-            importBusy = false
+    val documentLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocument(),
+        ) { uri: Uri? ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            scope.launch {
+                importBusy = true
+                runCatching { importProcessor.extractCandidates(uri) }
+                    .onSuccess(viewModel::stageImportCandidates)
+                    .onFailure { viewModel.reportImportFailure() }
+                importBusy = false
+            }
         }
-    }
 
     if (state.loading && state.entries.isEmpty()) {
         Column(
@@ -147,203 +147,251 @@ fun ScheduleScreen(
 
     Box(modifier = modifier.fillMaxSize()) {
         if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current) {
-            V8CampusBackdrop(modifier = Modifier.matchParentSize())
+            V8MatteBackdrop(modifier = Modifier.matchParentSize())
         }
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .widthIn(max = CompaneroSize.homeContentMaxWidth)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
-        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
-    ) {
-        V8ScreenHeader {
-            V8HeroTitle(leading = "Mi", accent = "horario")
-        }
-        Text(
-            text = "Organiza tu semana, consulta tus clases incluso sin conexión.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        ExpressiveSegmentedControl(
-            options = listOf("Semana", "Día"),
-            selectedIndex = if (mode == AgendaMode.WEEK) 0 else 1,
-            onSelected = { mode = if (it == 0) AgendaMode.WEEK else AgendaMode.DAY },
-        )
-
-        val monday = LocalDate.now().minusDays((LocalDate.now().dayOfWeek.value - 1).toLong())
-        val displayedDays = weeklyAgendaDays(state.entries)
-        val visibleSelectedDay = resolveScheduleDay(selectedDay, displayedDays)
-        V8DaySelector(
-            days = displayedDays.map { day ->
-                dayShortLabelV8(day) to monday.plusDays(java.time.DayOfWeek.valueOf(day).value.toLong() - 1).dayOfMonth.toString()
-            },
-            selectedIndex = displayedDays.indexOf(visibleSelectedDay).coerceAtLeast(0),
-            onSelect = { index ->
-                selectedDay = displayedDays[index]
-                mode = AgendaMode.DAY
-            },
-        )
-        if (state.fromCache) {
-            StatusNotice(
-                title = "Agenda guardada",
-                message = state.syncMessage
-                    ?: "Estás viendo la última versión disponible en este dispositivo.",
-                tone = NoticeTone.WARNING,
-            )
-        }
-
-        state.successMessage?.let {
-            StatusNotice(
-                title = "Listo",
-                message = it,
-                tone = NoticeTone.SUCCESS,
-            )
-        }
-
-        if (state.undoDrafts.isNotEmpty()) {
-            OutlinedButton(
-                onClick = viewModel::undoLastDelete,
-                enabled = !state.actionInProgress,
-            ) {
-                Text("Deshacer eliminación")
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .widthIn(max = CompaneroSize.homeContentMaxWidth)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
+        ) {
+            V8ScreenHeader {
+                V8HeroTitle(leading = "Mi", accent = "horario")
             }
-        }
-
-        state.errorMessage?.let {
-            StatusNotice(
-                title = "Revisa esta acción",
-                message = it,
-                tone = NoticeTone.ERROR,
-            )
-        }
-
-        if (state.entries.isEmpty()) {
-            EmptyScheduleActions(
-                loading = state.loading || state.actionInProgress || importBusy,
-                onSync = viewModel::load,
-                onImport = {
-                    documentLauncher.launch(arrayOf("application/pdf", "image/*"))
-                },
-                onManual = {
-                    editingEntry = null
-                    editingImportIndex = null
-                    showEditor = true
-                },
-            )
-        } else {
-            val effectiveFilter = subjectFilter?.takeIf { selected -> state.entries.any { it.subjectName == selected } }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                item { V8GlassFilterChip(selected = effectiveFilter == null, onClick = { subjectFilter = null }, label = { Text("Todas") }) }
-                items(state.entries.map { it.subjectName }.distinct().sorted()) { name ->
-                    V8GlassFilterChip(selected = effectiveFilter == name, onClick = { subjectFilter = name }, label = { Text(name) })
-                }
-            }
-            val visibleEntries = state.entries.filter { effectiveFilter == null || it.subjectName == effectiveFilter }
-            val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
-            AnimatedContent(
-                targetState = mode,
-                transitionSpec = {
-                    val duration = if (reducedMotion) {
-                        CompaneroMotionDuration.FAST
-                    } else {
-                        CompaneroMotionDuration.STANDARD
-                    }
-                    val enter = fadeIn(tween(duration)) +
-                        if (reducedMotion) slideInHorizontally(tween(0)) { 0 }
-                        else slideInHorizontally(tween(duration)) { it / 8 }
-                    val exit = fadeOut(tween(duration)) +
-                        if (reducedMotion) slideOutHorizontally(tween(0)) { 0 }
-                        else slideOutHorizontally(tween(duration)) { -it / 8 }
-                    enter.togetherWith(exit)
-                },
-                label = "agendaMode",
-            ) { currentMode ->
-                when (currentMode) {
-                    AgendaMode.DAY -> DayAgenda(
-                        entries = visibleEntries,
-                        selectedDay = visibleSelectedDay,
-                        onSelectedDay = { selectedDay = it },
-                        onEdit = {
-                            editingEntry = it
-                            editingImportIndex = null
-                            showEditor = true
-                        },
-                        onDelete = { deleteTarget = it },
-                        onMoveRequest = { proposal ->
-                            moveProposal = AgendaEditingRules.proposeMove(proposal.entry, proposal.targetDay, proposal.targetStart, state.entries)
-                        },
-                    )
-                    AgendaMode.WEEK -> WeekAgenda(
-                        entries = visibleEntries,
-                        onEdit = {
-                            editingEntry = it
-                            editingImportIndex = null
-                            showEditor = true
-                        },
-                        onDelete = { deleteTarget = it },
-                        onMoveRequest = { proposal ->
-                            moveProposal = AgendaEditingRules.proposeMove(proposal.entry, proposal.targetDay, proposal.targetStart, state.entries)
-                        },
-                    )
-                }
-            }
-
             Text(
-                text = "Tip: mantén presionada una clase personal y arrástrala para moverla. Se ajusta en intervalos de 15 minutos.",
-                style = MaterialTheme.typography.bodySmall,
+                text = "Organiza tu semana, consulta tus clases incluso sin conexión.",
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
-            ) {
+            ExpressiveSegmentedControl(
+                options = listOf("Semana", "Día"),
+                selectedIndex = if (mode == AgendaMode.WEEK) 0 else 1,
+                onSelected = { mode = if (it == 0) AgendaMode.WEEK else AgendaMode.DAY },
+            )
+
+            val monday = LocalDate.now().minusDays((LocalDate.now().dayOfWeek.value - 1).toLong())
+            val displayedDays = weeklyAgendaDays(state.entries)
+            val visibleSelectedDay = resolveScheduleDay(selectedDay, displayedDays)
+            V8DaySelector(
+                days =
+                    displayedDays.map { day ->
+                        dayShortLabelV8(day) to
+                            monday
+                                .plusDays(
+                                    java.time.DayOfWeek
+                                        .valueOf(day)
+                                        .value
+                                        .toLong() - 1,
+                                ).dayOfMonth
+                                .toString()
+                    },
+                selectedIndex = displayedDays.indexOf(visibleSelectedDay).coerceAtLeast(0),
+                onSelect = { index ->
+                    selectedDay = displayedDays[index]
+                    mode = AgendaMode.DAY
+                },
+            )
+            if (state.fromCache) {
+                StatusNotice(
+                    title = "Agenda guardada",
+                    message =
+                        state.syncMessage
+                            ?: "Estás viendo la última versión disponible en este dispositivo.",
+                    tone = NoticeTone.WARNING,
+                )
+            }
+
+            state.successMessage?.let {
+                StatusNotice(
+                    title = "Listo",
+                    message = it,
+                    tone = NoticeTone.SUCCESS,
+                )
+            }
+
+            if (state.undoDrafts.isNotEmpty()) {
                 OutlinedButton(
-                    onClick = {
+                    onClick = viewModel::undoLastDelete,
+                    enabled = !state.actionInProgress,
+                ) {
+                    Text("Deshacer eliminación")
+                }
+            }
+
+            state.errorMessage?.let {
+                StatusNotice(
+                    title = "Revisa esta acción",
+                    message = it,
+                    tone = NoticeTone.ERROR,
+                )
+            }
+
+            if (state.entries.isEmpty()) {
+                EmptyScheduleActions(
+                    loading = state.loading || state.actionInProgress || importBusy,
+                    onSync = viewModel::load,
+                    onImport = {
                         documentLauncher.launch(arrayOf("application/pdf", "image/*"))
                     },
-                    modifier = Modifier.weight(1f),
-                    enabled = !importBusy && !state.actionInProgress,
-                ) {
-                    Icon(Icons.Filled.Description, contentDescription = null)
-                    Text(" Importar")
-                }
-                Button(
-                    onClick = {
+                    onManual = {
                         editingEntry = null
                         editingImportIndex = null
                         showEditor = true
                     },
-                    modifier = Modifier.weight(1f),
-                    enabled = !state.actionInProgress,
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
-                    Text(" Clase")
+                )
+            } else {
+                val effectiveFilter = subjectFilter?.takeIf { selected -> state.entries.any { it.subjectName == selected } }
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {
+                        V8GlassFilterChip(
+                            selected = effectiveFilter == null,
+                            onClick = { subjectFilter = null },
+                            label = { Text("Todas") },
+                        )
+                    }
+                    items(
+                        state.entries
+                            .map { it.subjectName }
+                            .distinct()
+                            .sorted(),
+                    ) { name ->
+                        V8GlassFilterChip(selected = effectiveFilter == name, onClick = { subjectFilter = name }, label = { Text(name) })
+                    }
                 }
-            }
+                val visibleEntries = state.entries.filter { effectiveFilter == null || it.subjectName == effectiveFilter }
+                val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
+                AnimatedContent(
+                    targetState = mode,
+                    transitionSpec = {
+                        val duration =
+                            if (reducedMotion) {
+                                CompaneroMotionDuration.FAST
+                            } else {
+                                CompaneroMotionDuration.STANDARD
+                            }
+                        val enter =
+                            fadeIn(tween(duration)) +
+                                if (reducedMotion) {
+                                    slideInHorizontally(tween(0)) { 0 }
+                                } else {
+                                    slideInHorizontally(tween(duration)) { it / 8 }
+                                }
+                        val exit =
+                            fadeOut(tween(duration)) +
+                                if (reducedMotion) {
+                                    slideOutHorizontally(tween(0)) { 0 }
+                                } else {
+                                    slideOutHorizontally(tween(duration)) { -it / 8 }
+                                }
+                        enter.togetherWith(exit)
+                    },
+                    label = "agendaMode",
+                ) { currentMode ->
+                    when (currentMode) {
+                        AgendaMode.DAY ->
+                            DayAgenda(
+                                entries = visibleEntries,
+                                selectedDay = visibleSelectedDay,
+                                onSelectedDay = { selectedDay = it },
+                                onEdit = {
+                                    editingEntry = it
+                                    editingImportIndex = null
+                                    showEditor = true
+                                },
+                                onDelete = { deleteTarget = it },
+                                onMoveRequest = { proposal ->
+                                    moveProposal =
+                                        AgendaEditingRules.proposeMove(
+                                            proposal.entry,
+                                            proposal.targetDay,
+                                            proposal.targetStart,
+                                            state.entries,
+                                        )
+                                },
+                            )
+                        AgendaMode.WEEK ->
+                            WeekAgenda(
+                                entries = visibleEntries,
+                                onEdit = {
+                                    editingEntry = it
+                                    editingImportIndex = null
+                                    showEditor = true
+                                },
+                                onDelete = { deleteTarget = it },
+                                onMoveRequest = { proposal ->
+                                    moveProposal =
+                                        AgendaEditingRules.proposeMove(
+                                            proposal.entry,
+                                            proposal.targetDay,
+                                            proposal.targetStart,
+                                            state.entries,
+                                        )
+                                },
+                            )
+                    }
+                }
 
-            InstitutionSyncCard(
-                fromCache = state.fromCache,
-                lastUpdatedAtEpochSeconds = state.lastUpdatedAtEpochSeconds,
-                loading = state.loading,
-                onSync = viewModel::load,
-            )
+                Text(
+                    text = "Tip: mantén presionada una clase personal y arrástrala para moverla. Se ajusta en intervalos de 15 minutos.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            documentLauncher.launch(arrayOf("application/pdf", "image/*"))
+                        },
+                        modifier = Modifier.weight(1f),
+                        enabled = !importBusy && !state.actionInProgress,
+                    ) {
+                        Icon(Icons.Filled.Description, contentDescription = null)
+                        Text(" Importar")
+                    }
+                    Button(
+                        onClick = {
+                            editingEntry = null
+                            editingImportIndex = null
+                            showEditor = true
+                        },
+                        modifier = Modifier.weight(1f),
+                        enabled = !state.actionInProgress,
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = null)
+                        Text(" Clase")
+                    }
+                }
+
+                InstitutionSyncCard(
+                    fromCache = state.fromCache,
+                    lastUpdatedAtEpochSeconds = state.lastUpdatedAtEpochSeconds,
+                    loading = state.loading,
+                    onSync = viewModel::load,
+                )
+            }
         }
     }
 
-    }
-
     if (showEditor) {
-        val initial = editingEntry?.toDraft()
-            ?: editingImportIndex?.let { state.importCandidates.getOrNull(it) }
-        val initialDays = editingEntry?.seriesId?.let { seriesId ->
-            state.entries
-                .filter { it.seriesId == seriesId && it.source != ScheduleSource.INSTITUTIONAL }
-                .map { it.dayOfWeek }
-                .toSet()
-        }.orEmpty()
+        val initial =
+            editingEntry?.toDraft()
+                ?: editingImportIndex?.let { state.importCandidates.getOrNull(it) }
+        val initialDays =
+            editingEntry
+                ?.seriesId
+                ?.let { seriesId ->
+                    state.entries
+                        .filter { it.seriesId == seriesId && it.source != ScheduleSource.INSTITUTIONAL }
+                        .map { it.dayOfWeek }
+                        .toSet()
+                }.orEmpty()
         ScheduleEditorDialog(
             initial = initial,
             initialDays = initialDays,
@@ -467,7 +515,8 @@ private fun EmptyScheduleActions(
 ) {
     StatusNotice(
         title = "Aún no tienes un horario",
-        message = "No encontramos clases asociadas a tu cuenta. UPTlax sigue siendo la fuente oficial; también puedes agregar una copia personal.",
+        message =
+            "No encontramos clases asociadas a tu cuenta. UPTlax sigue siendo la fuente oficial; también puedes agregar una copia personal.",
     )
     Button(
         onClick = onSync,
@@ -621,30 +670,32 @@ private fun DayTimeGrid(
     val horizontalThresholdPx = with(density) { 72.dp.toPx() }
 
     BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(hourHeight * totalHours.toFloat())
-            .drawBehind {
-                for (index in 0..totalHours) {
-                    val y = index * hourHeight.toPx()
-                    drawLine(
-                        color = lineColor,
-                        start = Offset(railWidth.toPx(), y),
-                        end = Offset(size.width, y),
-                        strokeWidth = 1.dp.toPx(),
-                    )
-                }
-            },
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(hourHeight * totalHours.toFloat())
+                .drawBehind {
+                    for (index in 0..totalHours) {
+                        val y = index * hourHeight.toPx()
+                        drawLine(
+                            color = lineColor,
+                            start = Offset(railWidth.toPx(), y),
+                            end = Offset(size.width, y),
+                            strokeWidth = 1.dp.toPx(),
+                        )
+                    }
+                },
     ) {
         for (hour in startHour..endHour) {
             Text(
                 text = "%02d:00".format(hour),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .width(railWidth)
-                    .offset(y = hourHeight * (hour - startHour).toFloat())
-                    .padding(top = 2.dp),
+                modifier =
+                    Modifier
+                        .width(railWidth)
+                        .offset(y = hourHeight * (hour - startHour).toFloat())
+                        .padding(top = 2.dp),
             )
         }
 
@@ -667,8 +718,9 @@ private fun DayTimeGrid(
             val assignment = mutableMapOf<Int, Int>()
             group.forEach { index ->
                 val startAt = entries[index].startsAt
-                val lane = laneEnds.indexOfFirst { it <= startAt }.takeIf { it >= 0 }
-                    ?: laneEnds.size.also { laneEnds.add("") }
+                val lane =
+                    laneEnds.indexOfFirst { it <= startAt }.takeIf { it >= 0 }
+                        ?: laneEnds.size.also { laneEnds.add("") }
                 laneEnds[lane] = entries[index].endsAt
                 assignment[index] = lane
             }
@@ -676,83 +728,91 @@ private fun DayTimeGrid(
         }
 
         entries.forEachIndexed { index, entry ->
-            val start = runCatching { LocalTime.parse(entry.startsAt) }.getOrNull()
-                ?: return@forEachIndexed
-            val end = runCatching { LocalTime.parse(entry.endsAt) }.getOrNull()
-                ?: return@forEachIndexed
+            val start =
+                runCatching { LocalTime.parse(entry.startsAt) }.getOrNull()
+                    ?: return@forEachIndexed
+            val end =
+                runCatching { LocalTime.parse(entry.endsAt) }.getOrNull()
+                    ?: return@forEachIndexed
             if (!start.isBefore(end)) return@forEachIndexed
 
-            val minutesFromStart = (start.hour * 60 + start.minute - startHour * 60)
-                .coerceAtLeast(0)
+            val minutesFromStart =
+                (start.hour * 60 + start.minute - startHour * 60)
+                    .coerceAtLeast(0)
             val durationMinutes = Duration.between(start, end).toMinutes().coerceAtLeast(15)
             val top = hourHeight * (minutesFromStart / 60f)
-            val blockHeight = maxOf(
-                hourHeight * (durationMinutes / 60f),
-                24.dp,
-            )
+            val blockHeight =
+                maxOf(
+                    hourHeight * (durationMinutes / 60f),
+                    24.dp,
+                )
 
             var dragOffset by remember(entry.courseId) { mutableStateOf(Offset.Zero) }
             val draggable = entry.source != ScheduleSource.INSTITUTIONAL
-            val dragModifier = if (!draggable) {
-                Modifier
-            } else {
-                Modifier
-                    .graphicsLayer {
-                        translationX = dragOffset.x
-                        translationY = dragOffset.y
-                    }
-                    .pointerInput(entry.courseId, allEntries) {
-                        detectDragGesturesAfterLongPress(
-                            onDragStart = {
-                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            },
-                            onDragCancel = { dragOffset = Offset.Zero },
-                            onDragEnd = {
-                                val targetStart = AgendaEditingRules.shiftFromDrag(
-                                    entry = entry,
-                                    verticalPixels = dragOffset.y,
-                                    pixelsPerQuarterHour = quarterHourPx,
-                                )
-                                val targetDay = AgendaEditingRules.adjacentDay(
-                                    currentDay = entry.dayOfWeek,
-                                    horizontalPixels = dragOffset.x,
-                                    thresholdPixels = horizontalThresholdPx,
-                                )
-                                if (targetStart != null) {
-                                    AgendaEditingRules.proposeMove(
-                                        entry = entry,
-                                        targetDay = targetDay,
-                                        targetStart = targetStart,
-                                        existing = allEntries,
-                                    )?.let(onMoveRequest)
-                                }
-                                dragOffset = Offset.Zero
-                            },
-                            onDrag = { change, amount ->
-                                change.consume()
-                                dragOffset += amount
-                            },
-                        )
-                    }
-            }
+            val dragModifier =
+                if (!draggable) {
+                    Modifier
+                } else {
+                    Modifier
+                        .graphicsLayer {
+                            translationX = dragOffset.x
+                            translationY = dragOffset.y
+                        }.pointerInput(entry.courseId, allEntries) {
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = {
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                },
+                                onDragCancel = { dragOffset = Offset.Zero },
+                                onDragEnd = {
+                                    val targetStart =
+                                        AgendaEditingRules.shiftFromDrag(
+                                            entry = entry,
+                                            verticalPixels = dragOffset.y,
+                                            pixelsPerQuarterHour = quarterHourPx,
+                                        )
+                                    val targetDay =
+                                        AgendaEditingRules.adjacentDay(
+                                            currentDay = entry.dayOfWeek,
+                                            horizontalPixels = dragOffset.x,
+                                            thresholdPixels = horizontalThresholdPx,
+                                        )
+                                    if (targetStart != null) {
+                                        AgendaEditingRules
+                                            .proposeMove(
+                                                entry = entry,
+                                                targetDay = targetDay,
+                                                targetStart = targetStart,
+                                                existing = allEntries,
+                                            )?.let(onMoveRequest)
+                                    }
+                                    dragOffset = Offset.Zero
+                                },
+                                onDrag = { change, amount ->
+                                    change.consume()
+                                    dragOffset += amount
+                                },
+                            )
+                        }
+                }
 
             val (lane, laneCount) = laneMap[index] ?: (0 to 1)
             val availableWidth = (maxWidth - railWidth - CompaneroSpacing.xs)
             val laneWidth = availableWidth / laneCount
             Surface(
-                modifier = Modifier
-                    .padding(start = railWidth + CompaneroSpacing.xs)
-                    .offset(x = laneWidth * lane, y = top)
-                    .width(laneWidth)
-                    .height(blockHeight)
-                    .then(dragModifier)
-                    .then(
-                        if (draggable) {
-                            Modifier.clickable { onEdit(entry) }
-                        } else {
-                            Modifier
-                        },
-                    ),
+                modifier =
+                    Modifier
+                        .padding(start = railWidth + CompaneroSpacing.xs)
+                        .offset(x = laneWidth * lane, y = top)
+                        .width(laneWidth)
+                        .height(blockHeight)
+                        .then(dragModifier)
+                        .then(
+                            if (draggable) {
+                                Modifier.clickable { onEdit(entry) }
+                            } else {
+                                Modifier
+                            },
+                        ),
                 shape = MaterialTheme.shapes.large,
                 color = MaterialTheme.colorScheme.surfaceContainer,
                 tonalElevation = 1.dp,
@@ -807,18 +867,18 @@ private fun AgendaTimeline(
         role = CompaneroSurfaceRole.INSET,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .drawBehind {
-                    val railX = 59.dp.toPx()
-                    drawLine(
-                        color = railColor,
-                        start = Offset(railX, 12.dp.toPx()),
-                        end = Offset(railX, size.height - 12.dp.toPx()),
-                        strokeWidth = 2.dp.toPx(),
-                    )
-                }
-                .padding(horizontal = CompaneroSpacing.card, vertical = CompaneroSpacing.sm),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .drawBehind {
+                        val railX = 59.dp.toPx()
+                        drawLine(
+                            color = railColor,
+                            start = Offset(railX, 12.dp.toPx()),
+                            end = Offset(railX, size.height - 12.dp.toPx()),
+                            strokeWidth = 2.dp.toPx(),
+                        )
+                    }.padding(horizontal = CompaneroSpacing.card, vertical = CompaneroSpacing.sm),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
         ) {
             entries.sortedBy { it.startsAt }.forEach { entry ->
@@ -849,71 +909,76 @@ private fun AgendaTimelineEntry(
     val horizontalThresholdPx = with(density) { 72.dp.toPx() }
     val draggable = entry.source != ScheduleSource.INSTITUTIONAL
 
-    val dragModifier = if (!draggable) {
-        Modifier
-    } else {
-        Modifier
-            .graphicsLayer {
-                translationX = dragOffset.x
-                translationY = dragOffset.y
-            }
-            .pointerInput(entry.courseId, allEntries) {
-                detectDragGesturesAfterLongPress(
-                    onDragStart = {
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    },
-                    onDragCancel = { dragOffset = Offset.Zero },
-                    onDragEnd = {
-                        val targetStart = AgendaEditingRules.shiftFromDrag(
-                            entry = entry,
-                            verticalPixels = dragOffset.y,
-                            pixelsPerQuarterHour = quarterHourPx,
-                        )
-                        val targetDay = AgendaEditingRules.adjacentDay(
-                            currentDay = entry.dayOfWeek,
-                            horizontalPixels = dragOffset.x,
-                            thresholdPixels = horizontalThresholdPx,
-                        )
-                        if (targetStart != null) {
-                            AgendaEditingRules.proposeMove(
-                                entry = entry,
-                                targetDay = targetDay,
-                                targetStart = targetStart,
-                                existing = allEntries,
-                            )?.let { proposal ->
-                                if (
-                                    proposal.targetDay != entry.dayOfWeek ||
-                                    proposal.targetStart != entry.startsAt
-                                ) {
-                                    onMoveRequest(proposal)
-                                }
+    val dragModifier =
+        if (!draggable) {
+            Modifier
+        } else {
+            Modifier
+                .graphicsLayer {
+                    translationX = dragOffset.x
+                    translationY = dragOffset.y
+                }.pointerInput(entry.courseId, allEntries) {
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        },
+                        onDragCancel = { dragOffset = Offset.Zero },
+                        onDragEnd = {
+                            val targetStart =
+                                AgendaEditingRules.shiftFromDrag(
+                                    entry = entry,
+                                    verticalPixels = dragOffset.y,
+                                    pixelsPerQuarterHour = quarterHourPx,
+                                )
+                            val targetDay =
+                                AgendaEditingRules.adjacentDay(
+                                    currentDay = entry.dayOfWeek,
+                                    horizontalPixels = dragOffset.x,
+                                    thresholdPixels = horizontalThresholdPx,
+                                )
+                            if (targetStart != null) {
+                                AgendaEditingRules
+                                    .proposeMove(
+                                        entry = entry,
+                                        targetDay = targetDay,
+                                        targetStart = targetStart,
+                                        existing = allEntries,
+                                    )?.let { proposal ->
+                                        if (
+                                            proposal.targetDay != entry.dayOfWeek ||
+                                            proposal.targetStart != entry.startsAt
+                                        ) {
+                                            onMoveRequest(proposal)
+                                        }
+                                    }
                             }
-                        }
-                        dragOffset = Offset.Zero
-                    },
-                    onDrag = { change, amount ->
-                        change.consume()
-                        dragOffset += amount
-                    },
-                )
-            }
-    }
+                            dragOffset = Offset.Zero
+                        },
+                        onDrag = { change, amount ->
+                            change.consume()
+                            dragOffset += amount
+                        },
+                    )
+                }
+        }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(dragModifier),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .then(dragModifier),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
     ) {
         AcademicTimelineItem(
             time = "${entry.startsAt}–${entry.endsAt}",
             title = entry.subjectName,
             subtitle = locationAndTeacher(entry),
-            status = when (entry.source) {
-                ScheduleSource.INSTITUTIONAL -> null
-                ScheduleSource.MANUAL -> "Horario personal"
-                ScheduleSource.OCR_IMPORT -> "Importado · revisado"
-            },
+            status =
+                when (entry.source) {
+                    ScheduleSource.INSTITUTIONAL -> null
+                    ScheduleSource.MANUAL -> "Horario personal"
+                    ScheduleSource.OCR_IMPORT -> "Importado · revisado"
+                },
             subjectKey = entry.subjectCode.ifBlank { entry.subjectName },
             continuousRail = true,
             modifier = Modifier.fillMaxWidth(),
@@ -1010,11 +1075,12 @@ private fun ScheduleEditorDialog(
                                 V8GlassFilterChip(
                                     selected = value in selectedDays,
                                     onClick = {
-                                        selectedDays = if (value in selectedDays) {
-                                            selectedDays - value
-                                        } else {
-                                            selectedDays + value
-                                        }
+                                        selectedDays =
+                                            if (value in selectedDays) {
+                                                selectedDays - value
+                                            } else {
+                                                selectedDays + value
+                                            }
                                     },
                                     label = { Text(dayShortLabel(value)) },
                                     modifier = Modifier.weight(1f),
@@ -1085,8 +1151,9 @@ private fun ScheduleEditorDialog(
                             classroomName = room,
                             buildingName = initial?.buildingName,
                             source = initial?.source ?: ScheduleSource.MANUAL,
-                            recurrence = initial?.recurrence
-                                ?: org.companerodeescuela.shared.contracts.ScheduleRecurrence.WEEKLY,
+                            recurrence =
+                                initial?.recurrence
+                                    ?: org.companerodeescuela.shared.contracts.ScheduleRecurrence.WEEKLY,
                             seriesId = initial?.seriesId,
                             effectiveDate = initial?.effectiveDate,
                         ),
@@ -1094,10 +1161,11 @@ private fun ScheduleEditorDialog(
                         applyToSeries,
                     )
                 },
-                enabled = subject.isNotBlank() &&
-                    start.isNotBlank() &&
-                    end.isNotBlank() &&
-                    selectedDays.isNotEmpty(),
+                enabled =
+                    subject.isNotBlank() &&
+                        start.isNotBlank() &&
+                        end.isNotBlank() &&
+                        selectedDays.isNotEmpty(),
             ) {
                 Text("Guardar")
             }
@@ -1190,9 +1258,10 @@ private fun MoveScheduleDialog(
                 if (proposal.conflicts.isNotEmpty()) {
                     StatusNotice(
                         title = "Conflicto de horario",
-                        message = proposal.conflicts.joinToString("\n") {
-                            it.subjectName + " · " + it.startsAt + "–" + it.endsAt
-                        },
+                        message =
+                            proposal.conflicts.joinToString("\n") {
+                                it.subjectName + " · " + it.startsAt + "–" + it.endsAt
+                            },
                         tone = NoticeTone.WARNING,
                     )
                     Text(
@@ -1324,51 +1393,55 @@ private fun ScheduleEntry.toDraft(): PersonalScheduleDraft =
     )
 
 private fun locationAndTeacher(entry: ScheduleEntry): String {
-    val location = listOfNotNull(entry.classroomName, entry.buildingName)
-        .joinToString(" · ")
-        .ifBlank { "Aula por confirmar" }
+    val location =
+        listOfNotNull(entry.classroomName, entry.buildingName)
+            .joinToString(" · ")
+            .ifBlank { "Aula por confirmar" }
     return listOf(location, entry.teacherName)
         .filter(String::isNotBlank)
         .joinToString(" · ")
 }
 
-private fun dayOrder(day: String): Int = when (day) {
-    "MONDAY" -> 1
-    "TUESDAY" -> 2
-    "WEDNESDAY" -> 3
-    "THURSDAY" -> 4
-    "FRIDAY" -> 5
-    "SATURDAY" -> 6
-    "SUNDAY" -> 7
-    else -> 8
-}
+private fun dayOrder(day: String): Int =
+    when (day) {
+        "MONDAY" -> 1
+        "TUESDAY" -> 2
+        "WEDNESDAY" -> 3
+        "THURSDAY" -> 4
+        "FRIDAY" -> 5
+        "SATURDAY" -> 6
+        "SUNDAY" -> 7
+        else -> 8
+    }
 
-private fun dayShortLabel(day: String): String = when (day) {
-    "MONDAY" -> "Lun"
-    "TUESDAY" -> "Mar"
-    "WEDNESDAY" -> "Mié"
-    "THURSDAY" -> "Jue"
-    "FRIDAY" -> "Vie"
-    "SATURDAY" -> "Sáb"
-    "SUNDAY" -> "Dom"
-    else -> day.take(3)
-}
+private fun dayShortLabel(day: String): String =
+    when (day) {
+        "MONDAY" -> "Lun"
+        "TUESDAY" -> "Mar"
+        "WEDNESDAY" -> "Mié"
+        "THURSDAY" -> "Jue"
+        "FRIDAY" -> "Vie"
+        "SATURDAY" -> "Sáb"
+        "SUNDAY" -> "Dom"
+        else -> day.take(3)
+    }
 
-private fun dayLabel(day: String): String = when (day) {
-    "MONDAY" -> "Lunes"
-    "TUESDAY" -> "Martes"
-    "WEDNESDAY" -> "Miércoles"
-    "THURSDAY" -> "Jueves"
-    "FRIDAY" -> "Viernes"
-    "SATURDAY" -> "Sábado"
-    "SUNDAY" -> "Domingo"
-    else -> day
-}
-
+private fun dayLabel(day: String): String =
+    when (day) {
+        "MONDAY" -> "Lunes"
+        "TUESDAY" -> "Martes"
+        "WEDNESDAY" -> "Miércoles"
+        "THURSDAY" -> "Jueves"
+        "FRIDAY" -> "Viernes"
+        "SATURDAY" -> "Sábado"
+        "SUNDAY" -> "Domingo"
+        else -> day
+    }
 
 private fun formatSyncTime(epochSeconds: Long): String =
     runCatching {
-        DateTimeFormatter.ofPattern("dd/MM HH:mm")
+        DateTimeFormatter
+            .ofPattern("dd/MM HH:mm")
             .withZone(ZoneId.systemDefault())
             .format(Instant.ofEpochSecond(epochSeconds))
     }.getOrDefault("reciente")

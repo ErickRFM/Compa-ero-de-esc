@@ -5,7 +5,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,7 +20,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
@@ -65,8 +63,8 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.v8.V8AttendanceEvidence
-import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
@@ -223,7 +221,7 @@ fun studentAttendanceContent(
 
     Box(modifier = modifier.fillMaxSize()) {
         if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current) {
-            V8CampusBackdrop(modifier = Modifier.matchParentSize())
+            V8MatteBackdrop(modifier = Modifier.matchParentSize())
         }
         Column(
             modifier =
@@ -502,6 +500,7 @@ private fun qrCenterCard(
     onImage: () -> Unit,
     onPaste: () -> Unit,
 ) {
+    var showContingencyDialog by remember { mutableStateOf(false) }
     // DrawScope is not composable; capture the current theme color first.
     val qrAccent = MaterialTheme.colorScheme.primary
     V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
@@ -559,33 +558,37 @@ private fun qrCenterCard(
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                text = "Apunta la cámara al código de la escuela o de tu clase.",
+                text = "Escanea el QR institucional de presencia escolar.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 8.dp),
             )
-            BoxWithConstraints {
-                if (maxWidth >= 300.dp && androidx.compose.ui.platform.LocalDensity.current.fontScale <= 1.2f) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        org.companerodeescuela.core.designsystem.v8
-                            .V8RedPrimaryButton("Escanear código QR", onScan, Modifier.weight(1.8f))
-                        OutlinedButton(onClick = onImage, modifier = Modifier.weight(1f)) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Filled.Image, contentDescription = null)
-                                Text("Desde galería")
-                            }
-                        }
-                    }
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        org.companerodeescuela.core.designsystem.v8
-                            .V8RedPrimaryButton("Escanear código QR", onScan, Modifier.fillMaxWidth())
-                        OutlinedButton(onClick = onImage, modifier = Modifier.fillMaxWidth()) { Text("Desde galería") }
-                    }
-                }
+            org.companerodeescuela.core.designsystem.v8
+                .V8RedPrimaryButton("Escanear QR institucional", onScan, Modifier.fillMaxWidth())
+            TextButton(
+                onClick = { showContingencyDialog = true },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Opciones de contingencia de clase")
             }
-            TextButton(onClick = onPaste, modifier = Modifier.fillMaxWidth()) {
-                Text("Pegar código")
+            if (showContingencyDialog) {
+                AlertDialog(
+                    onDismissRequest = { showContingencyDialog = false },
+                    title = { Text("Contingencia de clase") },
+                    text = { Text("Usa estas opciones solo si el personal escolar indicó un pase de clase.") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            showContingencyDialog = false
+                            onImage()
+                        }) { Text("Elegir imagen QR") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = {
+                            showContingencyDialog = false
+                            onPaste()
+                        }) { Text("Pegar código") }
+                    },
+                )
             }
         }
     }
@@ -775,7 +778,7 @@ private fun teacherAttendanceBody(
     val review = records.filter(::attendanceRecordRequiresReview)
     Box(modifier = modifier.fillMaxSize()) {
         if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current) {
-            V8CampusBackdrop(Modifier.matchParentSize())
+            V8MatteBackdrop(Modifier.matchParentSize())
         }
         LazyColumn(
             modifier =

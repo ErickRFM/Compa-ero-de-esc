@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.feature.attendance
 
 import android.Manifest
@@ -47,13 +49,13 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.google.mlkit.vision.barcode.BarcodeScanner
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
-import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.common.InputImage
-import java.util.concurrent.atomic.AtomicBoolean
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
+import java.util.concurrent.atomic.AtomicBoolean
 
 @Composable
 fun AttendanceQrScanner(
@@ -71,11 +73,12 @@ fun AttendanceQrScanner(
             ) == PackageManager.PERMISSION_GRANTED,
         )
     }
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        permissionGranted = granted
-    }
+    val permissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission(),
+        ) { granted ->
+            permissionGranted = granted
+        }
 
     LaunchedEffect(Unit) {
         if (!permissionGranted) {
@@ -95,11 +98,13 @@ fun AttendanceQrScanner(
             return@Surface
         }
 
-        val options = remember {
-            BarcodeScannerOptions.Builder()
-                .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
-                .build()
-        }
+        val options =
+            remember {
+                BarcodeScannerOptions
+                    .Builder()
+                    .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+                    .build()
+            }
         val scanner = remember { BarcodeScanning.getClient(options) }
         val accepted = remember { AtomicBoolean(false) }
         var boundCameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
@@ -125,14 +130,16 @@ fun AttendanceQrScanner(
                             {
                                 val cameraProvider = cameraProviderFuture.get()
                                 boundCameraProvider = cameraProvider
-                                val preview = Preview.Builder().build().also {
-                                    it.surfaceProvider = surfaceProvider
-                                }
-                                val analysis = ImageAnalysis.Builder()
-                                    .setBackpressureStrategy(
-                                        ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST,
-                                    )
-                                    .build()
+                                val preview =
+                                    Preview.Builder().build().also {
+                                        it.surfaceProvider = surfaceProvider
+                                    }
+                                val analysis =
+                                    ImageAnalysis
+                                        .Builder()
+                                        .setBackpressureStrategy(
+                                            ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST,
+                                        ).build()
                                 analysis.setAnalyzer(
                                     ContextCompat.getMainExecutor(previewContext),
                                     QrAnalyzer(
@@ -158,9 +165,10 @@ fun AttendanceQrScanner(
 
             val frameColor = MaterialTheme.colorScheme.primary
             Canvas(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(CompaneroSize.scannerFrame),
+                modifier =
+                    Modifier
+                        .align(Alignment.Center)
+                        .size(CompaneroSize.scannerFrame),
             ) {
                 val length = size.minDimension * 0.22f
                 val strokeWidth = CompaneroSize.scannerFrameStroke.toPx()
@@ -178,12 +186,13 @@ fun AttendanceQrScanner(
             }
 
             Column(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.58f))
-                    .statusBarsPadding()
-                    .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md),
+                modifier =
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .background(Color.Black.copy(alpha = 0.58f))
+                        .statusBarsPadding()
+                        .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -213,12 +222,13 @@ fun AttendanceQrScanner(
             }
 
             Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.62f))
-                    .navigationBarsPadding()
-                    .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md),
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .background(Color.Black.copy(alpha = 0.62f))
+                        .navigationBarsPadding()
+                        .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
             ) {
@@ -243,11 +253,12 @@ private fun CameraPermissionRequired(
     onClose: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .padding(CompaneroSpacing.xl),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(CompaneroSpacing.xl),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -258,10 +269,11 @@ private fun CameraPermissionRequired(
         )
         Text(
             text = "La cámara se usa únicamente para leer el QR de asistencia. Puedes volver sin concederla.",
-            modifier = Modifier.padding(
-                top = CompaneroSpacing.sm,
-                bottom = CompaneroSpacing.lg,
-            ),
+            modifier =
+                Modifier.padding(
+                    top = CompaneroSpacing.sm,
+                    bottom = CompaneroSpacing.lg,
+                ),
             style = MaterialTheme.typography.bodyLarge,
             color = Color.White.copy(alpha = 0.8f),
         )
@@ -282,7 +294,6 @@ private class QrAnalyzer(
     private val accepted: AtomicBoolean,
     private val onToken: (String) -> Unit,
 ) : ImageAnalysis.Analyzer {
-
     @ExperimentalGetImage
     override fun analyze(imageProxy: androidx.camera.core.ImageProxy) {
         val mediaImage = imageProxy.image
@@ -291,22 +302,24 @@ private class QrAnalyzer(
             return
         }
 
-        val image = InputImage.fromMediaImage(
-            mediaImage,
-            imageProxy.imageInfo.rotationDegrees,
-        )
-        scanner.process(image)
+        val image =
+            InputImage.fromMediaImage(
+                mediaImage,
+                imageProxy.imageInfo.rotationDegrees,
+            )
+        scanner
+            .process(image)
             .addOnSuccessListener { barcodes ->
-                val value = barcodes
-                    .firstOrNull()
-                    ?.rawValue
-                    ?.trim()
-                    ?.takeIf { it.startsWith("v1.") }
+                val value =
+                    barcodes
+                        .firstOrNull()
+                        ?.rawValue
+                        ?.trim()
+                        ?.takeIf { it.startsWith("v1.") }
                 if (value != null && accepted.compareAndSet(false, true)) {
                     onToken(value)
                 }
-            }
-            .addOnCompleteListener {
+            }.addOnCompleteListener {
                 imageProxy.close()
             }
     }

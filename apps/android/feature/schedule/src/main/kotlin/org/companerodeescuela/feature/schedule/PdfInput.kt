@@ -1,11 +1,15 @@
 package org.companerodeescuela.feature.schedule
 
-import java.io.InputStream
-import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.CancellationException
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
 
 /** The caller owns and closes the stream. */
-internal fun readPdfBytes(input: InputStream, maxBytes: Int, checkActive: () -> Unit = {}): ByteArray? {
+internal fun readPdfBytes(
+    input: InputStream,
+    maxBytes: Int,
+    checkActive: () -> Unit = {},
+): ByteArray? {
     require(maxBytes >= 0 && maxBytes < Int.MAX_VALUE)
     val bytes = ByteArrayOutputStream(minOf(maxBytes, DEFAULT_BUFFER_SIZE))
     val buffer = ByteArray(minOf(maxBytes + 1, DEFAULT_BUFFER_SIZE))
@@ -27,10 +31,11 @@ internal fun readPdfBytes(input: InputStream, maxBytes: Int, checkActive: () -> 
     }
 }
 
-internal suspend fun <T> readNativePdfOrNull(read: suspend () -> T): T? = try {
-    read()
-} catch (cancelled: CancellationException) {
-    throw cancelled
-} catch (_: Exception) {
-    null
-}
+internal suspend fun <T> readNativePdfOrNull(read: suspend () -> T): T? =
+    try {
+        read()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        null
+    }

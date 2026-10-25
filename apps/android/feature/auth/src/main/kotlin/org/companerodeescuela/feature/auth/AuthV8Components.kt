@@ -49,8 +49,8 @@ import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
-import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8ColorScheme
+import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.motion.CompaneroMotionPolicy
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
@@ -108,7 +108,7 @@ private fun AuthV8Frame(
         }
     Box(modifier.fillMaxSize().background(background)) {
         if (authDark() && !LocalCompaneroHighContrast.current) {
-            V8CampusBackdrop(Modifier.matchParentSize(), login = true, backgroundColor = background)
+            V8MatteBackdrop(Modifier.matchParentSize())
         }
         CompositionLocalProvider(LocalContentColor provides authInk()) {
             Column(

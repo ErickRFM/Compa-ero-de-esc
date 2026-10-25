@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.core.designsystem.v8
 
 import androidx.compose.foundation.Image
@@ -18,15 +20,44 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.R
 
+/** Matte theme surface for secondary screens. Institutional photography belongs on Home only. */
+@Composable
+fun V8MatteBackdrop(modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxSize().background(androidx.compose.material3.MaterialTheme.colorScheme.background))
+}
+
 /**
  * V8 backdrop: one campus hero at the top, an opaque ink surface below.
  * It must never tile or bleed through the content cards / attendance QR area.
  * The image is an asset, not a flattened screenshot of an interactive screen.
  */
 @Composable
-fun V8CampusBackdrop(modifier: Modifier = Modifier, login: Boolean = false, backgroundColor: Color = V8RedColors.Background) {
-    val resolvedBackground = if (androidx.compose.material3.MaterialTheme.colorScheme.background.luminance() > 0.5f) androidx.compose.material3.MaterialTheme.colorScheme.background else backgroundColor
-    fun veil(alpha: Float) = resolvedBackground.copy(alpha = if (resolvedBackground.luminance() > 0.5f) alpha.coerceAtLeast(0.87f) else alpha)
+fun V8CampusBackdrop(
+    modifier: Modifier = Modifier,
+    login: Boolean = false,
+    backgroundColor: Color = V8RedColors.Background,
+) {
+    val resolvedBackground =
+        if (androidx.compose.material3.MaterialTheme.colorScheme.background
+                .luminance() >
+            0.5f
+        ) {
+            androidx.compose.material3.MaterialTheme.colorScheme.background
+        } else {
+            backgroundColor
+        }
+
+    fun veil(alpha: Float) =
+        resolvedBackground.copy(
+            alpha =
+                if (resolvedBackground.luminance() >
+                    0.5f
+                ) {
+                    alpha.coerceAtLeast(0.87f)
+                } else {
+                    alpha
+                },
+        )
     val heroHeight = if (login) 680.dp else 355.dp
     val endY = with(LocalDensity.current) { heroHeight.toPx() }
     Box(modifier = modifier.fillMaxSize().background(resolvedBackground)) {
@@ -38,28 +69,31 @@ fun V8CampusBackdrop(modifier: Modifier = Modifier, login: Boolean = false, back
             alignment = Alignment.Center,
         )
         Box(
-            modifier = Modifier.fillMaxSize().background(
-                Brush.verticalGradient(
-                    colorStops = arrayOf(
-                        0.00f to veil(0.69804f),
-                        0.20f to veil(0.41176f),
-                        0.50f to veil(0.65490f),
-                        0.78f to veil(0.94902f),
-                        1.00f to resolvedBackground,
+            modifier =
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(
+                        colorStops =
+                            arrayOf(
+                                0.00f to veil(0.69804f),
+                                0.20f to veil(0.41176f),
+                                0.50f to veil(0.65490f),
+                                0.78f to veil(0.94902f),
+                                1.00f to resolvedBackground,
+                            ),
+                        startY = 0f,
+                        endY = endY,
                     ),
-                    startY = 0f,
-                    endY = endY,
                 ),
-            ),
         )
         Box(
-            modifier = Modifier.fillMaxSize().background(
-                Brush.horizontalGradient(
-                    0.00f to veil(0.75294f),
-                    0.60f to veil(0.45882f),
-                    1.00f to veil(0.15686f),
+            modifier =
+                Modifier.fillMaxSize().background(
+                    Brush.horizontalGradient(
+                        0.00f to veil(0.75294f),
+                        0.60f to veil(0.45882f),
+                        1.00f to veil(0.15686f),
+                    ),
                 ),
-            ),
         )
     }
 }

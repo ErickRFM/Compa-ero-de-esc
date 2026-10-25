@@ -23,25 +23,27 @@ fun AttendanceQrCode(
     token: String,
     modifier: Modifier = Modifier,
 ) {
-    val matrix = remember(token) {
-        QRCodeWriter().encode(
-            token,
-            BarcodeFormat.QR_CODE,
-            1,
-            1,
-            mapOf(
-                EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M,
-                EncodeHintType.MARGIN to 2,
-            ),
-        )
-    }
+    val matrix =
+        remember(token) {
+            QRCodeWriter().encode(
+                token,
+                BarcodeFormat.QR_CODE,
+                1,
+                1,
+                mapOf(
+                    EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M,
+                    EncodeHintType.MARGIN to 2,
+                ),
+            )
+        }
 
     Canvas(
-        modifier = modifier
-            .aspectRatio(1f)
-            .clip(MaterialTheme.shapes.large)
-            .background(Color.White)
-            .padding(CompaneroSpacing.md),
+        modifier =
+            modifier
+                .aspectRatio(1f)
+                .clip(MaterialTheme.shapes.large)
+                .background(Color.White)
+                .padding(CompaneroSpacing.md),
     ) {
         drawRect(Color.White)
         val cellWidth = size.width / matrix.width
@@ -52,14 +54,16 @@ fun AttendanceQrCode(
                 if (matrix[x, y]) {
                     drawRect(
                         color = Color.Black,
-                        topLeft = Offset(
-                            x = x * cellWidth,
-                            y = y * cellHeight,
-                        ),
-                        size = Size(
-                            width = cellWidth + 0.5f,
-                            height = cellHeight + 0.5f,
-                        ),
+                        topLeft =
+                            Offset(
+                                x = x * cellWidth,
+                                y = y * cellHeight,
+                            ),
+                        size =
+                            Size(
+                                width = cellWidth + 0.5f,
+                                height = cellHeight + 0.5f,
+                            ),
                     )
                 }
             }

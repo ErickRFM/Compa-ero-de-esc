@@ -1,11 +1,11 @@
 package org.companerodeescuela.feature.attendance
 
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.LocalTime
 import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
 import org.companerodeescuela.shared.contracts.ClassOccurrenceStatusContract
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
 
 /**
  * Defensive client guidance only. The Ktor API remains authoritative for
@@ -31,23 +31,28 @@ internal fun teacherPassOpenStatus(
         val starts = LocalTime.parse(occurrence.startsAt)
         val ends = LocalTime.parse(occurrence.endsAt)
         if (starts == ends) return TeacherPassOpenStatus.INVALID_SCHEDULE
-        val endDateTime = LocalDateTime.of(date, ends).let {
-            if (ends < starts) it.plusDays(1) else it
+        val endDateTime =
+            LocalDateTime.of(date, ends).let {
+                if (ends < starts) it.plusDays(1) else it
+            }
+        if (now >= endDateTime) {
+            TeacherPassOpenStatus.ENDED
+        } else {
+            TeacherPassOpenStatus.AVAILABLE
         }
-        if (now >= endDateTime) TeacherPassOpenStatus.ENDED
-        else TeacherPassOpenStatus.AVAILABLE
     }.getOrDefault(TeacherPassOpenStatus.INVALID_SCHEDULE)
 }
 
-internal fun teacherPassUnavailableMessage(status: TeacherPassOpenStatus): String = when (status) {
-    TeacherPassOpenStatus.AVAILABLE -> ""
-    TeacherPassOpenStatus.ENDED ->
-        "La clase ya terminó. No se puede iniciar un pase nuevo desde esta vista."
-    TeacherPassOpenStatus.CANCELLED ->
-        "Esta clase está cancelada. No se puede abrir su pase."
-    TeacherPassOpenStatus.INVALID_SCHEDULE ->
-        "El horario de esta clase necesita revisión antes de abrir asistencia."
-}
+internal fun teacherPassUnavailableMessage(status: TeacherPassOpenStatus): String =
+    when (status) {
+        TeacherPassOpenStatus.AVAILABLE -> ""
+        TeacherPassOpenStatus.ENDED ->
+            "La clase ya terminó. No se puede iniciar un pase nuevo desde esta vista."
+        TeacherPassOpenStatus.CANCELLED ->
+            "Esta clase está cancelada. No se puede abrir su pase."
+        TeacherPassOpenStatus.INVALID_SCHEDULE ->
+            "El horario de esta clase necesita revisión antes de abrir asistencia."
+    }
 
 /**
  * Opening a class pass is not the same operation as refreshing a roster.

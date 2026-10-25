@@ -1,21 +1,20 @@
 package org.companerodeescuela.core.academic
 
 import io.ktor.client.HttpClient
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
-import java.time.Clock
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.database.AcademicSnapshotCache
 import org.companerodeescuela.core.database.PersonalScheduleItem
 import org.companerodeescuela.core.database.PersonalScheduleStore
+import org.companerodeescuela.core.network.SessionRefreshCoordinator
 import org.companerodeescuela.core.network.apiCall
 import org.companerodeescuela.core.network.requireBody
-import org.companerodeescuela.core.network.SessionRefreshCoordinator
 import org.companerodeescuela.core.security.PlatformSessionClaims
 import org.companerodeescuela.core.security.SessionTokenInspector
 import org.companerodeescuela.core.security.SessionTokenStore
@@ -24,6 +23,7 @@ import org.companerodeescuela.shared.contracts.AcademicProfile
 import org.companerodeescuela.shared.contracts.AcademicScheduleResponse
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.ScheduleEntry
+import java.time.Clock
 
 data class AcademicContent(
     val academic: AcademicLoadResponse,
@@ -46,24 +46,39 @@ class AcademicRepository(
     private val refreshCoordinator: SessionRefreshCoordinator =
         SessionRefreshCoordinator(client, tokenStore, clock),
 ) {
-    suspend fun publishSchoolSchedule(request:org.companerodeescuela.shared.contracts.UpsertScheduleBlockRequest):Outcome<org.companerodeescuela.shared.contracts.ManagedScheduleBlock> {
-        val token=when(val access=refreshCoordinator.currentAccessToken()) { is Outcome.Success -> access.value;is Outcome.Failure -> return access }
-        return refreshCoordinator.execute(token) { current -> apiCall {
-            client.post("academic/manual-schedule") { bearerAuth(current);contentType(ContentType.Application.Json);setBody(request) }
-                .requireBody<ApiResponse<org.companerodeescuela.shared.contracts.ManagedScheduleBlock>>()
-        }.map { it.data } }
+    suspend fun publishSchoolSchedule(
+        request: org.companerodeescuela.shared.contracts.UpsertScheduleBlockRequest,
+    ): Outcome<org.companerodeescuela.shared.contracts.ManagedScheduleBlock> {
+        val token =
+            when (val access = refreshCoordinator.currentAccessToken()) {
+                is Outcome.Success -> access.value
+                is Outcome.Failure -> return access
+            }
+        return refreshCoordinator.execute(token) { current ->
+            apiCall {
+                client
+                    .post("academic/manual-schedule") {
+                        bearerAuth(current)
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }.requireBody<ApiResponse<org.companerodeescuela.shared.contracts.ManagedScheduleBlock>>()
+            }.map { it.data }
+        }
     }
+
     suspend fun load(): Outcome<AcademicContent> {
         val session = activeSession() ?: return Outcome.Failure(AppError.Http(status = 401))
         val (token, claims) = session
 
-        val remote = refreshCoordinator.execute(token) { accessToken ->
-            apiCall {
-                client.get("academic/load") {
-                    bearerAuth(accessToken)
-                }.requireBody<ApiResponse<AcademicLoadResponse>>()
-            }.map { it.data }
-        }
+        val remote =
+            refreshCoordinator.execute(token) { accessToken ->
+                apiCall {
+                    client
+                        .get("academic/load") {
+                            bearerAuth(accessToken)
+                        }.requireBody<ApiResponse<AcademicLoadResponse>>()
+                }.map { it.data }
+            }
 
         return when (remote) {
             is Outcome.Success -> {
@@ -91,7 +106,9 @@ class AcademicRepository(
             }
             is Outcome.Failure -> {
                 val error = remote.error
-                if (error is AppError.Http && error.status == 401) {
+                // Authority and contract responses must remain visible. Cached
+                // schedules must never make a revoked or out-of-scope account look valid.
+                if (error is AppError.Http && error.status in 400..499) {
                     remote
                 } else {
                     val cached = runCatching { cache.read(claims.userId) }.getOrNull()
@@ -113,16 +130,22 @@ class AcademicRepository(
 
     suspend fun readWeeklySchedule(): Outcome<List<ScheduleEntry>> {
         val session = activeSession() ?: return Outcome.Failure(AppError.Http(status = 401))
-        val cached = runCatching { cache.read(session.second.userId) }
-            .getOrElse {
-                return Outcome.Failure(
-                    AppError.Unknown(
-                        technicalDetail = "Could not read academic cache: " + it::class.simpleName,
-                    ),
-                )
-            }
+        val cached =
+            runCatching { cache.read(session.second.userId) }
+                .getOrElse {
+                    return Outcome.Failure(
+                        AppError.Unknown(
+                            technicalDetail = "Could not read academic cache: " + it::class.simpleName,
+                        ),
+                    )
+                }
 
-        val institutional = cached?.value?.schedule?.entries.orEmpty()
+        val institutional =
+            cached
+                ?.value
+                ?.schedule
+                ?.entries
+                .orEmpty()
         val personal = personalEntries(session.second.userId)
         return Outcome.Success(mergeEntries(institutional, personal))
     }
@@ -133,22 +156,23 @@ class AcademicRepository(
      * imports live in the personal schedule store and are a valid source for
      * Today/Agenda presentation, but never become institutional enrollment.
      */
-    private suspend fun localOnlyContent(
-        claims: PlatformSessionClaims,
-    ): Outcome.Success<AcademicContent>? {
+    private suspend fun localOnlyContent(claims: PlatformSessionClaims): Outcome.Success<AcademicContent>? {
         val personal = personalEntries(claims.userId)
         if (personal.isEmpty()) return null
 
-        val local = AcademicLoadResponse(
-            student = AcademicProfile(
-                id = claims.userId,
-                displayName = claims.displayName ?: "Estudiante",
-            ),
-            schedule = AcademicScheduleResponse(
-                ownerId = claims.userId,
-                entries = mergeEntries(emptyList(), personal),
-            ),
-        )
+        val local =
+            AcademicLoadResponse(
+                student =
+                    AcademicProfile(
+                        id = claims.userId,
+                        displayName = claims.displayName ?: "Estudiante",
+                    ),
+                schedule =
+                    AcademicScheduleResponse(
+                        ownerId = claims.userId,
+                        entries = mergeEntries(emptyList(), personal),
+                    ),
+            )
         return Outcome.Success(
             AcademicContent(
                 academic = local,
@@ -165,9 +189,10 @@ class AcademicRepository(
         val personal = personalEntries(ownerId)
         if (personal.isEmpty()) return value
         return value.copy(
-            schedule = value.schedule.copy(
-                entries = mergeEntries(value.schedule.entries, personal),
-            ),
+            schedule =
+                value.schedule.copy(
+                    entries = mergeEntries(value.schedule.entries, personal),
+                ),
         )
     }
 
@@ -194,14 +219,16 @@ class AcademicRepository(
     }
 
     private suspend fun activeSession(): Pair<String, PlatformSessionClaims>? {
-        val token = when (val result = refreshCoordinator.currentAccessToken()) {
-            is Outcome.Success -> result.value
-            is Outcome.Failure -> return null
-        }
-        val claims = SessionTokenInspector.inspect(token) ?: run {
-            runCatching { tokenStore.clear() }
-            return null
-        }
+        val token =
+            when (val result = refreshCoordinator.currentAccessToken()) {
+                is Outcome.Success -> result.value
+                is Outcome.Failure -> return null
+            }
+        val claims =
+            SessionTokenInspector.inspect(token) ?: run {
+                runCatching { tokenStore.clear() }
+                return null
+            }
         return token to claims
     }
 }
@@ -232,13 +259,14 @@ private fun scheduleKey(entry: ScheduleEntry): String =
         entry.subjectName.trim().lowercase(),
     ).joinToString("|")
 
-private fun dayOrder(day: String): Int = when (day) {
-    "MONDAY" -> 1
-    "TUESDAY" -> 2
-    "WEDNESDAY" -> 3
-    "THURSDAY" -> 4
-    "FRIDAY" -> 5
-    "SATURDAY" -> 6
-    "SUNDAY" -> 7
-    else -> 8
-}
+private fun dayOrder(day: String): Int =
+    when (day) {
+        "MONDAY" -> 1
+        "TUESDAY" -> 2
+        "WEDNESDAY" -> 3
+        "THURSDAY" -> 4
+        "FRIDAY" -> 5
+        "SATURDAY" -> 6
+        "SUNDAY" -> 7
+        else -> 8
+    }

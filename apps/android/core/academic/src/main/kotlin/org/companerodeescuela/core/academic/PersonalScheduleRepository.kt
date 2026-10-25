@@ -1,8 +1,5 @@
 package org.companerodeescuela.core.academic
 
-import java.time.Clock
-import java.time.LocalTime
-import java.util.UUID
 import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.database.PersonalScheduleItem
@@ -12,6 +9,9 @@ import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.shared.contracts.ScheduleEntry
 import org.companerodeescuela.shared.contracts.ScheduleRecurrence
 import org.companerodeescuela.shared.contracts.ScheduleSource
+import java.time.Clock
+import java.time.LocalTime
+import java.util.UUID
 
 data class PersonalScheduleDraft(
     val id: String? = null,
@@ -54,8 +54,9 @@ class PersonalScheduleRepository(
 
     suspend fun save(draft: PersonalScheduleDraft): Outcome<ScheduleEntry> {
         val ownerId = ownerId() ?: return Outcome.Failure(AppError.Http(status = 401))
-        val item = normalize(ownerId, draft)
-            ?: return Outcome.Failure(AppError.Http(status = 422))
+        val item =
+            normalize(ownerId, draft)
+                ?: return Outcome.Failure(AppError.Http(status = 422))
         return runCatching {
             store.upsert(item)
             item.toScheduleEntry()
@@ -79,10 +80,11 @@ class PersonalScheduleRepository(
             return Outcome.Failure(AppError.Http(status = 422))
         }
         val ownerId = ownerId() ?: return Outcome.Failure(AppError.Http(status = 401))
-        val items = drafts.map {
-            normalize(ownerId, it.copy(source = source))
-                ?: return Outcome.Failure(AppError.Http(status = 422))
-        }
+        val items =
+            drafts.map {
+                normalize(ownerId, it.copy(source = source))
+                    ?: return Outcome.Failure(AppError.Http(status = 422))
+            }
         return runCatching {
             store.replaceBySource(ownerId, source, items)
         }.fold(
@@ -112,9 +114,11 @@ class PersonalScheduleRepository(
     }
 
     private suspend fun ownerId(): String? {
-        val token = runCatching { tokenStore.readAccessToken() }.getOrNull()
-            ?.takeIf(String::isNotBlank)
-            ?: return null
+        val token =
+            runCatching { tokenStore.readAccessToken() }
+                .getOrNull()
+                ?.takeIf(String::isNotBlank)
+                ?: return null
         if (!SessionTokenInspector.isUsable(token, clock)) return null
         return SessionTokenInspector.inspect(token)?.userId
     }
@@ -132,13 +136,15 @@ class PersonalScheduleRepository(
         if (subject.isBlank()) return null
 
         val id = draft.id?.takeIf(String::isNotBlank) ?: newId()
-        val effectiveDate = when (draft.recurrence) {
-            ScheduleRecurrence.ONE_TIME -> draft.effectiveDate
-                ?.trim()
-                ?.takeIf(String::isNotBlank)
-                ?: return null
-            else -> null
-        }
+        val effectiveDate =
+            when (draft.recurrence) {
+                ScheduleRecurrence.ONE_TIME ->
+                    draft.effectiveDate
+                        ?.trim()
+                        ?.takeIf(String::isNotBlank)
+                        ?: return null
+                else -> null
+            }
 
         return PersonalScheduleItem(
             id = id,
@@ -154,8 +160,9 @@ class PersonalScheduleRepository(
             buildingName = draft.buildingName?.trim()?.takeIf(String::isNotBlank),
             source = draft.source,
             recurrence = draft.recurrence,
-            seriesId = draft.seriesId?.trim()?.takeIf(String::isNotBlank)
-                ?: if (draft.recurrence == ScheduleRecurrence.WEEKLY) id else null,
+            seriesId =
+                draft.seriesId?.trim()?.takeIf(String::isNotBlank)
+                    ?: if (draft.recurrence == ScheduleRecurrence.WEEKLY) id else null,
             effectiveDate = effectiveDate,
             updatedAtEpochSeconds = clock.instant().epochSecond,
         )
@@ -168,15 +175,16 @@ class PersonalScheduleRepository(
     }
 
     private companion object {
-        val VALID_DAYS = setOf(
-            "MONDAY",
-            "TUESDAY",
-            "WEDNESDAY",
-            "THURSDAY",
-            "FRIDAY",
-            "SATURDAY",
-            "SUNDAY",
-        )
+        val VALID_DAYS =
+            setOf(
+                "MONDAY",
+                "TUESDAY",
+                "WEDNESDAY",
+                "THURSDAY",
+                "FRIDAY",
+                "SATURDAY",
+                "SUNDAY",
+            )
     }
 }
 

@@ -1,8 +1,8 @@
 package org.companerodeescuela.feature.schedule
 
+import org.companerodeescuela.shared.contracts.ScheduleEntry
 import java.time.Duration
 import java.time.LocalTime
-import org.companerodeescuela.shared.contracts.ScheduleEntry
 
 data class AgendaMoveProposal(
     val entry: ScheduleEntry,
@@ -32,11 +32,19 @@ object AgendaEditingRules {
 
         val startText = format(snapped)
         val endText = format(targetEnd)
-        val conflicts = existing
-            .filterNot { it === entry || (it.courseId == entry.courseId && it.dayOfWeek == entry.dayOfWeek && it.startsAt == entry.startsAt && it.endsAt == entry.endsAt) }
-            .filter { it.dayOfWeek == targetDay }
-            .filter { overlaps(startText, endText, it.startsAt, it.endsAt) }
-            .sortedBy { it.startsAt }
+        val conflicts =
+            existing
+                .filterNot {
+                    it === entry ||
+                        (
+                            it.courseId == entry.courseId &&
+                                it.dayOfWeek == entry.dayOfWeek &&
+                                it.startsAt == entry.startsAt &&
+                                it.endsAt == entry.endsAt
+                        )
+                }.filter { it.dayOfWeek == targetDay }
+                .filter { overlaps(startText, endText, it.startsAt, it.endsAt) }
+                .sortedBy { it.startsAt }
 
         return AgendaMoveProposal(
             entry = entry,
@@ -60,7 +68,11 @@ object AgendaEditingRules {
         return format(LocalTime.of((target / 60).toInt(), (target % 60).toInt()))
     }
 
-    fun adjacentDay(currentDay: String, horizontalPixels: Float, thresholdPixels: Float): String {
+    fun adjacentDay(
+        currentDay: String,
+        horizontalPixels: Float,
+        thresholdPixels: Float,
+    ): String {
         if (kotlin.math.abs(horizontalPixels) < thresholdPixels) return currentDay
         val index = academicDaysV8.indexOf(currentDay).takeIf { it >= 0 } ?: return currentDay
         val delta = if (horizontalPixels > 0) 1 else -1
@@ -80,36 +92,38 @@ object AgendaEditingRules {
         return aStart < bEnd && aEnd > bStart
     }
 
-    private fun snap(value: LocalTime, minutes: Int): LocalTime {
+    private fun snap(
+        value: LocalTime,
+        minutes: Int,
+    ): LocalTime {
         val totalMinutes = value.hour * 60 + value.minute
         val snapped = ((totalMinutes + minutes / 2) / minutes) * minutes
         val bounded = snapped.coerceIn(0, 23 * 60 + 45)
         return LocalTime.of(bounded / 60, bounded % 60)
     }
 
-    private fun parse(value: String): LocalTime? =
-        runCatching { LocalTime.parse(value) }.getOrNull()
+    private fun parse(value: String): LocalTime? = runCatching { LocalTime.parse(value) }.getOrNull()
 
-    private fun format(value: LocalTime): String =
-        "%02d:%02d".format(value.hour, value.minute)
+    private fun format(value: LocalTime): String = "%02d:%02d".format(value.hour, value.minute)
 }
 
-internal val academicDaysV8 = listOf(
-    "MONDAY",
-    "TUESDAY",
-    "WEDNESDAY",
-    "THURSDAY",
-    "FRIDAY",
-    "SATURDAY",
-)
+internal val academicDaysV8 =
+    listOf(
+        "MONDAY",
+        "TUESDAY",
+        "WEDNESDAY",
+        "THURSDAY",
+        "FRIDAY",
+        "SATURDAY",
+    )
 
-
-internal fun dayShortLabelV8(day: String): String = when (day) {
-    "MONDAY" -> "Lun"
-    "TUESDAY" -> "Mar"
-    "WEDNESDAY" -> "Mié"
-    "THURSDAY" -> "Jue"
-    "FRIDAY" -> "Vie"
-    "SATURDAY" -> "Sáb"
-    else -> day.take(3)
-}
+internal fun dayShortLabelV8(day: String): String =
+    when (day) {
+        "MONDAY" -> "Lun"
+        "TUESDAY" -> "Mar"
+        "WEDNESDAY" -> "Mié"
+        "THURSDAY" -> "Jue"
+        "FRIDAY" -> "Vie"
+        "SATURDAY" -> "Sáb"
+        else -> day.take(3)
+    }

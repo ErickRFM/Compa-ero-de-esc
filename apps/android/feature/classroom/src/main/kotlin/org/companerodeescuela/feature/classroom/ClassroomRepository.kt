@@ -1,13 +1,13 @@
 package org.companerodeescuela.feature.classroom
 
 import io.ktor.client.HttpClient
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.network.SessionRefreshCoordinator
 import org.companerodeescuela.core.network.apiCall
@@ -28,28 +28,47 @@ class ClassroomRepository(
     private val refreshCoordinator: SessionRefreshCoordinator =
         SessionRefreshCoordinator(client, tokenStore),
 ) {
-    suspend fun create(request:CreateClassroomRequest):Outcome<ClassroomSummary> = authorized { token -> apiCall {
-        client.post("classrooms") { bearerAuth(token);contentType(ContentType.Application.Json);setBody(request) }.requireBody<ApiResponse<ClassroomSummary>>()
-    }.map { it.data } }
+    suspend fun create(request: CreateClassroomRequest): Outcome<ClassroomSummary> =
+        authorized { token ->
+            apiCall {
+                client
+                    .post("classrooms") {
+                        bearerAuth(token)
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }.requireBody<ApiResponse<ClassroomSummary>>()
+            }.map { it.data }
+        }
+
     suspend fun classrooms(): Outcome<List<ClassroomSummary>> =
         authorized { token ->
             apiCall {
-                client.get("classrooms") { bearerAuth(token) }
+                client
+                    .get("classrooms") { bearerAuth(token) }
                     .requireBody<ApiResponse<List<ClassroomSummary>>>()
             }.map { it.data }
         }
 
-    suspend fun create(name:String,description:String?,room:String?,groupId:String,groupName:String,teacherId:String,teacherDisplayName:String):Outcome<ClassroomSummary> =
-        create(CreateClassroomRequest(name,description,room,groupId,groupName,teacherId,teacherDisplayName))
+    suspend fun create(
+        name: String,
+        description: String?,
+        room: String?,
+        groupId: String,
+        groupName: String,
+        teacherId: String,
+        teacherDisplayName: String,
+    ): Outcome<ClassroomSummary> =
+        create(CreateClassroomRequest(name, description, room, groupId, groupName, teacherId, teacherDisplayName))
 
     suspend fun join(code: String): Outcome<JoinClassInviteResponse> =
         authorized { token ->
             apiCall {
-                client.post("classrooms/join") {
-                    bearerAuth(token)
-                    contentType(ContentType.Application.Json)
-                    setBody(JoinClassInviteRequest(code = code))
-                }.requireBody<ApiResponse<JoinClassInviteResponse>>()
+                client
+                    .post("classrooms/join") {
+                        bearerAuth(token)
+                        contentType(ContentType.Application.Json)
+                        setBody(JoinClassInviteRequest(code = code))
+                    }.requireBody<ApiResponse<JoinClassInviteResponse>>()
             }.map { it.data }
         }
 
@@ -59,11 +78,12 @@ class ClassroomRepository(
     ): Outcome<ClassInvite> =
         authorized { token ->
             apiCall {
-                client.post("classrooms/$classroomId/invites") {
-                    bearerAuth(token)
-                    contentType(ContentType.Application.Json)
-                    setBody(CreateClassInviteRequest(ttlMinutes = ttlMinutes))
-                }.requireBody<ApiResponse<ClassInvite>>()
+                client
+                    .post("classrooms/$classroomId/invites") {
+                        bearerAuth(token)
+                        contentType(ContentType.Application.Json)
+                        setBody(CreateClassInviteRequest(ttlMinutes = ttlMinutes))
+                    }.requireBody<ApiResponse<ClassInvite>>()
             }.map { it.data }
         }
 
@@ -73,19 +93,19 @@ class ClassroomRepository(
     ): Outcome<Unit> =
         authorized { token ->
             apiCall {
-                client.delete("classrooms/$classroomId/invites/$inviteId") {
-                    bearerAuth(token)
-                }.requireUnit()
+                client
+                    .delete("classrooms/$classroomId/invites/$inviteId") {
+                        bearerAuth(token)
+                    }.requireUnit()
             }
         }
 
-    private suspend fun <T> authorized(
-        block: suspend (String) -> Outcome<T>,
-    ): Outcome<T> {
-        val token = when (val result = refreshCoordinator.currentAccessToken()) {
-            is Outcome.Success -> result.value
-            is Outcome.Failure -> return result
-        }
+    private suspend fun <T> authorized(block: suspend (String) -> Outcome<T>): Outcome<T> {
+        val token =
+            when (val result = refreshCoordinator.currentAccessToken()) {
+                is Outcome.Success -> result.value
+                is Outcome.Failure -> return result
+            }
         return refreshCoordinator.execute(token, block)
     }
 }

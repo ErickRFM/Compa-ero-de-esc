@@ -1,6 +1,7 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.feature.attendance
 
-import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,38 +14,37 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Campaign
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.ui.graphics.vector.ImageVector
-import org.companerodeescuela.core.designsystem.v8.V8IconTile
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import java.time.LocalDate
-import java.time.LocalTime
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
-import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8ClassSummary
 import org.companerodeescuela.core.designsystem.v8.V8DailyClassRow
 import org.companerodeescuela.core.designsystem.v8.V8DashboardStat
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
-import org.companerodeescuela.core.designsystem.v8.V8HeroTitle
+import org.companerodeescuela.core.designsystem.v8.V8IconTile
+import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
+import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.ui.component.StatusNotice
+import java.time.LocalDate
 
 /**
  * Teacher dashboard backed by the authorized teacher's occurrences/active roster.
@@ -73,13 +73,16 @@ fun TeacherHomeScreen(
 
     Box(modifier = modifier.fillMaxSize()) {
         if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current) {
-            V8CampusBackdrop(modifier = Modifier.matchParentSize())
+            V8MatteBackdrop(modifier = Modifier.matchParentSize())
         }
         Column(
-            modifier = Modifier.align(Alignment.TopCenter)
-                .widthIn(max = CompaneroSize.homeContentMaxWidth).fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
+            modifier =
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .widthIn(max = CompaneroSize.homeContentMaxWidth)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
         ) {
             V8ScreenHeader {
@@ -92,8 +95,9 @@ fun TeacherHomeScreen(
                     )
                     val greeting = displayName?.trim()?.takeIf { it.isNotEmpty() }
                     Text(
-                        text = greeting?.let { "Hola, $it · Tus clases asignadas" }
-                            ?: "Consulta tus clases asignadas y organiza la jornada.",
+                        text =
+                            greeting?.let { "Hola, $it · Tus clases asignadas" }
+                                ?: "Consulta tus clases asignadas y organiza la jornada.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -105,7 +109,8 @@ fun TeacherHomeScreen(
             } else if (state.mode != AttendanceMode.TEACHER) {
                 StatusNotice(
                     title = "Acceso docente pendiente",
-                    message = "Tu cuenta todavía no tiene autorización docente activa. Solicita a control escolar la validación de tu perfil.",
+                    message =
+                        "Tu cuenta todavía no tiene autorización docente activa. Solicita a control escolar la validación de tu perfil.",
                 )
             } else {
                 state.errorMessage?.let {
@@ -117,33 +122,45 @@ fun TeacherHomeScreen(
                 val upcoming = upcomingTeacherClasses(sessions, java.time.LocalDateTime.now())
                 val records = state.roster?.records.orEmpty()
                 val review = attendanceRecordsRequiringReviewCount(records)
-                val active = state.teacherSession?.takeIf {
-                    it.closedAtEpochSeconds == null && it.closesAtEpochSeconds > System.currentTimeMillis() / 1000
-                }
+                val active =
+                    state.teacherSession?.takeIf {
+                        it.closedAtEpochSeconds == null && it.closesAtEpochSeconds > System.currentTimeMillis() / 1000
+                    }
                 val campus = state.campusRoster
 
                 V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("Pase de lista", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                        Text(
+                            "Pase de lista",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold,
+                        )
                         Text(
                             text = if (active != null) "EN VIVO · ${active.groupName}" else "Sin pase abierto",
                             style = MaterialTheme.typography.labelLarge,
                             color = if (active != null) V8RedColors.Success else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            text = if (active != null) {
-                                sessions.firstOrNull { it.id == active.occurrenceId }?.subjectName
-                                    ?: "Sesión de ${active.groupName}"
-                            } else "Inicia el pase de una clase asignada",
+                            text =
+                                if (active != null) {
+                                    sessions.firstOrNull { it.id == active.occurrenceId }?.subjectName
+                                        ?: "Sesión de ${active.groupName}"
+                                } else {
+                                    "Inicia el pase de una clase asignada"
+                                },
                             style = MaterialTheme.typography.titleLarge,
                             color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            text = if (active != null) {
-                                "${active.scheduledStartsAt} – ${active.scheduledEndsAt} · " +
-                                    (if (state.roster == null) "Actualizando registros…" else "${records.size} registros recibidos")
-                            } else "El QR se genera desde el servidor y se renueva automáticamente.",
+                            text =
+                                if (active != null) {
+                                    "${active.scheduledStartsAt} – ${active.scheduledEndsAt} · " +
+                                        (if (state.roster == null) "Actualizando registros…" else "${records.size} registros recibidos")
+                                } else {
+                                    "El QR se genera desde el servidor y se renueva automáticamente."
+                                },
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium,
                         )
@@ -159,10 +176,17 @@ fun TeacherHomeScreen(
                 if (nextClass != null) {
                     V8GlassCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenSchedule)) {
                         Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
-                            Text("SIGUIENTE CLASE", color = MaterialTheme.colorScheme.primary,
-                                style = MaterialTheme.typography.labelLarge)
-                            Text(nextClass.subjectName, color = MaterialTheme.colorScheme.onSurface,
-                                style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            Text(
+                                "SIGUIENTE CLASE",
+                                color = MaterialTheme.colorScheme.primary,
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                            Text(
+                                nextClass.subjectName,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                            )
                             Text(
                                 listOfNotNull(
                                     nextClass.date,
@@ -172,8 +196,11 @@ fun TeacherHomeScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodyMedium,
                             )
-                            Text("Ver detalles en Mi horario", color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.labelSmall)
+                            Text(
+                                "Ver detalles en Mi horario",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelSmall,
+                            )
                         }
                     }
                 } else if (state.occurrencesLoaded) {
@@ -222,10 +249,18 @@ fun TeacherHomeScreen(
                 if (campus != null) {
                     V8GlassCard(modifier = Modifier.fillMaxWidth()) {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("Entrada escolar · ${campus.groupName}",
-                                style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                            Text("${campus.students.count { it.campusEntryAtEpochSeconds != null }} de ${campus.students.size} integrantes con ingreso registrado",
-                                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                "Entrada escolar · ${campus.groupName}",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                "${campus.students.count {
+                                    it.campusEntryAtEpochSeconds != null
+                                }} de ${campus.students.size} integrantes con ingreso registrado",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                             Text(
                                 "Consulta el padrón completo y los retardos en Asistencia.",
                                 style = MaterialTheme.typography.bodySmall,
@@ -239,8 +274,10 @@ fun TeacherHomeScreen(
                         }
                     }
                 } else if (state.campusRosterError != null) {
-                    StatusNotice(title = "Padrón escolar no disponible",
-                        message = state.campusRosterError!!)
+                    StatusNotice(
+                        title = "Padrón escolar no disponible",
+                        message = state.campusRosterError!!,
+                    )
                 }
 
                 Text("Accesos rápidos", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
@@ -262,18 +299,22 @@ fun TeacherHomeScreen(
                 } else {
                     upcoming.take(3).forEach { occurrence ->
                         V8DailyClassRow(
-                            classInfo = V8ClassSummary(
-                                id = occurrence.id,
-                                title = occurrence.subjectName,
-                                start = occurrence.startsAt,
-                                end = occurrence.endsAt,
-                                room = buildString {
-                                    append(occurrence.date)
-                                    val room = listOfNotNull(occurrence.classroomName, occurrence.buildingName)
-                                        .filter { it.isNotBlank() }.joinToString(" · ")
-                                    if (room.isNotEmpty()) append(" · $room")
-                                },
-                            ),
+                            classInfo =
+                                V8ClassSummary(
+                                    id = occurrence.id,
+                                    title = occurrence.subjectName,
+                                    start = occurrence.startsAt,
+                                    end = occurrence.endsAt,
+                                    room =
+                                        buildString {
+                                            append(occurrence.date)
+                                            val room =
+                                                listOfNotNull(occurrence.classroomName, occurrence.buildingName)
+                                                    .filter { it.isNotBlank() }
+                                                    .joinToString(" · ")
+                                            if (room.isNotEmpty()) append(" · $room")
+                                        },
+                                ),
                             isNext = occurrence.id == upcoming.first().id,
                             onClick = { onOpenSchedule() },
                         )

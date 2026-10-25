@@ -2,16 +2,26 @@ package org.companerodeescuela
 
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
 import org.companerodeescuela.feature.attendance.AttendanceMode
 import org.companerodeescuela.feature.attendance.AttendanceUiState
 import org.companerodeescuela.feature.attendance.teacherAttendanceContent
-import org.companerodeescuela.shared.contracts.*
+import org.companerodeescuela.shared.contracts.AttendanceReasonCode
+import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
+import org.companerodeescuela.shared.contracts.AttendanceRosterResponse
+import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
+import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
+import org.companerodeescuela.shared.contracts.AttendanceStatus
 import org.junit.Rule
 import org.junit.Test
 
@@ -31,6 +41,9 @@ class TeacherAttendanceScopeUiTest {
     @Test fun revalidatedScopeDropsOldPrivateReviewDraftEvenForSameRecordId() {
         val current = mutableStateOf(state())
         render(current)
+        compose
+            .onNode(hasScrollToNodeAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange))
+            .performScrollToNode(hasText("Revisar registro"))
         compose.onNodeWithText("Revisar registro").performScrollTo().performClick()
         compose.onNodeWithText("Validar por excepción docente").performScrollTo().performClick()
         compose.onNodeWithText("Motivo").performTextInput("QA private draft")

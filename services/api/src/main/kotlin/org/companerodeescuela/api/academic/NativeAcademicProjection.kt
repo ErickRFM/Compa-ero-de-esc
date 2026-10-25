@@ -6,6 +6,7 @@ import org.companerodeescuela.api.auth.PlatformAccountRepository
 import org.companerodeescuela.api.classroom.ClassroomService
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.shared.contracts.AcademicLoadResponse
+import org.companerodeescuela.shared.contracts.AcademicProfile
 import org.companerodeescuela.shared.contracts.AcademicScheduleResponse
 import org.companerodeescuela.shared.contracts.AcademicWeekResponse
 import org.companerodeescuela.shared.contracts.AttendanceIdentitySource
@@ -20,7 +21,6 @@ import org.companerodeescuela.shared.contracts.ScheduleSource
 import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
 import org.companerodeescuela.shared.model.AcademicId
-import org.companerodeescuela.shared.contracts.AcademicProfile
 import org.companerodeescuela.shared.model.ClassOccurrence
 import org.companerodeescuela.shared.model.ClassOccurrenceStatus
 import org.companerodeescuela.shared.model.Course
@@ -45,6 +45,7 @@ class NativeAcademicProjection(
     private val groups: AcademicGroupRepository,
     private val schedules: AcademicScheduleOverrideRepository,
     private val clock: Clock = Clock.systemUTC(),
+    val institutionalAttendance: org.companerodeescuela.api.attendance.SiiiAttendanceAuthority? = null,
 ) {
     private val policy = InstitutionScopePolicy(accounts, clock)
 
@@ -251,12 +252,16 @@ class NativeAcademicProjection(
     suspend fun studentIdsForTeacher(
         actor: UserSummary,
         classroomId: String,
-    ): List<String> = classrooms.studentIdsForTeacher(actor, classroomId)
+    ): List<String> =
+        institutionalAttendance?.takeIf { it.configured(actor) }?.studentIdsForTeacher(actor, classroomId)
+            ?: classrooms.studentIdsForTeacher(actor, classroomId)
 
     suspend fun activeStudentIdsForTeacher(
         actor: UserSummary,
         classroomId: String,
-    ): List<String> = classrooms.activeStudentIdsForTeacher(actor, classroomId)
+    ): List<String> =
+        institutionalAttendance?.takeIf { it.configured(actor) }?.studentIdsForTeacher(actor, classroomId)
+            ?: classrooms.activeStudentIdsForTeacher(actor, classroomId)
 
     suspend fun bindSession(
         actor: UserSummary,
@@ -282,6 +287,11 @@ class NativeAcademicProjection(
         actor: UserSummary,
         session: AttendanceSessionResponse,
     ) {
+        institutionalAttendance?.takeIf { it.configured(actor) || session.academicSource == "SIII" }?.let {
+            it.requireSession(actor, session)
+            return
+        }
+        if (session.academicSource != null) throw ApiException.Forbidden("Institutional attendance authority is unavailable")
         val current = policy.live(actor)
         if (session.identitySource != AttendanceIdentitySource.NATIVE ||
             session.institutionId != current.institutionId ||

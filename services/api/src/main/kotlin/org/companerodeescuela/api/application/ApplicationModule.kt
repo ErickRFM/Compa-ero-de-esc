@@ -249,6 +249,16 @@ fun Application.module(
             classroomGraph.classroomService,
             academicGraph.groupRepository,
             academicGraph.scheduleOverrides,
+            institutionalAttendance =
+                institutionalAcademic?.let { academic ->
+                    org.companerodeescuela.api.attendance.SiiiAttendanceAuthority(
+                        academic,
+                        checkNotNull(institutionalSections).reader,
+                        institutionalIdentityLinkRepository,
+                        institutionalIdentityLinkService,
+                        identityGraph.accounts,
+                    )
+                },
         )
     val presenceGraph =
         buildPresenceFeatureGraph(

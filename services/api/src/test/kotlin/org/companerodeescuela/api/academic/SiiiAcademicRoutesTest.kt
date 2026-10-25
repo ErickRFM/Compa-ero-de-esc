@@ -211,7 +211,7 @@ class SiiiAcademicRoutesTest {
             assertEquals(1, load.schedule.entries.size)
         }
 
-    private class Fixture(
+    internal class Fixture(
         private val dualTeacher: Boolean = false,
     ) {
         val settings = TestFixtures.settings().copy(jwtSecret = "0123456789abcdef0123456789abcdef".toCharArray())
@@ -276,7 +276,7 @@ class SiiiAcademicRoutesTest {
                     stored = value
                 }
             }
-        private val identities =
+        val identities =
             InstitutionalIdentityLinkService(
                 accounts,
                 directory,
@@ -293,11 +293,12 @@ class SiiiAcademicRoutesTest {
                     ),
                 ),
             )
+        val reader = SiiiSectionReader(accounts, directory, identities, repository)
         val service =
             SiiiAcademicService(
                 accounts,
                 links,
-                SiiiSectionReader(accounts, directory, identities, repository),
+                reader,
                 SiiiAcademicAuthority { institution, kind, external ->
                     if (revoked || institution != "tenant-a") throw ApiException.Forbidden()
                     SiiiAuthorityManifest(

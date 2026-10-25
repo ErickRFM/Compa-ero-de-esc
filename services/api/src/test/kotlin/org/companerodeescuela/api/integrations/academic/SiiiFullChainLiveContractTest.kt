@@ -10,13 +10,27 @@ import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.bson.Document
+import org.companerodeescuela.api.academic.InMemoryAcademicScheduleOverrideRepository
+import org.companerodeescuela.api.academic.NativeAcademicProjection
 import org.companerodeescuela.api.academic.academicRoutes
+import org.companerodeescuela.api.academic.groups.InMemoryAcademicGroupRepository
+import org.companerodeescuela.api.attendance.AttendanceAccessPolicy
+import org.companerodeescuela.api.attendance.AttendanceAdministrationPolicy
+import org.companerodeescuela.api.attendance.AttendanceEnrollmentResolver
+import org.companerodeescuela.api.attendance.AttendanceReviewService
+import org.companerodeescuela.api.attendance.AttendanceSessionService
+import org.companerodeescuela.api.attendance.AttendanceStudentService
+import org.companerodeescuela.api.attendance.MongoAttendanceRepository
+import org.companerodeescuela.api.attendance.ProviderAttendanceOccurrenceResolver
+import org.companerodeescuela.api.attendance.SiiiAttendanceAuthority
+import org.companerodeescuela.api.attendance.attendanceRoutes
 import org.companerodeescuela.api.auth.AuthTokenService
 import org.companerodeescuela.api.auth.InMemoryPlatformAccountRepository
 import org.companerodeescuela.api.auth.InMemoryRefreshSessionRepository
@@ -24,6 +38,13 @@ import org.companerodeescuela.api.auth.PlatformAccount
 import org.companerodeescuela.api.auth.PlatformSessionAuthority
 import org.companerodeescuela.api.auth.RefreshSession
 import org.companerodeescuela.api.auth.SessionIdentitySource
+import org.companerodeescuela.api.classroom.ClassroomService
+import org.companerodeescuela.api.classroom.InMemoryClassroomRepository
+import org.companerodeescuela.api.devices.InMemoryDeviceTokenRepository
+import org.companerodeescuela.api.devices.MongoPushOutboxRepository
+import org.companerodeescuela.api.devices.PushDeliveryResult
+import org.companerodeescuela.api.devices.PushGateway
+import org.companerodeescuela.api.devices.PushOutboxService
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.institutions.MongoInstitutionRepository
 import org.companerodeescuela.api.integrations.academic.siii.MongoSiiiSectionSnapshotRepository
@@ -48,10 +69,21 @@ import org.companerodeescuela.api.integrations.push.MongoInstitutionalPushReposi
 import org.companerodeescuela.api.integrations.push.institutionalPushRoutes
 import org.companerodeescuela.api.plugins.ApiJson
 import org.companerodeescuela.api.plugins.configurePlugins
+import org.companerodeescuela.api.presence.MongoSchoolPresenceRepository
+import org.companerodeescuela.api.presence.SchoolPresencePolicy
+import org.companerodeescuela.api.presence.SchoolPresenceService
 import org.companerodeescuela.api.test.TestFixtures
 import org.companerodeescuela.shared.contracts.AcademicLoadResponse
 import org.companerodeescuela.shared.contracts.ApiResponse
+import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
+import org.companerodeescuela.shared.contracts.AttendanceRosterResponse
+import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
+import org.companerodeescuela.shared.contracts.AttendanceStatus
+import org.companerodeescuela.shared.contracts.ClassCallConfirmationRequest
+import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
+import org.companerodeescuela.shared.contracts.SchoolNetworkEvidence
+import org.companerodeescuela.shared.contracts.StartSchoolPresenceRequest
 import org.companerodeescuela.shared.contracts.UserRole
 import org.junit.jupiter.api.Timeout
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
@@ -174,10 +206,105 @@ class SiiiFullChainLiveContractTest {
                 )
             val academic =
                 SiiiAcademicService(identities.accounts, identities.links, identities.reader(snapshots), authority, setOf(tenantId))
+            val attendanceClock = java.time.Clock.fixed(Instant.parse("2026-10-22T15:30:00Z"), java.time.ZoneOffset.UTC)
+            val attendanceAuthority =
+                SiiiAttendanceAuthority(
+                    academic,
+                    identities.reader(snapshots),
+                    identities.links,
+                    identities.identityLinks(),
+                    identities.accounts,
+                )
+            val nativeGroups = InMemoryAcademicGroupRepository()
+            val nativeClasses = ClassroomService(InMemoryClassroomRepository(), nativeGroups, accounts = identities.accounts)
+            val nativeProjection =
+                NativeAcademicProjection(
+                    identities.accounts,
+                    nativeClasses,
+                    nativeGroups,
+                    InMemoryAcademicScheduleOverrideRepository(),
+                    institutionalAttendance = attendanceAuthority,
+                )
+            val attendanceRepository = MongoAttendanceRepository(db)
+            val occurrenceResolver = ProviderAttendanceOccurrenceResolver(MockAcademicProvider())
+            val access =
+                AttendanceAccessPolicy(
+                    attendanceRepository,
+                    occurrenceResolver,
+                    AttendanceAdministrationPolicy(identities.accounts, nativeClasses, nativeProjection),
+                )
+            val devices = InMemoryDeviceTokenRepository()
+            val deviceToken = "fcm_synthetic_chain_student_123456"
+            devices.register("NATIVE:${student.id}", deviceToken, "android", null, "chain-session-${student.id}")
+            var notice: Map<String, String>? = null
+            val push =
+                PushOutboxService(
+                    devices,
+                    MongoPushOutboxRepository(db),
+                    object : PushGateway {
+                        override suspend fun send(
+                            token: String,
+                            title: String,
+                            body: String,
+                        ) = error("Session action is required")
+
+                        override suspend fun send(
+                            token: String,
+                            title: String,
+                            body: String,
+                            data: Map<String, String>,
+                        ): PushDeliveryResult {
+                            notice = data
+                            return PushDeliveryResult.ACCEPTED
+                        }
+                    },
+                    attendanceClock,
+                    authorizeRecipient = { it == "NATIVE:${student.id}" },
+                    authorizeSession = { owner, token -> owner == "NATIVE:${student.id}" && token == deviceToken },
+                )
+            val entry = "synthetic-source-chain-school-entry"
+            val entryHash =
+                java.security.MessageDigest
+                    .getInstance(
+                        "SHA-256",
+                    ).digest(entry.toByteArray())
+                    .joinToString("") { "%02x".format(it) }
+            val presence =
+                SchoolPresenceService(
+                    MongoSchoolPresenceRepository(db),
+                    SchoolPresencePolicy(entryHash, setOf("CHAIN-QA"), emptySet(), institutionId = tenantId),
+                    clock = attendanceClock,
+                    accounts = identities.accounts,
+                )
+            val attendanceSessions =
+                AttendanceSessionService(
+                    attendanceRepository,
+                    occurrenceResolver,
+                    access,
+                    attendanceClock,
+                    nativeProjection = nativeProjection,
+                    pushService = push,
+                )
+            val attendanceStudents =
+                AttendanceStudentService(
+                    attendanceRepository,
+                    AttendanceEnrollmentResolver(MockAcademicProvider(), nativeClasses, attendanceAuthority),
+                    schoolPresenceService = presence,
+                    clock = attendanceClock,
+                    nativeProjection = nativeProjection,
+                )
             val readServer =
                 embeddedServer(CIO, host = "127.0.0.1", port = 0) {
                     configurePlugins(settings, sessions, PlatformSessionAuthority(identities.accounts, MockIdentityProvider()))
-                    routing { academicRoutes(settings, MockAcademicProvider(), institutionalAcademic = academic) }
+                    routing {
+                        academicRoutes(settings, MockAcademicProvider(), institutionalAcademic = academic)
+                        attendanceRoutes(
+                            settings,
+                            attendanceSessions,
+                            attendanceStudents,
+                            AttendanceReviewService(attendanceRepository, access, attendanceClock),
+                        )
+                    }
                 }.start(wait = false)
             closeReads = { readServer.stop(0, 5000) }
             val readPort =
@@ -195,6 +322,29 @@ class SiiiFullChainLiveContractTest {
                     connection.connectTimeout = 5000
                     connection.readTimeout = 15000
                     connection.setRequestProperty("Authorization", "Bearer ${accessTokens.getValue(account.id)}")
+                    val status = connection.responseCode
+                    return status to (if (status == 200) connection.inputStream.bufferedReader().use { it.readText() } else "")
+                } finally {
+                    connection.disconnect()
+                }
+            }
+
+            fun attendanceHttp(
+                account: PlatformAccount,
+                path: String,
+                body: String? = null,
+            ): Pair<Int, String> {
+                val connection = URI("http://127.0.0.1:$readPort/attendance$path").toURL().openConnection() as HttpURLConnection
+                try {
+                    connection.connectTimeout = 5000
+                    connection.readTimeout = 30000
+                    connection.setRequestProperty("Authorization", "Bearer ${accessTokens.getValue(account.id)}")
+                    if (body != null) {
+                        connection.requestMethod = "POST"
+                        connection.doOutput = true
+                        connection.setRequestProperty("Content-Type", "application/json")
+                        connection.outputStream.use { it.write(body.toByteArray()) }
+                    }
                     val status = connection.responseCode
                     return status to (if (status == 200) connection.inputStream.bufferedReader().use { it.readText() } else "")
                 } finally {
@@ -239,9 +389,63 @@ class SiiiFullChainLiveContractTest {
             assertEquals(sectionId, mobile.institutionalSections.single().id)
             assertTrue(mobile.schedule.entries.isNotEmpty())
             assertEquals(200, httpRead(teacher).first)
+            val meeting =
+                mobile.institutionalSections
+                    .single()
+                    .occurrences
+                    .single()
+            val opened =
+                attendanceHttp(teacher, "/sessions", Json.encodeToString(CreateAttendanceSessionRequest(meeting.id, meeting.date, 10)))
+            assertEquals(200, opened.first)
+            val pass = Json.decodeFromString<ApiResponse<AttendanceSessionResponse>>(opened.second).data
+            assertEquals("SIII", pass.academicSource)
+            assertEquals(pass, MongoAttendanceRepository(db).findSession(pass.id), "Session must survive a new Mongo repository")
+            val discovery = attendanceHttp(student, "/sessions/active")
+            assertEquals(200, discovery.first)
+            assertEquals(listOf(pass), Json.decodeFromString<ApiResponse<List<AttendanceSessionResponse>>>(discovery.second).data)
+            assertEquals(null, notice)
+            assertTrue(push.dispatchNext())
+            assertEquals(mapOf("type" to "attendance_session_opened", "sessionId" to pass.id), notice)
+            presence.start(
+                student.id,
+                StartSchoolPresenceRequest(
+                    "synthetic-entry",
+                    entry,
+                    SchoolNetworkEvidence(ssid = "CHAIN-QA"),
+                    attendanceClock.instant().epochSecond,
+                ),
+                student.toUserSummary(),
+            )
+            val confirmed =
+                attendanceHttp(
+                    student,
+                    "/sessions/${pass.id}/confirm",
+                    Json.encodeToString(ClassCallConfirmationRequest("synthetic-confirm", SchoolNetworkEvidence(ssid = "CHAIN-QA"))),
+                )
+            assertEquals(200, confirmed.first)
+            val record = Json.decodeFromString<ApiResponse<AttendanceRecordResponse>>(confirmed.second).data
+            assertEquals(AttendanceStatus.REVIEW_REQUIRED, record.status, "Synthetic evidence cannot certify physical presence")
+            val roster = attendanceHttp(teacher, "/sessions/${pass.id}/roster")
+            assertEquals(200, roster.first)
+            assertEquals(listOf(record), Json.decodeFromString<ApiResponse<AttendanceRosterResponse>>(roster.second).data.records)
 
             val withdrawn = probe.action("withdraw")
             val withdrawnVersion = withdrawn.long("sourceVersion")
+            assertEquals(
+                emptyList(),
+                Json
+                    .decodeFromString<ApiResponse<List<AttendanceSessionResponse>>>(
+                        attendanceHttp(student, "/sessions/active").second,
+                    ).data,
+            )
+            assertEquals(
+                403,
+                attendanceHttp(
+                    student,
+                    "/sessions/${pass.id}/confirm",
+                    Json.encodeToString(ClassCallConfirmationRequest("revoked-confirm", SchoolNetworkEvidence(ssid = "CHAIN-QA"))),
+                ).first,
+            )
             assertEquals(
                 404,
                 httpRead(student, "/institutional/sections/$sectionId").first,
@@ -353,7 +557,7 @@ class SiiiFullChainLiveContractTest {
                     passwordHash = "fixture-hash",
                     roles = setOf(role),
                     institutionId = tenant,
-                    emailVerifiedAt = Instant.now(),
+                    emailVerifiedAt = Instant.parse("2026-10-01T00:00:00Z"),
                 )
             accounts.create(account)
             links.createIfAbsent(
@@ -375,19 +579,22 @@ class SiiiFullChainLiveContractTest {
             SiiiSectionReader(
                 accounts,
                 institutions,
-                InstitutionalIdentityLinkService(
-                    accounts,
-                    institutions,
-                    links,
-                    org.companerodeescuela.api.security.MfaService(
-                        accounts,
-                        org.companerodeescuela.api.security
-                            .InMemoryMfaRepository(),
-                        org.companerodeescuela.api.security
-                            .MfaSecretCipher(randomKey()),
-                    ),
-                ),
+                identityLinks(),
                 snapshots,
+            )
+
+        fun identityLinks() =
+            InstitutionalIdentityLinkService(
+                accounts,
+                institutions,
+                links,
+                org.companerodeescuela.api.security.MfaService(
+                    accounts,
+                    org.companerodeescuela.api.security
+                        .InMemoryMfaRepository(),
+                    org.companerodeescuela.api.security
+                        .MfaSecretCipher(randomKey()),
+                ),
             )
     }
 

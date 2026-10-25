@@ -27,6 +27,16 @@ internal fun teacherPassOpenStatus(
     }
 
     return runCatching {
+        if (occurrence.startsAt.contains('T') || occurrence.endsAt.contains('T')) {
+            val start = java.time.Instant.parse(occurrence.startsAt)
+            val end = java.time.Instant.parse(occurrence.endsAt)
+            if (!end.isAfter(start)) return TeacherPassOpenStatus.INVALID_SCHEDULE
+            return if (now.atZone(java.time.ZoneId.systemDefault()).toInstant() >= end) {
+                TeacherPassOpenStatus.ENDED
+            } else {
+                TeacherPassOpenStatus.AVAILABLE
+            }
+        }
         val date = LocalDate.parse(occurrence.date)
         val starts = LocalTime.parse(occurrence.startsAt)
         val ends = LocalTime.parse(occurrence.endsAt)

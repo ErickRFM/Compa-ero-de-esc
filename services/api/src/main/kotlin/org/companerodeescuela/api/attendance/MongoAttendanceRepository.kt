@@ -482,6 +482,7 @@ class MongoAttendanceRepository(
             .append("institutionId", institutionId)
             .append("groupId", groupId)
             .append("groupScopeRevision", groupScopeRevision)
+            .append("academicSource", academicSource)
 
     private fun Document.toSession(): AttendanceSessionResponse =
         AttendanceSessionResponse(
@@ -506,6 +507,7 @@ class MongoAttendanceRepository(
                 },
             institutionId = get("institutionId") as? String,
             groupId = get("groupId") as? String,
+            academicSource = get("academicSource") as? String,
             groupScopeRevision =
                 when (val scope = get("groupScopeRevision")) {
                     is Long -> scope

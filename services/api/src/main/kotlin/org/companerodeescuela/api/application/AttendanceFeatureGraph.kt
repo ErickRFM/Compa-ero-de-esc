@@ -72,7 +72,7 @@ fun buildAttendanceFeatureGraph(
         studentService =
             AttendanceStudentService(
                 repository = repository,
-                enrollmentResolver = AttendanceEnrollmentResolver(academicProvider, classrooms),
+                enrollmentResolver = AttendanceEnrollmentResolver(academicProvider, classrooms, nativeProjection.institutionalAttendance),
                 qrService = qrService,
                 schoolPresenceService = schoolPresenceService,
                 nativeProjection = nativeProjection,

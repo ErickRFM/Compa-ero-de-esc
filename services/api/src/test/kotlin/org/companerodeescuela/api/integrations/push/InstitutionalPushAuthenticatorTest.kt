@@ -66,6 +66,45 @@ class InstitutionalPushAuthenticatorTest {
             assertEquals(1, repository.reservedNonceCount())
         }
 
+
+    @Test
+    fun `successor and predecessor coexist, then revoked predecessor is rejected`() =
+        runBlocking {
+            val predecessor = credential()
+            val successorSecret = "successor-test-secret-at-least-thirty-two-bytes".toByteArray()
+            val successor = predecessor.copy(keyId = "key-02", secret = successorSecret)
+            val dualRepository = InMemoryInstitutionalIntegrationRepository(credentials = listOf(predecessor, successor))
+            val dualAuthenticator = InstitutionalPushAuthenticator(dualRepository, dualRepository, clock)
+
+            fun requestFor(keyId: String, secret: ByteArray): SignedIntegrationRequest {
+                val prototype = signedRequest()
+                val signature = InstitutionalPushAuthenticator.sign(
+                    secret,
+                    InstitutionalPushAuthenticator.canonicalMessage(
+                        prototype.method,
+                        prototype.path,
+                        prototype.timestamp,
+                        prototype.nonce,
+                        prototype.body,
+                    ),
+                )
+                return prototype.copy(keyId = keyId, signature = signature)
+            }
+
+            assertEquals("school-north", dualAuthenticator.authenticate(requestFor(predecessor.keyId, predecessor.secret))?.tenantId)
+            assertEquals("school-north", dualAuthenticator.authenticate(requestFor(successor.keyId, successor.secret))?.tenantId)
+            assertEquals(2, dualRepository.reservedNonceCount())
+
+            val revokedRepository =
+                InMemoryInstitutionalIntegrationRepository(
+                    credentials = listOf(predecessor.copy(enabled = false), successor),
+                )
+            val afterRotation = InstitutionalPushAuthenticator(revokedRepository, revokedRepository, clock)
+            assertNull(afterRotation.authenticate(requestFor(predecessor.keyId, predecessor.secret)))
+            assertEquals("school-north", afterRotation.authenticate(requestFor(successor.keyId, successor.secret))?.tenantId)
+            assertNull(afterRotation.authenticate(requestFor(successor.keyId, predecessor.secret)))
+        }
+
     private fun credential(
         enabled: Boolean = true,
         scopes: Set<String> = setOf("schedule:write"),

@@ -23,13 +23,16 @@ jobs:
     timeout-minutes: 45
     env:
       COMPANERO_SIGNING_MODE: distribution
-      COMPANERO_RELEASE_KEYSTORE_PATH: ${{ runner.temp }}/companero-distribution.jks
       COMPANERO_RELEASE_STORE_PASSWORD: ${{ secrets.COMPANERO_RELEASE_STORE_PASSWORD }}
       COMPANERO_RELEASE_KEY_ALIAS: ${{ secrets.COMPANERO_RELEASE_KEY_ALIAS }}
       COMPANERO_RELEASE_KEY_PASSWORD: ${{ secrets.COMPANERO_RELEASE_KEY_PASSWORD }}
       COMPANERO_VERSION_CODE: ${{ inputs.version_code }}
       COMPANERO_VERSION_NAME: ${{ inputs.version_name }}
       COMPANERO_RELEASE_API_BASE_URL: ${{ vars.COMPANERO_RELEASE_API_BASE_URL }}
+      COMPANERO_FIREBASE_APP_ID: ${{ vars.COMPANERO_FIREBASE_APP_ID }}
+      COMPANERO_FIREBASE_PROJECT_ID: ${{ vars.COMPANERO_FIREBASE_PROJECT_ID }}
+      COMPANERO_FIREBASE_SENDER_ID: ${{ vars.COMPANERO_FIREBASE_SENDER_ID }}
+      COMPANERO_FIREBASE_API_KEY: ${{ vars.COMPANERO_FIREBASE_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -43,6 +46,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          export COMPANERO_RELEASE_KEYSTORE_PATH="$RUNNER_TEMP/companero-distribution.jks"
+          printf 'COMPANERO_RELEASE_KEYSTORE_PATH=%s\n' "$COMPANERO_RELEASE_KEYSTORE_PATH" >> "$GITHUB_ENV"
           test -n "$KEYSTORE_B64" || { echo "::error::Release keystore secret missing"; exit 1; }
           test -n "$COMPANERO_RELEASE_STORE_PASSWORD" || exit 1
           test -n "$COMPANERO_RELEASE_KEY_ALIAS" || exit 1

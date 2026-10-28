@@ -19,6 +19,7 @@ import org.companerodeescuela.api.integrations.academic.AcademicProvider
 import org.companerodeescuela.api.presence.SchoolPresenceService
 
 data class AttendanceFeatureGraph(
+    val repository: org.companerodeescuela.api.attendance.AttendanceRepository,
     val sessionService: AttendanceSessionService,
     val studentService: AttendanceStudentService,
     val reviewService: AttendanceReviewService,
@@ -61,6 +62,7 @@ fun buildAttendanceFeatureGraph(
             )
         }
     return AttendanceFeatureGraph(
+        repository = repository,
         sessionService =
             AttendanceSessionService(
                 repository = repository,

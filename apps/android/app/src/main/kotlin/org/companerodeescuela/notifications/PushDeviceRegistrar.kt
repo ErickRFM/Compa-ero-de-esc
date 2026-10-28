@@ -28,7 +28,6 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.companerodeescuela.BuildConfig
-import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.network.SessionRefreshCoordinator
 import org.companerodeescuela.core.network.apiCall
@@ -47,7 +46,10 @@ object PushRegistrationSchedule {
     private const val NAME = "companero-fcm-device-register"
 
     fun enqueue(context: Context) {
-        if (!BuildConfig.FIREBASE_CONFIGURED) return
+        if (!BuildConfig.FIREBASE_CONFIGURED) {
+            PushRegistrationDiagnostics.update(PushRegistrationState.NOT_CONFIGURED)
+            return
+        }
         val request =
             OneTimeWorkRequestBuilder<PushTokenWorker>()
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
@@ -58,6 +60,7 @@ object PushRegistrationSchedule {
 
     fun cancel(context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(NAME)
+        PushRegistrationDiagnostics.update(PushRegistrationState.NOT_REGISTERED)
     }
 }
 
@@ -70,20 +73,22 @@ class PushDeviceRegistrar
         private val refresh: SessionRefreshCoordinator,
         private val auth: AuthRepository,
     ) {
-        suspend fun register(fcmToken: String): Boolean {
-            if (!BuildConfig.FIREBASE_CONFIGURED || fcmToken.isBlank()) return true
-            val claims = SessionTokenInspector.inspect(store.readAccessToken().orEmpty()) ?: return true
-            if (claims.sessionId.isNullOrBlank()) return true
+        suspend fun register(fcmToken: String): PushRegistrationState {
+            if (!BuildConfig.FIREBASE_CONFIGURED) return PushRegistrationState.NOT_CONFIGURED
+            if (fcmToken.isBlank()) return PushRegistrationState.REJECTED
+            val claims = SessionTokenInspector.inspect(store.readAccessToken().orEmpty()) ?: return PushRegistrationState.AUTH_REQUIRED
+            if (claims.sessionId.isNullOrBlank()) return PushRegistrationState.AUTH_REQUIRED
             val user =
                 when (val check = auth.currentUser()) {
                     is Outcome.Success -> check.value
-                    is Outcome.Failure -> {
-                        // An expired/forbidden account must not be registered; server retries are not useful.
-                        val status = (check.error as? AppError.Http)?.status
-                        return status == 401 || status == 403
-                    }
+                    is Outcome.Failure -> return pushRegistrationFailure(check.error)
                 }
-            if (user.id != claims.userId || user.accountStatus != AccountStatus.ACTIVE || !user.emailVerified) return true
+            if (user.id != claims.userId ||
+                user.accountStatus != AccountStatus.ACTIVE ||
+                !user.emailVerified
+            ) {
+                return PushRegistrationState.REJECTED
+            }
             val prefs = context.getSharedPreferences("push_installation", Context.MODE_PRIVATE)
             val installation =
                 prefs.getString("installation_id", null)?.takeIf(String::isNotBlank)
@@ -100,7 +105,7 @@ class PushDeviceRegistrar
                     put("deviceId", installation)
                 }
             return when (val access = refresh.currentAccessToken()) {
-                is Outcome.Failure -> (access.error as? AppError.Http)?.status == 401
+                is Outcome.Failure -> pushRegistrationFailure(access.error)
                 is Outcome.Success ->
                     when (
                         val result =
@@ -115,8 +120,8 @@ class PushDeviceRegistrar
                                 }.map { it.data }
                             }
                     ) {
-                        is Outcome.Success -> result.value
-                        is Outcome.Failure -> (result.error as? AppError.Http)?.status in listOf(400, 401, 403)
+                        is Outcome.Success -> if (result.value) PushRegistrationState.REGISTERED else PushRegistrationState.REJECTED
+                        is Outcome.Failure -> pushRegistrationFailure(result.error)
                     }
             }
         }
@@ -131,22 +136,39 @@ class PushTokenWorker
         private val registrar: PushDeviceRegistrar,
     ) : CoroutineWorker(context, params) {
         override suspend fun doWork(): Result {
-            if (!BuildConfig.FIREBASE_CONFIGURED) return Result.success()
+            if (!BuildConfig.FIREBASE_CONFIGURED) {
+                PushRegistrationDiagnostics.update(PushRegistrationState.NOT_CONFIGURED)
+                return Result.success()
+            }
             // Never fetch/register an FCM destination until notifications are enabled.
             if (Build.VERSION.SDK_INT >= 33 &&
                 applicationContext.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
             ) {
+                PushRegistrationDiagnostics.update(PushRegistrationState.PERMISSION_REQUIRED)
                 return Result.success()
             }
-            if (!NotificationManagerCompat.from(applicationContext).areNotificationsEnabled()) return Result.success()
+            if (!NotificationManagerCompat.from(applicationContext).areNotificationsEnabled() ||
+                !AcademicNotificationChannel.enabled(applicationContext)
+            ) {
+                PushRegistrationDiagnostics.update(PushRegistrationState.PERMISSION_REQUIRED)
+                return Result.success()
+            }
+            PushRegistrationDiagnostics.update(PushRegistrationState.REGISTERING)
             val token =
                 try {
                     FirebaseMessaging.getInstance().token.await()
                 } catch (cancelled: kotlinx.coroutines.CancellationException) {
                     throw cancelled
                 } catch (_: Exception) {
+                    PushRegistrationDiagnostics.update(PushRegistrationState.RETRYING)
                     return Result.retry()
                 }
-            return if (registrar.register(token)) Result.success() else Result.retry()
+            val state = registrar.register(token)
+            PushRegistrationDiagnostics.update(state)
+            return when (state) {
+                PushRegistrationState.REGISTERED, PushRegistrationState.NOT_CONFIGURED -> Result.success()
+                PushRegistrationState.RETRYING -> Result.retry()
+                else -> Result.failure()
+            }
         }
     }

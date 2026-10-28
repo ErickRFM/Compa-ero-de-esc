@@ -62,6 +62,18 @@ fun Route.attendanceRoutes(
                 )
             }
 
+            get("/records/mine") {
+                val principal = call.requirePlatformPrincipal()
+                principal.requireRole(UserRole.STUDENT)
+                call.response.headers.append("Cache-Control", "no-store")
+                call.respond(
+                    ApiResponse(
+                        data = studentService.myHistory(principal.subjectId(), nativeActor(call)),
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
+
             get("/sessions/active") {
                 val principal = call.requirePlatformPrincipal()
                 principal.requireRole(UserRole.STUDENT)

@@ -7,6 +7,18 @@ import kotlin.test.assertEquals
 /** The APK selector must not leak an experience from the other distribution. */
 class AppDistributionRoleResolverTest {
     @Test
+    fun `direction is available only in management and never grants another experience`() {
+        val roles = setOf(UserRole.PRINCIPAL)
+        assertEquals(emptyList(), RoleExperienceResolver.available(roles, AppDistribution.ACADEMIC))
+        assertEquals(emptyList(), RoleExperienceResolver.available(roles, AppDistribution.LEGACY))
+        assertEquals(listOf(AppExperience.PRINCIPAL), RoleExperienceResolver.available(roles, AppDistribution.MANAGEMENT))
+        val config = RoleExperienceResolver.resolve(roles, distribution = AppDistribution.MANAGEMENT)
+        assertEquals(AppExperience.PRINCIPAL, config.experience)
+        assertEquals(Destination.CoordinatorHome, config.startDestination)
+        assertEquals(listOf(TopLevelDestination.CoordinatorHome, TopLevelDestination.Schedule), config.topLevelDestinations)
+    }
+
+    @Test
     fun `academic includes only student teacher and tutor among mixed roles`() {
         val roles =
             setOf(

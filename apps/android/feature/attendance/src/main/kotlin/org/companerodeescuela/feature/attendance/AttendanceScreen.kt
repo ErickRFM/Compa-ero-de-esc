@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -44,6 +46,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -107,10 +110,7 @@ fun attendanceScreen(
         if (requestedMode == AttendanceMode.STUDENT &&
             sessionId.matches(Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}"))
         ) {
-            viewModel.refresh()
-            // Tapping the authenticated attendance alert is the one-tap confirmation.
-            // The API still verifies active school presence, enrollment and session state.
-            viewModel.confirmClassCall(sessionId)
+            viewModel.openRequestedSession(sessionId)
         }
         onConsumeRequestedSession()
     }
@@ -206,6 +206,13 @@ fun studentAttendanceContent(
             state.occurrences.associateBy { it.id }
         }
     var showPasteDialog by remember { mutableStateOf(false) }
+    val selectedSessionFocus = remember { BringIntoViewRequester() }
+    LaunchedEffect(state.requestedStudentSessionId, state.activeSessions) {
+        if (state.activeSessions.any { it.id == state.requestedStudentSessionId }) {
+            withFrameNanos { }
+            selectedSessionFocus.bringIntoView()
+        }
+    }
     // A monotonic interval advances the server timestamp even if the device wall clock changes.
     var monotonicNow by remember { mutableLongStateOf(android.os.SystemClock.elapsedRealtime()) }
     LaunchedEffect(Unit) {
@@ -260,6 +267,14 @@ fun studentAttendanceContent(
                     tone = NoticeTone.ERROR,
                 )
             }
+            state.requestedStudentSessionId?.let { selectedId ->
+                if (!state.loading && state.activeSessions.none { it.id == selectedId }) {
+                    StatusNotice(
+                        title = "Pase no disponible",
+                        message = "El pase del aviso ya terminó o no está disponible para tu cuenta. No se envió ninguna confirmación.",
+                    )
+                }
+            }
 
             qrCenterCard(
                 onScan = onGenericScan,
@@ -293,31 +308,72 @@ fun studentAttendanceContent(
                 )
             }
 
-            state.activeSessions.forEach { session ->
+            state.activeSessions.sortedBy { it.id != state.requestedStudentSessionId }.forEach { session ->
                 val occurrence = occurrenceById[session.occurrenceId]
                 val local =
                     state.localRecords
                         .filter { it.sessionId == session.id }
                         .maxByOrNull { it.updatedAtEpochSeconds }
 
-                studentSessionCard(
-                    session = session,
-                    occurrence = occurrence,
-                    local = local,
-                    onScan = { onScan(session.id) },
-                    onConfirm = { onConfirmClassCall(session.id) },
-                    confirmed = state.confirmedClassCalls[session.id],
-                    busy = state.actionInProgress,
-                    schoolPresenceActive = schoolRecorded,
-                )
+                Column(
+                    modifier =
+                        if (session.id ==
+                            state.requestedStudentSessionId
+                        ) {
+                            Modifier.bringIntoViewRequester(selectedSessionFocus)
+                        } else {
+                            Modifier
+                        },
+                ) {
+                    if (session.id == state.requestedStudentSessionId) {
+                        Text("Pase del aviso · revisa la clase antes de enviar", style = MaterialTheme.typography.labelLarge)
+                    }
+                    studentSessionCard(
+                        session = session,
+                        occurrence = occurrence,
+                        local = local,
+                        onScan = { onScan(session.id) },
+                        onConfirm = { onConfirmClassCall(session.id) },
+                        confirmed = state.confirmedClassCalls[session.id],
+                        busy = state.actionInProgress,
+                        schoolPresenceActive = schoolRecorded,
+                    )
+                }
             }
 
-            if (state.localRecords.isNotEmpty()) {
+            Text("Mi historial de asistencia", style = MaterialTheme.typography.titleMedium)
+            state.studentHistoryError?.let {
+                StatusNotice(title = "Historial sin actualizar", message = it, tone = NoticeTone.ERROR)
+            }
+            val historicalRecords = studentHistoricalRecords(state.studentHistory, state.activeSessions.map { it.id }.toSet())
+            if (historicalRecords.isEmpty() && state.studentHistoryLoaded && state.studentHistoryError == null) {
+                Text("Aún no hay pases anteriores registrados.", style = MaterialTheme.typography.bodyMedium)
+            }
+            historicalRecords.forEach { record ->
+                CompaneroSurface {
+                    Column(Modifier.padding(CompaneroSpacing.md), verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
+                        Text(
+                            occurrenceById[record.occurrenceId]?.subjectName ?: "Registro de clase",
+                            style = MaterialTheme.typography.titleSmall,
+                        )
+                        Text(
+                            Instant
+                                .ofEpochSecond(record.receivedAtEpochSeconds)
+                                .atZone(java.time.ZoneId.systemDefault())
+                                .format(DateTimeFormatter.ofPattern("dd MMM yyyy · HH:mm", Locale.getDefault())),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(classCallRecordMessage(record), style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+            val unsummarizedLocal = state.localRecords.filter { local -> state.studentHistory.none { it.sessionId == local.sessionId } }
+            if (unsummarizedLocal.isNotEmpty()) {
                 Text(
                     text = "Actividad reciente",
                     style = MaterialTheme.typography.titleMedium,
                 )
-                state.localRecords.take(5).forEach { record ->
+                unsummarizedLocal.take(5).forEach { record ->
                     localAttendanceRow(record)
                 }
             }

@@ -40,6 +40,7 @@
     <string name="login_continue_teacher">Continue as teacher</string>
     <string name="login_continue_tutor">Continue as tutor</string>
     <string name="login_continue_coordinator">Continue as coordinator</string>
+    <string name="login_continue_principal">Continue as direction</string>
     <string name="login_continue_admin">Continue as administrator</string>
     <string name="login_continue_super_admin">Continue as superadministrator</string>
     <string name="login_continue_guest">Continue as guest</string>

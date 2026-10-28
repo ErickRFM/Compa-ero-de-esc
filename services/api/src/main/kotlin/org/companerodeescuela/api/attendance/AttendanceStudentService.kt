@@ -434,6 +434,61 @@ class AttendanceStudentService(
         }
     }
 
+    /** Closed passes remain readable, but neither a stored row nor an old role grants current scope. */
+    suspend fun myHistory(
+        studentId: String,
+        nativeActor: org.companerodeescuela.shared.contracts.UserSummary? = null,
+    ): List<AttendanceRecordResponse> {
+        if (nativeActor != null && nativeActor.id != studentId) {
+            throw ApiException.Forbidden("Actual student identity does not match")
+        }
+        val institutional = nativeActor?.let { nativeProjection?.institutionalAttendance?.takeIf { authority -> authority.configured(it) } }
+        val readContext = institutional?.newSessionReadContext()
+        val enrolled =
+            if (readContext !=
+                null
+            ) {
+                readContext.studentGroups(checkNotNull(nativeActor))
+            } else {
+                enrollmentResolver.courseGroupsFor(studentId, nativeActor)
+            }
+        val history = mutableListOf<AttendanceRecordResponse>()
+        for (record in repository.recordsForStudent(studentId)) {
+            if (record.studentId != studentId) continue
+            val session = repository.findSession(record.sessionId) ?: continue
+            if ((nativeActor == null && session.academicSource != null) ||
+                record.occurrenceId != session.occurrenceId ||
+                (session.courseId to session.groupName.trim()) !in enrolled
+            ) {
+                continue
+            }
+            if (nativeActor == null) {
+                if (session.identitySource == AttendanceIdentitySource.NATIVE ||
+                    session.institutionId != null ||
+                    session.groupId != null
+                ) {
+                    continue
+                }
+            } else {
+                try {
+                    if (institutional != null) {
+                        institutional.requireSession(nativeActor, session, readContext)
+                    } else {
+                        (nativeProjection ?: throw ApiException.DependencyUnavailable("Native academic authority is unavailable"))
+                            .requireSession(nativeActor, session)
+                    }
+                } catch (_: ApiException.Forbidden) {
+                    continue
+                } catch (_: ApiException.NotFound) {
+                    continue
+                }
+            }
+            history += record.withCurrentPresencePolicy()
+        }
+        readContext?.revalidate()
+        return history
+    }
+
     /** Existing canonical decision; only the enrolled student can read their own row. */
     suspend fun myClassRecord(
         studentId: String,

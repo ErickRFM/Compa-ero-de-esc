@@ -6,6 +6,7 @@ enum class AppExperience {
     STUDENT,
     TEACHER,
     TUTOR,
+    PRINCIPAL,
     COORDINATOR,
     ADMIN,
     SUPER_ADMIN,
@@ -36,6 +37,7 @@ object RoleExperienceResolver {
                 add(AppExperience.TEACHER)
             }
             if (UserRole.TUTOR in roles) add(AppExperience.TUTOR)
+            if (UserRole.PRINCIPAL in roles) add(AppExperience.PRINCIPAL)
             if (UserRole.COORDINATOR in roles) add(AppExperience.COORDINATOR)
             if (UserRole.ADMIN in roles) add(AppExperience.ADMIN)
             if (UserRole.SUPER_ADMIN in roles) add(AppExperience.SUPER_ADMIN)
@@ -109,7 +111,9 @@ object RoleExperienceResolver {
                             TopLevelDestination.TutorRequests,
                         ),
                 )
-            AppExperience.COORDINATOR ->
+            AppExperience.PRINCIPAL,
+            AppExperience.COORDINATOR,
+            ->
                 RoleExperienceConfig(
                     experience = selected,
                     startDestination = Destination.CoordinatorHome,

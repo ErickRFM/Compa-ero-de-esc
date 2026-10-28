@@ -224,6 +224,10 @@ class FcmHttpV1Gateway(
                                         "notification",
                                         buildJsonObject {
                                             put("click_action", AttendancePushContract.CLICK_ACTION)
+                                            put("channel_id", AttendancePushContract.CHANNEL_ID)
+                                            data[AttendancePushContract.SESSION_ID]?.let { sessionId ->
+                                                put("tag", AttendancePushContract.notificationTag(sessionId))
+                                            }
                                         },
                                     )
                                 }

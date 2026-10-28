@@ -1,32 +1,33 @@
 package org.companerodeescuela.shared.contracts
 
-import java.time.Instant
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Test
+import java.time.Instant
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.DisplayName
-import org.junit.jupiter.api.Test
 
 class HealthResponseSerializationTest {
-
     private val json = Json { encodeDefaults = true }
 
     @Test
     @DisplayName("HealthResponse serializes the documented wire format")
     fun serializesHealthResponse() {
-        val response = HealthResponse(
-            service = "companero-api",
-            status = ServiceStatus.UP,
-            version = "0.1.0",
-            environment = "local",
-            timestamp = Instant.parse("2026-01-31T12:00:00Z"),
-            dependencies = listOf(
-                DependencyStatus(name = "mongodb", status = ServiceStatus.UP),
-            ),
-        )
+        val response =
+            HealthResponse(
+                service = "companero-api",
+                status = ServiceStatus.UP,
+                version = "0.1.0",
+                environment = "local",
+                timestamp = Instant.parse("2026-01-31T12:00:00Z"),
+                dependencies =
+                    listOf(
+                        DependencyStatus(name = "mongodb", status = ServiceStatus.UP),
+                    ),
+            )
 
         val encoded = json.encodeToString(response)
 
@@ -43,6 +44,7 @@ class HealthResponseSerializationTest {
         assertEquals("\"degraded\"", json.encodeToString(ServiceStatus.DEGRADED))
         assertEquals("\"student\"", json.encodeToString(UserRole.STUDENT))
         assertEquals("\"super_admin\"", json.encodeToString(UserRole.SUPER_ADMIN))
+        assertEquals("\"principal\"", json.encodeToString(UserRole.PRINCIPAL))
         assertEquals("\"dependency_unavailable\"", json.encodeToString(ApiErrorCode.DEPENDENCY_UNAVAILABLE))
     }
 
@@ -66,6 +68,7 @@ class UserRoleTest {
         assertFalse(UserRole.WORKSHOP_PARTICIPANT.isStaff)
         assertTrue(UserRole.TEACHER.isStaff)
         assertTrue(UserRole.COORDINATOR.isStaff)
+        assertTrue(UserRole.PRINCIPAL.isStaff)
         assertTrue(UserRole.ADMIN.isStaff)
         assertTrue(UserRole.SUPER_ADMIN.isStaff)
     }
@@ -78,6 +81,7 @@ class UserRoleTest {
         assertFalse(UserRole.WORKSHOP_PARTICIPANT.isAdministrative)
         assertFalse(UserRole.TEACHER.isAdministrative)
         assertTrue(UserRole.COORDINATOR.isAdministrative)
+        assertTrue(UserRole.PRINCIPAL.isAdministrative)
         assertTrue(UserRole.ADMIN.isAdministrative)
         assertTrue(UserRole.SUPER_ADMIN.isAdministrative)
     }

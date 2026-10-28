@@ -36,6 +36,12 @@ sealed interface SessionWriteResult {
 }
 
 interface AttendanceRepository {
+    suspend fun institutionOverview(
+        institutionId: String,
+        atEpochSeconds: Long,
+        sessionLimit: Int = MAX_INSTITUTION_ATTENDANCE_SESSIONS,
+    ): AttendanceInstitutionOverview
+
     suspend fun createSession(session: AttendanceSessionResponse): SessionWriteResult
 
     suspend fun findSession(id: String): AttendanceSessionResponse?
@@ -73,6 +79,12 @@ interface AttendanceRepository {
 
     suspend fun recordsForSession(sessionId: String): List<AttendanceRecordResponse>
 
+    /** Bounded candidate history; callers must authorize each stored session's current scope. */
+    suspend fun recordsForStudent(
+        studentId: String,
+        limit: Int = MAX_STUDENT_HISTORY_RESULTS,
+    ): List<AttendanceRecordResponse>
+
     suspend fun replaceRecord(record: AttendanceRecordResponse)
 
     suspend fun findRecord(id: String): AttendanceRecordResponse?
@@ -100,6 +112,28 @@ class InMemoryAttendanceRepository : AttendanceRepository {
     private val qrNonceUses = linkedMapOf<Pair<String, String>, MutableMap<String, Long>>()
     private val attemptsByStudent = linkedMapOf<Pair<String, String>, MutableSet<String>>()
     private val attemptOperationOwners = linkedMapOf<String, Pair<Pair<String, String>, String>>()
+
+    override suspend fun institutionOverview(
+        institutionId: String,
+        atEpochSeconds: Long,
+        sessionLimit: Int,
+    ): AttendanceInstitutionOverview =
+        mutex.withLock {
+            val limit = sessionLimit.coerceIn(1, MAX_INSTITUTION_ATTENDANCE_SESSIONS)
+            val candidates =
+                sessions.values
+                    .filter { it.belongsToInstitutionOverview(institutionId) }
+                    .sortedWith(compareByDescending<AttendanceSessionResponse> { it.openedAtEpochSeconds }.thenBy { it.id })
+                    .take(limit + 1)
+            val sampled = candidates.take(limit)
+            val ids = sampled.map { it.id }.toSet()
+            AttendanceInstitutionOverview(
+                openPasses = sampled.count { it.isOpenAt(atEpochSeconds) },
+                pendingReviews = records.values.count { it.sessionId in ids && it.isPendingInstitutionalReview() }.toLong(),
+                sessionSampleLimit = limit,
+                sampleLimited = candidates.size > limit,
+            )
+        }
 
     override suspend fun createSession(session: AttendanceSessionResponse): SessionWriteResult =
         mutex.withLock {
@@ -239,6 +273,19 @@ class InMemoryAttendanceRepository : AttendanceRepository {
             records.values.filter { it.sessionId == sessionId }
         }
 
+    override suspend fun recordsForStudent(
+        studentId: String,
+        limit: Int,
+    ): List<AttendanceRecordResponse> =
+        mutex.withLock {
+            records.values
+                .asSequence()
+                .filter { it.studentId == studentId }
+                .sortedWith(compareByDescending<AttendanceRecordResponse> { it.receivedAtEpochSeconds }.thenBy { it.id })
+                .take(limit.coerceIn(1, MAX_STUDENT_HISTORY_RESULTS))
+                .toList()
+        }
+
     override suspend fun replaceRecord(record: AttendanceRecordResponse) {
         mutex.withLock {
             records[record.id] = record
@@ -271,3 +318,4 @@ class InMemoryAttendanceRepository : AttendanceRepository {
 }
 
 const val MAX_OPEN_SESSION_RESULTS = 100
+const val MAX_STUDENT_HISTORY_RESULTS = 100

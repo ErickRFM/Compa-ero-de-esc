@@ -101,12 +101,17 @@ internal val loginAccesses =
     )
 
 /**
- * Coordinator is intentionally absent from the original five-card carousel.
- * The management APK includes it without changing legacy navigation snapshots.
+ * Direction and coordination belong to Management; preserve the legacy carousel.
  */
 internal fun loginAccessesFor(distribution: AppDistribution): List<LoginAccess> =
     if (distribution == AppDistribution.MANAGEMENT) {
         listOf(
+            LoginAccess(
+                AppExperience.PRINCIPAL,
+                R.string.auth_role_principal,
+                R.string.auth_principal_description,
+                Icons.Filled.Business,
+            ),
             LoginAccess(
                 AppExperience.COORDINATOR,
                 R.string.auth_role_coordinator,

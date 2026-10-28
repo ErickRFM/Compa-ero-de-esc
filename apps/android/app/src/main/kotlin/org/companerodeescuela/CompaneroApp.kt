@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.companerodeescuela.core.security.SessionTokenInspector
 import org.companerodeescuela.core.security.SessionTokenStore
+import org.companerodeescuela.notifications.AcademicNotificationChannel
 import org.companerodeescuela.notifications.PushRegistrationSchedule
 import javax.inject.Inject
 
@@ -33,6 +34,7 @@ class CompaneroApp :
     override fun onCreate() {
         super.onCreate()
         if (!BuildConfig.FIREBASE_CONFIGURED) return
+        AcademicNotificationChannel.create(this)
         val options =
             FirebaseOptions
                 .Builder()

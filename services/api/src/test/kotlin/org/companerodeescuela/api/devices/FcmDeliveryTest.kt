@@ -165,6 +165,17 @@ class FcmDeliveryTest {
                 )
             assertEquals(PushDeliveryResult.ACCEPTED, gateway.send(token, "Pase", "Toca para revisar", deliveredData!!))
             assertEquals(expectedData, message?.get("data")?.jsonObject?.mapValues { it.value.jsonPrimitive.content })
+            val androidNotification =
+                message
+                    ?.get("android")
+                    ?.jsonObject
+                    ?.get("notification")
+                    ?.jsonObject
+            assertEquals("companero_academic_updates", androidNotification?.get("channel_id")?.jsonPrimitive?.content)
+            assertEquals(
+                "attendance-session:${expectedData.getValue("sessionId")}",
+                androidNotification?.get("tag")?.jsonPrimitive?.content,
+            )
             assertEquals(
                 "org.companerodeescuela.OPEN_ATTENDANCE",
                 message

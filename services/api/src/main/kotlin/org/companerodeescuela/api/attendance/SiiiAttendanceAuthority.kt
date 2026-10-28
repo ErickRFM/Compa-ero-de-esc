@@ -9,6 +9,7 @@ import org.companerodeescuela.api.integrations.academic.siii.SiiiSectionReader
 import org.companerodeescuela.api.integrations.academic.siii.SiiiTeacherSectionView
 import org.companerodeescuela.api.integrations.push.InstitutionalIdentityLinkRepository
 import org.companerodeescuela.api.integrations.push.InstitutionalIdentityLinkService
+import org.companerodeescuela.shared.contracts.AcademicLoadResponse
 import org.companerodeescuela.shared.contracts.AttendanceIdentitySource
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
@@ -30,6 +31,46 @@ class SiiiAttendanceAuthority(
     private val policy = InstitutionScopePolicy(accounts)
 
     fun configured(actor: UserSummary): Boolean = academic.configured(actor)
+
+    /** One HTTP read only: memoized proofs are re-read before any historical rows leave the service. */
+    inner class SessionReadContext internal constructor() {
+        private val loads = linkedMapOf<Pair<UserSummary, InstitutionalIdentityKind>, AcademicLoadResponse>()
+        private val views = linkedMapOf<Pair<UserSummary, InstitutionalAcademicSection>, SiiiTeacherSectionView>()
+
+        internal suspend fun load(
+            actor: UserSummary,
+            kind: InstitutionalIdentityKind,
+        ): AcademicLoadResponse {
+            val key = actor to kind
+            return loads[key] ?: academic.load(actor, kind).also { loads[key] = it }
+        }
+
+        internal suspend fun teacherView(
+            actor: UserSummary,
+            section: InstitutionalAcademicSection,
+        ): SiiiTeacherSectionView {
+            val key = actor to section
+            return views[key] ?: this@SiiiAttendanceAuthority.teacherView(actor, section).also { views[key] = it }
+        }
+
+        suspend fun studentGroups(actor: UserSummary): Set<Pair<String, String>> =
+            load(actor, InstitutionalIdentityKind.STUDENT).institutionalSections.map { it.id to it.groupName }.toSet()
+
+        suspend fun revalidate() {
+            for ((key, previous) in loads) {
+                if (academic.load(key.first, key.second).institutionalSections != previous.institutionalSections) {
+                    throw ApiException.DependencyUnavailable("Institutional authority changed during the history read")
+                }
+            }
+            for ((key, previous) in views) {
+                if (this@SiiiAttendanceAuthority.teacherView(key.first, key.second) != previous) {
+                    throw ApiException.DependencyUnavailable("Institutional section changed during the history read")
+                }
+            }
+        }
+    }
+
+    fun newSessionReadContext(): SessionReadContext = SessionReadContext()
 
     data class Meeting(
         val section: InstitutionalAcademicSection,
@@ -113,6 +154,7 @@ class SiiiAttendanceAuthority(
     suspend fun requireSession(
         actor: UserSummary,
         session: AttendanceSessionResponse,
+        readContext: SessionReadContext? = null,
     ) {
         val current = policy.live(actor)
         if (session.academicSource != SOURCE ||
@@ -130,7 +172,7 @@ class SiiiAttendanceAuthority(
                 InstitutionalIdentityKind.STUDENT
             }
         val section =
-            academic.load(actor, kind).institutionalSections.singleOrNull { it.id == session.courseId }
+            (readContext?.load(actor, kind) ?: academic.load(actor, kind)).institutionalSections.singleOrNull { it.id == session.courseId }
                 ?: throw ApiException.Forbidden("Institutional section is no longer assigned")
         val occurrence =
             section.occurrences.singleOrNull { it.id == session.occurrenceId && it.date == session.occurrenceDate }
@@ -146,7 +188,8 @@ class SiiiAttendanceAuthority(
         val teacher = accounts.findById(session.openedBy) ?: throw ApiException.Forbidden("Assigned teacher is unavailable")
         val assigned =
             try {
-                academic.load(teacher.toUserSummary(), InstitutionalIdentityKind.TEACHER)
+                readContext?.load(teacher.toUserSummary(), InstitutionalIdentityKind.TEACHER)
+                    ?: academic.load(teacher.toUserSummary(), InstitutionalIdentityKind.TEACHER)
             } catch (
                 _: ApiException.Unauthorized,
             ) {
@@ -156,7 +199,7 @@ class SiiiAttendanceAuthority(
         if (assigned != section) throw ApiException.Forbidden("The opener is no longer assigned to this institutional section")
         val teacherStatus =
             try {
-                teacherView(teacher.toUserSummary(), section).section.status
+                (readContext?.teacherView(teacher.toUserSummary(), section) ?: teacherView(teacher.toUserSummary(), section)).section.status
             } catch (
                 _: ApiException.Unauthorized,
             ) {

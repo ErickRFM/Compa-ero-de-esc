@@ -367,7 +367,7 @@ fun Application.module(
             )
         }
         academicGroupRoutes(settings = settings, service = academicGraph.groupService)
-        coordinationRoutes(settings, academicGraph.groupRepository, identityGraph.accounts)
+        coordinationRoutes(settings, academicGraph.groupRepository, identityGraph.accounts, attendanceGraph.repository)
         tutoringRoutes(settings = settings, service = academicGraph.tutoringService)
         tutorCaseRoutes(settings = settings, service = academicGraph.caseService)
         groupRepresentativeRoutes(settings = settings, service = academicGraph.representativeService)

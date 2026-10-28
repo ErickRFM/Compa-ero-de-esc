@@ -89,6 +89,16 @@ class AttendanceRemoteClient
                 }.map { it.data }
             }
 
+        suspend fun studentHistory(token: String): Outcome<List<AttendanceRecordResponse>> =
+            authorized(token) { accessToken ->
+                apiCall {
+                    client
+                        .get("attendance/records/mine") {
+                            bearerAuth(accessToken)
+                        }.requireBody<ApiResponse<List<AttendanceRecordResponse>>>()
+                }.map { it.data }
+            }
+
         suspend fun activeTeacherSessions(token: String): Outcome<List<AttendanceSessionResponse>> =
             authorized(token) { accessToken ->
                 apiCall {

@@ -3,8 +3,11 @@
 package org.companerodeescuela
 
 import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -34,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.core.app.ActivityCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -43,6 +47,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import org.companerodeescuela.core.attendance.AttendanceSyncScheduler
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
 import org.companerodeescuela.core.motion.ProvideCompaneroMotionPreferences
+import org.companerodeescuela.core.navigation.AcademicRoutePolicy
 import org.companerodeescuela.core.navigation.AppDistribution
 import org.companerodeescuela.core.navigation.AppExperience
 import org.companerodeescuela.core.navigation.CompaneroScaffold
@@ -61,7 +66,7 @@ import org.companerodeescuela.feature.auth.SessionViewModel
 import org.companerodeescuela.feature.auth.StaffApplicationScreen
 import org.companerodeescuela.feature.channel.ChannelScreen
 import org.companerodeescuela.feature.classroom.ClassroomScreen
-import org.companerodeescuela.feature.coordinator.CoordinatorHomeScreen
+import org.companerodeescuela.feature.coordinator.coordinatorHomeScreen
 import org.companerodeescuela.feature.designsystem.DesignSystemCatalogScreen
 import org.companerodeescuela.feature.grading.GradebookScreen
 import org.companerodeescuela.feature.grading.StudentGradesScreen
@@ -77,6 +82,7 @@ import org.companerodeescuela.feature.tutoring.StudentRepresentativesScreen
 import org.companerodeescuela.feature.tutoring.TutorGroupsScreen
 import org.companerodeescuela.feature.tutoring.TutorHomeScreen
 import org.companerodeescuela.feature.tutoring.TutorRequestsScreen
+import org.companerodeescuela.notifications.PushRegistrationDiagnostics
 import org.companerodeescuela.notifications.PushRegistrationSchedule
 import org.companerodeescuela.notifications.parseAttendanceSessionId
 import org.companerodeescuela.shared.contracts.AttendancePushContract
@@ -108,9 +114,10 @@ class MainActivity : AppCompatActivity() {
             val notificationsPermissionLauncher =
                 rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestPermission(),
-                ) { granted ->
-                    if (granted) PushRegistrationSchedule.enqueue(this@MainActivity)
+                ) {
+                    PushRegistrationSchedule.enqueue(this@MainActivity)
                 }
+            val pushRegistration by PushRegistrationDiagnostics.state.collectAsStateWithLifecycle()
             val appearance by appearancePreferences.state.collectAsStateWithLifecycle()
             val systemDark = isSystemInDarkTheme()
             val darkTheme =
@@ -347,14 +354,15 @@ class MainActivity : AppCompatActivity() {
                                             TutorRequestsScreen()
                                         }
                                         composable(Destination.RepresentativeInvitations.route) {
-                                            if (org.companerodeescuela.shared.contracts.UserRole.STUDENT in session.roles) {
+                                            if (AcademicRoutePolicy.studentActions(roleConfig.experience, session.roles)) {
                                                 StudentRepresentativesScreen()
                                             } else {
                                                 RoleUnavailableScreen(AppExperience.UNSUPPORTED, onLogout = sessionViewModel::logout)
                                             }
                                         }
                                         composable(Destination.CoordinatorHome.route) {
-                                            CoordinatorHomeScreen(
+                                            coordinatorHomeScreen(
+                                                directionExperience = roleConfig.experience == AppExperience.PRINCIPAL,
                                                 onOpenSchedule = {
                                                     navController.navigate(Destination.Schedule.route) {
                                                         launchSingleTop = true
@@ -425,10 +433,12 @@ class MainActivity : AppCompatActivity() {
                                                         TeacherClassContext.STATE_KEY,
                                                         null,
                                                     ).collectAsStateWithLifecycle()
-                                            if (roleConfig.experience == AppExperience.STUDENT) {
-                                                StudentGradesScreen()
-                                            } else {
-                                                GradebookScreen(requestedClassroom = selection)
+                                            when {
+                                                AcademicRoutePolicy.studentActions(roleConfig.experience, session.roles) ->
+                                                    StudentGradesScreen()
+                                                AcademicRoutePolicy.teacherActions(roleConfig.experience, session.roles) ->
+                                                    GradebookScreen(requestedClassroom = selection)
+                                                else -> RoleUnavailableScreen(roleConfig.experience, onLogout = sessionViewModel::logout)
                                             }
                                         }
                                         composable(Destination.Channel.route) { entry ->
@@ -450,19 +460,25 @@ class MainActivity : AppCompatActivity() {
                                             val requestedSessionId by entry.savedStateHandle
                                                 .getStateFlow<String?>(AttendancePushContract.SESSION_ID, null)
                                                 .collectAsStateWithLifecycle()
-                                            attendanceScreen(
-                                                requestedClassroom = selection,
-                                                requestedSessionId = requestedSessionId,
-                                                onConsumeRequestedSession = {
-                                                    entry.savedStateHandle.remove<String>(AttendancePushContract.SESSION_ID)
-                                                },
-                                                requestedMode =
-                                                    when (roleConfig.experience) {
-                                                        AppExperience.STUDENT -> AttendanceMode.STUDENT
-                                                        AppExperience.TEACHER -> AttendanceMode.TEACHER
-                                                        else -> null
+                                            if (AcademicRoutePolicy.studentActions(roleConfig.experience, session.roles) ||
+                                                AcademicRoutePolicy.teacherActions(roleConfig.experience, session.roles)
+                                            ) {
+                                                attendanceScreen(
+                                                    requestedClassroom = selection,
+                                                    requestedSessionId = requestedSessionId,
+                                                    onConsumeRequestedSession = {
+                                                        entry.savedStateHandle.remove<String>(AttendancePushContract.SESSION_ID)
                                                     },
-                                            )
+                                                    requestedMode =
+                                                        when (roleConfig.experience) {
+                                                            AppExperience.STUDENT -> AttendanceMode.STUDENT
+                                                            AppExperience.TEACHER -> AttendanceMode.TEACHER
+                                                            else -> null
+                                                        },
+                                                )
+                                            } else {
+                                                RoleUnavailableScreen(roleConfig.experience, onLogout = sessionViewModel::logout)
+                                            }
                                         }
                                         composable(Destination.RoleUnavailable.route) {
                                             RoleUnavailableScreen(roleConfig.experience, onLogout = sessionViewModel::logout)
@@ -488,15 +504,31 @@ class MainActivity : AppCompatActivity() {
                                                     )
                                                 },
                                                 onSecurity = { navController.navigate(Destination.Mfa.route) },
+                                                notificationsStatus = pushRegistration.userMessage,
                                                 onNotifications =
                                                     if (BuildConfig.FIREBASE_CONFIGURED) {
                                                         {
                                                             if (Build.VERSION.SDK_INT >= 33) {
-                                                                notificationsPermissionLauncher.launch(
-                                                                    Manifest.permission.POST_NOTIFICATIONS,
-                                                                )
+                                                                val consent = getSharedPreferences("notification_consent", MODE_PRIVATE)
+                                                                val granted =
+                                                                    checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+                                                                        PackageManager.PERMISSION_GRANTED
+                                                                val permanentlyDenied =
+                                                                    consent.getBoolean("requested", false) &&
+                                                                        !ActivityCompat.shouldShowRequestPermissionRationale(
+                                                                            this@MainActivity,
+                                                                            Manifest.permission.POST_NOTIFICATIONS,
+                                                                        )
+                                                                if (granted || permanentlyDenied) {
+                                                                    openNotificationSettings()
+                                                                } else {
+                                                                    consent.edit().putBoolean("requested", true).apply()
+                                                                    notificationsPermissionLauncher.launch(
+                                                                        Manifest.permission.POST_NOTIFICATIONS,
+                                                                    )
+                                                                }
                                                             } else {
-                                                                PushRegistrationSchedule.enqueue(this@MainActivity)
+                                                                openNotificationSettings()
                                                             }
                                                         }
                                                     } else {
@@ -510,7 +542,7 @@ class MainActivity : AppCompatActivity() {
                                                     },
                                                 onRepresentatives =
                                                     if (appDistribution == AppDistribution.ACADEMIC &&
-                                                        org.companerodeescuela.shared.contracts.UserRole.STUDENT in session.roles
+                                                        AcademicRoutePolicy.studentActions(roleConfig.experience, session.roles)
                                                     ) {
                                                         {
                                                             navController.navigate(Destination.RepresentativeInvitations.route) {
@@ -583,6 +615,16 @@ class MainActivity : AppCompatActivity() {
         pendingAttendanceSessionId = attendanceSessionId(intent)
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Recheck permission/channel changes after returning from Android settings.
+        if (BuildConfig.FIREBASE_CONFIGURED) PushRegistrationSchedule.enqueue(this)
+    }
+
+    private fun openNotificationSettings() {
+        startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
+    }
+
     private fun attendanceSessionId(intent: android.content.Intent?): String? =
         parseAttendanceSessionId(
             intent?.action,
@@ -597,6 +639,7 @@ private fun RoleUnavailableScreen(
 ) {
     val title =
         when (experience) {
+            AppExperience.PRINCIPAL -> "Dirección"
             AppExperience.COORDINATOR -> "Coordinación"
             AppExperience.ADMIN -> "Administración"
             AppExperience.SUPER_ADMIN -> "Administración general"
@@ -689,6 +732,7 @@ private fun ExperiencePickerScreen(
 private fun experienceLabel(experience: AppExperience): String =
     stringResource(
         when (experience) {
+            AppExperience.PRINCIPAL -> R.string.login_continue_principal
             AppExperience.STUDENT -> R.string.login_continue_student
             AppExperience.TEACHER -> R.string.login_continue_teacher
             AppExperience.TUTOR -> R.string.login_continue_tutor

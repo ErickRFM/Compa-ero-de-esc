@@ -9,6 +9,17 @@ import org.companerodeescuela.shared.contracts.SchoolPresenceResponse
 import org.companerodeescuela.shared.contracts.SchoolPresenceStatus
 import org.companerodeescuela.shared.validation.requiresAttendancePresenceReview
 
+/** Active cards already display their current record; history contains older classes once each. */
+fun studentHistoricalRecords(
+    records: List<AttendanceRecordResponse>,
+    activeSessionIds: Set<String>,
+): List<AttendanceRecordResponse> =
+    records
+        .filterNot { it.sessionId in activeSessionIds }
+        .sortedByDescending { it.receivedAtEpochSeconds }
+        .distinctBy { it.sessionId }
+        .take(100)
+
 fun schoolDayRecorded(
     presence: SchoolPresenceResponse?,
     nowEpochSeconds: Long,

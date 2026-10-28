@@ -6,9 +6,13 @@ import com.mongodb.client.model.Filters.elemMatch
 import com.mongodb.client.model.Filters.eq
 import com.mongodb.client.model.Filters.exists
 import com.mongodb.client.model.Filters.gt
+import com.mongodb.client.model.Filters.`in`
 import com.mongodb.client.model.Filters.lt
+import com.mongodb.client.model.Filters.lte
 import com.mongodb.client.model.Filters.ne
 import com.mongodb.client.model.Filters.or
+import com.mongodb.client.model.Filters.regex
+import com.mongodb.client.model.Filters.type
 import com.mongodb.client.model.FindOneAndReplaceOptions
 import com.mongodb.client.model.FindOneAndUpdateOptions
 import com.mongodb.client.model.IndexOptions
@@ -26,6 +30,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.bson.BsonType
 import org.bson.Document
 import org.companerodeescuela.shared.contracts.AttendanceDisposition
 import org.companerodeescuela.shared.contracts.AttendanceReasonCode
@@ -52,6 +57,62 @@ class MongoAttendanceRepository(
 
     @Volatile
     private var indexesReady = false
+
+    override suspend fun institutionOverview(
+        institutionId: String,
+        atEpochSeconds: Long,
+        sessionLimit: Int,
+    ): AttendanceInstitutionOverview {
+        ensureIndexes()
+        val limit = sessionLimit.coerceIn(1, MAX_INSTITUTION_ATTENDANCE_SESSIONS)
+        val candidates =
+            sessions
+                .find(
+                    and(
+                        eq("institutionId", institutionId),
+                        eq("identitySource", org.companerodeescuela.shared.contracts.AttendanceIdentitySource.NATIVE.name),
+                        regex("groupId", "\\S"),
+                        com.mongodb.client.model.Filters
+                            .gte("groupScopeRevision", 0),
+                        or(type("groupScopeRevision", BsonType.INT32), type("groupScopeRevision", BsonType.INT64)),
+                    ),
+                ).sort(Sorts.orderBy(Sorts.descending("openedAtEpochSeconds"), Sorts.ascending("_id")))
+                .limit(limit + 1)
+                .toList()
+                .map { it.toSession() }
+        val sampled = candidates.take(limit)
+        val pending =
+            if (sampled.isEmpty()) {
+                0L
+            } else {
+                records.countDocuments(
+                    and(
+                        `in`("sessionId", sampled.map { it.id }),
+                        or(
+                            and(eq("status", AttendanceStatus.REVIEW_REQUIRED.name), eq("disposition", null)),
+                            and(
+                                or(
+                                    eq("status", AttendanceStatus.VERIFIED.name),
+                                    `in`("disposition", listOf(AttendanceDisposition.PRESENT.name, AttendanceDisposition.LATE.name)),
+                                ),
+                                or(
+                                    eq("reviewedBy", null),
+                                    regex("reviewedBy", "^\\s*$"),
+                                    eq("reviewedAtEpochSeconds", null),
+                                    lte("reviewedAtEpochSeconds", 0),
+                                ),
+                            ),
+                        ),
+                    ),
+                )
+            }
+        return AttendanceInstitutionOverview(
+            openPasses = sampled.count { it.isOpenAt(atEpochSeconds) },
+            pendingReviews = pending,
+            sessionSampleLimit = limit,
+            sampleLimited = candidates.size > limit,
+        )
+    }
 
     override suspend fun createSession(session: AttendanceSessionResponse): SessionWriteResult {
         ensureIndexes()
@@ -359,6 +420,19 @@ class MongoAttendanceRepository(
         return records.find(eq("sessionId", sessionId)).toList().map { it.toRecord() }
     }
 
+    override suspend fun recordsForStudent(
+        studentId: String,
+        limit: Int,
+    ): List<AttendanceRecordResponse> {
+        ensureIndexes()
+        return records
+            .find(eq("studentId", studentId))
+            .sort(Sorts.orderBy(Sorts.descending("receivedAtEpochSeconds"), Sorts.ascending("_id")))
+            .limit(limit.coerceIn(1, MAX_STUDENT_HISTORY_RESULTS))
+            .toList()
+            .map { it.toRecord() }
+    }
+
     override suspend fun replaceRecord(record: AttendanceRecordResponse) {
         ensureIndexes()
         records.replaceOne(
@@ -432,6 +506,14 @@ class MongoAttendanceRepository(
                 Indexes.compoundIndex(Indexes.ascending("openedBy"), Indexes.descending("openedAtEpochSeconds")),
                 IndexOptions().name("ix_attendance_teacher_history"),
             )
+            sessions.createIndex(
+                Indexes.compoundIndex(
+                    Indexes.ascending("institutionId", "identitySource"),
+                    Indexes.descending("openedAtEpochSeconds"),
+                    Indexes.ascending("_id"),
+                ),
+                IndexOptions().name("ix_attendance_institution_overview"),
+            )
             records.createIndex(
                 Indexes.ascending("operationId"),
                 IndexOptions().unique(true).name("uq_attendance_operation_id"),
@@ -443,6 +525,18 @@ class MongoAttendanceRepository(
             records.createIndex(
                 Indexes.ascending("sessionId", "studentId"),
                 IndexOptions().name("ix_attendance_record_session_student"),
+            )
+            records.createIndex(
+                Indexes.ascending("sessionId", "status", "disposition"),
+                IndexOptions().name("ix_attendance_pending_review"),
+            )
+            records.createIndex(
+                Indexes.compoundIndex(
+                    Indexes.ascending("studentId"),
+                    Indexes.descending("receivedAtEpochSeconds"),
+                    Indexes.ascending("_id"),
+                ),
+                IndexOptions().name("ix_attendance_student_history"),
             )
             qrNonceUses.createIndex(
                 Indexes.ascending("sessionId", "nonce", "studentId"),

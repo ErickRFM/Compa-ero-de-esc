@@ -127,5 +127,7 @@
 <string name="staff_request_unavailable">Esta cuenta no puede solicitar acceso adicional de tutor.</string>
 <string name="staff_request_empty">Sin solicitudes anteriores</string>
 <string name="auth_role_coordinator">Coordinación</string>
+<string name="auth_role_principal">Dirección</string>
+<string name="auth_principal_description">Consulta los indicadores autorizados de tu institución con permisos de supervisión.</string>
 <string name="auth_coordinator_description">Consulta y coordina los grupos autorizados de tu institución.</string>
 </resources>

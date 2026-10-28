@@ -56,6 +56,7 @@ fun ProfileScreen(
     onLogout: () -> Unit,
     onSecurity: (() -> Unit)? = null,
     onNotifications: (() -> Unit)? = null,
+    notificationsStatus: String? = null,
     onTutorRequest: (() -> Unit)? = null,
     onRepresentatives: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -206,7 +207,7 @@ fun ProfileScreen(
                     GroupDivider()
                     ProfileRow(
                         title = "Notificaciones",
-                        detail = "Activar avisos académicos en este dispositivo.",
+                        detail = notificationsStatus ?: "Activar avisos académicos en este dispositivo.",
                         onClick = action,
                     )
                 }
@@ -319,6 +320,7 @@ private fun roleSummary(roles: Set<UserRole>): String =
                 UserRole.TEACHER_PENDING -> "Docente pendiente"
                 UserRole.TEACHER -> "Docente"
                 UserRole.TUTOR -> "Tutoría"
+                UserRole.PRINCIPAL -> "Dirección"
                 UserRole.COORDINATOR -> "Coordinación"
                 UserRole.ADMIN -> "Administración"
                 UserRole.SUPER_ADMIN -> "Administración general"

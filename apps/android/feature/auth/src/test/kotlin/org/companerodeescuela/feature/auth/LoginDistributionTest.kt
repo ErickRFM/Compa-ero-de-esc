@@ -18,7 +18,7 @@ class LoginDistributionTest {
     @Test
     fun `management login contains only authorized staff experiences`() {
         assertEquals(
-            listOf(AppExperience.COORDINATOR, AppExperience.ADMIN, AppExperience.SUPER_ADMIN),
+            listOf(AppExperience.PRINCIPAL, AppExperience.COORDINATOR, AppExperience.ADMIN, AppExperience.SUPER_ADMIN),
             loginAccessesFor(AppDistribution.MANAGEMENT).map { it.experience },
         )
     }

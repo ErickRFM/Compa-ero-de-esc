@@ -5,6 +5,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import java.time.Clock
 import java.time.Instant
+import java.time.ZoneId
 import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -66,6 +67,74 @@ class InstitutionalPushAuthenticatorTest {
             assertEquals(1, repository.reservedNonceCount())
         }
 
+    @Test
+    fun `successor and predecessor coexist, then revoked predecessor is rejected`() =
+        runBlocking {
+            val predecessor = credential()
+            val successorSecret = "successor-test-secret-at-least-thirty-two-bytes".toByteArray()
+            val successor = predecessor.copy(keyId = "key-02", secret = successorSecret)
+            val dualRepository = InMemoryInstitutionalIntegrationRepository(credentials = listOf(predecessor, successor))
+            val dualAuthenticator = InstitutionalPushAuthenticator(dualRepository, dualRepository, clock)
+
+            fun requestFor(
+                keyId: String,
+                secret: ByteArray,
+            ): SignedIntegrationRequest {
+                val prototype = signedRequest()
+                val signature =
+                    InstitutionalPushAuthenticator.sign(
+                        secret,
+                        InstitutionalPushAuthenticator.canonicalMessage(
+                            prototype.method,
+                            prototype.path,
+                            prototype.timestamp,
+                            prototype.nonce,
+                            prototype.body,
+                        ),
+                    )
+                return prototype.copy(keyId = keyId, signature = signature)
+            }
+
+            assertEquals("school-north", dualAuthenticator.authenticate(requestFor(predecessor.keyId, predecessor.secret))?.tenantId)
+            assertNull(dualAuthenticator.authenticate(requestFor(successor.keyId, predecessor.secret)))
+            assertEquals(1, dualRepository.reservedNonceCount(), "Wrong key must fail before consuming the successor nonce")
+            assertEquals("school-north", dualAuthenticator.authenticate(requestFor(successor.keyId, successor.secret))?.tenantId)
+            assertEquals(2, dualRepository.reservedNonceCount())
+
+            val revokedRepository =
+                InMemoryInstitutionalIntegrationRepository(
+                    credentials = listOf(predecessor.copy(enabled = false), successor),
+                )
+            val afterRotation = InstitutionalPushAuthenticator(revokedRepository, revokedRepository, clock)
+            assertNull(afterRotation.authenticate(requestFor(predecessor.keyId, predecessor.secret)))
+            assertNull(afterRotation.authenticate(requestFor(successor.keyId, predecessor.secret)))
+            assertEquals(0, revokedRepository.reservedNonceCount())
+            assertEquals("school-north", afterRotation.authenticate(requestFor(successor.keyId, successor.secret))?.tenantId)
+        }
+
+    @Test
+    fun `future timestamp cannot replay after the first nonce retention window`() =
+        runBlocking {
+            var now = instant
+            val advancingClock =
+                object : Clock() {
+                    override fun getZone(): ZoneId = ZoneOffset.UTC
+
+                    override fun withZone(zone: ZoneId): Clock = this
+
+                    override fun instant(): Instant = now
+                }
+            val repository = InMemoryInstitutionalIntegrationRepository(listOf(credential()), advancingClock)
+            val authenticator = InstitutionalPushAuthenticator(repository, repository, advancingClock)
+            val request = signedRequest(timestamp = instant.plusSeconds(300).epochSecond.toString())
+
+            assertEquals("school-north", authenticator.authenticate(request)?.tenantId)
+            now = instant.plusSeconds(301)
+            assertNull(authenticator.authenticate(request), "Accepted signed request must remain reserved for its entire validity")
+            now = instant.plusSeconds(600)
+            assertNull(authenticator.authenticate(request), "Timestamp is still valid at the inclusive skew boundary")
+        }
+
     private fun credential(
         enabled: Boolean = true,
         scopes: Set<String> = setOf("schedule:write"),
@@ -110,10 +179,11 @@ class InstitutionalPushAuthenticatorTest {
 
 private class InMemoryInstitutionalIntegrationRepository(
     credentials: List<IntegrationCredential> = emptyList(),
+    private val clock: Clock? = null,
 ) : IntegrationCredentialRepository,
     IntegrationNonceRepository {
     private val credentialById = credentials.associateBy(IntegrationCredential::keyId)
-    private val nonces = mutableSetOf<Pair<String, String>>()
+    private val nonces = mutableMapOf<Pair<String, String>, Instant>()
 
     override suspend fun findCredential(keyId: String): IntegrationCredential? = credentialById[keyId]
 
@@ -123,7 +193,8 @@ private class InMemoryInstitutionalIntegrationRepository(
         expiresAt: Instant,
     ): Boolean =
         synchronized(nonces) {
-            nonces.add(credentialId to nonce)
+            clock?.instant()?.let { now -> nonces.entries.removeIf { !it.value.isAfter(now) } }
+            nonces.putIfAbsent(credentialId to nonce, expiresAt) == null
         }
 
     fun reservedNonceCount(): Int = synchronized(nonces) { nonces.size }

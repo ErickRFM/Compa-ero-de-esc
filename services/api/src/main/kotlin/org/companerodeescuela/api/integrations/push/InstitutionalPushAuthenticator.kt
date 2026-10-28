@@ -93,7 +93,9 @@ class InstitutionalPushAuthenticator(
             nonces.reserveNonce(
                 credentialId = credential.keyId,
                 nonce = request.nonce,
-                expiresAt = clock.instant().plusSeconds(allowedClockSkewSeconds),
+                // A future-dated request remains acceptable until timestamp + skew,
+                // including that exact second. Retain its nonce through the full window.
+                expiresAt = Instant.ofEpochSecond(timestamp + allowedClockSkewSeconds + 1),
             )
         if (!reserved) return null
         return VerifiedInstitution(credential.keyId, credential.tenantId, credential.scopes)

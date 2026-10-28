@@ -297,7 +297,7 @@ jobs:
           require_distinct('org.companerodeescuela.AttendanceTruthUiTest', 6)
           if flavor == 'management':
               require_distinct('org.companerodeescuela.DistributionLoginUiTest', 2)
-              require_distinct('org.companerodeescuela.V14RoleNavigationUiTest', 6)
+              require_distinct('org.companerodeescuela.V14RoleNavigationUiTest', 7)
           PY
 
       - name: Upload Android UI evidence

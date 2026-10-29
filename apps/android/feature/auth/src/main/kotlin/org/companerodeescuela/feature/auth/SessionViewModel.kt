@@ -72,14 +72,7 @@ class SessionViewModel @Inject constructor(
                     return@collectLatest
                 }
                 // Claims provide expiry bookkeeping; only /auth/me grants restored navigation.
-                when (val verified = repository.currentUser()) {
-                    is Outcome.Failure -> {
-                        val status = (verified.error as? AppError.Http)?.status
-                        publishSignedOut(if (status == 401 || status == 403) SessionNotice.EXPIRED else SessionNotice.CONNECTION)
-                        return@collectLatest
-                    }
-                    is Outcome.Success -> publishAuthenticated(verified.value)
-                }
+                if (!verifyRestoredSession()) return@collectLatest
                 val current = tokenStore.readAccessToken() ?: return@collectLatest
                 val claims = SessionTokenInspector.inspect(current) ?: return@collectLatest
                 val remaining = ((claims.expiresAtEpochSeconds - clock.instant().epochSecond) * 1_000L).coerceAtLeast(0L)
@@ -87,9 +80,41 @@ class SessionViewModel @Inject constructor(
                 if (tokenStore.readAccessToken() == current) {
                     when (val refreshed = repository.refreshSession()) {
                         is Outcome.Success -> Unit // Token emission rechecks the server authority.
-                        is Outcome.Failure -> publishSignedOut(
-                            if ((refreshed.error as? AppError.Http)?.status == 401) SessionNotice.EXPIRED else SessionNotice.CONNECTION)
+                        is Outcome.Failure -> {
+                            val status = (refreshed.error as? AppError.Http)?.status
+                            if (status == 401 || status == 403) {
+                                publishSignedOut(SessionNotice.EXPIRED)
+                            } else {
+                                // Recover automatically when the server/network becomes reachable.
+                                verifyRestoredSession()
+                            }
+                        }
                     }
+                }
+            }
+        }
+    }
+
+    /**
+     * Do not interpret transport/5xx failures as a revoked session.
+     * Keep navigation locked until /auth/me verifies live roles, and recheck
+     * automatically while this token is still observed.
+     */
+    private suspend fun verifyRestoredSession(): Boolean {
+        while (true) {
+            when (val verified = repository.currentUser()) {
+                is Outcome.Success -> {
+                    publishAuthenticated(verified.value)
+                    return true
+                }
+                is Outcome.Failure -> {
+                    val status = (verified.error as? AppError.Http)?.status
+                    if (status == 401 || status == 403) {
+                        publishSignedOut(SessionNotice.EXPIRED)
+                        return false
+                    }
+                    publishSignedOut(SessionNotice.CONNECTION)
+                    delay(15_000L)
                 }
             }
         }

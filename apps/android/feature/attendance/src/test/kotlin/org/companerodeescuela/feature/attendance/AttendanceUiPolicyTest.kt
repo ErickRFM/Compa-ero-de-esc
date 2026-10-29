@@ -226,6 +226,43 @@ class AttendanceUiPolicyTest {
         assertEquals("Registro rechazado", classCallRecordMessage(rejected))
     }
 
+    @Test fun `history filters require teacher decisions rather than automatic optimistic states`() {
+        val pending =
+            org.companerodeescuela.shared.contracts.AttendanceRecordResponse(
+                "pending", "op", "session-a", "occ", "student",
+                AttendanceStatus.REVIEW_REQUIRED, AttendanceReasonCode.CLASS_CALL_CONFIRMED, 1, 1,
+            )
+        val present = pending.copy(
+            id = "present",
+            sessionId = "session-b",
+            disposition = org.companerodeescuela.shared.contracts.AttendanceDisposition.PRESENT,
+            reviewedBy = "teacher",
+            reviewedAtEpochSeconds = 2,
+        )
+        val late = present.copy(
+            id = "late",
+            sessionId = "session-c",
+            disposition = org.companerodeescuela.shared.contracts.AttendanceDisposition.LATE,
+        )
+        val absent = present.copy(
+            id = "absent",
+            sessionId = "session-d",
+            disposition = org.companerodeescuela.shared.contracts.AttendanceDisposition.ABSENT,
+        )
+        val legacy = pending.copy(
+            id = "legacy",
+            sessionId = "session-e",
+            status = AttendanceStatus.VERIFIED,
+            disposition = org.companerodeescuela.shared.contracts.AttendanceDisposition.PRESENT,
+        )
+        val records = listOf(pending, present, late, absent, legacy)
+        assertEquals(5, filterStudentHistory(records, StudentHistoryFilter.ALL).size)
+        assertEquals(listOf("present"), filterStudentHistory(records, StudentHistoryFilter.PRESENT).map { it.id })
+        assertEquals(listOf("late"), filterStudentHistory(records, StudentHistoryFilter.LATE).map { it.id })
+        assertEquals(listOf("absent"), filterStudentHistory(records, StudentHistoryFilter.ABSENT).map { it.id })
+        assertEquals(listOf("pending", "legacy"), filterStudentHistory(records, StudentHistoryFilter.PENDING).map { it.id })
+    }
+
     private fun local(
         syncState: LocalAttendanceSyncState,
         attendanceStatus: AttendanceStatus?,

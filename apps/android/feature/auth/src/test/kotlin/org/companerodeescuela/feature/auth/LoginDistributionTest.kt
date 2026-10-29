@@ -10,9 +10,15 @@ class LoginDistributionTest {
     @Test
     fun `academic login contains no administrative cards`() {
         assertEquals(
-            listOf(AppExperience.STUDENT, AppExperience.TEACHER, AppExperience.TUTOR),
+            listOf(AppExperience.STUDENT, AppExperience.TEACHER, AppExperience.TUTOR, AppExperience.GUEST),
             loginAccessesFor(AppDistribution.ACADEMIC).map { it.experience },
         )
+    }
+
+    @Test
+    fun `guest card cannot self-register or claim institutional permissions`() {
+        val guest = loginAccessesFor(AppDistribution.ACADEMIC).single { it.experience == AppExperience.GUEST }
+        assertFalse(guest.canRegister)
     }
 
     @Test

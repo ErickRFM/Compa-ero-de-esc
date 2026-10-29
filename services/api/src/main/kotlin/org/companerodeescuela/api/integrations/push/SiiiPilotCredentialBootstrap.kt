@@ -51,11 +51,16 @@ object SiiiPilotCredentialBootstrap {
         require(expiry > now + 3_600 && expiry <= now + 90L * 86_400) {
             "SIII_INBOUND_EXPIRES_AT_EPOCH_SECONDS must be between one hour and 90 days ahead"
         }
+        // A key has exactly one purpose. Never widen the existing producer key.
+        val scope = env("SIII_INBOUND_SCOPE") ?: "group:write"
+        require(scope in setOf("group:write", "attendance:read")) {
+            "SIII_INBOUND_SCOPE must be group:write or attendance:read"
+        }
         return IntegrationCredential(
             keyId = keyId,
             tenantId = tenantId,
             secret = secret,
-            scopes = setOf("group:write"),
+            scopes = setOf(scope),
             enabled = true,
             expiresAtEpochSeconds = expiry,
         )

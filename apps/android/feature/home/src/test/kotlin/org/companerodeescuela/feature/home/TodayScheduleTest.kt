@@ -4,6 +4,7 @@ import org.companerodeescuela.shared.contracts.AcademicLoadResponse
 import org.companerodeescuela.shared.contracts.AcademicProfile
 import org.companerodeescuela.shared.contracts.AcademicScheduleResponse
 import org.companerodeescuela.shared.contracts.ScheduleEntry
+import org.companerodeescuela.shared.contracts.ScheduleRecurrence
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -13,6 +14,95 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class TodayScheduleTest {
+    @Test
+    fun `personal Thursday timetable appears on home even without institutional assignment`() {
+        val personal =
+            listOf(
+                entry("Sistemas Embebidos", "13:00", "14:00").copy(
+                    dayOfWeek = "THURSDAY",
+                    subjectCode = "PERSONAL",
+                ),
+                entry("Inglés IX", "14:00", "16:00").copy(
+                    dayOfWeek = "THURSDAY",
+                    subjectCode = "PERSONAL",
+                ),
+            )
+        val result =
+            TodaySchedule.calculateEntries(
+                allEntries = personal,
+                now = LocalDateTime.of(2026, 10, 29, 13, 34),
+            )
+
+        assertEquals(true, result.hasSchedule)
+        assertEquals(2, result.classes.size)
+        assertEquals("Sistemas Embebidos", result.current?.subjectName)
+        assertEquals("Inglés IX", result.next?.subjectName)
+    }
+
+    @Test
+    fun `home uses personal timetable when authorized academic response is empty`() {
+        val institutional =
+            AcademicLoadResponse(
+                student = AcademicProfile("student-1", "Ana García"),
+                schedule = AcademicScheduleResponse(ownerId = "student-1", entries = emptyList()),
+            )
+        val personal = listOf(entry("Programación móvil", "08:00", "09:00"))
+        val selected = TodaySchedule.select(institutional, personal, LocalDateTime.of(2026, 10, 5, 8, 20))
+        assertEquals(true, selected.usesPersonalSchedule)
+        assertEquals("Ana García", selected.overview.studentName)
+        assertEquals("Programación móvil", selected.overview.current?.subjectName)
+    }
+
+    @Test
+    fun `home never replaces official lessons with personal imports`() {
+        val official = entry("Sistemas oficiales", "09:00", "10:00")
+        val institutional =
+            AcademicLoadResponse(
+                student = AcademicProfile("student-1", "Ana"),
+                schedule = AcademicScheduleResponse(ownerId = "student-1", entries = listOf(official)),
+            )
+        val selected =
+            TodaySchedule.select(
+                institutional,
+                listOf(entry("Clase personal", "08:00", "09:00")),
+                LocalDateTime.of(2026, 10, 5, 8, 20),
+            )
+        assertEquals(false, selected.usesPersonalSchedule)
+        assertEquals(listOf("Sistemas oficiales"), selected.overview.classes.map { it.subjectName })
+    }
+
+    @Test
+    fun `one time personal events are never repeated weekly`() {
+        val personal =
+            listOf(
+                entry("Clase extraordinaria", "08:00", "09:00").copy(
+                    recurrence = ScheduleRecurrence.ONE_TIME,
+                    effectiveDate = "2026-10-05",
+                ),
+            )
+        val sameDay = TodaySchedule.calculateEntries(personal, now = LocalDateTime.of(2026, 10, 5, 8, 20))
+        assertEquals("Clase extraordinaria", sameDay.current?.subjectName)
+
+        val nextWeek = TodaySchedule.calculateEntries(personal, now = LocalDateTime.of(2026, 10, 12, 8, 20))
+        assertEquals(emptyList(), nextWeek.classes)
+        assertEquals(null, nextWeek.nextScheduled)
+    }
+
+    @Test
+    fun `one time future event is scheduled for its effective date only`() {
+        val personal =
+            listOf(
+                entry("Conferencia especial", "11:00", "12:00").copy(
+                    recurrence = ScheduleRecurrence.ONE_TIME,
+                    effectiveDate = "2026-10-12",
+                ),
+            )
+        val priorWeek = TodaySchedule.calculateEntries(personal, now = LocalDateTime.of(2026, 10, 5, 8, 20))
+        assertEquals(emptyList(), priorWeek.classes)
+        assertEquals(7, priorWeek.nextScheduledDaysAway)
+        assertEquals("Conferencia especial", priorWeek.nextScheduled?.subjectName)
+    }
+
     @Test
     fun `now and next are selected from the current weekday`() {
         val result =

@@ -121,6 +121,23 @@ fun HomeScreen(
                 }
             }
 
+            Text(
+                text =
+                    when {
+                        state.loading -> "Sincronizando información…"
+                        state.errorMessage != null && overview == null -> "Sin sincronizar · revisa tu sesión o conexión"
+                        state.institutionalAccessDenied -> "Agenda personal · acceso escolar no autorizado"
+                        state.personalOnly && state.errorMessage == null -> "Agenda personal · sin materias escolares asignadas"
+                        state.fromCache && state.errorMessage != null -> "Agenda personal disponible · sincronización escolar pendiente"
+                        state.fromCache -> "Agenda guardada · conexión escolar pendiente"
+                        overview != null && !overview.hasSchedule -> "Cuenta conectada · sin horario escolar asignado"
+                        overview != null -> "Información escolar actualizada"
+                        else -> "Sin información sincronizada"
+                    },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
             if (state.loading && overview == null) {
                 CircularProgressIndicator()
             }
@@ -140,7 +157,13 @@ fun HomeScreen(
                             )
                             Text(
                                 if (state.errorMessage != null) {
-                                    "No se pudo actualizar. Tus clases guardadas siguen disponibles."
+                                    if (state.institutionalAccessDenied) {
+                                        "La cuenta aún no tiene acceso escolar. Tus clases personales están disponibles."
+                                    } else {
+                                        "No se pudo sincronizar con la escuela. Tu agenda personal está disponible."
+                                    }
+                                } else if (state.personalOnly) {
+                                    "Tu horario importado está disponible. Aún no hay clases oficiales asignadas a esta cuenta."
                                 } else {
                                     "Puedes consultar tu horario mientras se restablece la sincronización."
                                 },
@@ -157,8 +180,14 @@ fun HomeScreen(
 
             if (state.errorMessage != null && overview == null) {
                 StatusNotice(
-                    title = "No pudimos actualizar",
-                    message = "Compañero puede seguir funcionando con tu agenda local. Reintenta cuando tengas conexión.",
+                    title = if (state.institutionalAccessDenied) "Acceso escolar pendiente" else "No pudimos actualizar",
+                    message =
+                        if (state.institutionalAccessDenied) {
+                            "Tu sesión funciona, pero no tienes permiso para consultar las clases oficiales. " +
+                                "Comprueba tu perfil y vinculación con SIII."
+                        } else {
+                            "No se pudieron cargar tus datos. Comprueba tu sesión o conexión y vuelve a intentarlo."
+                        },
                     tone = NoticeTone.WARNING,
                 )
                 Button(onClick = viewModel::refresh) {
@@ -194,10 +223,10 @@ fun HomeScreen(
                 when {
                     !day.hasSchedule -> {
                         StatusNotice(
-                            title = "Todavía no tienes horario",
+                            title = "Aún no hay clases en tu horario",
                             message =
-                                "Importa una imagen o PDF, crea tu agenda manualmente o " +
-                                    "conecta el sistema escolar desde Configuración.",
+                                "Importa una imagen o PDF o crea tu agenda personal; " +
+                                    "las clases asignadas desde SIII aparecerán al sincronizar.",
                         )
                         Button(
                             onClick = onOpenSchedule,

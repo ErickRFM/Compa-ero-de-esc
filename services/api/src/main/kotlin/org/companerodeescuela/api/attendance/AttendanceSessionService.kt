@@ -95,9 +95,10 @@ class AttendanceSessionService(
                 openedBy = teacherId,
                 openedAtEpochSeconds = now.epochSecond,
                 closesAtEpochSeconds =
-                    now
-                        .plus(Duration.ofMinutes(request.durationMinutes.toLong()))
-                        .epochSecond,
+                    minOf(
+                        now.plus(Duration.ofMinutes(request.durationMinutes.toLong())).epochSecond,
+                        scheduledEnd.epochSecond,
+                    ),
                 status = AttendanceSessionStatus.OPEN,
                 identitySource = org.companerodeescuela.shared.contracts.AttendanceIdentitySource.INSTITUTIONAL,
             ).let { candidate ->

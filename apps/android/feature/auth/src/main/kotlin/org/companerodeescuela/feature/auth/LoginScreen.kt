@@ -115,7 +115,14 @@ fun LoginScreen(
             ) {
                 Column(Modifier.padding(18.dp)) {
                     Text(
-                        text = stringResource(R.string.auth_notice_title),
+                        text =
+                            stringResource(
+                                if (state.noticeReason == SessionNotice.EXPIRED) {
+                                    R.string.auth_notice_title
+                                } else {
+                                    R.string.auth_notice_connection_title
+                                },
+                            ),
                         color = ink,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,

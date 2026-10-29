@@ -42,8 +42,14 @@ object TodaySchedule {
     fun calculate(
         load: AcademicLoadResponse,
         now: LocalDateTime = LocalDateTime.now(),
+    ): TodayOverview = calculateEntries(load.schedule.entries, load.student.displayName, now)
+
+    /** Shares the exact same timetable logic with locally imported classes. */
+    fun calculateEntries(
+        allEntries: List<ScheduleEntry>,
+        studentName: String = "",
+        now: LocalDateTime = LocalDateTime.now(),
     ): TodayOverview {
-        val allEntries = load.schedule.entries
         val today =
             allEntries
                 .filter { it.dayOfWeek == now.dayOfWeek.name }
@@ -65,7 +71,7 @@ object TodaySchedule {
         val weeklyNext = findNextScheduled(allEntries, now)
 
         return TodayOverview(
-            studentName = load.student.displayName,
+            studentName = studentName,
             hasSchedule = allEntries.isNotEmpty(),
             current = current?.entry,
             next = next?.entry,

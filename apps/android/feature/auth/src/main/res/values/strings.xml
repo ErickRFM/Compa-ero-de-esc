@@ -18,11 +18,13 @@
 <string name="auth_role_student">Alumno</string>
 <string name="auth_role_teacher">Docente</string>
 <string name="auth_role_tutor">Tutor</string>
+    <string name="auth_role_guest">Invitado</string>
 <string name="auth_role_admin">Administrador</string>
 <string name="auth_role_super_admin">Superadministrador</string>
 <string name="auth_student_description">Tus clases, horario y asistencia en un solo lugar.</string>
 <string name="auth_teacher_description">Organiza tus clases y acompaña el aprendizaje de tus alumnos.</string>
 <string name="auth_tutor_description">Acompaña a tu grupo y da seguimiento a sus solicitudes.</string>
+    <string name="auth_guest_description">Consulta únicamente los espacios y eventos que te autorizaron. Requiere una cuenta invitada.</string>
 <string name="auth_admin_description">Gestiona los servicios de tu institución con tu acceso autorizado.</string>
 <string name="auth_super_admin_description">Supervisa la plataforma con las atribuciones de tu cuenta.</string>
 <string name="auth_access_position">Acceso %1$d de %2$d</string>

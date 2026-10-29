@@ -6,6 +6,12 @@ import kotlin.test.assertEquals
 
 /** The APK selector must not leak an experience from the other distribution. */
 class AppDistributionRoleResolverTest {
+    @kotlin.test.Test
+    fun `academic distribution allows restricted guest but not admin`() {
+        kotlin.test.assertEquals(true, AppDistribution.ACADEMIC.allows(AppExperience.GUEST))
+        kotlin.test.assertEquals(false, AppDistribution.ACADEMIC.allows(AppExperience.ADMIN))
+    }
+
     @Test
     fun `direction is available only in management and never grants another experience`() {
         val roles = setOf(UserRole.PRINCIPAL)

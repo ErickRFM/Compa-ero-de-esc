@@ -9,9 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -49,7 +47,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -65,15 +62,12 @@ import org.companerodeescuela.core.database.LocalAttendanceSyncState
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
-import org.companerodeescuela.core.designsystem.v8.V8AttendanceEvidence
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
-import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.ui.component.CompaneroHeroSurface
 import org.companerodeescuela.core.ui.component.CompaneroSurface
-import org.companerodeescuela.core.ui.component.CompaneroSurfaceRole
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.AttendanceDisposition
@@ -158,7 +152,7 @@ fun attendanceScreen(
                 state = state,
                 onRefresh = viewModel::refresh,
                 onScan = viewModel::openScanner,
-                onGenericScan = viewModel::openGenericScanner,
+                onPrepareClassContingency = viewModel::prepareClassContingency,
                 onStartSchoolDay = viewModel::openSchoolDayScanner,
                 onConfirmClassCall = viewModel::confirmClassCall,
                 onPickImage = { imageLauncher.launch(arrayOf("image/*")) },
@@ -193,7 +187,7 @@ fun studentAttendanceContent(
     state: AttendanceUiState,
     onRefresh: () -> Unit,
     onScan: (String?) -> Unit,
-    onGenericScan: () -> Unit,
+    onPrepareClassContingency: (String) -> Unit,
     onStartSchoolDay: () -> Unit,
     onConfirmClassCall: (String) -> Unit,
     onPickImage: () -> Unit,
@@ -206,6 +200,8 @@ fun studentAttendanceContent(
             state.occurrences.associateBy { it.id }
         }
     var showPasteDialog by remember { mutableStateOf(false) }
+    var historyExpanded by remember { mutableStateOf(false) }
+    var historyFilter by remember { mutableStateOf(StudentHistoryFilter.ALL) }
     val selectedSessionFocus = remember { BringIntoViewRequester() }
     LaunchedEffect(state.requestedStudentSessionId, state.activeSessions) {
         if (state.activeSessions.any { it.id == state.requestedStudentSessionId }) {
@@ -243,12 +239,6 @@ fun studentAttendanceContent(
                 org.companerodeescuela.core.designsystem.v8
                     .V8HeroTitle("Pase de", "lista")
             }
-            V8AttendanceEvidence(
-                // No independently authenticated campus witness is available.
-                schoolNetworkVerified = null,
-                locationVerified = null,
-                ready = schoolRecorded && state.activeSessions.isNotEmpty(),
-            )
             TextButton(onClick = onRefresh, enabled = !state.loading, modifier = Modifier.align(Alignment.End)) {
                 Text(if (state.loading) "Actualizando…" else "Actualizar")
             }
@@ -276,35 +266,12 @@ fun studentAttendanceContent(
                 }
             }
 
-            qrCenterCard(
-                onScan = onGenericScan,
-                onImage = onPickImage,
-                onPaste = { showPasteDialog = true },
-            )
-
-            schoolDayPresenceCard(
-                recorded = schoolRecorded,
-                ssid = state.schoolNetworkSsid,
-                expiresAtEpochSeconds = state.schoolPresence?.expiresAtEpochSeconds,
-                busy = state.actionInProgress,
-                onStart = onStartSchoolDay,
-            )
-
-            state.qrInspection?.let { inspection ->
-                qrInspectionCard(
-                    inspection = inspection,
-                    occurrence = inspection.session?.occurrenceId?.let(occurrenceById::get),
-                    busy = state.actionInProgress,
-                    onDismiss = onDismissInspection,
-                )
-            }
-
             if (!state.loading && state.activeSessions.isEmpty()) {
                 StatusNotice(
-                    title = "Sin sesión de clase activa",
+                    title = "Esperando pase del docente",
                     message =
-                        "Puedes iniciar la jornada escolar con el QR institucional. " +
-                            "El pase de clase aparecerá cuando lo abra tu docente.",
+                        "Recibirás una notificación cuando tu docente abra el pase de lista. " +
+                            "También aparecerá aquí, incluso si no recibiste el aviso.",
                 )
             }
 
@@ -333,6 +300,14 @@ fun studentAttendanceContent(
                         occurrence = occurrence,
                         local = local,
                         onScan = { onScan(session.id) },
+                        onImage = {
+                            onPrepareClassContingency(session.id)
+                            onPickImage()
+                        },
+                        onPaste = {
+                            onPrepareClassContingency(session.id)
+                            showPasteDialog = true
+                        },
                         onConfirm = { onConfirmClassCall(session.id) },
                         confirmed = state.confirmedClassCalls[session.id],
                         busy = state.actionInProgress,
@@ -341,20 +316,73 @@ fun studentAttendanceContent(
                 }
             }
 
-            Text("Mi historial de asistencia", style = MaterialTheme.typography.titleMedium)
+            schoolDayPresenceCard(
+                recorded = schoolRecorded,
+                ssid = state.schoolNetworkSsid,
+                expiresAtEpochSeconds = state.schoolPresence?.expiresAtEpochSeconds,
+                busy = state.actionInProgress,
+                onStart = onStartSchoolDay,
+            )
+
+            state.qrInspection?.let { inspection ->
+                qrInspectionCard(
+                    inspection = inspection,
+                    occurrence = inspection.session?.occurrenceId?.let(occurrenceById::get),
+                    busy = state.actionInProgress,
+                    onDismiss = onDismissInspection,
+                )
+            }
+
+            val historicalRecords = studentHistoricalRecords(state.studentHistory, state.activeSessions.map { it.id }.toSet())
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("Mi historial", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                if (state.studentHistoryLoaded) {
+                    Text("${historicalRecords.size} registros", style = MaterialTheme.typography.labelMedium)
+                }
+            }
             state.studentHistoryError?.let {
                 StatusNotice(title = "Historial sin actualizar", message = it, tone = NoticeTone.ERROR)
             }
-            val historicalRecords = studentHistoricalRecords(state.studentHistory, state.activeSessions.map { it.id }.toSet())
-            if (historicalRecords.isEmpty() && state.studentHistoryLoaded && state.studentHistoryError == null) {
-                Text("Aún no hay pases anteriores registrados.", style = MaterialTheme.typography.bodyMedium)
+            if (!state.studentHistoryLoaded && state.studentHistoryError == null) {
+                Text("Cargando historial…", style = MaterialTheme.typography.bodySmall)
             }
-            historicalRecords.forEach { record ->
+            if (historicalRecords.isNotEmpty()) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
+                    items(StudentHistoryFilter.entries) { option ->
+                        FilterChip(
+                            selected = historyFilter == option,
+                            onClick = {
+                                historyFilter = option
+                                historyExpanded = false
+                            },
+                            label = { Text(option.label) },
+                        )
+                    }
+                }
+            }
+            val filteredHistory = filterStudentHistory(historicalRecords, historyFilter)
+            if (historicalRecords.isEmpty() && state.studentHistoryLoaded && state.studentHistoryError == null) {
+                Text(
+                    "Todavía no hay asistencias anteriores. Los resultados revisados por el docente aparecerán aquí.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            } else if (filteredHistory.isEmpty() && historicalRecords.isNotEmpty()) {
+                Text("No hay registros con este estado.", style = MaterialTheme.typography.bodyMedium)
+            }
+            filteredHistory.take(if (historyExpanded) 100 else 5).forEach { record ->
                 CompaneroSurface {
-                    Column(Modifier.padding(CompaneroSpacing.md), verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
+                    Column(
+                        Modifier.padding(CompaneroSpacing.md),
+                        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                    ) {
                         Text(
-                            occurrenceById[record.occurrenceId]?.subjectName ?: "Registro de clase",
+                            occurrenceById[record.occurrenceId]?.subjectName ?: "Clase registrada",
                             style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
                         )
                         Text(
                             Instant
@@ -365,6 +393,11 @@ fun studentAttendanceContent(
                         )
                         Text(classCallRecordMessage(record), style = MaterialTheme.typography.bodyMedium)
                     }
+                }
+            }
+            if (filteredHistory.size > 5) {
+                TextButton(onClick = { historyExpanded = !historyExpanded }) {
+                    Text(if (historyExpanded) "Ver menos" else "Ver todos (${filteredHistory.size})")
                 }
             }
             val unsummarizedLocal = state.localRecords.filter { local -> state.studentHistory.none { it.sessionId == local.sessionId } }
@@ -397,11 +430,14 @@ private fun studentSessionCard(
     occurrence: ClassOccurrenceContract?,
     local: LocalAttendanceRecord?,
     onScan: () -> Unit,
+    onImage: () -> Unit,
+    onPaste: () -> Unit,
     onConfirm: () -> Unit,
     confirmed: AttendanceRecordResponse?,
     busy: Boolean,
     schoolPresenceActive: Boolean,
 ) {
+    var showContingencyDialog by remember(session.id) { mutableStateOf(false) }
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
@@ -443,36 +479,83 @@ private fun studentSessionCard(
                     )
                 }
 
-                Button(
-                    onClick = onConfirm,
-                    enabled = !busy && confirmed == null && local == null && schoolPresenceActive,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(if (confirmed == null) "Enviar pase para revisión" else classCallRecordMessage(confirmed))
-                }
-                if (!schoolPresenceActive) {
-                    Text(
-                        "Sin Wi-Fi escolar, el QR de contingencia del docente queda pendiente de revisión.",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = onScan,
-                    enabled = !busy && local == null && confirmed == null,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.QrCodeScanner,
-                        contentDescription = null,
-                    )
-                    Text(
-                        text =
-                            if (local == null) {
-                                " Comprobar QR"
-                            } else {
-                                " Pase ya registrado en este dispositivo"
+                if (confirmed == null && local == null) {
+                    Button(
+                        onClick = onConfirm,
+                        enabled = !busy && schoolPresenceActive,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Confirmar pase de lista")
+                    }
+                } else if (confirmed != null) {
+                    val needsReview = attendanceRecordRequiresReview(confirmed)
+                    val isRejected = confirmed.status == AttendanceStatus.REJECTED
+                    StatusNotice(
+                        title =
+                            when {
+                                isRejected -> "Pase rechazado"
+                                needsReview -> "Pase recibido · en revisión"
+                                else -> "Resultado de asistencia"
                             },
+                        message = classCallRecordMessage(confirmed),
+                        tone =
+                            when {
+                                isRejected -> NoticeTone.ERROR
+                                needsReview || confirmed.disposition == AttendanceDisposition.ABSENT -> NoticeTone.WARNING
+                                else -> NoticeTone.SUCCESS
+                            },
+                    )
+                }
+                if (!schoolPresenceActive && confirmed == null) {
+                    Text(
+                        "Para confirmar el pase, primero registra tu jornada con el QR institucional. " +
+                            "Si hay una incidencia, consulta al docente.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = CompanionColors.onDarkSurfaceVariant,
+                    )
+                }
+                if (confirmed == null && local == null) {
+                    TextButton(
+                        onClick = { showContingencyDialog = true },
+                        enabled = !busy,
+                    ) { Text("¿Problemas con el pase? · Contingencia") }
+                }
+                if (showContingencyDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showContingencyDialog = false },
+                        title = { Text("Contingencia de clase") },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
+                                Text("Solo si tu docente te proporcionó un QR o código alternativo. No sustituye su revisión.")
+                                TextButton(
+                                    onClick = {
+                                        showContingencyDialog = false
+                                        onScan()
+                                    },
+                                ) {
+                                    Text("Escanear QR del docente")
+                                }
+                                TextButton(
+                                    onClick = {
+                                        showContingencyDialog = false
+                                        onImage()
+                                    },
+                                ) {
+                                    Text("Elegir imagen del código")
+                                }
+                                TextButton(
+                                    onClick = {
+                                        showContingencyDialog = false
+                                        onPaste()
+                                    },
+                                ) {
+                                    Text("Pegar código")
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showContingencyDialog = false }) { Text("Cerrar") }
+                        },
                     )
                 }
             }
@@ -490,52 +573,48 @@ private fun schoolDayPresenceCard(
     busy: Boolean,
     onStart: () -> Unit,
 ) {
-    CompaneroSurface(
-        modifier = Modifier.fillMaxWidth(),
-        role = CompaneroSurfaceRole.CARD,
-    ) {
+    V8GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(CompaneroSpacing.md),
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
         ) {
-            Text(
-                text = "Presencia en la escuela",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            if (recorded) {
-                StatusNotice(
-                    title = "Ingreso registrado · presencia sin verificar",
-                    message =
-                        buildString {
-                            append(
-                                "El QR fue reconocido. La red declarada no acredita presencia física; el pase de clase requiere revisión docente.",
-                            )
-                            expiresAtEpochSeconds?.let {
-                                append(" Registro vigente hasta ")
-                                append(
-                                    DateTimeFormatter
-                                        .ofPattern(
-                                            "HH:mm",
-                                        ).withZone(java.time.ZoneId.systemDefault())
-                                        .format(Instant.ofEpochSecond(it)),
-                                )
-                            }
-                        },
-                    tone = NoticeTone.WARNING,
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Jornada escolar", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    if (recorded) "Registrada" else "Pendiente",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (recorded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            if (recorded) {
+                Text(
+                    "Tu QR institucional fue reconocido. La presencia física queda sujeta a verificación; " +
+                        "cada asistencia a clase requiere confirmación y revisión docente.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                expiresAtEpochSeconds?.let {
+                    Text(
+                        "Vigente hasta " +
+                            DateTimeFormatter
+                                .ofPattern("HH:mm")
+                                .withZone(java.time.ZoneId.systemDefault())
+                                .format(Instant.ofEpochSecond(it)),
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
             } else {
                 Text(
-                    text = "Conéctate al Wi-Fi de la escuela y escanea el QR institucional una vez al iniciar tu jornada.",
+                    "Al llegar, conéctate al Wi-Fi escolar y escanea una sola vez el QR institucional.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (ssid != null) {
-                    Text(
-                        text = "Red detectada: $ssid",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+                    Text("Red detectada: $ssid", style = MaterialTheme.typography.labelMedium)
                 }
                 Button(
                     onClick = onStart,
@@ -543,108 +622,8 @@ private fun schoolDayPresenceCard(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(Icons.Filled.QrCodeScanner, contentDescription = null)
-                    Text(" Iniciar jornada")
+                    Text("Escanear QR institucional", modifier = Modifier.padding(start = 8.dp))
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun qrCenterCard(
-    onScan: () -> Unit,
-    onImage: () -> Unit,
-    onPaste: () -> Unit,
-) {
-    var showContingencyDialog by remember { mutableStateOf(false) }
-    // DrawScope is not composable; capture the current theme color first.
-    val qrAccent = MaterialTheme.colorScheme.primary
-    V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Box(
-                Modifier
-                    .size(124.dp)
-                    .align(Alignment.CenterHorizontally)
-                    .then(
-                        Modifier.drawBehind {
-                            val length = 20.dp.toPx()
-                            val inset = 4.dp.toPx()
-                            val stroke = 3.dp.toPx()
-                            for (x in listOf(inset, size.width - inset)) {
-                                for (y in listOf(inset, size.height - inset)) {
-                                    val sx = if (x == inset) 1 else -1
-                                    val sy = if (y == inset) 1 else -1
-                                    drawLine(
-                                        qrAccent,
-                                        androidx.compose.ui.geometry
-                                            .Offset(x, y),
-                                        androidx.compose.ui.geometry
-                                            .Offset(x + sx * length, y),
-                                        stroke,
-                                    )
-                                    drawLine(
-                                        qrAccent,
-                                        androidx.compose.ui.geometry
-                                            .Offset(x, y),
-                                        androidx.compose.ui.geometry
-                                            .Offset(x, y + sy * length),
-                                        stroke,
-                                    )
-                                }
-                            }
-                        },
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Filled.QrCodeScanner,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(78.dp),
-                )
-            }
-            Text(
-                "Escanea el código QR",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = "Escanea el QR institucional de presencia escolar.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 8.dp),
-            )
-            org.companerodeescuela.core.designsystem.v8
-                .V8RedPrimaryButton("Escanear QR institucional", onScan, Modifier.fillMaxWidth())
-            TextButton(
-                onClick = { showContingencyDialog = true },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Opciones de contingencia de clase")
-            }
-            if (showContingencyDialog) {
-                AlertDialog(
-                    onDismissRequest = { showContingencyDialog = false },
-                    title = { Text("Contingencia de clase") },
-                    text = { Text("Usa estas opciones solo si el personal escolar indicó un pase de clase.") },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            showContingencyDialog = false
-                            onImage()
-                        }) { Text("Elegir imagen QR") }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = {
-                            showContingencyDialog = false
-                            onPaste()
-                        }) { Text("Pegar código") }
-                    },
-                )
             }
         }
     }

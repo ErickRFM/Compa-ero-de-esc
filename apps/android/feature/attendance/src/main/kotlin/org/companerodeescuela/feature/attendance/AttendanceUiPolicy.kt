@@ -9,6 +9,33 @@ import org.companerodeescuela.shared.contracts.SchoolPresenceResponse
 import org.companerodeescuela.shared.contracts.SchoolPresenceStatus
 import org.companerodeescuela.shared.validation.requiresAttendancePresenceReview
 
+/** History filters reflect the teacher's disposition, never a local sync guess. */
+enum class StudentHistoryFilter(
+    val label: String,
+) {
+    ALL("Todos"),
+    PRESENT("Presentes"),
+    LATE("Retardos"),
+    ABSENT("Ausencias"),
+    PENDING("Pendientes"),
+}
+
+fun filterStudentHistory(
+    records: List<AttendanceRecordResponse>,
+    filter: StudentHistoryFilter,
+): List<AttendanceRecordResponse> =
+    records.filter { record ->
+        when (filter) {
+            StudentHistoryFilter.ALL -> true
+            StudentHistoryFilter.PRESENT -> !attendanceRecordRequiresReview(record) && record.disposition == AttendanceDisposition.PRESENT
+            StudentHistoryFilter.LATE -> !attendanceRecordRequiresReview(record) && record.disposition == AttendanceDisposition.LATE
+            StudentHistoryFilter.ABSENT -> !attendanceRecordRequiresReview(record) && record.disposition == AttendanceDisposition.ABSENT
+            StudentHistoryFilter.PENDING ->
+                attendanceRecordRequiresReview(record) ||
+                    (record.disposition == null && record.status == AttendanceStatus.LIKELY)
+        }
+    }
+
 /** Active cards already display their current record; history contains older classes once each. */
 fun studentHistoricalRecords(
     records: List<AttendanceRecordResponse>,

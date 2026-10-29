@@ -34,10 +34,10 @@ class AttendanceTruthUiTest {
     @Test fun recordedEntryAllowsReviewCaptureAndDoesNotClaimVerifiedPresence() {
         var confirmations = 0
         render(state()) { confirmations++ }
-        compose.onNodeWithText("Ingreso registrado · presencia sin verificar").assertExists()
+        compose.onNodeWithText("Registrada").assertExists()
         compose.onNodeWithText("Verificada").assertDoesNotExist()
         compose
-            .onNodeWithText("Enviar pase para revisión")
+            .onNodeWithText("Confirmar pase de lista")
             .performScrollTo()
             .assertIsEnabled()
             .performClick()
@@ -90,7 +90,7 @@ class AttendanceTruthUiTest {
                 studentHistory = listOf(record().copy(sessionId = "closed-session")),
             ),
         )
-        compose.onNodeWithText("Mi historial de asistencia").performScrollTo().assertExists()
+        compose.onNodeWithText("Mi historial").performScrollTo().assertExists()
         compose.onNodeWithText("Registro recibido · requiere revisión docente").performScrollTo().assertExists()
         compose.onNodeWithText("Asistencia confirmada").assertDoesNotExist()
     }
@@ -104,6 +104,29 @@ class AttendanceTruthUiTest {
             ),
         )
         compose.onAllNodesWithText("Registro recibido · requiere revisión docente").assertCountEquals(1)
+    }
+
+    @Test fun campusQrHasOneEntryPointAndNoDuplicateScannerCard() {
+        val noCampusEntry =
+            state().copy(
+                activeSessions = emptyList(),
+                schoolPresence = null,
+                schoolPresenceReceivedRealtime = null,
+            )
+        render(noCampusEntry)
+        compose.onAllNodesWithText("Escanear QR institucional").assertCountEquals(1)
+        compose.onNodeWithText("Esperando pase del docente").assertExists()
+        compose.onNodeWithText("Confirmar pase de lista").assertDoesNotExist()
+    }
+
+    @Test fun teacherContingencyIsHiddenUntilStudentOpensIt() {
+        render(state())
+        compose.onNodeWithText("Escanear QR del docente").assertDoesNotExist()
+        compose
+            .onNodeWithText("¿Problemas con el pase? · Contingencia")
+            .performScrollTo()
+            .performClick()
+        compose.onNodeWithText("Escanear QR del docente").assertExists()
     }
 
     private fun render(

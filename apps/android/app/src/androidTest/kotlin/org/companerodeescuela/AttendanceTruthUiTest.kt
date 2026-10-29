@@ -108,11 +108,12 @@ class AttendanceTruthUiTest {
     }
 
     @Test fun campusQrHasOneEntryPointAndNoDuplicateScannerCard() {
-        val noCampusEntry = state().copy(
-            activeSessions = emptyList(),
-            schoolPresence = null,
-            schoolPresenceReceivedRealtime = null,
-        )
+        val noCampusEntry =
+            state().copy(
+                activeSessions = emptyList(),
+                schoolPresence = null,
+                schoolPresenceReceivedRealtime = null,
+            )
         render(noCampusEntry)
         compose.onAllNodesWithText("Escanear QR institucional").assertCountEquals(1)
         compose.onNodeWithText("Esperando pase del docente").assertExists()
@@ -122,7 +123,8 @@ class AttendanceTruthUiTest {
     @Test fun teacherContingencyIsHiddenUntilStudentOpensIt() {
         render(state())
         compose.onNodeWithText("Escanear QR del docente").assertDoesNotExist()
-        compose.onNodeWithText("¿Problemas con el pase? · Contingencia")
+        compose
+            .onNodeWithText("¿Problemas con el pase? · Contingencia")
             .performScrollTo()
             .performClick()
         compose.onNodeWithText("Escanear QR del docente").assertExists()

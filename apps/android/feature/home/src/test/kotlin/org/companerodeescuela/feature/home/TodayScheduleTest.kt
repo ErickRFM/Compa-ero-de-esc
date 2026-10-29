@@ -15,20 +15,22 @@ import kotlin.test.assertEquals
 class TodayScheduleTest {
     @Test
     fun `personal Thursday timetable appears on home even without institutional assignment`() {
-        val personal = listOf(
-            entry("Sistemas Embebidos", "13:00", "14:00").copy(
+        val personal =
+            listOf(
+                entry("Sistemas Embebidos", "13:00", "14:00").copy(
                 dayOfWeek = "THURSDAY",
                 subjectCode = "PERSONAL",
             ),
-            entry("Inglés IX", "14:00", "16:00").copy(
+                entry("Inglés IX", "14:00", "16:00").copy(
                 dayOfWeek = "THURSDAY",
                 subjectCode = "PERSONAL",
             ),
-        )
-        val result = TodaySchedule.calculateEntries(
-            allEntries = personal,
-            now = LocalDateTime.of(2026, 10, 29, 13, 34),
-        )
+            )
+        val result =
+            TodaySchedule.calculateEntries(
+                allEntries = personal,
+                now = LocalDateTime.of(2026, 10, 29, 13, 34),
+            )
 
         assertEquals(true, result.hasSchedule)
         assertEquals(2, result.classes.size)

@@ -30,7 +30,7 @@ fun filterStudentHistory(
             StudentHistoryFilter.ABSENT -> !attendanceRecordRequiresReview(record) && record.disposition == AttendanceDisposition.ABSENT
             StudentHistoryFilter.PENDING ->
                 attendanceRecordRequiresReview(record) ||
-                    (record.disposition == null && record.status != AttendanceStatus.REJECTED)
+                    (record.disposition == null && record.status == AttendanceStatus.LIKELY)
         }
     }
 

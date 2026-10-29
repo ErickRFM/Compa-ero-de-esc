@@ -27,6 +27,7 @@ data class HomeUiState(
     val updatedAtEpochSeconds: Long? = null,
     val errorMessage: String? = null,
     val institutionalAccessDenied: Boolean = false,
+    val personalOnly: Boolean = false,
 )
 
 @HiltViewModel
@@ -55,7 +56,7 @@ class HomeViewModel
                             overview =
                                 when {
                                     snapshot != null -> TodaySchedule.calculate(snapshot, LocalDateTime.now())
-                                    personal != null -> TodaySchedule.calculateEntries(personal, now = LocalDateTime.now())
+                                    personal != null -> TodaySchedule.calculateEntries(personal, state.overview?.studentName.orEmpty(), LocalDateTime.now())
                                     else -> state.overview
                                 },
                         )
@@ -72,14 +73,26 @@ class HomeViewModel
                     _state.update { it.copy(loading = true, errorMessage = null) }
                     when (val result = repository.load()) {
                         is Outcome.Success -> {
-                            latestAcademic = result.value.academic
-                            latestPersonal = null
+                            val academic = result.value.academic
+                            val personal =
+                                if (academic.schedule.entries.isEmpty()) {
+                                    when (val saved = personalRepository.list()) {
+                                        is Outcome.Success -> saved.value
+                                        is Outcome.Failure -> emptyList()
+                                    }
+                                } else {
+                                    emptyList()
+                                }
+                            val selected = TodaySchedule.select(academic, personal, LocalDateTime.now())
+                            latestAcademic = academic.takeUnless { selected.usesPersonalSchedule }
+                            latestPersonal = personal.takeIf { selected.usesPersonalSchedule }
                             _state.value =
                                 HomeUiState(
                                     loading = false,
-                                    overview = TodaySchedule.calculate(result.value.academic, LocalDateTime.now()),
-                                    fromCache = result.value.fromCache,
+                                    overview = selected.overview,
+                                    fromCache = result.value.fromCache || selected.usesPersonalSchedule,
                                     updatedAtEpochSeconds = result.value.updatedAtEpochSeconds,
+                                    personalOnly = selected.usesPersonalSchedule,
                                 )
                         }
                         is Outcome.Failure -> {
@@ -105,6 +118,7 @@ class HomeViewModel
                                         fromCache = true,
                                         errorMessage = result.error.userMessage,
                                         institutionalAccessDenied = status == 403,
+                                        personalOnly = true,
                                     )
                             } else {
                                 _state.value =

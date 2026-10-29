@@ -70,6 +70,27 @@ class AttendanceServiceTest {
         }
 
     @Test
+    fun `attendance session never extends past official class ending`() =
+        runTest {
+            val occurrence = teacherOccurrence()
+            val endsAt =
+                occurrence.date
+                    .atTime(occurrence.endsAt)
+                    .atZone(ZoneId.systemDefault())
+                    .toInstant()
+            val openedAt = endsAt.minusSeconds(90)
+            val service = service(clock = Clock.fixed(openedAt, ZoneOffset.UTC))
+            val session =
+                service.openSession(
+                    "T-0001",
+                    requestFor(occurrence).copy(durationMinutes = 15),
+                )
+
+            assertEquals(endsAt.epochSecond, session.closesAtEpochSeconds)
+            assertEquals(openedAt.epochSecond, session.openedAtEpochSeconds)
+        }
+
+    @Test
     fun `teacher opens attendance only for a dated occurrence they teach`() =
         runTest {
             val occurrence = teacherOccurrence()

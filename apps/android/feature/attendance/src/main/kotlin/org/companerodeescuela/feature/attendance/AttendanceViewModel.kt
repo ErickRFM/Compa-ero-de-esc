@@ -82,6 +82,10 @@ data class AttendanceUiState(
     val campusRoster: TeacherCampusRosterResponse? = null,
     val campusRosterError: String? = null,
     val confirmedClassCalls: Map<String, AttendanceRecordResponse> = emptyMap(),
+    val studentHistory: List<AttendanceRecordResponse> = emptyList(),
+    val studentHistoryLoaded: Boolean = false,
+    val studentHistoryError: String? = null,
+    val requestedStudentSessionId: String? = null,
     val localRecords: List<LocalAttendanceRecord> = emptyList(),
     val schoolPresence: SchoolPresenceResponse? = null,
     val schoolPresenceReceivedRealtime: Long? = null,
@@ -107,9 +111,17 @@ class AttendanceViewModel
         private var qrRotationJob: Job? = null
         private var rosterPollingJob: Job? = null
         private var studentPollingJob: Job? = null
+        private var studentHistoryJob: Job? = null
+        private var studentHistoryVersion = 0L
         private var requestedClassroom: TeacherClassContext? = null
         private var modeGeneration = 0L
         private var teacherRequests = SupervisorJob(viewModelScope.coroutineContext[Job])
+
+        private fun cancelStudentHistory() {
+            studentHistoryVersion++
+            studentHistoryJob?.cancel()
+            studentHistoryJob = null
+        }
 
         private fun launchTeacherRequest(block: suspend CoroutineScope.() -> Unit): Job =
             CoroutineScope(viewModelScope.coroutineContext + teacherRequests).launch(block = block)
@@ -119,6 +131,7 @@ class AttendanceViewModel
             loading: Boolean = false,
         ) {
             modeGeneration++
+            cancelStudentHistory()
             teacherRequests.cancel()
             teacherRequests = SupervisorJob(viewModelScope.coroutineContext[Job])
             qrRotationJob?.cancel()
@@ -155,6 +168,7 @@ class AttendanceViewModel
 
         fun setClassroomContext(selection: TeacherClassContext?) {
             modeGeneration++
+            cancelStudentHistory()
             studentPollingJob?.cancel()
             teacherRequests.cancel()
             teacherRequests = SupervisorJob(viewModelScope.coroutineContext[Job])
@@ -173,6 +187,11 @@ class AttendanceViewModel
                     sessionsLoaded = false,
                     teacherHistory = emptyList(),
                     teacherHistoryLoaded = false,
+                    studentHistory = emptyList(),
+                    studentHistoryLoaded = false,
+                    studentHistoryError = null,
+                    requestedStudentSessionId = null,
+                    confirmedClassCalls = emptyMap(),
                     actionInProgress = false,
                     campusRosterError = null,
                     qrVisualState = QrVisualState.IDLE,
@@ -190,6 +209,7 @@ class AttendanceViewModel
         fun selectMode(requestedMode: AttendanceMode) {
             if (requestedMode !in setOf(AttendanceMode.STUDENT, AttendanceMode.TEACHER)) return
             val generation = ++modeGeneration
+            cancelStudentHistory()
             studentPollingJob?.cancel()
 
             viewModelScope.launch {
@@ -216,7 +236,8 @@ class AttendanceViewModel
                         }
 
                         _state.update {
-                            it.copy(
+                            val scoped = if (it.userId != null && it.userId != claims.userId) AttendanceUiState() else it
+                            scoped.copy(
                                 mode = requestedMode,
                                 userId = claims.userId,
                                 loading = false,
@@ -474,19 +495,44 @@ class AttendanceViewModel
             }
         }
 
+        /** A notification only selects the class; sending requires the student's explicit action. */
+        fun openRequestedSession(sessionId: String) {
+            if (!sessionId.matches(
+                    Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}"),
+                )
+            ) {
+                return
+            }
+            _state.update { it.copy(requestedStudentSessionId = sessionId) }
+            refresh()
+        }
+
         fun confirmClassCall(sessionId: String) {
-            if (_state.value.actionInProgress || _state.value.confirmedClassCalls.containsKey(sessionId)) return
+            if (_state.value.mode != AttendanceMode.STUDENT ||
+                _state.value.activeSessions.none { it.id == sessionId } ||
+                _state.value.actionInProgress ||
+                _state.value.confirmedClassCalls.containsKey(sessionId)
+            ) {
+                return
+            }
+            val generation = modeGeneration
             viewModelScope.launch {
                 _state.update { it.copy(actionInProgress = true, errorMessage = null, successMessage = null) }
-                when (val result = repository.confirmClassCall(sessionId)) {
-                    is Outcome.Success ->
+                val result = repository.confirmClassCall(sessionId)
+                if (_state.value.mode != AttendanceMode.STUDENT || generation != modeGeneration) return@launch
+                when (result) {
+                    is Outcome.Success -> {
+                        // A history snapshot started before this submission must not erase the new record.
+                        cancelStudentHistory()
                         _state.update {
                             it.copy(
                                 actionInProgress = false,
                                 confirmedClassCalls = it.confirmedClassCalls + (sessionId to result.value),
+                                studentHistory = listOf(result.value) + it.studentHistory.filterNot { row -> row.id == result.value.id },
                                 successMessage = classCallRecordMessage(result.value),
                             )
                         }
+                    }
                     is Outcome.Failure ->
                         _state.update {
                             it.copy(actionInProgress = false, errorMessage = classCallErrorMessage(result.error))
@@ -733,7 +779,8 @@ class AttendanceViewModel
                                 else -> AttendanceMode.UNSUPPORTED
                             }
                         _state.update {
-                            it.copy(
+                            val scoped = if (it.userId != null && it.userId != claims.userId) AttendanceUiState() else it
+                            scoped.copy(
                                 mode = mode,
                                 userId = claims.userId,
                                 loading = false,
@@ -774,6 +821,8 @@ class AttendanceViewModel
 
         private fun refreshStudent() {
             val generation = modeGeneration
+            val ownerId = _state.value.userId ?: return
+            refreshStudentHistory(generation, ownerId)
             viewModelScope.launch {
                 if (_state.value.mode != AttendanceMode.STUDENT || generation != modeGeneration) return@launch
                 _state.update { it.copy(loading = true, errorMessage = null) }
@@ -782,7 +831,7 @@ class AttendanceViewModel
                 val sessions = repository.activeStudentSessions()
                 val presence = repository.schoolPresence()
                 if (_state.value.mode != AttendanceMode.STUDENT || generation != modeGeneration) return@launch
-                val presenceReceivedRealtime = android.os.SystemClock.elapsedRealtime()
+                val presenceReceivedRealtime = if (presence.valueOrNull() != null) android.os.SystemClock.elapsedRealtime() else null
                 val network = repository.currentSchoolNetwork()
 
                 val occurrences = week.valueOrNull()?.occurrences.orEmpty()
@@ -821,6 +870,63 @@ class AttendanceViewModel
                         }
                 }
             }
+        }
+
+        /** History can require slow institutional authorization; it never gates the live class call. */
+        private fun refreshStudentHistory(
+            generation: Long,
+            ownerId: String,
+        ) {
+            cancelStudentHistory()
+            val version = studentHistoryVersion
+
+            fun isCurrent(): Boolean =
+                generation == modeGeneration &&
+                    version == studentHistoryVersion &&
+                    _state.value.mode == AttendanceMode.STUDENT &&
+                    _state.value.userId == ownerId
+
+            studentHistoryJob =
+                viewModelScope.launch {
+                    if (!isCurrent()) return@launch
+                    val identity = repository.localSessionClaims().valueOrNull() ?: return@launch
+                    if (identity.userId != ownerId || !isCurrent()) return@launch
+                    val history = repository.studentHistory()
+                    ensureActive()
+                    val currentIdentity = repository.localSessionClaims().valueOrNull()
+                    if (!isCurrent()) return@launch
+                    if (currentIdentity == null || currentIdentity.userId != ownerId || currentIdentity.sessionId != identity.sessionId) {
+                        _state.update {
+                            it.copy(
+                                studentHistory = emptyList(),
+                                studentHistoryLoaded = false,
+                                studentHistoryError = "Tu sesión cambió. Actualiza para consultar tu historial.",
+                            )
+                        }
+                        return@launch
+                    }
+                    _state.update {
+                        when (history) {
+                            is Outcome.Success ->
+                                it.copy(
+                                    studentHistory = history.value,
+                                    studentHistoryLoaded = true,
+                                    studentHistoryError = null,
+                                )
+                            is Outcome.Failure ->
+                                it.copy(
+                                    studentHistory =
+                                        if ((history.error as? AppError.Http)?.status in setOf(401, 403, 404)
+                                        ) {
+                                            emptyList()
+                                        } else {
+                                            it.studentHistory
+                                        },
+                                    studentHistoryError = "No pudimos actualizar tu historial. " + history.error.userMessage,
+                                )
+                        }
+                    }
+                }
         }
 
         private fun refreshTeacher() {
@@ -1100,6 +1206,7 @@ class AttendanceViewModel
         }
 
         override fun onCleared() {
+            cancelStudentHistory()
             teacherRequests.cancel()
             qrRotationJob?.cancel()
             rosterPollingJob?.cancel()

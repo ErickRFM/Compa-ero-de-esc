@@ -16,6 +16,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
@@ -25,12 +27,14 @@ import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.ui.component.CompaneroSurface
 import org.companerodeescuela.core.ui.component.CompaneroSurfaceRole
 import org.companerodeescuela.core.ui.component.StatusNotice
+import org.companerodeescuela.shared.contracts.CoordinationOverview
 
 @Composable
-fun CoordinatorHomeScreen(
+fun coordinatorHomeScreen(
     onOpenSchedule: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: CoordinatorHomeViewModel = hiltViewModel(),
+    directionExperience: Boolean = false,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
@@ -47,12 +51,12 @@ fun CoordinatorHomeScreen(
     ) {
         V8ScreenHeader {
             Text(
-                text = "Coordinación Académica",
+                text = if (directionExperience) "Dirección" else "Coordinación Académica",
                 style = MaterialTheme.typography.headlineSmall,
             )
         }
         Text(
-            text = "Supervisión de grupos, asistencia docente y seguimiento de incidencias.",
+            text = "Supervisión de grupos y seguimiento institucional de asistencia.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -98,11 +102,6 @@ fun CoordinatorHomeScreen(
                         message = state.errorMessage.orEmpty(),
                     )
                 }
-                Text(
-                    text = "Asistencia docente e incidencias: indicadores pendientes de integración institucional.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
                 TextButton(
                     onClick = viewModel::refresh,
                     modifier = Modifier.fillMaxWidth(),
@@ -113,7 +112,10 @@ fun CoordinatorHomeScreen(
             }
         }
 
-        Text("Acciones de coordinación", style = MaterialTheme.typography.titleMedium)
+        Text(
+            if (directionExperience) "Supervisión institucional" else "Acciones de coordinación",
+            style = MaterialTheme.typography.titleMedium,
+        )
 
         CompaneroSurface(
             modifier = Modifier.fillMaxWidth(),
@@ -123,19 +125,17 @@ fun CoordinatorHomeScreen(
                 modifier = Modifier.padding(CompaneroSpacing.sm),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
             ) {
-                Text("Monitoreo de Asistencia", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "El reporte consolidado requiere una consulta institucional autorizada; " +
-                        "el pase de lista de alumno y docente no concede acceso a Coordinación.",
+                    "Monitoreo de asistencia",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.semantics { heading() },
+                )
+                Text(
+                    "Pases de lista y revisiones docentes de tu institución.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                StatusNotice(
-                    title = "Reporte aún no disponible",
-                    message =
-                        "Los indicadores de asistencia no están conectados todavía. " +
-                            "No se mostrará información de otros perfiles como si fuera un reporte.",
-                )
+                coordinationAttendanceIndicators(state.overview)
             }
         }
 
@@ -184,6 +184,31 @@ fun CoordinatorHomeScreen(
                             "La función se habilitará cuando el servidor verifique destinatarios y permisos.",
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun coordinationAttendanceIndicators(overview: CoordinationOverview?) {
+    Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
+        Text(
+            overview?.openAttendancePasses?.let { "$it pases abiertos" } ?: "Pases abiertos: no disponible",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            overview?.pendingAttendanceReviews?.let { "$it revisiones pendientes" } ?: "Revisiones pendientes: no disponible",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        if (overview?.attendanceSampleLimited == true) {
+            Text(
+                overview.attendanceSessionsSampleLimit?.let {
+                    "Vista parcial: hasta $it sesiones recientes. Los conteos corresponden a esa muestra."
+                } ?: "Vista parcial: los conteos corresponden a una muestra de sesiones recientes.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

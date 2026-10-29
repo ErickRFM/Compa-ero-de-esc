@@ -19,8 +19,13 @@ class NotificationConsentUiTest {
         var count = 0
         compose.setContent {
             CompaneroTheme {
-                ProfileScreen("Student", setOf(UserRole.STUDENT),
-                    onAppearance = {}, onLogout = {}, onNotifications = { count++ })
+                ProfileScreen(
+                    "Student",
+                    setOf(UserRole.STUDENT),
+                    onAppearance = {},
+                    onLogout = {},
+                    onNotifications = { count++ },
+                )
             }
         }
         compose.onNodeWithText("Notificaciones").performScrollTo().performClick()
@@ -30,10 +35,32 @@ class NotificationConsentUiTest {
     @Test fun notificationRowIsAbsentWithoutFirebaseConfig() {
         compose.setContent {
             CompaneroTheme {
-                ProfileScreen("Student", setOf(UserRole.STUDENT),
-                    onAppearance = {}, onLogout = {})
+                ProfileScreen(
+                    "Student",
+                    setOf(UserRole.STUDENT),
+                    onAppearance = {},
+                    onLogout = {},
+                )
             }
         }
         compose.onNodeWithText("Notificaciones").assertDoesNotExist()
+    }
+
+    @Test fun notificationRegistrationFailureIsVisibleWithoutClaimingSuccess() {
+        val message = "No se pudo registrar este dispositivo. Revisa el estado de tu cuenta y vuelve a intentarlo."
+        compose.setContent {
+            CompaneroTheme {
+                ProfileScreen(
+                    "Student",
+                    setOf(UserRole.STUDENT),
+                    onAppearance = {},
+                    onLogout = {},
+                    onNotifications = {},
+                    notificationsStatus = message,
+                )
+            }
+        }
+        compose.onNodeWithText(message).performScrollTo().assertExists()
+        compose.onNodeWithText("Dispositivo registrado.", substring = true).assertDoesNotExist()
     }
 }

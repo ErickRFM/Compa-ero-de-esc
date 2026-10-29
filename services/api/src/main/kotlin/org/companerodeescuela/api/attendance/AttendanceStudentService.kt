@@ -434,6 +434,74 @@ class AttendanceStudentService(
         }
     }
 
+    /** Closed passes remain readable, but neither a stored row nor an old role grants current scope. */
+    suspend fun myHistory(
+        studentId: String,
+        nativeActor: org.companerodeescuela.shared.contracts.UserSummary? = null,
+    ): List<AttendanceRecordResponse> = withHistory(studentId, nativeActor) { entries -> entries.map { it.record } }
+
+    internal data class HistoryEntry(
+        val record: AttendanceRecordResponse,
+        val session: AttendanceSessionResponse,
+    )
+
+    /** The projection can recheck S2S identity before the final fresh source-authority validation. */
+    internal suspend fun <T> withHistory(
+        studentId: String,
+        nativeActor: org.companerodeescuela.shared.contracts.UserSummary?,
+        read: suspend (List<HistoryEntry>) -> T,
+    ): T {
+        if (nativeActor != null && nativeActor.id != studentId) {
+            throw ApiException.Forbidden("Actual student identity does not match")
+        }
+        val institutional = nativeActor?.let { nativeProjection?.institutionalAttendance?.takeIf { authority -> authority.configured(it) } }
+        val readContext = institutional?.newSessionReadContext()
+        val enrolled =
+            if (readContext !=
+                null
+            ) {
+                readContext.studentGroups(checkNotNull(nativeActor))
+            } else {
+                enrollmentResolver.courseGroupsFor(studentId, nativeActor)
+            }
+        val history = mutableListOf<HistoryEntry>()
+        for (record in repository.recordsForStudent(studentId)) {
+            if (record.studentId != studentId) continue
+            val session = repository.findSession(record.sessionId) ?: continue
+            if ((nativeActor == null && session.academicSource != null) ||
+                record.occurrenceId != session.occurrenceId ||
+                (session.courseId to session.groupName.trim()) !in enrolled
+            ) {
+                continue
+            }
+            if (nativeActor == null) {
+                if (session.identitySource == AttendanceIdentitySource.NATIVE ||
+                    session.institutionId != null ||
+                    session.groupId != null
+                ) {
+                    continue
+                }
+            } else {
+                try {
+                    if (institutional != null) {
+                        institutional.requireSession(nativeActor, session, readContext)
+                    } else {
+                        (nativeProjection ?: throw ApiException.DependencyUnavailable("Native academic authority is unavailable"))
+                            .requireSession(nativeActor, session)
+                    }
+                } catch (_: ApiException.Forbidden) {
+                    continue
+                } catch (_: ApiException.NotFound) {
+                    continue
+                }
+            }
+            history += HistoryEntry(record.withCurrentPresencePolicy(), session)
+        }
+        val result = read(history)
+        readContext?.revalidate()
+        return result
+    }
+
     /** Existing canonical decision; only the enrolled student can read their own row. */
     suspend fun myClassRecord(
         studentId: String,

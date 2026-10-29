@@ -8,6 +8,9 @@ object AttendancePushContract {
     const val TYPE = "attendance_session_opened"
     const val SESSION_ID = "sessionId"
     const val CLICK_ACTION = "org.companerodeescuela.OPEN_ATTENDANCE"
+    const val CHANNEL_ID = "companero_academic_updates"
+
+    fun notificationTag(sessionId: String): String = "attendance-session:$sessionId"
 }
 
 @Serializable

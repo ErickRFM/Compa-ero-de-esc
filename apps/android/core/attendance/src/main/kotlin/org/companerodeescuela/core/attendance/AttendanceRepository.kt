@@ -89,6 +89,8 @@ class AttendanceRepository(
 
     suspend fun activeStudentSessions(): Outcome<List<AttendanceSessionResponse>> = withToken(remoteClient::activeStudentSessions)
 
+    suspend fun studentHistory(): Outcome<List<AttendanceRecordResponse>> = withToken(remoteClient::studentHistory)
+
     suspend fun activeTeacherSessions(): Outcome<List<AttendanceSessionResponse>> = withToken(remoteClient::activeTeacherSessions)
 
     suspend fun teacherSessionHistory(): Outcome<List<AttendanceSessionResponse>> = withToken(remoteClient::teacherSessionHistory)

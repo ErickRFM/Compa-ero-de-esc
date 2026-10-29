@@ -167,6 +167,8 @@ class SiiiAttendanceTest {
                 who: String,
             ) = client.get(path) { header(HttpHeaders.Authorization, "Bearer ${f.tokens.getValue(who)}") }
             assertEquals(HttpStatusCode.Unauthorized, client.get("/attendance/sessions/active").status)
+            assertEquals(HttpStatusCode.Unauthorized, client.get("/attendance/records/mine").status)
+            assertEquals(HttpStatusCode.Forbidden, get("/attendance/records/mine", "teacher").status)
             assertEquals(HttpStatusCode.Forbidden, post("/attendance/sessions", "student", Json.encodeToString(request)).status)
             val response = post("/attendance/sessions", "teacher", Json.encodeToString(request))
             assertEquals(HttpStatusCode.OK, response.status)
@@ -196,6 +198,30 @@ class SiiiAttendanceTest {
             assertEquals(AttendanceStatus.REVIEW_REQUIRED, record.status, "Synthetic network evidence never certifies physical attendance")
             assertEquals(AttendanceReasonCode.CLASS_CALL_CONFIRMED, record.reasonCode)
             assertEquals(listOf(record), sessions.roster(teacher.id, session.id, nativeActor = teacher).records)
+            val foreignSession = session.copy(id = "foreign-tenant", occurrenceId = "foreign-occurrence", institutionId = "tenant-b")
+            repository.createSession(foreignSession)
+            repository.writeAttempt(
+                record.copy(
+                    id = "foreign-record",
+                    operationId = "foreign-operation",
+                    sessionId = foreignSession.id,
+                    occurrenceId = foreignSession.occurrenceId,
+                ),
+            )
+            assertFailsWith<ApiException.Unauthorized> { students.myHistory(student.id, student.copy(institutionId = "tenant-b")) }
+            val history = get("/attendance/records/mine?studentId=teacher", "student")
+            assertEquals(HttpStatusCode.OK, history.status)
+            assertEquals("no-store", history.headers[HttpHeaders.CacheControl])
+            assertEquals(listOf(record), Json.decodeFromString<ApiResponse<List<AttendanceRecordResponse>>>(history.bodyAsText()).data)
+            sessions.closeSession(teacher.id, session.id, nativeActor = teacher)
+            assertEquals(
+                listOf(record),
+                Json
+                    .decodeFromString<ApiResponse<List<AttendanceRecordResponse>>>(
+                        get("/attendance/records/mine", "student").bodyAsText(),
+                    ).data,
+            )
+            repository.replaceSession(session)
             assertEquals(HttpStatusCode.NotFound, get("/attendance/sessions/missing/roster", "teacher").status)
             val superAccount =
                 org.companerodeescuela.api.auth.PlatformAccount(
@@ -228,6 +254,7 @@ class SiiiAttendanceTest {
             f.stored = openSnapshot
             f.sections = emptyList()
             assertEquals(emptyList(), students.discoverActiveFor(student.id, student))
+            assertEquals(emptyList(), students.myHistory(student.id, student))
             assertFailsWith<ApiException.Forbidden> { sessions.roster(teacher.id, session.id, nativeActor = teacher) }
             assertEquals(HttpStatusCode.Forbidden, get("/attendance/sessions/${session.id}/roster", "teacher").status)
             f.sections =
@@ -248,6 +275,7 @@ class SiiiAttendanceTest {
                 ),
             )
             assertFailsWith<ApiException.Forbidden> { sessions.roster("global", session.id, true, superAccount.toUserSummary()) }
+            assertEquals(emptyList(), students.myHistory(student.id, student))
             Unit
         }
 }

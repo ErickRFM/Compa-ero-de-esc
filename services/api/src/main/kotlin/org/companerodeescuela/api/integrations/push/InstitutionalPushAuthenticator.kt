@@ -93,7 +93,9 @@ class InstitutionalPushAuthenticator(
             nonces.reserveNonce(
                 credentialId = credential.keyId,
                 nonce = request.nonce,
-                expiresAt = clock.instant().plusSeconds(allowedClockSkewSeconds),
+                // A future-dated request remains acceptable until timestamp + skew,
+                // including that exact second. Retain its nonce through the full window.
+                expiresAt = Instant.ofEpochSecond(timestamp + allowedClockSkewSeconds + 1),
             )
         if (!reserved) return null
         return VerifiedInstitution(credential.keyId, credential.tenantId, credential.scopes)
@@ -102,7 +104,8 @@ class InstitutionalPushAuthenticator(
     companion object {
         const val EVENTS_PATH = "/integration/v1/events"
         const val PROJECTION_STATUS_PATH = "/integration/v1/projection-status"
-        private val AUTHENTICATED_PATHS = setOf(EVENTS_PATH, PROJECTION_STATUS_PATH)
+        const val ATTENDANCE_HISTORY_PATH = "/integration/v1/attendance-history"
+        private val AUTHENTICATED_PATHS = setOf(EVENTS_PATH, PROJECTION_STATUS_PATH, ATTENDANCE_HISTORY_PATH)
         const val DEFAULT_ALLOWED_CLOCK_SKEW_SECONDS = 300L
         const val MAX_ALLOWED_CLOCK_SKEW_SECONDS = 600L
         const val MIN_SECRET_BYTES = 32

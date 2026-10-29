@@ -1,8 +1,10 @@
 package org.companerodeescuela
 
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -12,7 +14,15 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
 import org.companerodeescuela.feature.attendance.AttendanceMode
 import org.companerodeescuela.feature.attendance.AttendanceUiState
 import org.companerodeescuela.feature.attendance.studentAttendanceContent
-import org.companerodeescuela.shared.contracts.*
+import org.companerodeescuela.shared.contracts.AttendanceDisposition
+import org.companerodeescuela.shared.contracts.AttendanceReasonCode
+import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
+import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
+import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
+import org.companerodeescuela.shared.contracts.AttendanceStatus
+import org.companerodeescuela.shared.contracts.NetworkVerificationMethod
+import org.companerodeescuela.shared.contracts.SchoolPresenceResponse
+import org.companerodeescuela.shared.contracts.SchoolPresenceStatus
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -26,14 +36,26 @@ class AttendanceTruthUiTest {
         render(state()) { confirmations++ }
         compose.onNodeWithText("Ingreso registrado · presencia sin verificar").assertExists()
         compose.onNodeWithText("Verificada").assertDoesNotExist()
-        compose.onNodeWithText("Enviar pase para revisión").performScrollTo().assertIsEnabled().performClick()
+        compose
+            .onNodeWithText("Enviar pase para revisión")
+            .performScrollTo()
+            .assertIsEnabled()
+            .performClick()
         assertEquals(1, confirmations)
     }
 
     @Test fun legacyAutomaticPresentAndSyncedVerifiedCacheAreNotDisplayedAsVerified() {
         val legacy = record().copy(status = AttendanceStatus.VERIFIED, disposition = AttendanceDisposition.PRESENT)
-        val local = LocalAttendanceRecord("cached", "student", "session", LocalAttendanceSyncState.SYNCED,
-            AttendanceStatus.VERIFIED, AttendanceReasonCode.QR_VALID, 1)
+        val local =
+            LocalAttendanceRecord(
+                "cached",
+                "student",
+                "session",
+                LocalAttendanceSyncState.SYNCED,
+                AttendanceStatus.VERIFIED,
+                AttendanceReasonCode.QR_VALID,
+                1,
+            )
         render(state().copy(confirmedClassCalls = mapOf("session" to legacy), localRecords = listOf(local)))
         compose.onNodeWithText("Asistencia confirmada").assertDoesNotExist()
         compose.onNodeWithText("Verificada por el servidor").assertDoesNotExist()
@@ -47,15 +69,47 @@ class AttendanceTruthUiTest {
     }
 
     @Test fun humanExceptionValidationWithoutDispositionDoesNotRemainPending() {
-        val human = record().copy(status = AttendanceStatus.VERIFIED, reasonCode = AttendanceReasonCode.TEACHER_REVIEW,
-            reviewedBy = "teacher", reviewedAtEpochSeconds = 1)
+        val human =
+            record().copy(
+                status = AttendanceStatus.VERIFIED,
+                reasonCode = AttendanceReasonCode.TEACHER_REVIEW,
+                reviewedBy = "teacher",
+                reviewedAtEpochSeconds = 1,
+            )
         render(state().copy(confirmedClassCalls = mapOf("session" to human)))
         compose.onNodeWithText("Evidencia validada por docente").performScrollTo().assertExists()
         compose.onNodeWithText("Registro recibido · requiere revisión docente").assertDoesNotExist()
         compose.onNodeWithText("Asistencia confirmada").assertDoesNotExist()
     }
 
-    private fun render(state: AttendanceUiState, onConfirm: (String) -> Unit = {}) {
+    @Test fun closedClassHistoryRemainsVisibleAndRequiresTeacherReview() {
+        render(
+            state().copy(
+                activeSessions = emptyList(),
+                studentHistoryLoaded = true,
+                studentHistory = listOf(record().copy(sessionId = "closed-session")),
+            ),
+        )
+        compose.onNodeWithText("Mi historial de asistencia").performScrollTo().assertExists()
+        compose.onNodeWithText("Registro recibido · requiere revisión docente").performScrollTo().assertExists()
+        compose.onNodeWithText("Asistencia confirmada").assertDoesNotExist()
+    }
+
+    @Test fun activeRecordIsNotDuplicatedInHistory() {
+        render(
+            state().copy(
+                studentHistoryLoaded = true,
+                studentHistory = listOf(record()),
+                confirmedClassCalls = mapOf("session" to record()),
+            ),
+        )
+        compose.onAllNodesWithText("Registro recibido · requiere revisión docente").assertCountEquals(1)
+    }
+
+    private fun render(
+        state: AttendanceUiState,
+        onConfirm: (String) -> Unit = {},
+    ) {
         compose.setContent {
             CompaneroTheme {
                 studentAttendanceContent(state, {}, {}, {}, {}, onConfirm, {}, {}, {}, Modifier)
@@ -65,15 +119,50 @@ class AttendanceTruthUiTest {
 
     private fun state(): AttendanceUiState {
         val now = System.currentTimeMillis() / 1_000
-        val session = AttendanceSessionResponse("session", "occurrence", "QA subject", "QA group", "2026-10-09",
-            "08:00", "08:50", "teacher", now - 30, now + 3600, status = AttendanceSessionStatus.OPEN)
-        return AttendanceUiState(mode = AttendanceMode.STUDENT, loading = false, activeSessions = listOf(session),
-            schoolPresence = SchoolPresenceResponse("entry", "student", now - 60, now + 3600,
-                status = SchoolPresenceStatus.ACTIVE, qrVerified = true, networkVerified = true,
-                networkVerificationMethod = NetworkVerificationMethod.SSID, serverTimeEpochSeconds = now),
-            schoolPresenceReceivedRealtime = android.os.SystemClock.elapsedRealtime())
+        val session =
+            AttendanceSessionResponse(
+                "session",
+                "occurrence",
+                "QA subject",
+                "QA group",
+                "2026-10-09",
+                "08:00",
+                "08:50",
+                "teacher",
+                now - 30,
+                now + 3600,
+                status = AttendanceSessionStatus.OPEN,
+            )
+        return AttendanceUiState(
+            mode = AttendanceMode.STUDENT,
+            loading = false,
+            activeSessions = listOf(session),
+            schoolPresence =
+                SchoolPresenceResponse(
+                    "entry",
+                    "student",
+                    now - 60,
+                    now + 3600,
+                    status = SchoolPresenceStatus.ACTIVE,
+                    qrVerified = true,
+                    networkVerified = true,
+                    networkVerificationMethod = NetworkVerificationMethod.SSID,
+                    serverTimeEpochSeconds = now,
+                ),
+            schoolPresenceReceivedRealtime = android.os.SystemClock.elapsedRealtime(),
+        )
     }
 
-    private fun record() = AttendanceRecordResponse("record", "op", "session", "occurrence", "student",
-        AttendanceStatus.REVIEW_REQUIRED, AttendanceReasonCode.CLASS_CALL_CONFIRMED, 1, 1)
+    private fun record() =
+        AttendanceRecordResponse(
+            "record",
+            "op",
+            "session",
+            "occurrence",
+            "student",
+            AttendanceStatus.REVIEW_REQUIRED,
+            AttendanceReasonCode.CLASS_CALL_CONFIRMED,
+            1,
+            1,
+        )
 }

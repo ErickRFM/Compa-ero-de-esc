@@ -1,11 +1,10 @@
 package org.companerodeescuela.notifications
 
 import android.Manifest
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
@@ -62,18 +61,14 @@ class CompaneroFirebaseMessagingService : FirebaseMessagingService() {
         ) {
             return
         }
-        val manager = getSystemService(NotificationManager::class.java)
-        val channelId = "companero_academic_updates"
-        if (Build.VERSION.SDK_INT >= 26) {
-            manager.createNotificationChannel(
-                NotificationChannel(channelId, "Avisos académicos", NotificationManager.IMPORTANCE_DEFAULT),
-            )
-        }
+        AcademicNotificationChannel.create(this)
+        val channelId = AttendancePushContract.CHANNEL_ID
         val activity =
             Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 if (attendanceNotice) {
                     action = AttendancePushContract.CLICK_ACTION
+                    data = Uri.parse("companero://attendance/$sessionId")
                     putExtra(AttendancePushContract.SESSION_ID, sessionId)
                 }
             }
@@ -99,10 +94,11 @@ class CompaneroFirebaseMessagingService : FirebaseMessagingService() {
                 .setAutoCancel(true)
                 .setContentIntent(pending)
                 .build()
-        NotificationManagerCompat.from(this).notify(
-            sessionId?.hashCode()
-                ?: message.messageId?.hashCode() ?: SystemClock.uptimeMillis().toInt(),
-            notification,
-        )
+        val notifications = NotificationManagerCompat.from(this)
+        if (attendanceNotice && sessionId != null) {
+            notifications.notify(AttendancePushContract.notificationTag(sessionId), 0, notification)
+        } else {
+            notifications.notify(message.messageId?.hashCode() ?: SystemClock.uptimeMillis().toInt(), notification)
+        }
     }
 }

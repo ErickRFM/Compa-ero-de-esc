@@ -13,6 +13,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
+import org.companerodeescuela.core.navigation.AppDistribution
 import org.companerodeescuela.core.navigation.CompaneroScaffold
 import org.companerodeescuela.core.navigation.Destination
 import org.companerodeescuela.core.navigation.RoleExperienceResolver
@@ -26,24 +27,44 @@ import org.junit.Test
 /** Real Compose navigation-graph fixtures for every authorized main experience. */
 class V14RoleNavigationUiTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
-    private val routes = listOf(
-        Destination.Home, Destination.TeacherHome, Destination.TutorHome,
-        Destination.TutorGroups, Destination.TutorRequests,
-        Destination.CoordinatorHome, Destination.AdminHome,
-        Destination.Schedule, Destination.Attendance, Destination.Classrooms,
-        Destination.Channel, Destination.Grading, Destination.Profile,
-        Destination.AppearanceSettings,
-    )
+    private val routes =
+        listOf(
+            Destination.Home,
+            Destination.TeacherHome,
+            Destination.TutorHome,
+            Destination.TutorGroups,
+            Destination.TutorRequests,
+            Destination.CoordinatorHome,
+            Destination.AdminHome,
+            Destination.Schedule,
+            Destination.Attendance,
+            Destination.Classrooms,
+            Destination.Channel,
+            Destination.Grading,
+            Destination.Profile,
+            Destination.AppearanceSettings,
+        )
 
     @Test fun studentBackToHome() = verify(UserRole.STUDENT)
+
     @Test fun teacherBackToHome() = verify(UserRole.TEACHER)
+
     @Test fun tutorBackToHome() = verify(UserRole.TUTOR)
+
     @Test fun coordinatorBackToHome() = verify(UserRole.COORDINATOR)
+
+    @Test fun directionBackToHome() = verify(UserRole.PRINCIPAL)
+
     @Test fun adminBackToHome() = verify(UserRole.ADMIN)
+
     @Test fun superAdminBackToHome() = verify(UserRole.SUPER_ADMIN)
 
     private fun verify(role: UserRole) {
-        val config = RoleExperienceResolver.resolve(setOf(role))
+        val config =
+            RoleExperienceResolver.resolve(
+                setOf(role),
+                distribution = if (role == UserRole.PRINCIPAL) AppDistribution.MANAGEMENT else AppDistribution.LEGACY,
+            )
         var nav: NavHostController? = null
         compose.setContent {
             CompaneroTheme {

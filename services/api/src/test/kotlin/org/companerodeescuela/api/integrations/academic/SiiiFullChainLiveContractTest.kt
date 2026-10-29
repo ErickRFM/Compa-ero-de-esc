@@ -56,6 +56,7 @@ import org.companerodeescuela.api.integrations.academic.siii.SiiiSectionProjecti
 import org.companerodeescuela.api.integrations.academic.siii.SiiiSectionReader
 import org.companerodeescuela.api.integrations.mock.MockAcademicProvider
 import org.companerodeescuela.api.integrations.mock.MockIdentityProvider
+import org.companerodeescuela.api.integrations.push.InstitutionalAttendanceHistoryService
 import org.companerodeescuela.api.integrations.push.InstitutionalEventProjectionWorker
 import org.companerodeescuela.api.integrations.push.InstitutionalIdentityLink
 import org.companerodeescuela.api.integrations.push.InstitutionalIdentityLinkService
@@ -66,6 +67,7 @@ import org.companerodeescuela.api.integrations.push.InstitutionalSecretProtector
 import org.companerodeescuela.api.integrations.push.IntegrationCredential
 import org.companerodeescuela.api.integrations.push.MongoInstitutionalIdentityLinkRepository
 import org.companerodeescuela.api.integrations.push.MongoInstitutionalPushRepository
+import org.companerodeescuela.api.integrations.push.institutionalAttendanceHistoryRoutes
 import org.companerodeescuela.api.integrations.push.institutionalPushRoutes
 import org.companerodeescuela.api.plugins.ApiJson
 import org.companerodeescuela.api.plugins.configurePlugins
@@ -74,6 +76,8 @@ import org.companerodeescuela.api.presence.SchoolPresencePolicy
 import org.companerodeescuela.api.presence.SchoolPresenceService
 import org.companerodeescuela.api.test.TestFixtures
 import org.companerodeescuela.shared.contracts.AcademicLoadResponse
+import org.companerodeescuela.shared.contracts.ApiError
+import org.companerodeescuela.shared.contracts.ApiErrorCode
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
 import org.companerodeescuela.shared.contracts.AttendanceRosterResponse
@@ -81,6 +85,8 @@ import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.AttendanceStatus
 import org.companerodeescuela.shared.contracts.ClassCallConfirmationRequest
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
+import org.companerodeescuela.shared.contracts.InstitutionalAttendanceHistoryContract
+import org.companerodeescuela.shared.contracts.InstitutionalAttendanceHistoryResponse
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
 import org.companerodeescuela.shared.contracts.SchoolNetworkEvidence
 import org.companerodeescuela.shared.contracts.StartSchoolPresenceRequest
@@ -145,6 +151,12 @@ class SiiiFullChainLiveContractTest {
         val snapshots = MongoSiiiSectionSnapshotRepository(db)
         val identities = readerGraph(db, tenantId)
         inbox.putCredential(IntegrationCredential(keyId, tenantId, secret.copyOf(), setOf("group:write"), true, null), Instant.now())
+        val readKeyId = "read-${UUID.randomUUID()}"
+        val readSecret = ByteArray(32).also(SecureRandom()::nextBytes)
+        inbox.putCredential(
+            IntegrationCredential(readKeyId, tenantId, readSecret.copyOf(), setOf("attendance:read"), true, null),
+            Instant.now(),
+        )
         val server =
             embeddedServer(CIO, host = "127.0.0.1", port = 0) {
                 install(ContentNegotiation) { json(ApiJson) }
@@ -167,6 +179,8 @@ class SiiiFullChainLiveContractTest {
                 tenantId,
                 keyId,
                 secret,
+                readKeyId,
+                readSecret,
             )
         var closeReads: (() -> Unit)? = null
         try {
@@ -305,6 +319,11 @@ class SiiiFullChainLiveContractTest {
                             attendanceStudents,
                             AttendanceReviewService(attendanceRepository, access, attendanceClock),
                         )
+                        institutionalAttendanceHistoryRoutes(
+                            InstitutionalPushAuthenticator(inbox, inbox),
+                            InstitutionalAttendanceHistoryService(identities.identityLinks(), attendanceStudents, attendanceAuthority),
+                            inbox,
+                        )
                     }
                 }.start(wait = false)
             closeReads = { readServer.stop(0, 5000) }
@@ -347,7 +366,8 @@ class SiiiFullChainLiveContractTest {
                         connection.outputStream.use { it.write(body.toByteArray()) }
                     }
                     val status = connection.responseCode
-                    return status to (if (status == 200) connection.inputStream.bufferedReader().use { it.readText() } else "")
+                    val stream = if (status == 200) connection.inputStream else connection.errorStream
+                    return status to (stream?.bufferedReader()?.use { it.readText() } ?: "")
                 } finally {
                     connection.disconnect()
                 }
@@ -429,9 +449,32 @@ class SiiiFullChainLiveContractTest {
             val roster = attendanceHttp(teacher, "/sessions/${pass.id}/roster")
             assertEquals(200, roster.first)
             assertEquals(listOf(record), Json.decodeFromString<ApiResponse<AttendanceRosterResponse>>(roster.second).data.records)
+            assertEquals(200, attendanceHttp(teacher, "/sessions/${pass.id}/close", "{}").first)
+            val ownClosedRecord = attendanceHttp(student, "/sessions/${pass.id}/mine")
+            assertEquals(200, ownClosedRecord.first)
+            assertEquals(record, Json.decodeFromString<ApiResponse<AttendanceRecordResponse>>(ownClosedRecord.second).data)
+            val historyOrigin = "http://127.0.0.1:$readPort"
+            val exported = probe.action("history", mapOf("origin" to historyOrigin))
+            val history = ApiJson.decodeFromString<InstitutionalAttendanceHistoryResponse>(exported.getValue("history").toString())
+            assertEquals(InstitutionalAttendanceHistoryContract.RESPONSE, history.contract)
+            assertEquals(100, history.sampleLimit)
+            assertEquals(pass.id, history.records.single().sessionId)
+            assertEquals(sectionId, history.records.single().sectionId)
+            assertEquals(AttendanceStatus.REVIEW_REQUIRED, history.records.single().status)
+            assertTrue(
+                history.records
+                    .single()
+                    .auditRecordId
+                    .matches(Regex("[0-9a-f]{64}")),
+            )
+            assertTrue(!exported.toString().contains(student.id))
+            assertTrue(!exported.toString().contains("reviewedBy"))
 
             val withdrawn = probe.action("withdraw")
             val withdrawnVersion = withdrawn.long("sourceVersion")
+            val withdrawnHistory = probe.action("history", mapOf("origin" to historyOrigin))
+            assertEquals(404L, withdrawnHistory.long("historyStatus"))
+            assertTrue("history" !in withdrawnHistory)
             assertEquals(
                 emptyList(),
                 Json
@@ -439,13 +482,20 @@ class SiiiFullChainLiveContractTest {
                         attendanceHttp(student, "/sessions/active").second,
                     ).data,
             )
-            assertEquals(
-                403,
+            // Closed calls fail before enrollment checks; reading the saved row must still enforce live revocation.
+            assertEquals(403, attendanceHttp(student, "/sessions/${pass.id}/mine").first)
+            val closedConfirmation =
                 attendanceHttp(
                     student,
                     "/sessions/${pass.id}/confirm",
                     Json.encodeToString(ClassCallConfirmationRequest("revoked-confirm", SchoolNetworkEvidence(ssid = "CHAIN-QA"))),
-                ).first,
+                )
+            assertEquals(409, closedConfirmation.first)
+            assertEquals(ApiErrorCode.ATTENDANCE_SESSION_CLOSED, Json.decodeFromString<ApiError>(closedConfirmation.second).code)
+            assertEquals(
+                listOf(record),
+                attendanceRepository.recordsForSession(pass.id),
+                "A denied confirmation must not alter saved attendance",
             )
             assertEquals(
                 404,
@@ -471,6 +521,7 @@ class SiiiFullChainLiveContractTest {
             closeReads?.invoke()
             probe.close()
             server.stop(0, 5_000)
+            readSecret.fill(0)
         }
     }
 
@@ -605,6 +656,8 @@ class SiiiFullChainLiveContractTest {
         tenantId: String,
         keyId: String,
         secret: ByteArray,
+        readKeyId: String,
+        readSecret: ByteArray,
     ) {
         private val project = Path.of(requireNotNull(System.getenv("COMPANION_CHAIN_PROBE_PROJECT_ROOT"))).toAbsolutePath().normalize()
         private val process: Process
@@ -639,6 +692,8 @@ class SiiiFullChainLiveContractTest {
                     "COMPANION_CHAIN_ORIGIN" to "http://127.0.0.1:$receiverPort",
                     "COMPANION_CHAIN_KEY_ID" to keyId,
                     "COMPANION_CHAIN_SECRET_BASE64" to encoded,
+                    "COMPANION_CHAIN_ATTENDANCE_KEY_ID" to readKeyId,
+                    "COMPANION_CHAIN_ATTENDANCE_SECRET_BASE64" to Base64.getEncoder().encodeToString(readSecret),
                 ),
             )
             process = builder.start()
@@ -648,12 +703,16 @@ class SiiiFullChainLiveContractTest {
 
         fun start(): JsonObject = readReport()
 
-        fun action(name: String): JsonObject {
+        fun action(
+            name: String,
+            fields: Map<String, String> = emptyMap(),
+        ): JsonObject {
             input.write(
                 Json.encodeToString(
                     JsonObject.serializer(),
                     kotlinx.serialization.json.buildJsonObject {
                         put("action", kotlinx.serialization.json.JsonPrimitive(name))
+                        fields.forEach { (key, value) -> put(key, kotlinx.serialization.json.JsonPrimitive(value)) }
                     },
                 ),
             )

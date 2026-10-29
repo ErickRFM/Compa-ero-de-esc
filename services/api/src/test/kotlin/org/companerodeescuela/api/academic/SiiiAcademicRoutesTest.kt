@@ -260,6 +260,8 @@ class SiiiAcademicRoutesTest {
         var sections = listOf(SiiiAuthoritySection(sectionId, 1))
         var missing = false
         var revoked = false
+        var authorityReads = 0
+        var onAuthorityRead: (() -> Unit)? = null
         val tokens = mutableMapOf<String, String>()
         private val repository =
             object : SiiiSectionSnapshotRepository {
@@ -300,6 +302,8 @@ class SiiiAcademicRoutesTest {
                 links,
                 reader,
                 SiiiAcademicAuthority { institution, kind, external ->
+                    authorityReads++
+                    onAuthorityRead?.invoke()
                     if (revoked || institution != "tenant-a") throw ApiException.Forbidden()
                     SiiiAuthorityManifest(
                         "siii.academic_authority.v1",

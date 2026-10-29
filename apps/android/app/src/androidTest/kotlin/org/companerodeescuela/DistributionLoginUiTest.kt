@@ -36,13 +36,14 @@ class DistributionLoginUiTest {
             if (distribution == AppDistribution.ACADEMIC) {
                 setOf(AppExperience.STUDENT, AppExperience.TEACHER, AppExperience.TUTOR)
             } else {
-                setOf(AppExperience.COORDINATOR, AppExperience.ADMIN, AppExperience.SUPER_ADMIN)
+                setOf(AppExperience.PRINCIPAL, AppExperience.COORDINATOR, AppExperience.ADMIN, AppExperience.SUPER_ADMIN)
             }
         val known =
             setOf(
                 AppExperience.STUDENT,
                 AppExperience.TEACHER,
                 AppExperience.TUTOR,
+                AppExperience.PRINCIPAL,
                 AppExperience.COORDINATOR,
                 AppExperience.ADMIN,
                 AppExperience.SUPER_ADMIN,

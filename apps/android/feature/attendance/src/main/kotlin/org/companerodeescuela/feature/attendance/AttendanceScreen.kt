@@ -488,10 +488,22 @@ private fun studentSessionCard(
                         Text("Confirmar pase de lista")
                     }
                 } else if (confirmed != null) {
+                    val needsReview = attendanceRecordRequiresReview(confirmed)
+                    val isRejected = confirmed.status == AttendanceStatus.REJECTED
                     StatusNotice(
-                        title = "Pase enviado",
+                        title =
+                            when {
+                                isRejected -> "Pase rechazado"
+                                needsReview -> "Pase recibido · en revisión"
+                                else -> "Resultado de asistencia"
+                            },
                         message = classCallRecordMessage(confirmed),
-                        tone = NoticeTone.SUCCESS,
+                        tone =
+                            when {
+                                isRejected -> NoticeTone.ERROR
+                                needsReview || confirmed.disposition == AttendanceDisposition.ABSENT -> NoticeTone.WARNING
+                                else -> NoticeTone.SUCCESS
+                            },
                     )
                 }
                 if (!schoolPresenceActive && confirmed == null) {

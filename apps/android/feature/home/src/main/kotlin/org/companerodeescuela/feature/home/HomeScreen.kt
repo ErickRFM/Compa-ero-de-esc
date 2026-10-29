@@ -126,6 +126,7 @@ fun HomeScreen(
                     when {
                         state.loading -> "Sincronizando información…"
                         state.errorMessage != null && overview == null -> "Sin sincronizar · revisa tu sesión o conexión"
+                        state.institutionalAccessDenied -> "Agenda personal · acceso escolar no autorizado"
                         state.fromCache && state.errorMessage != null -> "Agenda personal disponible · sincronización escolar pendiente"
                         state.fromCache -> "Agenda guardada · conexión escolar pendiente"
                         overview != null -> "Información escolar actualizada"
@@ -154,7 +155,11 @@ fun HomeScreen(
                             )
                             Text(
                                 if (state.errorMessage != null) {
-                                    "No se pudo sincronizar con la escuela. Tu agenda personal está disponible."
+                                    if (state.institutionalAccessDenied) {
+                                        "La cuenta aún no tiene acceso escolar. Tus clases personales están disponibles."
+                                    } else {
+                                        "No se pudo sincronizar con la escuela. Tu agenda personal está disponible."
+                                    }
                                 } else {
                                     "Puedes consultar tu horario mientras se restablece la sincronización."
                                 },
@@ -171,8 +176,14 @@ fun HomeScreen(
 
             if (state.errorMessage != null && overview == null) {
                 StatusNotice(
-                    title = "No pudimos actualizar",
-                    message = "No se pudieron cargar tus datos. Comprueba tu sesión o conexión y vuelve a intentarlo.",
+                    title = if (state.institutionalAccessDenied) "Acceso escolar pendiente" else "No pudimos actualizar",
+                    message =
+                        if (state.institutionalAccessDenied) {
+                            "Tu sesión funciona, pero no tienes permiso para consultar las clases oficiales. " +
+                                "Comprueba tu perfil y vinculación con SIII."
+                        } else {
+                            "No se pudieron cargar tus datos. Comprueba tu sesión o conexión y vuelve a intentarlo."
+                        },
                     tone = NoticeTone.WARNING,
                 )
                 Button(onClick = viewModel::refresh) {

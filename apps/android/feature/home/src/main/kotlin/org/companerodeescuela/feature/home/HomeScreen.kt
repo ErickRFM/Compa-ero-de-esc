@@ -127,8 +127,10 @@ fun HomeScreen(
                         state.loading -> "Sincronizando información…"
                         state.errorMessage != null && overview == null -> "Sin sincronizar · revisa tu sesión o conexión"
                         state.institutionalAccessDenied -> "Agenda personal · acceso escolar no autorizado"
+                        state.personalOnly && state.errorMessage == null -> "Agenda personal · sin materias escolares asignadas"
                         state.fromCache && state.errorMessage != null -> "Agenda personal disponible · sincronización escolar pendiente"
                         state.fromCache -> "Agenda guardada · conexión escolar pendiente"
+                        overview != null && !overview.hasSchedule -> "Cuenta conectada · sin horario escolar asignado"
                         overview != null -> "Información escolar actualizada"
                         else -> "Sin información sincronizada"
                     },
@@ -160,6 +162,8 @@ fun HomeScreen(
                                     } else {
                                         "No se pudo sincronizar con la escuela. Tu agenda personal está disponible."
                                     }
+                                } else if (state.personalOnly) {
+                                    "Tu horario importado está disponible. Aún no hay clases oficiales asignadas a esta cuenta."
                                 } else {
                                     "Puedes consultar tu horario mientras se restablece la sincronización."
                                 },

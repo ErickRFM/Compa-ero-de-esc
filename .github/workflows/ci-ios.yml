@@ -29,7 +29,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
       - name: Build and test the same simulator pipeline as Codemagic
         run: bash infrastructure/scripts/build-ios-simulator.sh
       - name: Upload simulator and verification evidence

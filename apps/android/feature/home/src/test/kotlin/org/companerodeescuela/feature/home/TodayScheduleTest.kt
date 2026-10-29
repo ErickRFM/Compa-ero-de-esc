@@ -4,6 +4,7 @@ import org.companerodeescuela.shared.contracts.AcademicLoadResponse
 import org.companerodeescuela.shared.contracts.AcademicProfile
 import org.companerodeescuela.shared.contracts.AcademicScheduleResponse
 import org.companerodeescuela.shared.contracts.ScheduleEntry
+import org.companerodeescuela.shared.contracts.ScheduleRecurrence
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -68,6 +69,38 @@ class TodayScheduleTest {
             )
         assertEquals(false, selected.usesPersonalSchedule)
         assertEquals(listOf("Sistemas oficiales"), selected.overview.classes.map { it.subjectName })
+    }
+
+    @Test
+    fun `one time personal events are never repeated weekly`() {
+        val personal =
+            listOf(
+                entry("Clase extraordinaria", "08:00", "09:00").copy(
+                    recurrence = ScheduleRecurrence.ONE_TIME,
+                    effectiveDate = "2026-10-05",
+                ),
+            )
+        val sameDay = TodaySchedule.calculateEntries(personal, now = LocalDateTime.of(2026, 10, 5, 8, 20))
+        assertEquals("Clase extraordinaria", sameDay.current?.subjectName)
+
+        val nextWeek = TodaySchedule.calculateEntries(personal, now = LocalDateTime.of(2026, 10, 12, 8, 20))
+        assertEquals(emptyList(), nextWeek.classes)
+        assertEquals(null, nextWeek.nextScheduled)
+    }
+
+    @Test
+    fun `one time future event is scheduled for its effective date only`() {
+        val personal =
+            listOf(
+                entry("Conferencia especial", "11:00", "12:00").copy(
+                    recurrence = ScheduleRecurrence.ONE_TIME,
+                    effectiveDate = "2026-10-12",
+                ),
+            )
+        val priorWeek = TodaySchedule.calculateEntries(personal, now = LocalDateTime.of(2026, 10, 5, 8, 20))
+        assertEquals(emptyList(), priorWeek.classes)
+        assertEquals(7, priorWeek.nextScheduledDaysAway)
+        assertEquals("Conferencia especial", priorWeek.nextScheduled?.subjectName)
     }
 
     @Test

@@ -39,6 +39,38 @@ class TodayScheduleTest {
     }
 
     @Test
+    fun `home uses personal timetable when authorized academic response is empty`() {
+        val institutional =
+            AcademicLoadResponse(
+                student = AcademicProfile("student-1", "Ana García"),
+                schedule = AcademicScheduleResponse(ownerId = "student-1", entries = emptyList()),
+            )
+        val personal = listOf(entry("Programación móvil", "08:00", "09:00"))
+        val selected = TodaySchedule.select(institutional, personal, LocalDateTime.of(2026, 10, 5, 8, 20))
+        assertEquals(true, selected.usesPersonalSchedule)
+        assertEquals("Ana García", selected.overview.studentName)
+        assertEquals("Programación móvil", selected.overview.current?.subjectName)
+    }
+
+    @Test
+    fun `home never replaces official lessons with personal imports`() {
+        val official = entry("Sistemas oficiales", "09:00", "10:00")
+        val institutional =
+            AcademicLoadResponse(
+                student = AcademicProfile("student-1", "Ana"),
+                schedule = AcademicScheduleResponse(ownerId = "student-1", entries = listOf(official)),
+            )
+        val selected =
+            TodaySchedule.select(
+                institutional,
+                listOf(entry("Clase personal", "08:00", "09:00")),
+                LocalDateTime.of(2026, 10, 5, 8, 20),
+            )
+        assertEquals(false, selected.usesPersonalSchedule)
+        assertEquals(listOf("Sistemas oficiales"), selected.overview.classes.map { it.subjectName })
+    }
+
+    @Test
     fun `now and next are selected from the current weekday`() {
         val result =
             TodaySchedule.calculate(

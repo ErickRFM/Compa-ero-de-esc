@@ -294,7 +294,7 @@ jobs:
           require_distinct('org.companerodeescuela.InstitutionalClassesUiTest', 4)
           require_distinct('org.companerodeescuela.CoordinationAttendanceIndicatorsUiTest', 3)
           require_distinct('org.companerodeescuela.NotificationConsentUiTest', 3)
-          require_distinct('org.companerodeescuela.AttendanceTruthUiTest', 6)
+          require_distinct('org.companerodeescuela.AttendanceTruthUiTest', 8)
           if flavor == 'management':
               require_distinct('org.companerodeescuela.DistributionLoginUiTest', 2)
               require_distinct('org.companerodeescuela.V14RoleNavigationUiTest', 7)

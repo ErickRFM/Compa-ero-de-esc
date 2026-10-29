@@ -617,7 +617,7 @@ private fun schoolDayPresenceCard(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(Icons.Filled.QrCodeScanner, contentDescription = null)
-                    Text(" Escanear QR institucional")
+                    Text("Escanear QR institucional", modifier = Modifier.padding(start = 8.dp))
                 }
             }
         }

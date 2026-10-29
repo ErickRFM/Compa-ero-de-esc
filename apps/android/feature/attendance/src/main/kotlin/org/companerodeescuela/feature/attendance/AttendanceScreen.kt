@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -70,7 +69,6 @@ import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.ui.component.CompaneroHeroSurface
 import org.companerodeescuela.core.ui.component.CompaneroSurface
-import org.companerodeescuela.core.ui.component.CompaneroSurfaceRole
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.AttendanceDisposition
@@ -364,7 +362,10 @@ fun studentAttendanceContent(
                     items(StudentHistoryFilter.entries) { option ->
                         FilterChip(
                             selected = historyFilter == option,
-                            onClick = { historyFilter = option; historyExpanded = false },
+                            onClick = {
+                                historyFilter = option
+                                historyExpanded = false
+                            },
                             label = { Text(option.label) },
                         )
                     }
@@ -521,13 +522,22 @@ private fun studentSessionCard(
                         text = {
                             Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
                                 Text("Solo si tu docente te proporcionó un QR o código alternativo. No sustituye su revisión.")
-                                TextButton(onClick = { showContingencyDialog = false; onScan() }) {
+                                TextButton(onClick = {
+                                        showContingencyDialog = false
+                                        onScan()
+                                    }) {
                                     Text("Escanear QR del docente")
                                 }
-                                TextButton(onClick = { showContingencyDialog = false; onImage() }) {
+                                TextButton(onClick = {
+                                        showContingencyDialog = false
+                                        onImage()
+                                    }) {
                                     Text("Elegir imagen del código")
                                 }
-                                TextButton(onClick = { showContingencyDialog = false; onPaste() }) {
+                                TextButton(onClick = {
+                                        showContingencyDialog = false
+                                        onPaste()
+                                    }) {
                                     Text("Pegar código")
                                 }
                             }
@@ -579,7 +589,8 @@ private fun schoolDayPresenceCard(
                 expiresAtEpochSeconds?.let {
                     Text(
                         "Vigente hasta " +
-                            DateTimeFormatter.ofPattern("HH:mm")
+                            DateTimeFormatter
+                                .ofPattern("HH:mm")
                                 .withZone(java.time.ZoneId.systemDefault())
                                 .format(Instant.ofEpochSecond(it)),
                         style = MaterialTheme.typography.labelMedium,

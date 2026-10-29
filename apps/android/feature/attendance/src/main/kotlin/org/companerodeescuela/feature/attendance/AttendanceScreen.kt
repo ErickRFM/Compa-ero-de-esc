@@ -522,22 +522,28 @@ private fun studentSessionCard(
                         text = {
                             Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
                                 Text("Solo si tu docente te proporcionó un QR o código alternativo. No sustituye su revisión.")
-                                TextButton(onClick = {
+                                TextButton(
+                                    onClick = {
                                         showContingencyDialog = false
                                         onScan()
-                                    }) {
+                                    },
+                                ) {
                                     Text("Escanear QR del docente")
                                 }
-                                TextButton(onClick = {
+                                TextButton(
+                                    onClick = {
                                         showContingencyDialog = false
                                         onImage()
-                                    }) {
+                                    },
+                                ) {
                                     Text("Elegir imagen del código")
                                 }
-                                TextButton(onClick = {
+                                TextButton(
+                                    onClick = {
                                         showContingencyDialog = false
                                         onPaste()
-                                    }) {
+                                    },
+                                ) {
                                     Text("Pegar código")
                                 }
                             }

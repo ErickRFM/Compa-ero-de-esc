@@ -13,6 +13,7 @@ import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.security.SessionTokenInspector
 import org.companerodeescuela.core.security.SessionTokenStore
+import org.companerodeescuela.shared.contracts.RegisterRequest
 import org.companerodeescuela.shared.contracts.RegistrationAccountType
 import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
@@ -204,10 +205,10 @@ class SessionViewModel @Inject constructor(
         password: String,
         accountType: RegistrationAccountType,
     ) = register(
-        org.companerodeescuela.shared.contracts.RegisterRequest(displayName, email, password, accountType),
+        RegisterRequest(displayName, email, password, accountType),
     )
 
-    fun register(request: org.companerodeescuela.shared.contracts.RegisterRequest) {
+    fun register(request: RegisterRequest) {
         if (!beginCredentials()) return
         credentialJob =
             viewModelScope.launch {

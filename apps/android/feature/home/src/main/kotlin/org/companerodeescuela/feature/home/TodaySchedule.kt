@@ -1,11 +1,13 @@
 package org.companerodeescuela.feature.home
 
 import java.time.DayOfWeek
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.util.Locale
 import org.companerodeescuela.shared.contracts.AcademicLoadResponse
 import org.companerodeescuela.shared.contracts.ScheduleEntry
+import org.companerodeescuela.shared.contracts.ScheduleRecurrence
 
 data class TodayOverview(
     val studentName: String,
@@ -75,7 +77,7 @@ object TodaySchedule {
     ): TodayOverview {
         val today =
             allEntries
-                .filter { it.dayOfWeek == now.dayOfWeek.name }
+                .filter { occursOnDate(it, now.toLocalDate()) }
                 .mapNotNull { entry ->
                     val start = runCatching { LocalTime.parse(entry.startsAt) }.getOrNull()
                     val end = runCatching { LocalTime.parse(entry.endsAt) }.getOrNull()
@@ -104,6 +106,13 @@ object TodaySchedule {
         )
     }
 
+    private fun occursOnDate(
+        entry: ScheduleEntry,
+        date: LocalDate,
+    ): Boolean =
+        entry.dayOfWeek == date.dayOfWeek.name &&
+            (entry.recurrence != ScheduleRecurrence.ONE_TIME || entry.effectiveDate == date.toString())
+
     private fun findNextScheduled(
         entries: List<ScheduleEntry>,
         now: LocalDateTime,
@@ -112,10 +121,22 @@ object TodaySchedule {
             entries.mapNotNull { entry ->
                 val day = runCatching { DayOfWeek.valueOf(entry.dayOfWeek) }.getOrNull() ?: return@mapNotNull null
                 val start = runCatching { LocalTime.parse(entry.startsAt) }.getOrNull() ?: return@mapNotNull null
-                var daysAway = (day.value - now.dayOfWeek.value + 7) % 7
-                if (daysAway == 0 && !start.isAfter(now.toLocalTime())) {
-                    daysAway = 7
-                }
+                val daysAway =
+                    if (entry.recurrence == ScheduleRecurrence.ONE_TIME) {
+                        val effectiveDate =
+                            entry.effectiveDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+                                ?: return@mapNotNull null
+                        if (effectiveDate.dayOfWeek != day) return@mapNotNull null
+                        val distance = java.time.temporal.ChronoUnit.DAYS.between(now.toLocalDate(), effectiveDate)
+                        if (distance < 0 || (distance == 0L && !start.isAfter(now.toLocalTime()))) {
+                            return@mapNotNull null
+                        }
+                        distance.toInt()
+                    } else {
+                        var distance = (day.value - now.dayOfWeek.value + 7) % 7
+                        if (distance == 0 && !start.isAfter(now.toLocalTime())) distance = 7
+                        distance
+                    }
                 WeeklyCandidate(entry = entry, start = start, daysAway = daysAway)
             }
         return candidates.minWithOrNull(

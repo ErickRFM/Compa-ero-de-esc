@@ -46,6 +46,23 @@ class SiiiPilotCredentialBootstrapTest {
     }
 
     @Test
+    fun `bootstrap can provision a separate attendance read credential without write access`() {
+        val vars = settings() + ("SIII_INBOUND_SCOPE" to "attendance:read")
+        val credential = requireNotNull(SiiiPilotCredentialBootstrap.parse(vars::get, clock))
+        assertEquals(setOf("attendance:read"), credential.scopes)
+    }
+
+    @Test
+    fun `bootstrap rejects combined unknown or blank scopes`() {
+        for (scope in listOf("group:write attendance:read", "group:write,attendance:read", "*", "", " attendance:read")) {
+            val vars = settings() + ("SIII_INBOUND_SCOPE" to scope)
+            assertFailsWith<IllegalArgumentException> {
+                SiiiPilotCredentialBootstrap.parse(vars::get, clock)
+            }
+        }
+    }
+
+    @Test
     fun `bootstrap refuses credentials for unknown or disabled institution`() =
         runBlocking {
             val credential = requireNotNull(SiiiPilotCredentialBootstrap.parse(settings()::get, clock))

@@ -34,6 +34,7 @@
 <string name="auth_access_is_intention">Your account determines the experiences you can use.</string>
 <string name="auth_managed_access">This access requires an account authorized by your institution.</string>
 <string name="auth_notice_title">Sign in again</string>
+    <string name="auth_notice_connection_title">Connection interrupted</string>
 <string name="auth_notice_expired">Your session ended. Please sign in again.</string>
 <string name="auth_notice_connection">We could not verify your session. Check your connection and try again.</string>
 <string name="auth_identifier_required">Enter your email, student ID or username.</string>

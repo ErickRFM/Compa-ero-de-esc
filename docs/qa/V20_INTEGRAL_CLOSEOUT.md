@@ -10,7 +10,7 @@ Especificación: misión V20 aportada por el usuario. Ejecución continua autori
 - [x] C: cerrar Android FCM: acción explícita tras deep link, canal y tag comunes, errores de registro, historial persistente desde servidor. Responsable: implementación notificaciones/Android. Archivos: feature/core attendance y app notifications; no MainActivity.
 - [x] D: añadir historial propio limitado y autorizado en Ktor/Mongo. Contrato: GET /attendance/records/mine → ApiResponse<List<AttendanceRecordResponse>>, sin selector de alumno, máximo 100, más recientes primero, identidad/tenant/inscripción actuales. Responsable: backend historial.
 - [x] E: integrar regresión 232 y corregir replay HMAC con reloj adelantado; completar payload FCM y corregir workflow inválido. Responsable: agente principal; no cambiar secretos.
-- [ ] F: ejecutar Kotlin/API/shared, Mongo real aislado, Android unit/lint/build y Compose API31/35 según disponibilidad; preservar pruebas negativas y controles.
+- [x] F: validación local completa: Kotlin/shared, Mongo aislado, lint/build, Compose API30 y cadena real de laboratorio con lectura SIII. API31/35 remotas aprobaron el bloque anterior; la nueva revisión requiere CI de su SHA.
 - [ ] G: revisión independiente del diff final; commits funcionales, push, PR y checks. Merge únicamente tras checks aprobados. Confirmar SHA de main y generar APK/hash desde ese SHA.
 - [ ] H: publicar artefacto y matriz Poco X7 Pro; distinguir emulación, hardware y dependencias externas.
 
@@ -32,6 +32,8 @@ Revisar especialmente cambio de cuenta/rol, repetición/reinicio, revocación de
 
 - PR219 portado conservando deep links; PR220 adaptado sin su carrusel incompatible. PRINCIPAL solo en Management y supervisión con capacidad explícita, sin gestión implícita.
 - GET `/attendance/records/mine`: estudiante actual, máximo100, sesiones cerradas, orden estable, no-store y autorización vigente por institución/inscripción. Mongo con índice para alumno/fecha.
+- Cobertura de fase D: se añadió el puente de consulta desde SIII. POST `/integration/v1/attendance-history` exige HMAC y `attendance:read`, resuelve matrícula dentro del tenant firmado, revalida identidad y autoridad fuente y devuelve máximo100 registros sin identidad nativa, notas, revisores ni evidencia de dispositivo. La credencial de escritura no puede leer; la de lectura no puede enviar eventos. SIII expone GET `/api/v1/institutions/{institutionId}/companion-attendance/{studentId}` a lectores institucionales con `academic.manage`, revalidando alumno, inscripción, versión y ocurrencias después de la consulta y auditando solo su alcance y cantidad.
+- Incremento lector verificado: API635 casos,632 ejecutados sin fallos y3 optativos; estilo global aprobado. SIII1005 unitarias y8HTTP nuevas sin fallos, typecheck/lint/build aprobados. Cadena real aislada:2/2 sin skips, fuente SIII `a1c29dfae53876e00f2e8dd7eb71a17c18205a40` más incremento lector → PostgreSQL/outbox → Ktor/Mongo → pase y cierre → GET SIII200 → retiro de inscripción → historial404 y lectura propia403 antes de entregar la proyección. Envío a sesión cerrada409 con código exacto y registro sin cambios. Gateway push falso; esta evidencia no certifica FCM físico. Revisión independiente del puente sin defectos P0/P1/P2 confirmados.
 - Historial Android independiente del refresco del pase; cancelación y verificación de usuario/session_id/modo impiden publicar una respuesta antigua. Error transitorio conserva el historial; revocación lo retira.
 - Notificación abre contexto y exige el botón de envío. Estado REVIEW_REQUIRED permanece diferenciado de presencia validada por docente. QR de clase sigue como contingencia.
 - Tag por sesión y canal compartidos para SDK Firebase/background y servicio foreground. Registro de dispositivos distingue rechazo, sesión y fallo transitorio; Perfil muestra diagnóstico y acceso a ajustes.
@@ -62,6 +64,8 @@ Validación local del bloque funcional `76dcd8a20351b47efdd6b6bb909f1fb4c77b0e43
 El alta de una identidad Dirección y su capacidad requiere provisionamiento institucional autorizado; este cambio no concede roles a cuentas reales ni agrega un atajo de asignación. SIII conserva pagos, calificaciones e historial académico oficial. Los datos de pruebas automatizadas residen en fixtures o bases desechables locales.
 
 ## Firebase pendiente: pasos exactos
+
+El lector SIII necesita una credencial institucional autorizada con scope exclusivo `attendance:read` y su configuración privada `SIII_COMPANION_ATTENDANCE_TARGETS_JSON`, separada de los targets de escritura. No se concedieron scopes ni se cambiaron credenciales productivas. Ausencia de configuración devuelve503; no se presenta como un historial vacío. El formato y operación se documentan en el repositorio SIII. La consulta de expedientes reales9A continúa pendiente de esa habilitación y de identidades autorizadas.
 
 Se buscaron archivos ocultos/ignorados en el repositorio completo, google-services.json y equivalentes, variables de proceso y nombres de variables/secretos de GitHub. No se encontró configuración reutilizable. El entorno GitHub android-release devolvió404; la firma productiva y sus valores no quedan acreditados. La arquitectura permite APK de diagnóstico con FIREBASE_CONFIGURED=false y diagnóstico visible; esta APK no recibe FCM.
 

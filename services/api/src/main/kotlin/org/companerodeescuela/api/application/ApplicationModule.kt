@@ -36,6 +36,7 @@ import org.companerodeescuela.api.institutions.institutionRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
 import org.companerodeescuela.api.integrations.academic.siii.SiiiSectionProjectionFeature
 import org.companerodeescuela.api.integrations.push.InMemoryInstitutionalIdentityLinkRepository
+import org.companerodeescuela.api.integrations.push.InstitutionalAttendanceHistoryService
 import org.companerodeescuela.api.integrations.push.InstitutionalEventProjectionWorker
 import org.companerodeescuela.api.integrations.push.InstitutionalIdentityLinkService
 import org.companerodeescuela.api.integrations.push.InstitutionalProjectionIdentityResolver
@@ -45,6 +46,7 @@ import org.companerodeescuela.api.integrations.push.InstitutionalSecretProtector
 import org.companerodeescuela.api.integrations.push.MongoInstitutionalIdentityLinkRepository
 import org.companerodeescuela.api.integrations.push.MongoInstitutionalPushRepository
 import org.companerodeescuela.api.integrations.push.SiiiPilotCredentialBootstrap
+import org.companerodeescuela.api.integrations.push.institutionalAttendanceHistoryRoutes
 import org.companerodeescuela.api.integrations.push.institutionalIdentityLinkRoutes
 import org.companerodeescuela.api.integrations.push.institutionalPushRoutes
 import org.companerodeescuela.api.plugins.configurePlugins
@@ -340,6 +342,15 @@ fun Application.module(
             institutionalPushAuthenticator,
             institutionalPushService,
             institutionalPushRepository,
+            institutionalPushRepository,
+        )
+        institutionalAttendanceHistoryRoutes(
+            institutionalPushAuthenticator,
+            InstitutionalAttendanceHistoryService(
+                institutionalIdentityLinkService,
+                attendanceGraph.studentService,
+                nativeAcademic.institutionalAttendance,
+            ),
             institutionalPushRepository,
         )
         academicRoutes(

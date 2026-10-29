@@ -438,7 +438,19 @@ class AttendanceStudentService(
     suspend fun myHistory(
         studentId: String,
         nativeActor: org.companerodeescuela.shared.contracts.UserSummary? = null,
-    ): List<AttendanceRecordResponse> {
+    ): List<AttendanceRecordResponse> = withHistory(studentId, nativeActor) { entries -> entries.map { it.record } }
+
+    internal data class HistoryEntry(
+        val record: AttendanceRecordResponse,
+        val session: AttendanceSessionResponse,
+    )
+
+    /** The projection can recheck S2S identity before the final fresh source-authority validation. */
+    internal suspend fun <T> withHistory(
+        studentId: String,
+        nativeActor: org.companerodeescuela.shared.contracts.UserSummary?,
+        read: suspend (List<HistoryEntry>) -> T,
+    ): T {
         if (nativeActor != null && nativeActor.id != studentId) {
             throw ApiException.Forbidden("Actual student identity does not match")
         }
@@ -452,7 +464,7 @@ class AttendanceStudentService(
             } else {
                 enrollmentResolver.courseGroupsFor(studentId, nativeActor)
             }
-        val history = mutableListOf<AttendanceRecordResponse>()
+        val history = mutableListOf<HistoryEntry>()
         for (record in repository.recordsForStudent(studentId)) {
             if (record.studentId != studentId) continue
             val session = repository.findSession(record.sessionId) ?: continue
@@ -483,10 +495,11 @@ class AttendanceStudentService(
                     continue
                 }
             }
-            history += record.withCurrentPresencePolicy()
+            history += HistoryEntry(record.withCurrentPresencePolicy(), session)
         }
+        val result = read(history)
         readContext?.revalidate()
-        return history
+        return result
     }
 
     /** Existing canonical decision; only the enrolled student can read their own row. */

@@ -34,8 +34,9 @@
 <string name="auth_access_is_intention">Tu cuenta determina los perfiles que puedes utilizar.</string>
 <string name="auth_managed_access">Este acceso requiere una cuenta autorizada por la institución.</string>
 <string name="auth_notice_title">Vuelve a iniciar sesión</string>
+    <string name="auth_notice_connection_title">Conexión interrumpida</string>
 <string name="auth_notice_expired">Tu sesión terminó. Inicia sesión de nuevo.</string>
-<string name="auth_notice_connection">No pudimos verificar tu sesión. Revisa tu conexión e inténtalo de nuevo.</string>
+<string name="auth_notice_connection">No pudimos verificar tu sesión. Volveremos a comprobarla automáticamente cuando haya conexión.</string>
 <string name="auth_identifier_required">Ingresa tu correo, matrícula o usuario.</string>
 <string name="auth_identifier_short">El usuario debe tener al menos 3 caracteres.</string>
 <string name="auth_identifier_invalid">Usa solo letras, números y los caracteres . _ - @ +</string>

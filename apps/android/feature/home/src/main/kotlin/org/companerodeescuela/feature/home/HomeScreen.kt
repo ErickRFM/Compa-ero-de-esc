@@ -121,6 +121,20 @@ fun HomeScreen(
                 }
             }
 
+            Text(
+                text =
+                    when {
+                        state.loading -> "Sincronizando información…"
+                        state.errorMessage != null && overview == null -> "Sin sincronizar · revisa tu sesión o conexión"
+                        state.fromCache && state.errorMessage != null -> "Agenda personal disponible · sincronización escolar pendiente"
+                        state.fromCache -> "Agenda guardada · conexión escolar pendiente"
+                        overview != null -> "Información escolar actualizada"
+                        else -> "Sin información sincronizada"
+                    },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
             if (state.loading && overview == null) {
                 CircularProgressIndicator()
             }
@@ -140,7 +154,7 @@ fun HomeScreen(
                             )
                             Text(
                                 if (state.errorMessage != null) {
-                                    "No se pudo actualizar. Tus clases guardadas siguen disponibles."
+                                    "No se pudo sincronizar con la escuela. Tu agenda personal está disponible."
                                 } else {
                                     "Puedes consultar tu horario mientras se restablece la sincronización."
                                 },
@@ -158,7 +172,7 @@ fun HomeScreen(
             if (state.errorMessage != null && overview == null) {
                 StatusNotice(
                     title = "No pudimos actualizar",
-                    message = "Compañero puede seguir funcionando con tu agenda local. Reintenta cuando tengas conexión.",
+                    message = "No se pudieron cargar tus datos. Comprueba tu sesión o conexión y vuelve a intentarlo.",
                     tone = NoticeTone.WARNING,
                 )
                 Button(onClick = viewModel::refresh) {
@@ -194,10 +208,10 @@ fun HomeScreen(
                 when {
                     !day.hasSchedule -> {
                         StatusNotice(
-                            title = "Todavía no tienes horario",
+                            title = "Aún no hay clases en tu horario",
                             message =
-                                "Importa una imagen o PDF, crea tu agenda manualmente o " +
-                                    "conecta el sistema escolar desde Configuración.",
+                                "Importa una imagen o PDF o crea tu agenda personal; " +
+                                    "las clases asignadas desde SIII aparecerán al sincronizar.",
                         )
                         Button(
                             onClick = onOpenSchedule,

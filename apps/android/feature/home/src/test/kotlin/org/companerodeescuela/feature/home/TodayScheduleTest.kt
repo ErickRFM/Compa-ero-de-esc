@@ -14,6 +14,29 @@ import kotlin.test.assertEquals
 
 class TodayScheduleTest {
     @Test
+    fun `personal Thursday timetable appears on home even without institutional assignment`() {
+        val personal = listOf(
+            entry("Sistemas Embebidos", "13:00", "14:00").copy(
+                dayOfWeek = "THURSDAY",
+                subjectCode = "PERSONAL",
+            ),
+            entry("Inglés IX", "14:00", "16:00").copy(
+                dayOfWeek = "THURSDAY",
+                subjectCode = "PERSONAL",
+            ),
+        )
+        val result = TodaySchedule.calculateEntries(
+            allEntries = personal,
+            now = LocalDateTime.of(2026, 10, 29, 13, 34),
+        )
+
+        assertEquals(true, result.hasSchedule)
+        assertEquals(2, result.classes.size)
+        assertEquals("Sistemas Embebidos", result.current?.subjectName)
+        assertEquals("Inglés IX", result.next?.subjectName)
+    }
+
+    @Test
     fun `now and next are selected from the current weekday`() {
         val result =
             TodaySchedule.calculate(

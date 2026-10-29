@@ -266,8 +266,16 @@ class AttendanceUiPolicyTest {
                 status = AttendanceStatus.VERIFIED,
                 disposition = org.companerodeescuela.shared.contracts.AttendanceDisposition.PRESENT,
             )
-        val records = listOf(pending, present, late, absent, legacy)
-        assertEquals(5, filterStudentHistory(records, StudentHistoryFilter.ALL).size)
+        val validated =
+            pending.copy(
+                id = "validated",
+                sessionId = "session-f",
+                status = AttendanceStatus.VERIFIED,
+                reviewedBy = "teacher",
+                reviewedAtEpochSeconds = 2,
+            )
+        val records = listOf(pending, present, late, absent, legacy, validated)
+        assertEquals(6, filterStudentHistory(records, StudentHistoryFilter.ALL).size)
         assertEquals(listOf("present"), filterStudentHistory(records, StudentHistoryFilter.PRESENT).map { it.id })
         assertEquals(listOf("late"), filterStudentHistory(records, StudentHistoryFilter.LATE).map { it.id })
         assertEquals(listOf("absent"), filterStudentHistory(records, StudentHistoryFilter.ABSENT).map { it.id })

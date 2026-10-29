@@ -26,6 +26,7 @@ data class HomeUiState(
     val fromCache: Boolean = false,
     val updatedAtEpochSeconds: Long? = null,
     val errorMessage: String? = null,
+    val institutionalAccessDenied: Boolean = false,
 )
 
 @HiltViewModel
@@ -87,7 +88,7 @@ class HomeViewModel
                             // Revoked/unauthorized accounts must not fall back to stale class data.
                             val status = (result.error as? AppError.Http)?.status
                             val local =
-                                if (status == 401 || status == 403) {
+                                if (status == 401) {
                                     null
                                 } else {
                                     when (val personal = personalRepository.list()) {
@@ -103,12 +104,14 @@ class HomeViewModel
                                         overview = TodaySchedule.calculateEntries(local, now = LocalDateTime.now()),
                                         fromCache = true,
                                         errorMessage = result.error.userMessage,
+                                        institutionalAccessDenied = status == 403,
                                     )
                             } else {
                                 _state.value =
                                     HomeUiState(
                                         loading = false,
                                         errorMessage = result.error.userMessage,
+                                        institutionalAccessDenied = status == 403,
                                     )
                             }
                         }

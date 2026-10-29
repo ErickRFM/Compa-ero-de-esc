@@ -63,7 +63,7 @@ class SmartRoleLoginUiTest {
         assertEquals(Triple("qa.docente", "test-password", AppExperience.TUTOR), submitted)
     }
 
-    @Test fun swipeArrowAndIndicatorSelectAllFiveAccesses() {
+    @Test fun swipeArrowAndIndicatorSelectAllSixAccesses() {
         compose.setContent { loginTestContent() }
         compose.onNodeWithTag("role_pager").performScrollTo().performTouchInput { swipeLeft() }
         compose.onNodeWithTag("role_title_TEACHER", useUnmergedTree = true).assertIsDisplayed()
@@ -72,6 +72,10 @@ class SmartRoleLoginUiTest {
         compose.onNodeWithTag("role_pager").performScrollTo()
         compose.onNodeWithTag("role_title_TUTOR", useUnmergedTree = true).assertIsDisplayed()
         captureAccess("tutor")
+        compose.onNodeWithTag("role_GUEST").performScrollTo().performClick()
+        compose.onNodeWithTag("role_title_GUEST", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithTag("login_registration").assertDoesNotExist()
+        captureAccess("guest")
         compose.onNodeWithTag("role_ADMIN").performScrollTo().performClick()
         compose.onNodeWithTag("role_title_ADMIN", useUnmergedTree = true).assertIsDisplayed()
         captureAccess("admin")

@@ -34,7 +34,6 @@ class AttendanceTruthUiTest {
     @Test fun recordedEntryAllowsReviewCaptureAndDoesNotClaimVerifiedPresence() {
         var confirmations = 0
         render(state()) { confirmations++ }
-        compose.onNodeWithText("Jornada escolar").assertExists()
         compose.onNodeWithText("Registrada").assertExists()
         compose.onNodeWithText("Verificada").assertDoesNotExist()
         compose

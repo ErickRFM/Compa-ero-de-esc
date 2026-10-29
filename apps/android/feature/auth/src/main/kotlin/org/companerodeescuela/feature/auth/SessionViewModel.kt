@@ -124,107 +124,204 @@ class SessionViewModel @Inject constructor(
         if (signingOut) return
         _state.update {
             it.copy(
-                checking = false, authenticated = true, submitting = false, userId = user.id,
-                displayName = user.displayName, roles = user.roles, errorMessage = null, noticeMessage = null,
-                accountStatus = user.accountStatus, registrationAccountType = user.registrationAccountType,
-                email = user.email, emailVerified = user.emailVerified, verificationDelivery = user.verificationDelivery,
+                checking = false,
+                authenticated = true,
+                submitting = false,
+                userId = user.id,
+                displayName = user.displayName,
+                roles = user.roles,
+                errorMessage = null,
+                noticeMessage = null,
+                accountStatus = user.accountStatus,
+                registrationAccountType = user.registrationAccountType,
+                email = user.email,
+                emailVerified = user.emailVerified,
+                verificationDelivery = user.verificationDelivery,
                 verificationFailure = null,
-                failure = null, noticeReason = null,
+                failure = null,
+                noticeReason = null,
             )
         }
     }
 
     private fun publishSignedOut(notice: SessionNotice? = null) {
-        val message = when (notice) {
-            SessionNotice.EXPIRED -> "Tu sesión terminó. Inicia sesión de nuevo."
-            SessionNotice.CONNECTION -> "No pudimos renovar tu sesión. Revisa tu conexión e inténtalo de nuevo."
-            null -> null
-        }
+        val message =
+            when (notice) {
+                SessionNotice.EXPIRED -> "Tu sesión terminó. Inicia sesión de nuevo."
+                SessionNotice.CONNECTION -> "No pudimos renovar tu sesión. Revisa tu conexión e inténtalo de nuevo."
+                null -> null
+            }
         _state.update {
-            it.copy(checking = false, authenticated = false, submitting = signingOut, userId = null,
-                displayName = null, roles = emptySet(), errorMessage = null, noticeMessage = message,
+            it.copy(
+                checking = false,
+                authenticated = false,
+                submitting = signingOut,
+                userId = null,
+                displayName = null,
+                roles = emptySet(),
+                errorMessage = null,
+                noticeMessage = message,
                 accountStatus = org.companerodeescuela.shared.contracts.AccountStatus.ACTIVE,
-                registrationAccountType = null, email = null, emailVerified = false, verificationDelivery = null,
+                registrationAccountType = null,
+                email = null,
+                emailVerified = false,
+                verificationDelivery = null,
                 verificationFailure = null,
-                failure = null, noticeReason = notice)
+                failure = null,
+                noticeReason = notice,
+            )
         }
     }
 
     private fun beginCredentials(): Boolean {
         if (_state.value.submitting || credentialJob?.isActive == true || signingOut) return false
-        _state.update { it.copy(submitting = true, errorMessage = null, noticeMessage = null, failure = null, noticeReason = null) }
+        _state.update {
+            it.copy(
+                submitting = true,
+                errorMessage = null,
+                noticeMessage = null,
+                failure = null,
+                noticeReason = null,
+            )
+        }
         return true
     }
 
-    fun login(username: String, password: String) {
+    fun login(
+        username: String,
+        password: String,
+    ) {
         if (!beginCredentials()) return
-        credentialJob = viewModelScope.launch {
-            publishCredentialResult(repository.login(username, password), login = true)
-        }
+        credentialJob =
+            viewModelScope.launch {
+                publishCredentialResult(repository.login(username, password), login = true)
+            }
     }
 
-    fun register(displayName: String, email: String, password: String, accountType: RegistrationAccountType) =
-        register(org.companerodeescuela.shared.contracts.RegisterRequest(displayName, email, password, accountType))
+    fun register(
+        displayName: String,
+        email: String,
+        password: String,
+        accountType: RegistrationAccountType,
+    ) = register(
+        org.companerodeescuela.shared.contracts.RegisterRequest(displayName, email, password, accountType),
+    )
 
     fun register(request: org.companerodeescuela.shared.contracts.RegisterRequest) {
         if (!beginCredentials()) return
-        credentialJob = viewModelScope.launch { publishCredentialResult(repository.register(request), login = false) }
+        credentialJob =
+            viewModelScope.launch {
+                publishCredentialResult(repository.register(request), login = false)
+            }
     }
 
     private var institutionsJob: Job? = null
+
     fun loadRegistrationInstitutions() {
         if (institutionsJob?.isActive == true) return
         _state.update { it.copy(institutionsLoading = true, institutionsFailure = null) }
-        institutionsJob = viewModelScope.launch {
-            when (val result = repository.institutions()) {
-                is Outcome.Success -> _state.update { it.copy(institutions = result.value, institutionsLoading = false) }
-                is Outcome.Failure -> _state.update { it.copy(institutions = emptyList(), institutionsLoading = false, institutionsFailure = result.error) }
+        institutionsJob =
+            viewModelScope.launch {
+                when (val result = repository.institutions()) {
+                    is Outcome.Success ->
+                        _state.update {
+                            it.copy(institutions = result.value, institutionsLoading = false)
+                        }
+                    is Outcome.Failure ->
+                        _state.update {
+                            it.copy(
+                                institutions = emptyList(),
+                                institutionsLoading = false,
+                                institutionsFailure = result.error,
+                            )
+                        }
+                }
             }
-        }
     }
 
     fun verifyEmail(token: String) {
-        if (!_state.value.authenticated || _state.value.accountStatus != org.companerodeescuela.shared.contracts.AccountStatus.PENDING_VERIFICATION || !beginCredentials()) return
-        _state.update { it.copy(verificationFailure = null) }
-        credentialJob = viewModelScope.launch {
-            when (val result = repository.confirmVerification(token)) {
-                is Outcome.Success -> Unit // Fresh token emission rechecks live authority.
-                is Outcome.Failure -> _state.update { it.copy(submitting = false, verificationFailure = result.error) }
-            }
+        if (!_state.value.authenticated ||
+            _state.value.accountStatus != org.companerodeescuela.shared.contracts.AccountStatus.PENDING_VERIFICATION ||
+            !beginCredentials()
+        ) {
+            return
         }
+        _state.update { it.copy(verificationFailure = null) }
+        credentialJob =
+            viewModelScope.launch {
+                when (val result = repository.confirmVerification(token)) {
+                    is Outcome.Success -> Unit // Fresh token emission rechecks live authority.
+                    is Outcome.Failure ->
+                        _state.update {
+                            it.copy(submitting = false, verificationFailure = result.error)
+                        }
+                }
+            }
     }
 
     fun resendVerification() {
-        if (!_state.value.authenticated || _state.value.accountStatus != org.companerodeescuela.shared.contracts.AccountStatus.PENDING_VERIFICATION || !beginCredentials()) return
-        _state.update { it.copy(verificationFailure = null) }
-        credentialJob = viewModelScope.launch {
-            when (val result = repository.resendVerification()) {
-                is Outcome.Success -> _state.update { it.copy(submitting = false, verificationDelivery = result.value.status) }
-                is Outcome.Failure -> _state.update { it.copy(submitting = false, verificationFailure = result.error) }
-            }
+        if (!_state.value.authenticated ||
+            _state.value.accountStatus != org.companerodeescuela.shared.contracts.AccountStatus.PENDING_VERIFICATION ||
+            !beginCredentials()
+        ) {
+            return
         }
+        _state.update { it.copy(verificationFailure = null) }
+        credentialJob =
+            viewModelScope.launch {
+                when (val result = repository.resendVerification()) {
+                    is Outcome.Success ->
+                        _state.update {
+                            it.copy(submitting = false, verificationDelivery = result.value.status)
+                        }
+                    is Outcome.Failure ->
+                        _state.update {
+                            it.copy(submitting = false, verificationFailure = result.error)
+                        }
+                }
+            }
     }
 
     fun refreshIdentity() {
         if (!_state.value.authenticated || !beginCredentials()) return
-        credentialJob = viewModelScope.launch {
-            when (val result = repository.currentUser()) {
-                is Outcome.Success -> publishAuthenticated(result.value)
-                is Outcome.Failure -> _state.update { it.copy(submitting = false, verificationFailure = result.error) }
+        credentialJob =
+            viewModelScope.launch {
+                when (val result = repository.currentUser()) {
+                    is Outcome.Success -> publishAuthenticated(result.value)
+                    is Outcome.Failure ->
+                        _state.update {
+                            it.copy(submitting = false, verificationFailure = result.error)
+                        }
+                }
             }
-        }
     }
 
-    private fun publishCredentialResult(result: Outcome<UserSummary>, login: Boolean) {
+    private fun publishCredentialResult(
+        result: Outcome<UserSummary>,
+        login: Boolean,
+    ) {
         when (result) {
             is Outcome.Success -> Unit // Token observation publishes the newer /auth/me authority.
-            is Outcome.Failure -> _state.update {
-                it.copy(checking = false, authenticated = false, submitting = signingOut, userId = null,
-                    displayName = null, roles = emptySet(),
-                    errorMessage = if (login && (result.error as? AppError.Http)?.status == 401)
-                        "Usuario o contraseña incorrectos." else result.error.userMessage,
-                    noticeMessage = null, failure = result.error, noticeReason = null)
-            }
+            is Outcome.Failure ->
+                _state.update {
+                    it.copy(
+                        checking = false,
+                        authenticated = false,
+                        submitting = signingOut,
+                        userId = null,
+                        displayName = null,
+                        roles = emptySet(),
+                        errorMessage =
+                            if (login && (result.error as? AppError.Http)?.status == 401) {
+                                "Usuario o contraseña incorrectos."
+                            } else {
+                                result.error.userMessage
+                            },
+                        noticeMessage = null,
+                        failure = result.error,
+                        noticeReason = null,
+                    )
+                }
         }
     }
 
@@ -234,7 +331,12 @@ class SessionViewModel @Inject constructor(
         credentialJob?.cancel()
         publishSignedOut()
         viewModelScope.launch {
-            try { repository.logout() } finally { signingOut = false; publishSignedOut() }
+            try {
+                repository.logout()
+            } finally {
+                signingOut = false
+                publishSignedOut()
+            }
         }
     }
 }

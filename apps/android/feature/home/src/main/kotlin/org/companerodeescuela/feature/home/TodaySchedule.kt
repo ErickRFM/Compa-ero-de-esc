@@ -4,6 +4,7 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import org.companerodeescuela.shared.contracts.AcademicLoadResponse
 import org.companerodeescuela.shared.contracts.ScheduleEntry
@@ -127,7 +128,7 @@ object TodaySchedule {
                             entry.effectiveDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
                                 ?: return@mapNotNull null
                         if (effectiveDate.dayOfWeek != day) return@mapNotNull null
-                        val distance = java.time.temporal.ChronoUnit.DAYS.between(now.toLocalDate(), effectiveDate)
+                        val distance = ChronoUnit.DAYS.between(now.toLocalDate(), effectiveDate)
                         if (distance < 0 || (distance == 0L && !start.isAfter(now.toLocalTime()))) {
                             return@mapNotNull null
                         }

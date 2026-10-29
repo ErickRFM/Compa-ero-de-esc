@@ -38,7 +38,30 @@ internal fun nextClassStatLabel(day: TodayOverview): String {
     }
 }
 
+data class HomeScheduleChoice(
+    val overview: TodayOverview,
+    val usesPersonalSchedule: Boolean,
+)
+
+/** Official assignments take precedence. An empty official timetable must not hide imported lessons. */
 object TodaySchedule {
+    fun select(
+        academic: AcademicLoadResponse,
+        personal: List<ScheduleEntry>,
+        now: LocalDateTime = LocalDateTime.now(),
+    ): HomeScheduleChoice {
+        val usePersonal = academic.schedule.entries.isEmpty() && personal.isNotEmpty()
+        return HomeScheduleChoice(
+            overview =
+                if (usePersonal) {
+                    calculateEntries(personal, academic.student.displayName, now)
+                } else {
+                    calculate(academic, now)
+                },
+            usesPersonalSchedule = usePersonal,
+        )
+    }
+
     fun calculate(
         load: AcademicLoadResponse,
         now: LocalDateTime = LocalDateTime.now(),

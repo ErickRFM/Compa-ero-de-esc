@@ -62,7 +62,6 @@ import org.companerodeescuela.core.database.LocalAttendanceSyncState
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
-import org.companerodeescuela.core.designsystem.v8.V8AttendanceEvidence
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
@@ -240,12 +239,6 @@ fun studentAttendanceContent(
                 org.companerodeescuela.core.designsystem.v8
                     .V8HeroTitle("Pase de", "lista")
             }
-            V8AttendanceEvidence(
-                // No independently authenticated campus witness is available.
-                schoolNetworkVerified = null,
-                locationVerified = null,
-                ready = schoolRecorded && state.activeSessions.isNotEmpty(),
-            )
             TextButton(onClick = onRefresh, enabled = !state.loading, modifier = Modifier.align(Alignment.End)) {
                 Text(if (state.loading) "Actualizando…" else "Actualizar")
             }

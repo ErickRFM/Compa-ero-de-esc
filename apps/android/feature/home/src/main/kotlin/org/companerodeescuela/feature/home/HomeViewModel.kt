@@ -56,7 +56,12 @@ class HomeViewModel
                             overview =
                                 when {
                                     snapshot != null -> TodaySchedule.calculate(snapshot, LocalDateTime.now())
-                                    personal != null -> TodaySchedule.calculateEntries(personal, state.overview?.studentName.orEmpty(), LocalDateTime.now())
+                                    personal != null ->
+                                        TodaySchedule.calculateEntries(
+                                            personal,
+                                            state.overview?.studentName.orEmpty(),
+                                            LocalDateTime.now(),
+                                        )
                                     else -> state.overview
                                 },
                         )

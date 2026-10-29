@@ -34,7 +34,7 @@ class DistributionLoginUiTest {
 
         val expected =
             if (distribution == AppDistribution.ACADEMIC) {
-                setOf(AppExperience.STUDENT, AppExperience.TEACHER, AppExperience.TUTOR)
+                setOf(AppExperience.STUDENT, AppExperience.TEACHER, AppExperience.TUTOR, AppExperience.GUEST)
             } else {
                 setOf(AppExperience.PRINCIPAL, AppExperience.COORDINATOR, AppExperience.ADMIN, AppExperience.SUPER_ADMIN)
             }
@@ -43,6 +43,7 @@ class DistributionLoginUiTest {
                 AppExperience.STUDENT,
                 AppExperience.TEACHER,
                 AppExperience.TUTOR,
+                AppExperience.GUEST,
                 AppExperience.PRINCIPAL,
                 AppExperience.COORDINATOR,
                 AppExperience.ADMIN,

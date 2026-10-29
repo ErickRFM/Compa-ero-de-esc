@@ -18,13 +18,13 @@ class TodayScheduleTest {
         val personal =
             listOf(
                 entry("Sistemas Embebidos", "13:00", "14:00").copy(
-                dayOfWeek = "THURSDAY",
-                subjectCode = "PERSONAL",
-            ),
+                    dayOfWeek = "THURSDAY",
+                    subjectCode = "PERSONAL",
+                ),
                 entry("Inglés IX", "14:00", "16:00").copy(
-                dayOfWeek = "THURSDAY",
-                subjectCode = "PERSONAL",
-            ),
+                    dayOfWeek = "THURSDAY",
+                    subjectCode = "PERSONAL",
+                ),
             )
         val result =
             TodaySchedule.calculateEntries(

@@ -40,21 +40,24 @@ data class SessionUiState(
     val institutionsLoading: Boolean = false,
     val institutionsFailure: AppError? = null,
     val verificationFailure: AppError? = null,
-
 )
 
 @HiltViewModel
-class SessionViewModel @Inject constructor(
-    private val repository: AuthRepository,
-    private val tokenStore: SessionTokenStore,
-    private val clock: Clock = Clock.systemUTC(),
-) : ViewModel() {
+class SessionViewModel
+    @Inject
+    constructor(
+        private val repository: AuthRepository,
+        private val tokenStore: SessionTokenStore,
+        private val clock: Clock = Clock.systemUTC(),
+    ) : ViewModel() {
     private val _state = MutableStateFlow(SessionUiState())
     val state: StateFlow<SessionUiState> = _state.asStateFlow()
     private var credentialJob: Job? = null
     private var signingOut = false
 
-    init { observeSession() }
+    init {
+        observeSession()
+    }
 
     private fun observeSession() {
         viewModelScope.launch {

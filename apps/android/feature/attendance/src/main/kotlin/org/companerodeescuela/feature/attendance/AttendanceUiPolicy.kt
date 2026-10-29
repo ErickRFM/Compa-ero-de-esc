@@ -10,7 +10,9 @@ import org.companerodeescuela.shared.contracts.SchoolPresenceStatus
 import org.companerodeescuela.shared.validation.requiresAttendancePresenceReview
 
 /** History filters reflect the teacher's disposition, never a local sync guess. */
-enum class StudentHistoryFilter(val label: String) {
+enum class StudentHistoryFilter(
+    val label: String,
+) {
     ALL("Todos"),
     PRESENT("Presentes"),
     LATE("Retardos"),

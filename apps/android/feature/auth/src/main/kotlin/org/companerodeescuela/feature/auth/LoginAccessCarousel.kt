@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.VerifiedUser
@@ -85,6 +86,12 @@ internal val loginAccesses =
             R.string.auth_role_tutor,
             R.string.auth_tutor_description,
             Icons.Filled.Groups,
+        ),
+        LoginAccess(
+            AppExperience.GUEST,
+            R.string.auth_role_guest,
+            R.string.auth_guest_description,
+            Icons.Filled.PersonOutline,
         ),
         LoginAccess(
             AppExperience.ADMIN,

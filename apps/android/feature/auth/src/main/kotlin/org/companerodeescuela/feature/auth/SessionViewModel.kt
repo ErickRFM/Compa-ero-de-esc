@@ -123,12 +123,14 @@ class SessionViewModel @Inject constructor(
     private fun publishAuthenticated(user: UserSummary) {
         if (signingOut) return
         _state.update {
-            it.copy(checking = false, authenticated = true, submitting = false, userId = user.id,
+            it.copy(
+                checking = false, authenticated = true, submitting = false, userId = user.id,
                 displayName = user.displayName, roles = user.roles, errorMessage = null, noticeMessage = null,
                 accountStatus = user.accountStatus, registrationAccountType = user.registrationAccountType,
                 email = user.email, emailVerified = user.emailVerified, verificationDelivery = user.verificationDelivery,
                 verificationFailure = null,
-                failure = null, noticeReason = null)
+                failure = null, noticeReason = null,
+            )
         }
     }
 

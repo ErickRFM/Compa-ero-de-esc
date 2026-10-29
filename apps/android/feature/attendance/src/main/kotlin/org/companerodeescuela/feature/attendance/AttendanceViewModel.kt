@@ -294,6 +294,24 @@ class AttendanceViewModel
             openScanner(null)
         }
 
+        /** Assigns image/paste contingency to the active class, not the campus QR scanner. */
+        fun prepareClassContingency(sessionId: String) {
+            if (_state.value.mode != AttendanceMode.STUDENT ||
+                _state.value.activeSessions.none { it.id == sessionId }
+            ) {
+                return
+            }
+            _state.update {
+                it.copy(
+                    scannerOpen = false,
+                    scannerPurpose = ScannerPurpose.ATTENDANCE,
+                    scannerSessionHint = sessionId,
+                    qrInspection = null,
+                    errorMessage = null,
+                )
+            }
+        }
+
         fun openSchoolDayScanner() {
             val network = repository.currentSchoolNetwork()
             if (network == null) {

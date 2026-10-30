@@ -84,6 +84,7 @@ import org.companerodeescuela.feature.tutoring.TutorHomeScreen
 import org.companerodeescuela.feature.tutoring.TutorRequestsScreen
 import org.companerodeescuela.notifications.PushRegistrationDiagnostics
 import org.companerodeescuela.notifications.PushRegistrationSchedule
+import org.companerodeescuela.notifications.isChannelNotificationIntent
 import org.companerodeescuela.notifications.parseAttendanceSessionId
 import org.companerodeescuela.shared.contracts.AttendancePushContract
 import org.companerodeescuela.shared.contracts.TeacherClassContext
@@ -93,6 +94,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
     private var pendingAttendanceSessionId by mutableStateOf<String?>(null)
+    private var pendingChannelNavigation by mutableStateOf(false)
 
     @Inject
     lateinit var attendanceSyncScheduler: AttendanceSyncScheduler
@@ -107,6 +109,7 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         pendingAttendanceSessionId = attendanceSessionId(intent)
+        pendingChannelNavigation = isChannelNotificationIntent(intent?.action, intent?.getStringExtra("destination"))
         appearancePreferences.applySavedLanguage()
         val appDistribution = AppDistribution.valueOf(BuildConfig.APP_DISTRIBUTION)
 
@@ -278,6 +281,14 @@ class MainActivity : AppCompatActivity() {
                                                 requestedSession,
                                             )
                                             pendingAttendanceSessionId = null
+                                        }
+                                    }
+                                    LaunchedEffect(pendingChannelNavigation, roleConfig.experience, session.roles) {
+                                        if (pendingChannelNavigation && userId != null) {
+                                            pendingChannelNavigation = false
+                                            navController.navigate(Destination.Channel.route) {
+                                                launchSingleTop = true
+                                            }
                                         }
                                     }
                                     CompaneroScaffold(
@@ -613,6 +624,9 @@ class MainActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         pendingAttendanceSessionId = attendanceSessionId(intent)
+        if (isChannelNotificationIntent(intent.action, intent.getStringExtra("destination"))) {
+            pendingChannelNavigation = true
+        }
     }
 
     override fun onResume() {

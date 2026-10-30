@@ -48,7 +48,10 @@ class CompaneroFirebaseMessagingService : FirebaseMessagingService() {
                         ?.takeIf { it.equals(raw, ignoreCase = true) }
                 }
         val attendanceNotice = message.data["type"] == AttendancePushContract.TYPE && sessionId != null
-        if (message.notification == null && !attendanceNotice) return
+        val channelNotice =
+            message.data["type"] in setOf("channel", "channel_notice", "institutional_notice", "notice") ||
+                message.data["destination"] == "channel"
+        if (message.notification == null && !attendanceNotice && !channelNotice) return
         val hasSession =
             runBlocking(Dispatchers.IO) {
                 withTimeoutOrNull(1500) {
@@ -70,20 +73,24 @@ class CompaneroFirebaseMessagingService : FirebaseMessagingService() {
                     action = AttendancePushContract.CLICK_ACTION
                     data = Uri.parse("companero://attendance/$sessionId")
                     putExtra(AttendancePushContract.SESSION_ID, sessionId)
+                } else if (channelNotice) {
+                    action = CHANNEL_CLICK_ACTION
+                    data = Uri.parse("companero://channel")
+                    putExtra("destination", "channel")
                 }
             }
         val pending =
             PendingIntent.getActivity(
                 this,
-                sessionId?.hashCode() ?: 0,
+                sessionId?.hashCode() ?: message.messageId?.hashCode() ?: 0,
                 activity,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
         val contentText =
-            if (attendanceNotice) {
-                "Tu docente abrió el pase de lista. Toca para revisarlo."
-            } else {
-                "Tienes una nueva actualización académica."
+            when {
+                attendanceNotice -> "Tu docente abrió el pase de lista. Toca para revisarlo."
+                channelNotice -> "Nuevo aviso en el Canal Institucional. Toca para revisarlo."
+                else -> "Tienes una nueva actualización académica."
             }
         val notification =
             NotificationCompat

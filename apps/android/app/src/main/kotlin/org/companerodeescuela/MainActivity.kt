@@ -385,7 +385,8 @@ class MainActivity : AppCompatActivity() {
                                             adminHomeScreen(
                                                 onOpenSecurity = { navController.navigate(Destination.Mfa.route) },
                                                 onOpenSchedule = {
-                                                    navController.navigate(Destination.Classrooms.route) {
+                                                    // D1 fix: admin schedule must navigate to Schedule, not Classrooms
+                                                    navController.navigate(Destination.Schedule.route) {
                                                         launchSingleTop = true
                                                     }
                                                 },
@@ -459,7 +460,15 @@ class MainActivity : AppCompatActivity() {
                                                         TeacherClassContext.STATE_KEY,
                                                         null,
                                                     ).collectAsStateWithLifecycle()
-                                            ChannelScreen(requestedClassroom = selection)
+                                            val isAdministrative =
+                                                roleConfig.experience == AppExperience.ADMIN ||
+                                                    roleConfig.experience == AppExperience.SUPER_ADMIN ||
+                                                    roleConfig.experience == AppExperience.COORDINATOR ||
+                                                    roleConfig.experience == AppExperience.PRINCIPAL
+                                            ChannelScreen(
+                                                requestedClassroom = selection,
+                                                isAdministrativeSession = isAdministrative,
+                                            )
                                         }
                                         composable(Destination.Attendance.route) { entry ->
                                             val selection by
@@ -564,6 +573,7 @@ class MainActivity : AppCompatActivity() {
                                                     } else {
                                                         null
                                                     },
+                                                appVersion = BuildConfig.VERSION_NAME,
                                                 onLogout = {
                                                     loginExperienceName = null
                                                     sessionViewModel.logout()

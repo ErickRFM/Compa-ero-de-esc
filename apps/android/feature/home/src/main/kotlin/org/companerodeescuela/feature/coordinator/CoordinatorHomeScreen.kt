@@ -157,8 +157,8 @@ fun coordinatorHomeScreen(
                     Text("Abrir mi agenda")
                 }
                 StatusNotice(
-                    title = "Gestión de horarios institucionales pendiente",
-                    message = "La asignación global de aulas y grupos se habilitará desde un módulo autorizado.",
+                    title = "Gestión institucional de horarios",
+                    message = "Las modificaciones y asignaciones oficiales de horarios a grupos y aulas requieren permiso explícito (MANAGE_ACADEMICS) y confirmación con segundo factor (MFA Step-Up). Para consultar horarios oficiales, utiliza la vista de grupos.",
                 )
             }
         }

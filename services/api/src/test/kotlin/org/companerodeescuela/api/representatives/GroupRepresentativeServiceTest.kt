@@ -133,4 +133,30 @@ class GroupRepresentativeServiceTest {
         val active = service.activeAssignmentsForStudent("student-1")
         assertEquals(0, active.size)
     }
+
+    @Test
+    fun `activeAndPendingAssignmentsForStudent excludes revoked and declined but preserves history`() = runBlocking<Unit> {
+        val appointment = service.appointRepresentative(
+            actor = UserSummary("tutor-1", "Tutor 1", roles = tutorRoles, institutionId = ScopedAcademicFixtures.INSTITUTION),
+            groupId = "G-101",
+            groupName = "101-A",
+            request = AppointRepresentativeRequest("student-1", RepresentativePosition.CHIEF),
+        )
+        // While pending:
+        val pendingActive = service.activeAndPendingAssignmentsForStudent("student-1")
+        assertEquals(1, pendingActive.size)
+        assertEquals(RepresentativeStatus.PENDING, pendingActive.first().status)
+
+        // Decline it:
+        service.declineAppointment("student-1", appointment.id)
+
+        // activeAndPending must now be empty:
+        val afterDecline = service.activeAndPendingAssignmentsForStudent("student-1")
+        assertEquals(0, afterDecline.size)
+
+        // But full history still records the assignment:
+        val fullHistory = service.getStudentAssignments("student-1")
+        assertEquals(1, fullHistory.size)
+        assertEquals(RepresentativeStatus.DECLINED, fullHistory.first().status)
+    }
 }

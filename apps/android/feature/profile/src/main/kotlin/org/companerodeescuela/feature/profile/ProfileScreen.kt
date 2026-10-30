@@ -59,6 +59,8 @@ fun ProfileScreen(
     notificationsStatus: String? = null,
     onTutorRequest: (() -> Unit)? = null,
     onRepresentatives: (() -> Unit)? = null,
+    /** Version string shown in "Acerca de Compañero", e.g. "1.4.2". Pass from app module via BuildConfig.VERSION_NAME. */
+    appVersion: String? = null,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -152,7 +154,7 @@ fun ProfileScreen(
                 GroupDivider()
                 ProfileRow(
                     title = "Privacidad",
-                    detail = "Datos académicos separados por cuenta.",
+                    detail = "Tus datos académicos solo se comparten con tu institución. Compañero no vende información personal.",
                 )
             }
 
@@ -214,7 +216,7 @@ fun ProfileScreen(
                 GroupDivider()
                 ProfileRow(
                     title = "Acerca de Compañero",
-                    detail = "Compañero de Clase · interfaz V8",
+                    detail = if (appVersion != null) "v$appVersion · Compañero de Clase" else "Compañero de Clase · interfaz V8",
                 )
             }
 

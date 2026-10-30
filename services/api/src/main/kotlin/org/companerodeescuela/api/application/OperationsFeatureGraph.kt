@@ -76,10 +76,18 @@ fun buildOperationsFeatureGraph(
         outbox = outbox,
         sender = pushSender,
         authorizeRecipient = { owner ->
+            // Validates that the push recipient is an active, email-verified account.
+            // Event scopes already enforce which roles receive which event types;
+            // this gate only checks that the account itself is in good standing.
             val id = owner.takeIf { it.startsWith("NATIVE:") }?.removePrefix("NATIVE:")
             val current = id?.let { accounts?.findById(it) }
+            val allowedRoles = setOf(
+                UserRole.STUDENT, UserRole.TEACHER, UserRole.TUTOR,
+                UserRole.PRINCIPAL, UserRole.COORDINATOR,
+                UserRole.ADMIN, UserRole.SUPER_ADMIN,
+            )
             current?.permitsSession == true && current.emailVerifiedAt != null &&
-                UserRole.STUDENT in current.roles
+                current.roles.any { it in allowedRoles }
         },
         authorizeSession = { owner, token ->
             val sessionId = devices.sessionIdFor(owner, token)

@@ -155,6 +155,14 @@ class GroupRepresentativeService(
         return repository.listByStudent(studentUserId)
     }
 
+    /** Returns only assignments that are ACTIVE or PENDING within the current scope. */
+    suspend fun activeAndPendingAssignmentsForStudent(studentUserId: String): List<GroupRepresentativeAssignment> {
+        return repository.listByStudent(studentUserId).filter {
+            (it.status == RepresentativeStatus.ACTIVE || it.status == RepresentativeStatus.PENDING) &&
+                tutorAssignmentService.currentRepresentative(it)
+        }
+    }
+
     suspend fun activeAssignmentsForStudent(studentUserId: String): List<GroupRepresentativeAssignment> {
         return repository.listByStudent(studentUserId).filter { it.status == RepresentativeStatus.ACTIVE && tutorAssignmentService.currentRepresentative(it) }
     }

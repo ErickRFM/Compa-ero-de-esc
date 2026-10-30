@@ -76,4 +76,50 @@ class AcademicEventNativeScopeTest {
         assertTrue(f.service.listScoped(f.student).events.isEmpty())
         assertTrue(f.service.cancelScoped(f.teacher,first.id,AcademicOperationRequest("cancel",first.revision,"")))
     }
+    @Test fun `principal can read institution-scoped events`()=runTest {
+        val f=Fixture();f.initialize()
+        // Arrange: publish an institution-scoped event as admin, then verify PRINCIPAL can read it.
+        val command=f.command(event=f.event(AcademicEventScope.INSTITUTION,"campus"))
+        val signed=f.signed(command)
+        val created=f.service.writeScoped(f.admin,null,signed)
+        // PRINCIPAL belongs to the same institution; reading must succeed.
+        val principal=UserSummary("principal1","Principal",roles=setOf(UserRole.PRINCIPAL),institutionId="campus")
+        f.accounts.create(ScopedAcademicFixtures.account(principal))
+        val feed=f.service.listScoped(principal)
+        assertTrue(feed.events.any { it.id==created.id },"PRINCIPAL must see institution-scoped events of their institution")
+        // PRINCIPAL from a different institution must NOT see the event.
+        val foreignPrincipal=UserSummary("principal2","Foreign Principal",roles=setOf(UserRole.PRINCIPAL),institutionId="other")
+        f.accounts.create(ScopedAcademicFixtures.account(foreignPrincipal))
+        val foreignFeed=f.service.listScoped(foreignPrincipal)
+        assertTrue(foreignFeed.events.none { it.id==created.id },"PRINCIPAL from another institution must NOT see foreign events")
+    }
+    @Test fun `coordinator can read group-scoped events for their institution`()=runTest {
+        val f=Fixture();f.initialize()
+        // Arrange: publish a group-scoped event as teacher (group 6A belongs to "campus").
+        val groupEvent=f.event(AcademicEventScope.GROUP,"6A")
+        val created=f.service.writeScoped(f.teacher,null,f.command(event=groupEvent))
+        // COORDINATOR of the same institution must be able to read the group event.
+        val coordinator=UserSummary("coord1","Coordinator",roles=setOf(UserRole.COORDINATOR),institutionId="campus")
+        f.accounts.create(ScopedAcademicFixtures.account(coordinator))
+        val feed=f.service.listScoped(coordinator)
+        assertTrue(feed.events.any { it.id==created.id },"COORDINATOR must see group-scoped events of their institution")
+        // COORDINATOR from another institution must NOT see the event.
+        val foreignCoordinator=UserSummary("coord2","Foreign Coordinator",roles=setOf(UserRole.COORDINATOR),institutionId="other")
+        f.accounts.create(ScopedAcademicFixtures.account(foreignCoordinator))
+        val foreignFeed=f.service.listScoped(foreignCoordinator)
+        assertTrue(foreignFeed.events.none { it.id==created.id },"COORDINATOR from another institution must NOT see foreign group events")
+    }
+    @Test fun `principal cannot write events (requires MANAGE_ACADEMICS)`()=runTest {
+        val f=Fixture();f.initialize()
+        // PRINCIPAL is not an admin, so write must be denied for institution-scoped events...
+        val principal=UserSummary("principal3","Principal",roles=setOf(UserRole.PRINCIPAL),institutionId="campus")
+        f.accounts.create(ScopedAcademicFixtures.account(principal))
+        assertFailsWith<ApiException.Forbidden>("PRINCIPAL must not publish institution-scoped events") {
+            f.service.writeScoped(principal,null,f.command(event=f.event(AcademicEventScope.INSTITUTION,"campus")))
+        }
+        // ...and also for course-scoped events (teacher assignment is required).
+        assertFailsWith<ApiException.Forbidden>("PRINCIPAL must not publish course-scoped events without teacher assignment") {
+            f.service.writeScoped(principal,null,f.command(event=f.event(AcademicEventScope.COURSE,"own-class")))
+        }
+    }
 }

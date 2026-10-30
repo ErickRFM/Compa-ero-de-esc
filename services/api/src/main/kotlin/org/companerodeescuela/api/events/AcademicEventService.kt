@@ -36,7 +36,7 @@ class AcademicEventService(
     private fun admin(actor:UserSummary)=actor.roles.any { it==UserRole.ADMIN || it==UserRole.SUPER_ADMIN }
     private suspend fun reader(actor:UserSummary):PlatformAccount {
         val current=policy().live(actor)
-        if(current.roles.none { it in setOf(UserRole.STUDENT,UserRole.TEACHER,UserRole.TUTOR,UserRole.ADMIN,UserRole.SUPER_ADMIN) }) throw ApiException.Forbidden("Academic authority is required")
+        if(current.roles.none { it in setOf(UserRole.STUDENT,UserRole.TEACHER,UserRole.TUTOR,UserRole.ADMIN,UserRole.SUPER_ADMIN,UserRole.PRINCIPAL,UserRole.COORDINATOR) }) throw ApiException.Forbidden("Academic authority is required")
         return current
     }
     private data class Scope(val institution:String,val groupRevision:Long,val groupName:String?=null,val subjectName:String?=null)

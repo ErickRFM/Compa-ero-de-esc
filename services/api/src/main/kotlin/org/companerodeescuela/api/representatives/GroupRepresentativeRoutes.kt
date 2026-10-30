@@ -75,6 +75,17 @@ fun Route.groupRepresentativeRoutes(
         authenticate(AuthTokenService.PROVIDER_NAME) {
             get("/me") {
                 val principal = call.requirePrincipal()
+                val assignments = service.activeAndPendingAssignmentsForStudent(principal.subject())
+                call.respond(
+                    ApiResponse(
+                        data = assignments,
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
+
+            get("/me/history") {
+                val principal = call.requirePrincipal()
                 val assignments = service.getStudentAssignments(principal.subject())
                 call.respond(
                     ApiResponse(

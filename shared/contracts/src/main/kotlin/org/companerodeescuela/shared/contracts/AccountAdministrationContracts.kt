@@ -2,6 +2,20 @@ package org.companerodeescuela.shared.contracts
 
 import kotlinx.serialization.Serializable
 
+/**
+ * Administrative capabilities authorized on accounts.
+ *
+ * Operational:
+ * - APPROVE_STAFF: Enforced on staff approval endpoints.
+ * - MANAGE_USERS: Enforced on user lifecycle (suspension/revocation).
+ * - MANAGE_ACADEMICS: Enforced on academic group and schedule override mutations.
+ * - DIRECTIVE_SUPERVISION: Enforced on directive overview and attendance auditing.
+ *
+ * Reserved (under development; no active endpoints or UI tools until product definition):
+ * - REVIEW_WORKSHOPS: Workshop review tools.
+ * - VIEW_AUDIT: System-wide audit log access.
+ * - VIEW_SESSIONS: Active session inspection.
+ */
 @Serializable enum class AdminCapability {
     APPROVE_STAFF,
     MANAGE_USERS,

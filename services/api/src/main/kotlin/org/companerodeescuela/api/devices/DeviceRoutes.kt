@@ -28,6 +28,8 @@ data class DeviceRegistrationRequest(
     val model: String? = null,
     /** Stable random installation ID; old clients without one remain supported. */
     val deviceId: String? = null,
+    val appDistribution: String? = null,
+    val packageName: String? = null,
 )
 
 interface DeviceTokenRepository {

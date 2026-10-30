@@ -65,7 +65,7 @@ class CompaneroFirebaseMessagingService : FirebaseMessagingService() {
             return
         }
         AcademicNotificationChannel.create(this)
-        val channelId = AttendancePushContract.CHANNEL_ID
+        val channelId = AcademicNotificationChannel.channelId
         val activity =
             Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP

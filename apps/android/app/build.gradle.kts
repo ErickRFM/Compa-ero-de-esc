@@ -130,11 +130,15 @@ android {
             dimension = "distribution"
             applicationId = "org.companerodeescuela"
             buildConfigField("String", "APP_DISTRIBUTION", "\"ACADEMIC\"")
+            buildConfigField("String", "NOTIFICATION_CHANNEL_ID", "\"org.companerodeescuela.notification.academic\"")
+            buildConfigField("String", "NOTIFICATION_CHANNEL_NAME", "\"Avisos académicos\"")
         }
         create("management") {
             dimension = "distribution"
             applicationId = "org.companerodeescuela.gestion"
             buildConfigField("String", "APP_DISTRIBUTION", "\"MANAGEMENT\"")
+            buildConfigField("String", "NOTIFICATION_CHANNEL_ID", "\"org.companerodeescuela.gestion.notification.management\"")
+            buildConfigField("String", "NOTIFICATION_CHANNEL_NAME", "\"Avisos de gestión\"")
             // Never reuse the academic package's Firebase app registration.
             // Enable management FCM only after provisioning its own credentials.
             buildConfigField("boolean", "FIREBASE_CONFIGURED", "false")

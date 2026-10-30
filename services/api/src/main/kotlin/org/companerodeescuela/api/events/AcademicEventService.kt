@@ -71,7 +71,8 @@ class AcademicEventService(
             }
             AcademicEventScope.GROUP -> {
                 val group=group(target)
-                if(!management) {
+                val directiveReader=!write && (UserRole.COORDINATOR in current.roles || UserRole.PRINCIPAL in current.roles)
+                if(!management && !directiveReader) {
                     val assigned=(classrooms ?: throw ApiException.DependencyUnavailable("Classroom authority is unavailable")).nativeChannelsFor(actor).any { it.groupId==group.id }
                     if(!assigned) throw ApiException.Forbidden("Actual group membership or teacher assignment is required")
                 }

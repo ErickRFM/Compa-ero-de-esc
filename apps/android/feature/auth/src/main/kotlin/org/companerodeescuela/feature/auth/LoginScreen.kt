@@ -28,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -83,37 +84,37 @@ fun LoginScreen(
     }
 
     AuthV8Layout(modifier, themeAware = true) {
-        Text(
-            text = stringResource(R.string.auth_hero_title),
-            color = ink,
-            fontSize = 30.sp,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            text = stringResource(R.string.auth_hero_accent),
-            color = accent,
-            fontSize = 30.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 3.dp),
-        )
-        Text(
-            text = stringResource(R.string.auth_hero_description),
-            color = muted,
-            fontSize = 15.sp,
-            lineHeight = 21.sp,
-            modifier = Modifier.padding(top = 13.dp, bottom = 12.dp),
-        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(bottom = 10.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.auth_hero_title),
+                color = ink,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = stringResource(R.string.auth_hero_accent),
+                color = accent,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+
         LoginAccessCarousel(
             pager = pager,
             enabled = !state.submitting,
             accesses = accesses,
         )
+
         if (!state.noticeMessage.isNullOrBlank()) {
             V8FrostedGlassPanel(
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
                 themeAware = true,
             ) {
-                Column(Modifier.padding(18.dp)) {
+                Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                     Text(
                         text =
                             stringResource(
@@ -124,7 +125,7 @@ fun LoginScreen(
                                 },
                             ),
                         color = ink,
-                        fontSize = 18.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
@@ -137,40 +138,39 @@ fun LoginScreen(
                                 },
                             ),
                         color = muted,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
                         modifier =
                             Modifier
-                                .padding(top = 4.dp)
+                                .padding(top = 2.dp)
                                 .semantics { liveRegion = LiveRegionMode.Polite },
                     )
                 }
             }
         }
-        Spacer(Modifier.height(16.dp))
+
+        Spacer(Modifier.height(12.dp))
+
         V8FrostedGlassPanel(
             modifier = Modifier.fillMaxWidth(),
             themeAware = true,
         ) {
-            Column(Modifier.padding(horizontal = 18.dp, vertical = 22.dp)) {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 18.dp)) {
                 Text(
                     text = stringResource(R.string.auth_title),
                     color = ink,
-                    fontSize = 20.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 12.dp),
                 )
-                Text(
-                    text = stringResource(R.string.auth_subtitle),
-                    color = muted,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(top = 3.dp, bottom = 14.dp),
-                )
+
                 OutlinedTextField(
                     value = username,
                     onValueChange = { username = InstitutionalCredentialValidator.sanitizeIdentifier(it) },
                     modifier = Modifier.fillMaxWidth().testTag("login_username"),
                     enabled = !state.submitting,
                     singleLine = true,
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(16.dp),
                     label = { Text(stringResource(R.string.auth_identifier)) },
                     isError = username.isNotEmpty() && usernameIssue != null,
                     supportingText =
@@ -184,13 +184,14 @@ fun LoginScreen(
                         ),
                     colors = institutionalFieldColors(),
                 )
+
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = InstitutionalCredentialValidator.sanitizePassword(it) },
                     modifier = Modifier.fillMaxWidth().padding(top = 10.dp).testTag("login_password"),
                     enabled = !state.submitting,
                     singleLine = true,
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(16.dp),
                     label = { Text(stringResource(R.string.auth_password)) },
                     isError = password.isNotEmpty() && passwordIssue != null,
                     supportingText =
@@ -235,9 +236,11 @@ fun LoginScreen(
                     keyboardActions = KeyboardActions(onDone = { submit() }),
                     colors = institutionalFieldColors(),
                 )
-                state.errorMessage?.let {
+
+                val displayError = state.errorMessage ?: state.failure?.let { stringResource(loginErrorResource(it)) }
+                displayError?.let { msg ->
                     Text(
-                        text = stringResource(loginErrorResource(state.failure)),
+                        text = msg,
                         color = errorColor,
                         fontSize = 13.sp,
                         lineHeight = 18.sp,
@@ -250,43 +253,46 @@ fun LoginScreen(
                     (state.failure as? AppError.Http)?.requestId?.let { requestId ->
                         Text(
                             text = stringResource(R.string.auth_error_reference, requestId),
-                            color = muted,
+                            color = muted.copy(alpha = 0.7f),
                             fontSize = 11.sp,
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .padding(top = 4.dp)
+                                    .padding(top = 2.dp)
                                     .testTag("login_error_reference"),
                         )
                     }
                 }
+
                 AuthV8PrimaryAction(
                     text = stringResource(R.string.auth_submit),
                     onClick = ::submit,
                     enabled = canSubmit,
                     submitting = state.submitting,
-                    modifier = Modifier.padding(top = 20.dp).testTag("login_submit"),
+                    modifier = Modifier.padding(top = 16.dp).testTag("login_submit"),
                     submittingText = stringResource(R.string.auth_submitting),
                 )
+
                 if (access.canRegister) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 22.dp, bottom = 16.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         HorizontalDivider(
                             modifier = Modifier.weight(1f),
-                            color = muted.copy(alpha = 0.3f),
+                            color = muted.copy(alpha = 0.2f),
                         )
                         Text(
                             text = stringResource(R.string.auth_or),
                             color = muted,
-                            fontSize = 13.sp,
+                            fontSize = 12.sp,
                         )
                         HorizontalDivider(
                             modifier = Modifier.weight(1f),
-                            color = muted.copy(alpha = 0.3f),
+                            color = muted.copy(alpha = 0.2f),
                         )
                     }
+
                     AuthV8SecondaryAction(
                         text = stringResource(R.string.auth_create_account),
                         onClick = onCreateAccount,
@@ -298,17 +304,18 @@ fun LoginScreen(
                         text = stringResource(R.string.auth_managed_access),
                         color = muted,
                         fontSize = 12.sp,
-                        lineHeight = 18.sp,
-                        modifier = Modifier.padding(top = 18.dp),
+                        lineHeight = 16.sp,
+                        modifier = Modifier.padding(top = 14.dp),
                     )
                 }
             }
         }
+
         Text(
             text = stringResource(R.string.auth_footer),
-            color = muted,
+            color = muted.copy(alpha = 0.7f),
             fontSize = 11.sp,
-            modifier = Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 18.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 12.dp),
         )
     }
 }

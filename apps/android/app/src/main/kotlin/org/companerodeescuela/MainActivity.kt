@@ -132,6 +132,8 @@ class MainActivity : AppCompatActivity() {
 
             CompaneroTheme(
                 darkTheme = darkTheme,
+                dynamicColor = appearance.dynamicColor,
+                accentPalette = appearance.accentPalette,
                 fontScaleMultiplier = appearance.textScale,
                 highContrast = appearance.highContrast,
             ) {
@@ -257,6 +259,10 @@ class MainActivity : AppCompatActivity() {
                                             loginExperienceName = null
                                             preferredExperience = selected
                                         },
+                                        onLogout = {
+                                            loginExperienceName = null
+                                            sessionViewModel.logout()
+                                        },
                                     )
                                 } else {
                                     val roleConfig =
@@ -296,6 +302,7 @@ class MainActivity : AppCompatActivity() {
                                         startDestination = roleConfig.startDestination,
                                         topLevelDestinations = roleConfig.topLevelDestinations,
                                         highContrast = appearance.highContrast,
+                                        campusBackdropEnabled = appearance.campusBackdropEnabled,
                                     ) {
                                         composable(Destination.Home.route) {
                                             HomeScreen(
@@ -599,6 +606,9 @@ class MainActivity : AppCompatActivity() {
                                             AppearanceSettingsScreen(
                                                 settings = appearance,
                                                 onThemeMode = appearancePreferences::setThemeMode,
+                                                onAccentPalette = appearancePreferences::setAccentPalette,
+                                                onDynamicColor = appearancePreferences::setDynamicColor,
+                                                onCampusBackdrop = appearancePreferences::setCampusBackdropEnabled,
                                                 onLanguage = appearancePreferences::setLanguage,
                                                 onTextScale = appearancePreferences::setTextScale,
                                                 onReducedMotion = appearancePreferences::setReducedMotion,
@@ -686,23 +696,36 @@ private fun RoleUnavailableScreen(
                 style = MaterialTheme.typography.headlineMedium,
             )
         }
-        Text(
-            text =
-                if (experience == AppExperience.UNSUPPORTED) {
-                    "Tu cuenta no tiene un perfil autorizado en esta aplicación. Usa la aplicación correspondiente o cierra sesión."
-                } else {
-                    "Tu perfil está activo. Las herramientas para este rol se integrarán en el workspace V6 sin enviarte a pantallas de alumno."
-                },
-            modifier = Modifier.padding(top = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.sm),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (experience == AppExperience.UNSUPPORTED) {
-            Button(
-                onClick = onLogout,
-                modifier = Modifier.padding(top = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.md),
+        org.companerodeescuela.core.designsystem.v8.V8GlassCard(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.sm),
+        ) {
+            Column(
+                verticalArrangement =
+                    Arrangement.spacedBy(
+                        org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.sm,
+                    ),
             ) {
-                Text(stringResource(R.string.role_unavailable_logout))
+                Text(
+                    text =
+                        if (experience == AppExperience.UNSUPPORTED) {
+                            "Tu cuenta no tiene un perfil autorizado en esta aplicación. Usa la aplicación correspondiente o cierra sesión."
+                        } else {
+                            "Esta sección no forma parte de las herramientas asignadas a tu perfil activo."
+                        },
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (experience == AppExperience.UNSUPPORTED) {
+                    Button(
+                        onClick = onLogout,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.role_unavailable_logout))
+                    }
+                }
             }
         }
     }
@@ -713,6 +736,7 @@ private fun ExperiencePickerScreen(
     experiences: List<AppExperience>,
     selectionUnavailable: Boolean = false,
     onSelect: (AppExperience) -> Unit,
+    onLogout: (() -> Unit)? = null,
 ) {
     Column(
         modifier =
@@ -721,10 +745,12 @@ private fun ExperiencePickerScreen(
                 .padding(horizontal = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.page),
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(
-            text = stringResource(R.string.login_experience_picker_title),
-            style = MaterialTheme.typography.headlineMedium,
-        )
+        org.companerodeescuela.core.designsystem.v8.V8ScreenHeader {
+            Text(
+                text = stringResource(R.string.login_experience_picker_title),
+                style = MaterialTheme.typography.headlineMedium,
+            )
+        }
         Text(
             text =
                 stringResource(
@@ -738,15 +764,29 @@ private fun ExperiencePickerScreen(
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        experiences.forEach { experience ->
-            Button(
-                onClick = { onSelect(experience) },
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.xs),
+        org.companerodeescuela.core.designsystem.v8.V8GlassCard(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                verticalArrangement =
+                    Arrangement.spacedBy(
+                        org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.xs,
+                    ),
             ) {
-                Text(experienceLabel(experience))
+                experiences.forEach { experience ->
+                    Button(
+                        onClick = { onSelect(experience) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(experienceLabel(experience))
+                    }
+                }
+                onLogout?.let { logout ->
+                    androidx.compose.material3.TextButton(
+                        onClick = logout,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.role_unavailable_logout))
+                    }
+                }
             }
         }
     }

@@ -3,7 +3,6 @@ package org.companerodeescuela.feature.coordinator
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,6 +12,7 @@ import kotlinx.coroutines.launch
 import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.shared.contracts.CoordinationOverview
+import javax.inject.Inject
 
 data class CoordinatorOverviewUiState(
     val loading: Boolean = true,

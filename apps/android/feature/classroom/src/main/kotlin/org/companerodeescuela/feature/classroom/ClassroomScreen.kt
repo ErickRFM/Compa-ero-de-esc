@@ -45,10 +45,8 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8IconTile
 import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
-import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
-import org.companerodeescuela.core.ui.component.CompaneroSurface
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ClassInvite
 import org.companerodeescuela.shared.contracts.ClassroomStatus
@@ -107,21 +105,58 @@ fun ClassroomScreen(
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
         V8ScreenHeader {
-            Text(
-                text = "Mis clases",
-                style = MaterialTheme.typography.headlineSmall,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Mis clases",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                TextButton(onClick = model::refresh, enabled = !state.loading) {
+                    Text(if (state.loading) "Actualizando…" else "Actualizar clases")
+                }
+            }
         }
-        if (isStudent) {
-            TextButton(onClick = onOpenStudentGrades, modifier = Modifier.fillMaxWidth()) {
-                Text("Calificaciones")
+        V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = isStudent) {
+            Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
+                Text(
+                    text = if (isStudent) "Accesos académicos" else "Comunicación del grupo",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text =
+                        if (isStudent) {
+                            "Consulta tus calificaciones publicadas o revisa los avisos de tus docentes."
+                        } else {
+                            "Accede al canal de avisos y recursos de tus grupos."
+                        },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                ) {
+                    if (isStudent) {
+                        V8RedPrimaryButton(
+                            text = "Calificaciones",
+                            onClick = onOpenStudentGrades,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    OutlinedButton(onClick = { onOpenChannel(null) }, modifier = Modifier.weight(1f)) {
+                        Text("Canal de clase")
+                    }
+                }
             }
         }
         InstitutionalSections(state)
-        TextButton(onClick = model::refresh) { Text("Actualizar clases") }
-        OutlinedButton(onClick = { onOpenChannel(null) }, modifier = Modifier.fillMaxWidth()) {
-            Text("Canal de clase")
-        }
         Text(
             text = "Espacios colaborativos de Compañero. No sustituyen tus inscripciones oficiales de SIII.",
             style = MaterialTheme.typography.bodyMedium,
@@ -148,9 +183,8 @@ fun ClassroomScreen(
         }
 
         if (isStudent && state.groups.isEmpty() && state.institutionalSource != "SIII") {
-            CompaneroSurface(modifier = Modifier.fillMaxWidth()) {
+            V8GlassCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
-                    modifier = Modifier.padding(CompaneroSpacing.md),
                     verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
                 ) {
                     Text(
@@ -189,9 +223,8 @@ fun ClassroomScreen(
         }
 
         if (isStudent && state.groups.isNotEmpty()) {
-            CompaneroSurface(modifier = Modifier.fillMaxWidth()) {
+            V8GlassCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
-                    modifier = Modifier.padding(CompaneroSpacing.md),
                     verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
                 ) {
                     Text(
@@ -214,9 +247,8 @@ fun ClassroomScreen(
         }
 
         if (pendingTeacher) {
-            CompaneroSurface(modifier = Modifier.fillMaxWidth()) {
+            V8GlassCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
-                    modifier = Modifier.padding(CompaneroSpacing.md),
                     verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
                 ) {
                     Text(
@@ -310,16 +342,16 @@ private fun TeacherAssignedClassrooms(
                     text = "Mis clases",
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
-                    color = V8RedColors.TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
             InstitutionalSections(state)
             Text(
                 text = "Espacios colaborativos de Compañero. Sus permisos y herramientas son independientes del catálogo institucional.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = V8RedColors.TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (state.loading) CircularProgressIndicator(color = V8RedColors.Crimson)
+            if (state.loading) CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             state.errorMessage?.let { StatusNotice(title = "Datos sin actualizar", message = it) }
             if (!state.loading && state.errorMessage == null && assigned.isEmpty()) {
                 StatusNotice(
@@ -332,7 +364,7 @@ private fun TeacherAssignedClassrooms(
                     Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
                         Text(
                             text = "${assigned.size} espacios colaborativos activos",
-                            color = V8RedColors.TextPrimary,
+                            color = MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.titleLarge,
                         )
                         Text(
@@ -343,7 +375,7 @@ private fun TeacherAssignedClassrooms(
                                     .size
                                     .toString() +
                                     " grupos vinculados · permisos de docente",
-                            color = V8RedColors.TextSecondary,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -356,7 +388,7 @@ private fun TeacherAssignedClassrooms(
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Text(
                                         text = classroom.name,
-                                        color = V8RedColors.TextPrimary,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         style = MaterialTheme.typography.titleLarge,
                                         fontWeight = FontWeight.SemiBold,
                                     )
@@ -366,7 +398,7 @@ private fun TeacherAssignedClassrooms(
                                                 classroom.groupName?.takeIf(String::isNotBlank),
                                                 classroom.room?.takeIf(String::isNotBlank)?.let { "Aula $it" },
                                             ).joinToString(" · ").ifBlank { "Clase asignada" },
-                                        color = V8RedColors.TextSecondary,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         style = MaterialTheme.typography.bodyMedium,
                                     )
                                 }
@@ -419,17 +451,32 @@ internal fun InstitutionalSections(state: ClassroomUiState) {
         }
         if (state.institutionalSections.isEmpty()) Text("No hay inscripciones o asignaciones institucionales vigentes.")
         state.institutionalSections.forEach { section ->
-            Column(
-                Modifier.fillMaxWidth().testTag("institutional_section_${section.id}"),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+            V8GlassCard(
+                modifier = Modifier.fillMaxWidth().testTag("institutional_section_${section.id}"),
             ) {
-                Text(section.subjectName, style = MaterialTheme.typography.titleMedium)
-                Text("${section.subjectCode} · Grupo ${section.groupName}", style = MaterialTheme.typography.bodyMedium)
-                Text(
-                    section.teacherNames.joinToString(" · ").ifBlank { "Docente pendiente de asignación" },
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text("Fuente institucional · versión ${section.sourceVersion}", style = MaterialTheme.typography.bodySmall)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        section.subjectName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        "${section.subjectCode} · Grupo ${section.groupName}",
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        section.teacherNames.joinToString(" · ").ifBlank { "Docente pendiente de asignación" },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        "Fuente institucional · versión ${section.sourceVersion}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
@@ -441,14 +488,15 @@ internal fun ClassroomCard(
     enabled: Boolean,
     onGenerateInvite: () -> Unit,
 ) {
-    CompaneroSurface(modifier = Modifier.fillMaxWidth()) {
+    V8GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(CompaneroSpacing.md),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
         ) {
             Text(
                 text = classroom.name,
                 style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 text =
@@ -474,13 +522,12 @@ internal fun ClassroomCard(
                 )
             }
             if (classroom.canManageEnrollment) {
-                Button(
+                V8RedPrimaryButton(
+                    text = stringResource(R.string.academic_invite_generate),
                     onClick = onGenerateInvite,
                     enabled = enabled,
                     modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.academic_invite_generate))
-                }
+                )
             }
         }
     }
@@ -494,18 +541,21 @@ internal fun InviteCard(
     onRevoke: () -> Unit,
     enabled: Boolean,
 ) {
-    CompaneroSurface(modifier = Modifier.fillMaxWidth()) {
+    V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
         Column(
-            modifier = Modifier.padding(CompaneroSpacing.md),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
         ) {
             Text(
                 text = stringResource(R.string.academic_invite_title),
                 style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
                 text = invite.code,
                 style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
             )
             Text(
                 text = stringResource(R.string.academic_invite_expiry, expiryLabel(invite.expiresAtEpochSeconds)),

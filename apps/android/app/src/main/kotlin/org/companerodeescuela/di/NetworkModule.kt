@@ -15,7 +15,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
-
     /**
      * Base URL embedded at build time.
      *
@@ -32,13 +31,17 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideApiClient(environment: ApiEnvironment): HttpClient =
-        createApiClient(environment)
+    fun provideApiClient(environment: ApiEnvironment): HttpClient = createApiClient(environment)
 
     @Provides
     @Singleton
-    fun provideMfaRepository(client:HttpClient,tokenStore:SessionTokenStore,refreshCoordinator:SessionRefreshCoordinator):org.companerodeescuela.core.network.MfaRepository =
-        org.companerodeescuela.core.network.MfaRepository(client,tokenStore,refreshCoordinator)
+    fun provideMfaRepository(
+        client: HttpClient,
+        tokenStore: SessionTokenStore,
+        refreshCoordinator: SessionRefreshCoordinator,
+    ): org.companerodeescuela.core.network.MfaRepository =
+        org.companerodeescuela.core.network
+            .MfaRepository(client, tokenStore, refreshCoordinator)
 
     @Provides
     @Singleton

@@ -18,6 +18,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 
 val LocalCompaneroHighContrast = staticCompositionLocalOf { false }
+val LocalCompaneroAccentPalette = staticCompositionLocalOf { CompaneroAccentPalette.CRIMSON }
+val LocalCompaneroDynamicColor = staticCompositionLocalOf { false }
 
 private val LightColors =
     lightColorScheme(
@@ -95,18 +97,40 @@ private val DarkColors =
 fun CompaneroTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
+    accentPalette: CompaneroAccentPalette = CompaneroAccentPalette.CRIMSON,
     fontScaleMultiplier: Float = 1f,
     highContrast: Boolean = false,
     content: @Composable () -> Unit,
 ) {
+    val useDynamic = dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val baseScheme =
         when {
-            dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            useDynamic -> {
                 val context = LocalContext.current
                 if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
             }
-            darkTheme -> DarkColors
-            else -> LightColors
+            darkTheme ->
+                if (accentPalette == CompaneroAccentPalette.CRIMSON) {
+                    DarkColors
+                } else {
+                    DarkColors.copy(
+                        primary = accentPalette.darkPrimary,
+                        onPrimary = Color.White,
+                        primaryContainer = accentPalette.darkContainer,
+                        onPrimaryContainer = Color.White,
+                    )
+                }
+            else ->
+                if (accentPalette == CompaneroAccentPalette.CRIMSON) {
+                    LightColors
+                } else {
+                    LightColors.copy(
+                        primary = accentPalette.lightPrimary,
+                        onPrimary = Color.White,
+                        primaryContainer = accentPalette.lightContainer,
+                        onPrimaryContainer = accentPalette.lightPrimary,
+                    )
+                }
         }
     val colorScheme =
         if (highContrast) {
@@ -147,6 +171,8 @@ fun CompaneroTheme(
     CompositionLocalProvider(
         LocalDensity provides adjustedDensity,
         LocalCompaneroHighContrast provides highContrast,
+        LocalCompaneroAccentPalette provides accentPalette,
+        LocalCompaneroDynamicColor provides useDynamic,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,

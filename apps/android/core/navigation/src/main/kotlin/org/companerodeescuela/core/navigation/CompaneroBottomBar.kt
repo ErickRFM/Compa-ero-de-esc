@@ -52,8 +52,8 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavHostController
 import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
+import org.companerodeescuela.core.designsystem.theme.LocalCompaneroAccentPalette
 import org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled
-import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.v8GlassSurface
 import org.companerodeescuela.core.motion.CompaneroMotion
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
@@ -163,12 +163,13 @@ fun CompaneroBottomBar(
                         contentAlignment = Alignment.Center,
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            val qrContainerColor = LocalCompaneroAccentPalette.current.darkContainer
                             Box(
                                 modifier =
                                     Modifier
                                         .size(if (isQr) 38.dp else 34.dp)
                                         .clip(CircleShape)
-                                        .background(if (isQr) V8RedColors.DeepCrimson else Color.Transparent)
+                                        .background(if (isQr) qrContainerColor else Color.Transparent)
                                         .graphicsLayer {
                                             scaleX = scale
                                             scaleY = scale

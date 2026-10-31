@@ -1,5 +1,6 @@
 package org.companerodeescuela
 
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -7,12 +8,11 @@ import androidx.test.uiautomator.By
 import androidx.test.uiautomator.BySelector
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
-import androidx.test.uiautomator.Until
 import androidx.test.uiautomator.UiScrollable
 import androidx.test.uiautomator.UiSelector
-import org.junit.Assert.assertTrue
+import androidx.test.uiautomator.Until
 import org.companerodeescuela.feature.settings.AppLanguage
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -20,6 +20,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class LoginV8SmokeTest {
     @get:Rule val compose = createEmptyComposeRule()
+
     @Test
     fun registrationAccountTypeCanBeSelectedByItsLabel() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
@@ -65,9 +66,14 @@ class LoginV8SmokeTest {
         }
     }
 
-    private fun findVisible(device: UiDevice, selector: BySelector, forward: Boolean = true): UiObject2 {
-        val scroll = UiScrollable(UiSelector().packageName("org.companerodeescuela").scrollable(true))
-            .setAsVerticalList()
+    private fun findVisible(
+        device: UiDevice,
+        selector: BySelector,
+        forward: Boolean = true,
+    ): UiObject2 {
+        val scroll =
+            UiScrollable(UiSelector().packageName("org.companerodeescuela").scrollable(true))
+                .setAsVerticalList()
         repeat(6) {
             compose.waitForIdle()
             device.waitForIdle()

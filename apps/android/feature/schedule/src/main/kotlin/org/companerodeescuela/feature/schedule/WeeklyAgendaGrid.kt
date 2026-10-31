@@ -52,10 +52,12 @@ internal fun WeeklyAgendaGrid(
     val gridScroll = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
     var showAllDetails by remember { mutableStateOf(false) }
+    val colors = MaterialTheme.colorScheme
+    val gridLineColor = colors.outline.copy(alpha = 0.4f)
     LaunchedEffect(entries) { gridScroll.scrollTo(0) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("Lunes a sábado · desplaza a los lados", fontSize = 11.sp, color = V8RedColors.TextSecondary)
+            Text("Lunes a sábado · desplaza a los lados", fontSize = 11.sp, color = colors.onSurfaceVariant)
             TextButton(onClick = {
                 coroutineScope.launch { gridScroll.animateScrollTo(gridScroll.maxValue) }
             }) { Text("Ver sábado →") }
@@ -78,7 +80,7 @@ internal fun WeeklyAgendaGrid(
                         .v8GlassSurface(cornerRadius = 14.dp, elevation = 0.dp),
                 ) {
                     Row(Modifier.padding(vertical = 12.dp)) {
-                        Text("Hora", Modifier.width(rail).padding(start = 4.dp), fontSize = 10.sp, color = V8RedColors.TextSecondary)
+                        Text("Hora", Modifier.width(rail).padding(start = 4.dp), fontSize = 10.sp, color = colors.onSurfaceVariant)
                         days.forEachIndexed {
                             i,
                             day,
@@ -98,7 +100,7 @@ internal fun WeeklyAgendaGrid(
                                     "$hour:00",
                                     Modifier.height(hourHeight).padding(start = 4.dp, top = 4.dp),
                                     fontSize = 9.sp,
-                                    color = V8RedColors.TextSecondary,
+                                    color = colors.onSurfaceVariant,
                                 )
                             }
                         }
@@ -111,13 +113,13 @@ internal fun WeeklyAgendaGrid(
                                         for (hour in 0..(lastHour - startHour)) {
                                             val y = hourHeight.toPx() * hour
                                             drawLine(
-                                                V8RedColors.Outline.copy(alpha = 0.4f),
+                                                gridLineColor,
                                                 Offset(0f, y),
                                                 Offset(size.width, y),
                                                 1.dp.toPx(),
                                             )
                                         }
-                                        drawLine(V8RedColors.Outline.copy(alpha = 0.4f), Offset.Zero, Offset(0f, size.height), 1.dp.toPx())
+                                        drawLine(gridLineColor, Offset.Zero, Offset(0f, size.height), 1.dp.toPx())
                                     },
                             ) {
                                 layout.forEach { placement ->
@@ -201,14 +203,14 @@ internal fun WeeklyAgendaGrid(
                                                     entry.startsAt + "–" + entry.endsAt,
                                                     fontSize = 9.sp,
                                                     lineHeight = 11.sp,
-                                                    color = V8RedColors.TextSecondary,
+                                                    color = colors.onSurfaceVariant,
                                                 )
                                                 entry.classroomName?.let {
                                                     Text(
                                                         it,
                                                         fontSize = 9.sp,
                                                         lineHeight = 11.sp,
-                                                        color = V8RedColors.TextSecondary,
+                                                        color = colors.onSurfaceVariant,
                                                     )
                                                 }
                                             }
@@ -223,7 +225,7 @@ internal fun WeeklyAgendaGrid(
         }
         // Keep a compact grid. The full readable list is opt-in, not 25
         // duplicated rows that push the rest of the screen below the bottom bar.
-        Text("Toca un bloque para sus detalles o desliza para ver los demás días.", fontSize = 11.sp, color = V8RedColors.TextSecondary)
+        Text("Toca un bloque para sus detalles o desliza para ver los demás días.", fontSize = 11.sp, color = colors.onSurfaceVariant)
         TextButton(onClick = { showAllDetails = !showAllDetails }) {
             Text(if (showAllDetails) "Ocultar lista accesible" else "Ver horario como lista")
         }

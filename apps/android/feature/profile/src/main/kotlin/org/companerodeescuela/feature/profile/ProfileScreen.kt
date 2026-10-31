@@ -34,6 +34,7 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
+import org.companerodeescuela.core.designsystem.theme.LocalCompaneroAccentPalette
 import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
@@ -99,17 +100,18 @@ fun ProfileScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
                 ) {
+                    val avatarBg = LocalCompaneroAccentPalette.current.darkContainer
                     Surface(
                         modifier = Modifier.size(CompaneroSize.avatar),
                         shape = CircleShape,
-                        color = V8RedColors.DeepCrimson,
+                        color = avatarBg,
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
                                 text = initials(displayName),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
+                                color = androidx.compose.ui.graphics.Color.White,
                             )
                         }
                     }

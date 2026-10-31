@@ -1,9 +1,9 @@
 package org.companerodeescuela.core.navigation
 
+import org.companerodeescuela.shared.contracts.UserRole
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.companerodeescuela.shared.contracts.UserRole
 
 class NavigationChromePolicyTest {
     @Test

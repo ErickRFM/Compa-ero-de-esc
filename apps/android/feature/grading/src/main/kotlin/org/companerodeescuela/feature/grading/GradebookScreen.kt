@@ -20,7 +20,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -36,7 +35,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -44,10 +45,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8GlassFilterChip
 import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
+import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
+import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.TeacherClassContext
+
+private val teacherGradingPeriodPresets = listOf("Parcial 1", "Parcial 2", "Parcial 3", "Final")
 
 /**
  * Only classes returned with canManage=true can be selected. Server-side grading
@@ -64,6 +70,7 @@ fun GradebookScreen(
     var confirmSync by remember(state.classroomId, state.preview, state.categories, state.gradingPeriod) { mutableStateOf(false) }
     var confirmPublish by remember(state.classroomId, state.gradebookRevision, state.gradingPeriod) { mutableStateOf(false) }
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     val fileLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null) {
@@ -103,17 +110,21 @@ fun GradebookScreen(
                     .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
         ) {
-            Text(
-                "Evaluación",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                "Organiza las actividades de tus materias y revisa las calificaciones antes de enviarlas.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            V8ScreenHeader {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        "Evaluación",
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        "Organiza las actividades de tus materias y revisa las calificaciones antes de enviarlas.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
 
             V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
                 Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
@@ -135,10 +146,13 @@ fun GradebookScreen(
                             horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
                         ) {
                             state.assignedClassrooms.forEach { classroom ->
-                                FilterChip(
+                                V8GlassFilterChip(
                                     selected = classroom.id == state.classroomId,
-                                    enabled = !state.submitting,
-                                    onClick = { viewModel.setClassroomId(classroom.id) },
+                                    onClick = {
+                                        if (!state.submitting) {
+                                            viewModel.setClassroomId(classroom.id)
+                                        }
+                                    },
                                     label = { Text(classroom.name + " · " + classroom.groupName.orEmpty()) },
                                 )
                             }
@@ -150,6 +164,22 @@ fun GradebookScreen(
                                     (selected.room?.takeIf(String::isNotBlank)?.let { " · Aula $it" } ?: ""),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                    ) {
+                        teacherGradingPeriodPresets.forEach { preset ->
+                            V8GlassFilterChip(
+                                selected = state.gradingPeriod.equals(preset, ignoreCase = true),
+                                onClick = {
+                                    if (!state.submitting) {
+                                        viewModel.setGradingPeriod(preset)
+                                    }
+                                },
+                                label = { Text(preset) },
                             )
                         }
                     }
@@ -328,7 +358,10 @@ fun GradebookScreen(
                 StatusNotice(title = "Resultado de evaluación", message = it)
             }
             OutlinedButton(
-                onClick = viewModel::saveDraft,
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    viewModel.saveDraft()
+                },
                 enabled =
                     !state.submitting &&
                         !state.gradebookPublished &&
@@ -349,11 +382,12 @@ fun GradebookScreen(
                     },
                 )
             }
-            Button(
+            V8RedPrimaryButton(
+                text = if (state.gradebookPublished) "Calificaciones publicadas" else "Publicar para estudiantes",
                 onClick = { confirmPublish = true },
                 enabled = !state.submitting && !state.gradebookPublished && state.gradebookRevision != null,
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text(if (state.gradebookPublished) "Calificaciones publicadas" else "Publicar para estudiantes") }
+            )
             if (state.gradebookPublished) {
                 Text(
                     "Esta revisión ya está publicada. Para corregirla se requiere una operación de corrección autorizada.",
@@ -378,7 +412,8 @@ fun GradebookScreen(
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Comprobar conexión institucional") }
             }
-            Button(
+            V8RedPrimaryButton(
+                text = if (state.submitting) "Enviando a control escolar…" else "Enviar a control escolar",
                 onClick = { confirmSync = true },
                 enabled =
                     !state.submitting &&
@@ -391,13 +426,7 @@ fun GradebookScreen(
                         state.gradingPeriod.isNotBlank() &&
                         state.assignedClassrooms.any { it.id == state.classroomId },
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (state.submitting) {
-                    CircularProgressIndicator()
-                } else {
-                    Text("Enviar a control escolar")
-                }
-            }
+            )
         }
     }
     if (confirmSync) {
@@ -413,6 +442,7 @@ fun GradebookScreen(
             },
             confirmButton = {
                 Button(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     confirmSync = false
                     viewModel.sync()
                 }) { Text("Confirmar envío") }
@@ -431,6 +461,7 @@ fun GradebookScreen(
             },
             confirmButton = {
                 Button(onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     confirmPublish = false
                     viewModel.publishDraft()
                 }) { Text("Confirmar publicación") }

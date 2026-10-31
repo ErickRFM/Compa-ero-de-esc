@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import org.companerodeescuela.core.designsystem.theme.LocalCompaneroAccentPalette
 import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 
 /** V8 Red Edition — fixed visual baseline for the five approved student mockups.
@@ -75,25 +76,28 @@ fun V8RedPrimaryButton(
     val shape = RoundedCornerShape(V8RedDimensions.ControlCorner)
     val light = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val glossy = LocalCompaneroHighContrast.current && !light
-    val solidAccent = if (light) MaterialTheme.colorScheme.primary else V8RedColors.DeepCrimson
+    val palette = LocalCompaneroAccentPalette.current
+    val deepAccent = palette.darkContainer
+    val brightAccent = palette.darkPrimary
+    val solidAccent = if (light) MaterialTheme.colorScheme.primary else deepAccent
     val fills =
         when {
             !enabled -> listOf(solidAccent.copy(alpha = 0.35f), solidAccent.copy(alpha = 0.35f))
-            glossy -> listOf(V8RedColors.DeepCrimson, V8RedColors.Crimson)
+            glossy -> listOf(deepAccent, brightAccent)
             else -> listOf(solidAccent, solidAccent)
         }
     val shaded =
         modifier.shadow(
             if (enabled && glossy) 8.dp else 0.dp,
             shape,
-            ambientColor = V8RedColors.Crimson.copy(alpha = 0.25f),
-            spotColor = V8RedColors.Crimson.copy(alpha = 0.25f),
+            ambientColor = brightAccent.copy(alpha = 0.25f),
+            spotColor = brightAccent.copy(alpha = 0.25f),
         )
     val tinted = shaded.background(Brush.horizontalGradient(fills), shape)
     val framed =
         tinted.border(
             1.dp,
-            if (glossy) V8RedColors.Crimson else solidAccent.copy(alpha = 0.45f),
+            if (glossy) brightAccent else solidAccent.copy(alpha = 0.45f),
             shape,
         )
     Button(

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -23,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -65,7 +67,9 @@ internal fun V8WeekGrid(
     val hourHeight = 53.dp
     val gridHeight = hourHeight * (lastHour - firstHour)
     val shape = RoundedCornerShape(12.dp)
-    val gridLineColor = V8RedColors.Outline.copy(alpha = 0.52f)
+    val colors = MaterialTheme.colorScheme
+    val isLight = colors.background.luminance() > 0.5f
+    val gridLineColor = colors.outline.copy(alpha = 0.52f)
 
     V8GlassCard(
         modifier = Modifier.fillMaxWidth(),
@@ -75,14 +79,14 @@ internal fun V8WeekGrid(
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Hora", modifier = Modifier.width(42.dp), fontSize = 10.sp, color = V8RedColors.TextSecondary)
+                Text("Hora", modifier = Modifier.width(42.dp), fontSize = 10.sp, color = colors.onSurfaceVariant)
                 days.forEachIndexed { index, day ->
                     Text(
                         text = titles[index],
                         modifier = Modifier.weight(1f).clickable { onOpenDay(day) },
                         fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = if (day == selectedDay) V8RedColors.Crimson else V8RedColors.TextPrimary,
+                        color = if (day == selectedDay) colors.primary else colors.onSurface,
                         maxLines = 1,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     )
@@ -94,7 +98,7 @@ internal fun V8WeekGrid(
                         Text(
                             text = "%02d:00".format(hour),
                             modifier = Modifier.offset(y = hourHeight * (hour - firstHour).toFloat()),
-                            color = V8RedColors.TextSecondary,
+                            color = colors.onSurfaceVariant,
                             fontSize = 10.sp,
                             maxLines = 1,
                         )
@@ -120,6 +124,14 @@ internal fun V8WeekGrid(
                             val height = maxOf(38.dp, hourHeight * ((ends - starts) / 60f) - 3.dp)
                             val enabled = entry.source != ScheduleSource.INSTITUTIONAL
                             val emphasized = day == selectedDay
+                            val blockFill =
+                                when {
+                                    emphasized && isLight -> colors.primary.copy(alpha = 0.14f)
+                                    emphasized -> Color(0xFF48121C)
+                                    isLight -> colors.surfaceContainerHigh
+                                    else -> V8RedColors.Surface
+                                }
+                            val blockBorder = if (emphasized) colors.primary else colors.outline
                             Column(
                                 modifier =
                                     Modifier
@@ -128,21 +140,16 @@ internal fun V8WeekGrid(
                                         .height(height)
                                         .padding(horizontal = 2.dp)
                                         .clip(shape)
-                                        .background(
-                                            if (emphasized) Color(0xFF48121C) else V8RedColors.Surface,
-                                            shape,
-                                        ).border(
-                                            1.dp,
-                                            if (emphasized) V8RedColors.Crimson else V8RedColors.Outline,
-                                            shape,
-                                        ).clickable {
+                                        .background(blockFill, shape)
+                                        .border(1.dp, blockBorder, shape)
+                                        .clickable {
                                             if (enabled) onEditPersonal(entry) else onOpenDay(day)
                                         }.padding(horizontal = 4.dp, vertical = 5.dp),
                                 verticalArrangement = Arrangement.spacedBy(2.dp),
                             ) {
                                 Text(
                                     text = entry.subjectName,
-                                    color = V8RedColors.TextPrimary,
+                                    color = colors.onSurface,
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 10.sp,
                                     lineHeight = 11.sp,
@@ -152,12 +159,12 @@ internal fun V8WeekGrid(
                                 if (height > 70.dp) {
                                     Text(
                                         text = entry.startsAt + "–" + entry.endsAt,
-                                        color = V8RedColors.TextSecondary,
+                                        color = colors.onSurfaceVariant,
                                         fontSize = 9.sp,
                                         maxLines = 1,
                                     )
                                     entry.classroomName?.takeIf { it.isNotBlank() }?.let { room ->
-                                        Text(room, color = V8RedColors.TextSecondary, fontSize = 9.sp, maxLines = 1)
+                                        Text(room, color = colors.onSurfaceVariant, fontSize = 9.sp, maxLines = 1)
                                     }
                                 }
                             }

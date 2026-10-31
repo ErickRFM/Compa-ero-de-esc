@@ -45,7 +45,11 @@ fun TutorGroupsScreen(
 }
 
 @Composable
-private fun TutorGroupsContent(state: TutorUiState, viewModel: TutorViewModel, modifier: Modifier) {
+private fun TutorGroupsContent(
+    state: TutorUiState,
+    viewModel: TutorViewModel,
+    modifier: Modifier,
+) {
     var groupId by remember { mutableStateOf<String?>(null) }
     var studentId by remember { mutableStateOf<String?>(null) }
     var caseSummary by remember { mutableStateOf("") }
@@ -69,10 +73,12 @@ private fun TutorGroupsContent(state: TutorUiState, viewModel: TutorViewModel, m
     }
 
     Column(
-        modifier = modifier.fillMaxSize()
-            .widthIn(max = CompaneroSize.homeContentMaxWidth)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .widthIn(max = CompaneroSize.homeContentMaxWidth)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
         Text("Mi grupo", style = MaterialTheme.typography.headlineSmall)
@@ -167,7 +173,10 @@ private fun TutorGroupsContent(state: TutorUiState, viewModel: TutorViewModel, m
                             )
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
-                            OutlinedButton(onClick = { studentId = student.userId; editingCase = null }) {
+                            OutlinedButton(onClick = {
+                                studentId = student.userId
+                                editingCase = null
+                            }) {
                                 Text("Ver seguimiento")
                             }
                             val activeGroup = groupId ?: return@Row
@@ -223,7 +232,8 @@ private fun TutorGroupsContent(state: TutorUiState, viewModel: TutorViewModel, m
                 enabled = !state.submitting && caseSummary.trim().length in 8..500,
             ) { Text("Crear seguimiento") }
 
-            state.cases.filter { it.studentId == selected.userId && it.academicGroupId == groupId }
+            state.cases
+                .filter { it.studentId == selected.userId && it.academicGroupId == groupId }
                 .forEach { case ->
                     CompaneroSurface(modifier = Modifier.fillMaxWidth(), role = CompaneroSurfaceRole.CARD) {
                         Column(
@@ -232,7 +242,10 @@ private fun TutorGroupsContent(state: TutorUiState, viewModel: TutorViewModel, m
                         ) {
                             Text(case.summary, style = MaterialTheme.typography.titleSmall)
                             Text(
-                                "Estado: " + case.status.name.lowercase().replace('_', ' '),
+                                "Estado: " +
+                                    case.status.name
+                                        .lowercase()
+                                        .replace('_', ' '),
                                 style = MaterialTheme.typography.bodySmall,
                             )
                             case.notes.forEach { note ->
@@ -249,9 +262,11 @@ private fun TutorGroupsContent(state: TutorUiState, viewModel: TutorViewModel, m
                             }
                             if (editingCase == case.id) {
                                 OutlinedTextField(
-                                    value = noteText, onValueChange = { noteText = it.take(2000) },
+                                    value = noteText,
+                                    onValueChange = { noteText = it.take(2000) },
                                     label = { Text("Observación o acuerdo") },
-                                    modifier = Modifier.fillMaxWidth(), minLines = 2,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    minLines = 2,
                                 )
                                 Row(horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
                                     Switch(checked = publishNote, onCheckedChange = { publishNote = it })
@@ -266,7 +281,11 @@ private fun TutorGroupsContent(state: TutorUiState, viewModel: TutorViewModel, m
                                     },
                                 ) { Text("Guardar observación") }
                             } else {
-                                OutlinedButton(onClick = { editingCase = case.id; noteText = ""; publishNote = false }) {
+                                OutlinedButton(onClick = {
+                                    editingCase = case.id
+                                    noteText = ""
+                                    publishNote = false
+                                }) {
                                     Text("Añadir observación")
                                 }
                             }

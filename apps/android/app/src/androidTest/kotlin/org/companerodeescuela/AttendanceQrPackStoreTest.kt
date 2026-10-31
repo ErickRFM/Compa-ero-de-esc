@@ -6,8 +6,8 @@ import org.companerodeescuela.core.attendance.AndroidAttendanceQrPackStore
 import org.companerodeescuela.shared.contracts.AttendanceQrResponse
 import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
 import org.companerodeescuela.shared.contracts.ClassOccurrenceStatusContract
-import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -19,8 +19,20 @@ class AttendanceQrPackStoreTest {
     fun selectedClassContextSurvivesProcessRecreationAndClearsWithOwner() {
         val owner = "qa-class-context:login"
         val store = AndroidAttendanceQrPackStore(context)
-        val occurrence = ClassOccurrenceContract("occurrence-A", null, "course-A", "9A", "math", "Matemáticas", "QA Docente",
-            "2026-10-08", "09:00", "10:00", ClassOccurrenceStatusContract.SCHEDULED)
+        val occurrence =
+            ClassOccurrenceContract(
+                "occurrence-A",
+                null,
+                "course-A",
+                "9A",
+                "math",
+                "Matemáticas",
+                "QA Docente",
+                "2026-10-08",
+                "09:00",
+                "10:00",
+                ClassOccurrenceStatusContract.SCHEDULED,
+            )
         try {
             store.rememberOccurrence(owner, occurrence)
             val restored = AndroidAttendanceQrPackStore(context)
@@ -28,7 +40,9 @@ class AttendanceQrPackStoreTest {
             assertEquals(null, restored.restoreOccurrence("qa-another-owner:login"))
             restored.clearSession("qa-class-context")
             assertEquals(null, AndroidAttendanceQrPackStore(context).restoreOccurrence(owner))
-        } finally { store.clearSession("qa-class-context") }
+        } finally {
+            store.clearSession("qa-class-context")
+        }
     }
 
     @Test
@@ -42,7 +56,9 @@ class AttendanceQrPackStoreTest {
             val restored = AndroidAttendanceQrPackStore(context, { now + 5 }, { 105_000 }, { 10 })
             assertEquals(slots, restored.read(owner, "qa-session"))
             assertTrue(restored.read("qa-another-owner", "qa-session").isEmpty())
-        } finally { store.clearSession(owner) }
+        } finally {
+            store.clearSession(owner)
+        }
     }
 
     @Test
@@ -58,9 +74,14 @@ class AttendanceQrPackStoreTest {
             elapsed += 30_000
             assertTrue(store.read(owner, "qa-session").isEmpty())
             wall = initial
-            assertTrue(AndroidAttendanceQrPackStore(context, { wall }, { elapsed }, { 10 })
-                .read(owner, "qa-session").isEmpty())
-        } finally { store.clearSession(owner) }
+            assertTrue(
+                AndroidAttendanceQrPackStore(context, { wall }, { elapsed }, { 10 })
+                    .read(owner, "qa-session")
+                    .isEmpty(),
+            )
+        } finally {
+            store.clearSession(owner)
+        }
     }
 
     @Test
@@ -70,9 +91,14 @@ class AttendanceQrPackStoreTest {
         val store = AndroidAttendanceQrPackStore(context, { now }, { 100_000 }, { 10 })
         try {
             store.save(owner, "qa-session", listOf(AttendanceQrResponse("signed-qa", now, now + 25, 15)))
-            assertTrue(AndroidAttendanceQrPackStore(context, { now }, { 101_000 }, { 11 })
-                .read(owner, "qa-session").isEmpty())
-        } finally { store.clearSession(owner) }
+            assertTrue(
+                AndroidAttendanceQrPackStore(context, { now }, { 101_000 }, { 11 })
+                    .read(owner, "qa-session")
+                    .isEmpty(),
+            )
+        } finally {
+            store.clearSession(owner)
+        }
     }
 
     @Test
@@ -83,7 +109,9 @@ class AttendanceQrPackStoreTest {
         try {
             store.save(owner, "qa-session", listOf(AttendanceQrResponse("signed-qa", now - 40, now - 15, 15)))
             assertTrue(AndroidAttendanceQrPackStore(context).read(owner, "qa-session").isEmpty())
-        } finally { store.clearSession(owner) }
+        } finally {
+            store.clearSession(owner)
+        }
     }
 
     @Test
@@ -98,6 +126,8 @@ class AttendanceQrPackStoreTest {
             val restored = AndroidAttendanceQrPackStore(context)
             assertTrue(restored.read(owner, "qa-session-a").isEmpty())
             assertTrue(restored.read(owner, "qa-session-b").isEmpty())
-        } finally { store.clearSession(owner) }
+        } finally {
+            store.clearSession(owner)
+        }
     }
 }

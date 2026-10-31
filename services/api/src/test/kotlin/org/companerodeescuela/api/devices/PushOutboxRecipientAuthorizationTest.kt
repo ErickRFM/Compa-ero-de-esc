@@ -69,4 +69,3 @@ class PushOutboxRecipientAuthorizationTest {
         emailVerifiedAt = if (verified) Instant.now() else null,
     )
 }
-

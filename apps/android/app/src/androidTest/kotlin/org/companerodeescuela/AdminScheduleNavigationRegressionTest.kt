@@ -22,7 +22,7 @@ class AdminScheduleNavigationRegressionTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun `admin schedule button invokes onOpenSchedule not onOpenClassrooms`() {
+    fun adminScheduleButtonInvokesOnOpenScheduleNotOnOpenClassrooms() {
         var scheduleClicked = false
         var classroomsClicked = false
         compose.setContent {

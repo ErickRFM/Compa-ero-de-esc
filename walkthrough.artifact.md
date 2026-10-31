@@ -13,20 +13,36 @@
 
 | Punto | SHA | Nota |
 |---|---|---|
-| `origin/main` | `0ab96a625a2bff6161b1ead78a9a90284377e770` | base del PR |
-| Inicio de la sesión (HEAD local) | `cbb53d9156b0ab56bbb7141d6c489936ab16f457` | 5 commits por delante de `main` |
-| HEAD publicado al cerrar este bloque | `070932b5112e16b984a6d85e6fb23372c94baae9` | 6 commits por delante de `main` |
+| `origin/main` (inicial) | `0ab96a625a2bff6161b1ead78a9a90284377e770` | Base inicial del PR #239 |
+| Fusión PR #239 en `main` | `6dc31dc9b28b6aa19d28e75dbfc8f9a2dca58971` | Fusión completa de V21 y V23 |
+| Modernización UX/UI en `main` | `09cf250f16fa63bb6d6d45e7f12e2f69dc8448eb` | Pulido visual V8 Glass, feedback interactivo y componentes modernos |
 
-Commits que aporta la rama sobre `main`:
+---
 
-```
-070932b5 style(api,channel): clear ktlint blockers on V21 files without touching the baseline
-cbb53d91 style(test): reorder imports lexicographically for ktlint compliance
-4eae26aa fix(ci): remove trailing newline at EOF and use valid DEX test method name
-22718d7f fix(events): allow directive and coordinator read access to group-scoped events and finalize recipient authorization tests
-94a67274 feat(v21): apply master corrections D1-D10 for navigation, RBAC, profiles, events and representatives
-e62ff3b9 feat(v23): FCM channel isolation per Dual APK flavor and SIII->Ktor->Android E2E integration test
-```
+## 1.1 Modernización Estética y UX/UI (V8 Glass & Expressive Design)
+
+1. **Unificación V8 Glass Surface:**
+   - Reemplazo del legado `CompaneroSurface` y `CompaneroHeroSurface(containerColor = CompanionColors.graphite)` por `V8GlassCard(emphasized = ...)` en:
+     - `AttendanceScreen.kt` (Pase de lista en vivo del alumno y tarjetas de sesión histórica).
+     - `TutorHomeScreen.kt`, `TutorGroupsScreen.kt`, `TutorRequestsScreen.kt` (Grupos tutorados, casos de seguimiento, justificantes pendientes).
+     - `ScheduleScreen.kt` (Sincronización institucional y llamadas a la acción cuando la agenda está vacía).
+     - `ClassroomScreen.kt` (Materias y grupos de estudiantes y docentes).
+     - `AdminHomeScreen.kt` (Métricas institucionales destacadas y herramientas directivas con chevron de navegación).
+2. **Botones de Acción Primaria `V8RedPrimaryButton`:**
+   - Adopción consistente del botón rojo institucional con sombreado y gradiente pulido en:
+     - Confirmación de pase de lista en `AttendanceScreen`.
+     - Sincronización oficial de horarios en `ScheduleScreen`.
+     - Aprobación de justificaciones en `TutorRequestsScreen`.
+     - Creación de notas de seguimiento en `TutorGroupsScreen`.
+     - Redacción y publicación de avisos en `ChannelScreen`.
+     - Aprobación de solicitudes de personal en `AdminHomeScreen`.
+3. **Jerarquía Visual y Encabezados (`V8ScreenHeader`):**
+   - Estandarización de tipografía `headlineLarge` con descripción subordinada `bodyMedium` y acciones contextuales en el cuadrante superior derecho.
+   - Corrección de títulos secundarios en `CompaneroScaffold` para que pantallas secundarias (MFA, Tutorías, Justificantes) no muestren `"Volver"` como título del TopAppBar.
+4. **Estados Vacíos y de Error (`ContentStateHost`):**
+   - Rediseño con `V8GlassCard`, `V8IconTile` semánticos y mensajes legibles y amigables.
+5. **Previsualización en Ajustes de Apariencia (`AppearanceSettingsScreen`):**
+   - Incorporación de `LiveAppearancePreviewCard` que reacciona en tiempo real al cambio de paletas de color, temas y contraste.
 
 ---
 

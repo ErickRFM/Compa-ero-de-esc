@@ -37,7 +37,7 @@ serializationJson = "1.9.0"
 ktor = "3.3.3"
 ktlintGradle = "14.2.0"
 mongodbDriver = "5.13.0"
-logback = "1.5.18"
+logback = "1.6.6"
 
 # Testing
 junitJupiter = "5.14.4"

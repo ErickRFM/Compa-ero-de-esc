@@ -3,11 +3,11 @@ package org.companerodeescuela
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
-import org.companerodeescuela.feature.admin.adminHomeScreenContent
 import org.companerodeescuela.feature.admin.AdminUiState
+import org.companerodeescuela.feature.admin.adminHomeScreenContent
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule

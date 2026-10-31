@@ -1,7 +1,5 @@
 package org.companerodeescuela.api.representatives
 
-import org.companerodeescuela.api.auth.boundedBody
-
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.auth.authenticate
@@ -14,10 +12,11 @@ import io.ktor.server.routing.patch
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import org.companerodeescuela.api.auth.AuthTokenService
+import org.companerodeescuela.api.auth.SessionIdentitySource
+import org.companerodeescuela.api.auth.boundedBody
+import org.companerodeescuela.api.auth.verifiedSessionSource
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
-import org.companerodeescuela.api.auth.verifiedSessionSource
-import org.companerodeescuela.api.auth.SessionIdentitySource
 import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.AppointRepresentativeRequest
@@ -35,11 +34,12 @@ fun Route.groupRepresentativeRoutes(
                 val principal = call.requirePrincipal()
                 val groupId = call.requireGroupId()
                 val groupName = call.parameters["groupName"] ?: "Grupo $groupId"
-                val overview = service.getGroupOverview(
-                    actor = AuthTokenService(settings).userFrom(principal.payload),
-                    groupId = groupId,
-                    groupName = groupName,
-                )
+                val overview =
+                    service.getGroupOverview(
+                        actor = AuthTokenService(settings).userFrom(principal.payload),
+                        groupId = groupId,
+                        groupName = groupName,
+                    )
                 call.respond(
                     ApiResponse(
                         data = overview,
@@ -53,12 +53,13 @@ fun Route.groupRepresentativeRoutes(
                 val groupId = call.requireGroupId()
                 val groupName = call.parameters["groupName"] ?: "Grupo $groupId"
                 val request = call.boundedBody(AppointRepresentativeRequest.serializer())
-                val created = service.appointRepresentative(
-                    actor = AuthTokenService(settings).userFrom(principal.payload),
-                    groupId = groupId,
-                    groupName = groupName,
-                    request = request,
-                )
+                val created =
+                    service.appointRepresentative(
+                        actor = AuthTokenService(settings).userFrom(principal.payload),
+                        groupId = groupId,
+                        groupName = groupName,
+                        request = request,
+                    )
                 call.respond(
                     ApiResponse(
                         data = created,
@@ -122,10 +123,11 @@ fun Route.groupRepresentativeRoutes(
             patch("/{id}/revoke") {
                 val principal = call.requirePrincipal()
                 val id = call.requireAssignmentId()
-                val revoked = service.revokeAppointment(
-                    actor = AuthTokenService(settings).userFrom(principal.payload),
-                    assignmentId = id,
-                )
+                val revoked =
+                    service.revokeAppointment(
+                        actor = AuthTokenService(settings).userFrom(principal.payload),
+                        assignmentId = id,
+                    )
                 call.respond(
                     ApiResponse(
                         data = revoked,
@@ -138,7 +140,7 @@ fun Route.groupRepresentativeRoutes(
 }
 
 private fun ApplicationCall.requirePrincipal(): JWTPrincipal {
-    if(verifiedSessionSource()!=SessionIdentitySource.NATIVE) throw ApiException.Forbidden("Native identity is required")
+    if (verifiedSessionSource() != SessionIdentitySource.NATIVE) throw ApiException.Forbidden("Native identity is required")
     return principal<JWTPrincipal>() ?: throw ApiException.Unauthorized()
 }
 
@@ -150,11 +152,11 @@ private fun ApplicationCall.requireAssignmentId(): String =
     parameters["id"]?.takeIf(String::isNotBlank)
         ?: throw ApiException.Validation("id is required")
 
-private fun JWTPrincipal.subject(): String =
-    payload.subject?.takeIf(String::isNotBlank) ?: throw ApiException.Unauthorized()
+private fun JWTPrincipal.subject(): String = payload.subject?.takeIf(String::isNotBlank) ?: throw ApiException.Unauthorized()
 
 private fun JWTPrincipal.roles(): Set<UserRole> =
-    payload.getClaim("roles")
+    payload
+        .getClaim("roles")
         .asList(String::class.java)
         .orEmpty()
         .mapNotNull { encoded -> runCatching { UserRole.valueOf(encoded.uppercase()) }.getOrNull() }

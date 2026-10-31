@@ -158,7 +158,10 @@ fun coordinatorHomeScreen(
                 }
                 StatusNotice(
                     title = "Gestión institucional de horarios",
-                    message = "Las modificaciones y asignaciones oficiales de horarios a grupos y aulas requieren permiso explícito (MANAGE_ACADEMICS) y confirmación con segundo factor (MFA Step-Up). Para consultar horarios oficiales, utiliza la vista de grupos.",
+                    message =
+                        "Las modificaciones y asignaciones oficiales de horarios a grupos y aulas requieren permiso " +
+                            "explícito (MANAGE_ACADEMICS) y confirmación con segundo factor (MFA Step-Up). " +
+                            "Para consultar horarios oficiales, utiliza la vista de grupos.",
                 )
             }
         }

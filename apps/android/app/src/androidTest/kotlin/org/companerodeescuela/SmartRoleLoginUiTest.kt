@@ -82,7 +82,13 @@ class SmartRoleLoginUiTest {
         compose.onNodeWithTag("role_ADMIN").performScrollTo().performClick()
         compose.onNodeWithTag("role_title_ADMIN", useUnmergedTree = true).assertIsDisplayed()
         captureAccess("admin")
-        compose.onNodeWithTag("role_SUPER_ADMIN").performClick()
+        compose.onNodeWithTag("role_SUPER_ADMIN").performScrollTo().performClick()
+        // A direct chip choice must settle on the requested page, not a transient neighbour.
+        compose.waitUntil(timeoutMillis = 8_000) {
+            compose.onAllNodesWithTag("role_SUPER_ADMIN").fetchSemanticsNodes().firstOrNull()
+                ?.config?.getOrNull(SemanticsProperties.Selected) == true
+        }
+        compose.onNodeWithTag("role_SUPER_ADMIN").assertIsSelected()
         compose.onNodeWithTag("role_title_SUPER_ADMIN", useUnmergedTree = true).assertIsDisplayed()
         captureAccess("super_admin")
         compose.onNodeWithTag("access_next").assertIsNotEnabled()

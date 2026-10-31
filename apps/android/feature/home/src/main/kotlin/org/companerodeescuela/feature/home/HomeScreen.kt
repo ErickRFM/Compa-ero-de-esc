@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -128,7 +127,10 @@ fun HomeScreen(
                     }
                 }
                 V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
-                    Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
+                    Column(
+                        modifier = Modifier.padding(CompaneroSpacing.md),
+                        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+                    ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -196,7 +198,7 @@ fun HomeScreen(
                 if (state.fromCache || (state.errorMessage != null && overview != null)) {
                     V8GlassCard(modifier = Modifier.fillMaxWidth()) {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().padding(CompaneroSpacing.md),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
                         ) {
@@ -241,9 +243,11 @@ fun HomeScreen(
                             },
                         tone = NoticeTone.WARNING,
                     )
-                    Button(onClick = viewModel::refresh) {
-                        Text("Reintentar")
-                    }
+                    V8RedPrimaryButton(
+                        text = "Reintentar",
+                        onClick = viewModel::refresh,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
 
                 overview?.let { day ->
@@ -289,12 +293,11 @@ fun HomeScreen(
                                                 "Importa una imagen o PDF o crea tu agenda personal; " +
                                                     "las clases asignadas desde SIII aparecerán al sincronizar.",
                                         )
-                                        Button(
+                                        V8RedPrimaryButton(
+                                            text = "Preparar mi agenda",
                                             onClick = onOpenSchedule,
                                             modifier = Modifier.fillMaxWidth(),
-                                        ) {
-                                            Text("Preparar mi agenda")
-                                        }
+                                        )
                                     }
                                     day.classes.isEmpty() -> {
                                         StatusNotice(
@@ -395,12 +398,11 @@ fun HomeScreen(
                                         "Importa una imagen o PDF o crea tu agenda personal; " +
                                             "las clases asignadas desde SIII aparecerán al sincronizar.",
                                 )
-                                Button(
+                                V8RedPrimaryButton(
+                                    text = "Preparar mi agenda",
                                     onClick = onOpenSchedule,
                                     modifier = Modifier.fillMaxWidth(),
-                                ) {
-                                    Text("Preparar mi agenda")
-                                }
+                                )
                                 Text(
                                     text =
                                         "La agenda local funciona sin integración escolar y conserva " +

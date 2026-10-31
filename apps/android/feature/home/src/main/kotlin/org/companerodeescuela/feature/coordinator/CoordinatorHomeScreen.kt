@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,6 +22,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.CoordinationOverview
@@ -117,7 +117,8 @@ fun coordinatorHomeScreen(
 
         V8GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column(
-                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                modifier = Modifier.padding(CompaneroSpacing.md),
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
                 Text(
                     "Monitoreo de asistencia",
@@ -135,7 +136,8 @@ fun coordinatorHomeScreen(
 
         V8GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column(
-                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                modifier = Modifier.padding(CompaneroSpacing.md),
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
                 Text("Agenda personal", style = MaterialTheme.typography.titleSmall)
                 Text(
@@ -143,9 +145,11 @@ fun coordinatorHomeScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Button(onClick = onOpenSchedule, modifier = Modifier.fillMaxWidth()) {
-                    Text("Abrir mi agenda")
-                }
+                V8RedPrimaryButton(
+                    text = "Abrir mi agenda",
+                    onClick = onOpenSchedule,
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 StatusNotice(
                     title = "Gestión institucional de horarios",
                     message =
@@ -158,7 +162,8 @@ fun coordinatorHomeScreen(
 
         V8GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column(
-                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                modifier = Modifier.padding(CompaneroSpacing.md),
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
                 Text("Canal de avisos generales", style = MaterialTheme.typography.titleSmall)
                 Text(

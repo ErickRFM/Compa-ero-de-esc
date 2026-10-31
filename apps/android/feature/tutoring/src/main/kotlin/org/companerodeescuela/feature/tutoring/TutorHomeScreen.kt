@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -22,6 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ExcuseStatus
@@ -62,6 +62,7 @@ fun TutorHomeScreen(
             emphasized = true,
         ) {
             Column(
+                modifier = Modifier.padding(CompaneroSpacing.md),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
                 Text(
@@ -87,13 +88,12 @@ fun TutorHomeScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Button(
+                V8RedPrimaryButton(
+                    text = "Revisar solicitudes",
                     onClick = onOpenRequests,
                     enabled = state.groups.isNotEmpty() && !state.loading,
                     modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Revisar solicitudes")
-                }
+                )
             }
         }
         if (state.groups.isNotEmpty()) {
@@ -101,6 +101,7 @@ fun TutorHomeScreen(
             state.groups.forEach { group ->
                 V8GlassCard(modifier = Modifier.fillMaxWidth()) {
                     Column(
+                        modifier = Modifier.padding(CompaneroSpacing.md),
                         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
                     ) {
                         Text(group.name, style = MaterialTheme.typography.titleMedium)
@@ -113,8 +114,11 @@ fun TutorHomeScreen(
                 }
             }
         }
-        Button(onClick = viewModel::refresh, enabled = !state.loading && !state.submitting) {
-            Text("Actualizar")
-        }
+        V8RedPrimaryButton(
+            text = "Actualizar",
+            onClick = viewModel::refresh,
+            enabled = !state.loading && !state.submitting,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }

@@ -9,13 +9,20 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -114,37 +121,54 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
                 themeAware = true,
             ) {
-                Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                    Text(
-                        text =
-                            stringResource(
-                                if (state.noticeReason == SessionNotice.EXPIRED) {
-                                    R.string.auth_notice_title
-                                } else {
-                                    R.string.auth_notice_connection_title
-                                },
-                            ),
-                        color = ink,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector =
+                            if (state.noticeReason == SessionNotice.EXPIRED) {
+                                Icons.Filled.Info
+                            } else {
+                                Icons.Filled.WifiOff
+                            },
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(22.dp),
                     )
-                    Text(
-                        text =
-                            stringResource(
-                                if (state.noticeReason == SessionNotice.EXPIRED) {
-                                    R.string.auth_notice_expired
-                                } else {
-                                    R.string.auth_notice_connection
-                                },
-                            ),
-                        color = muted,
-                        fontSize = 12.sp,
-                        lineHeight = 16.sp,
-                        modifier =
-                            Modifier
-                                .padding(top = 2.dp)
-                                .semantics { liveRegion = LiveRegionMode.Polite },
-                    )
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text =
+                                stringResource(
+                                    if (state.noticeReason == SessionNotice.EXPIRED) {
+                                        R.string.auth_notice_title
+                                    } else {
+                                        R.string.auth_notice_connection_title
+                                    },
+                                ),
+                            color = ink,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text =
+                                stringResource(
+                                    if (state.noticeReason == SessionNotice.EXPIRED) {
+                                        R.string.auth_notice_expired
+                                    } else {
+                                        R.string.auth_notice_connection
+                                    },
+                                ),
+                            color = muted,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp,
+                            modifier =
+                                Modifier
+                                    .padding(top = 2.dp)
+                                    .semantics { liveRegion = LiveRegionMode.Polite },
+                        )
+                    }
                 }
             }
         }
@@ -172,6 +196,26 @@ fun LoginScreen(
                     singleLine = true,
                     shape = RoundedCornerShape(16.dp),
                     label = { Text(stringResource(R.string.auth_identifier)) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Badge,
+                            contentDescription = null,
+                            tint = if (username.isNotEmpty() && usernameIssue == null) accent else muted,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    },
+                    trailingIcon = {
+                        if (username.isNotEmpty() && !state.submitting) {
+                            IconButton(onClick = { username = "" }) {
+                                Icon(
+                                    imageVector = Icons.Filled.Clear,
+                                    contentDescription = null,
+                                    tint = muted,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                        }
+                    },
                     isError = username.isNotEmpty() && usernameIssue != null,
                     supportingText =
                         usernameIssue
@@ -193,6 +237,14 @@ fun LoginScreen(
                     singleLine = true,
                     shape = RoundedCornerShape(16.dp),
                     label = { Text(stringResource(R.string.auth_password)) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Lock,
+                            contentDescription = null,
+                            tint = if (password.isNotEmpty() && passwordIssue == null) accent else muted,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    },
                     isError = password.isNotEmpty() && passwordIssue != null,
                     supportingText =
                         passwordIssue
@@ -225,6 +277,7 @@ fun LoginScreen(
                                         },
                                     ),
                                 tint = muted,
+                                modifier = Modifier.size(20.dp),
                             )
                         }
                     },
@@ -239,28 +292,43 @@ fun LoginScreen(
 
                 val displayError = state.errorMessage ?: state.failure?.let { stringResource(loginErrorResource(it)) }
                 displayError?.let { msg ->
-                    Text(
-                        text = msg,
-                        color = errorColor,
-                        fontSize = 13.sp,
-                        lineHeight = 18.sp,
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(top = 10.dp)
-                                .semantics { liveRegion = LiveRegionMode.Assertive },
-                    )
-                    (state.failure as? AppError.Http)?.requestId?.let { requestId ->
-                        Text(
-                            text = stringResource(R.string.auth_error_reference, requestId),
-                            color = muted.copy(alpha = 0.7f),
-                            fontSize = 11.sp,
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 2.dp)
-                                    .testTag("login_error_reference"),
-                        )
+                    V8FrostedGlassPanel(
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp).testTag("login_error_container"),
+                        themeAware = true,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.ErrorOutline,
+                                contentDescription = null,
+                                tint = errorColor,
+                                modifier = Modifier.size(20.dp).padding(top = 1.dp),
+                            )
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    text = msg,
+                                    color = errorColor,
+                                    fontSize = 13.sp,
+                                    lineHeight = 18.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
+                                )
+                                (state.failure as? AppError.Http)?.requestId?.let { requestId ->
+                                    Text(
+                                        text = stringResource(R.string.auth_error_reference, requestId),
+                                        color = muted.copy(alpha = 0.8f),
+                                        fontSize = 11.sp,
+                                        modifier =
+                                            Modifier
+                                                .padding(top = 3.dp)
+                                                .testTag("login_error_reference"),
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 

@@ -39,6 +39,8 @@ interface DeviceTokenRepository {
         model: String?,
         deviceId: String? = null,
         sessionId: String? = null,
+        appDistribution: String? = null,
+        packageName: String? = null,
     )
 
     suspend fun unregister(
@@ -46,7 +48,10 @@ interface DeviceTokenRepository {
         token: String,
     ): Boolean
 
-    suspend fun listTokens(userIds: Set<String>): List<String>
+    suspend fun listTokens(
+        userIds: Set<String>,
+        appDistribution: String? = null,
+    ): List<String>
 
     /** A legacy record without a session binding must never be sent push. */
     suspend fun sessionIdFor(
@@ -84,7 +89,16 @@ fun Route.deviceRoutes(
                         .getClaim("session_id")
                         .asString()
                         ?.takeIf(String::isNotBlank) ?: throw ApiException.Unauthorized()
-                repository.register(ownerId, request.token, request.platform, request.model, request.deviceId, sessionId)
+                repository.register(
+                    userId = ownerId,
+                    token = request.token,
+                    platform = request.platform,
+                    model = request.model,
+                    deviceId = request.deviceId,
+                    sessionId = sessionId,
+                    appDistribution = request.appDistribution,
+                    packageName = request.packageName,
+                )
                 call.respond(ApiResponse(data = true, requestId = call.requestId()))
             }
             delete("/register") {

@@ -172,6 +172,18 @@ class MainActivity : AppCompatActivity() {
                                 ) {
                                     attendanceSyncScheduler.schedule()
                                 }
+                                if (session.accountStatus == org.companerodeescuela.shared.contracts.AccountStatus.ACTIVE &&
+                                    BuildConfig.FIREBASE_CONFIGURED &&
+                                    Build.VERSION.SDK_INT >= 33
+                                ) {
+                                    val consent = getSharedPreferences("notification_consent", MODE_PRIVATE)
+                                    if (!consent.getBoolean("requested", false) &&
+                                        checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                                    ) {
+                                        consent.edit().putBoolean("requested", true).apply()
+                                        notificationsPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    }
+                                }
                             }
                         }
 

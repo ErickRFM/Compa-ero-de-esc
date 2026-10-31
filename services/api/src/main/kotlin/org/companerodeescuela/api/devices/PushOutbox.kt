@@ -268,6 +268,7 @@ class PushOutboxService(
         title: String,
         body: String,
         data: Map<String, String> = emptyMap(),
+        appDistribution: String? = null,
     ): Int {
         if (eventId.length !in 1..256 ||
             owner.length !in 2..512 ||
@@ -278,7 +279,7 @@ class PushOutboxService(
             throw ApiException.Validation("Invalid notification request")
         }
         var created = 0
-        for (token in devices.listTokens(setOf(owner))) {
+        for (token in devices.listTokens(setOf(owner), appDistribution)) {
             val id = digest("$eventId\u0000$owner\u0000$token")
             if (outbox.enqueue(PushOutboxItem(id, owner, token, title, body, data = data))) created++
         }

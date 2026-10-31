@@ -232,15 +232,16 @@ fun studentAttendanceContent(
             schoolDayRecordedAtServerTime(state.schoolPresence, (monotonicNow - it) / 1_000)
         } ?: false
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current) {
             V8MatteBackdrop(modifier = Modifier.matchParentSize())
         }
         Column(
             modifier =
                 Modifier
-                    .fillMaxSize()
+                    .align(Alignment.TopCenter)
                     .widthIn(max = CompaneroSize.homeContentMaxWidth)
+                    .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),

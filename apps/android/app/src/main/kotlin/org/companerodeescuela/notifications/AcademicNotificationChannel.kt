@@ -19,9 +19,13 @@ internal object AcademicNotificationChannel {
         )
     }
 
-    fun enabled(context: Context): Boolean =
-        context
-            .getSystemService(NotificationManager::class.java)
-            .getNotificationChannel(channelId)
-            ?.importance != NotificationManager.IMPORTANCE_NONE
+    fun enabled(context: Context): Boolean {
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return false
+        val channel =
+            manager.getNotificationChannel(channelId) ?: run {
+                create(context)
+                manager.getNotificationChannel(channelId)
+            }
+        return channel?.importance != NotificationManager.IMPORTANCE_NONE
+    }
 }

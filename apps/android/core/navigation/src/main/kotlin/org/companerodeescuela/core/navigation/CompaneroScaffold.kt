@@ -5,7 +5,9 @@ package org.companerodeescuela.core.navigation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
@@ -21,9 +23,11 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -136,11 +140,17 @@ fun CompaneroScaffold(
                     },
                     bottomBar = {
                         if (!onSecondaryScreen && topLevelDestinations.isNotEmpty()) {
-                            CompaneroBottomBar(
-                                navController = navController,
-                                currentDestination = currentDestination,
-                                destinations = topLevelDestinations,
-                            )
+                            Box(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                CompaneroBottomBar(
+                                    navController = navController,
+                                    currentDestination = currentDestination,
+                                    destinations = topLevelDestinations,
+                                    modifier = Modifier.widthIn(max = 640.dp),
+                                )
+                            }
                         }
                     },
                 ) { innerPadding ->

@@ -110,8 +110,9 @@ fun ClassroomScreen(
             Column(
                 modifier =
                     Modifier
-                        .fillMaxSize()
+                        .align(Alignment.TopCenter)
                         .widthIn(max = CompaneroSize.homeContentMaxWidth)
+                        .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                         .padding(
                             horizontal = CompaneroSpacing.page,

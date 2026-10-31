@@ -6,20 +6,21 @@ import com.mongodb.client.model.Filters.eq
 import com.mongodb.client.model.Filters.gt
 import com.mongodb.client.model.Filters.`in`
 import com.mongodb.client.model.Filters.ne
+import com.mongodb.client.model.Filters.or
 import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
 import com.mongodb.client.model.ReplaceOptions
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
-import java.security.MessageDigest
-import java.time.Clock
-import java.time.temporal.ChronoUnit
-import java.util.Date
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.bson.Document
 import org.companerodeescuela.api.errors.ApiException
+import java.security.MessageDigest
+import java.time.Clock
+import java.time.temporal.ChronoUnit
+import java.util.Date
+import java.util.concurrent.TimeUnit
 
 /** Mongo keeps durable FCM destinations; the raw token is never logged or exposed by routes. */
 class MongoDeviceTokenRepository(
@@ -30,22 +31,37 @@ class MongoDeviceTokenRepository(
     private val indexMutex = Mutex()
     private var indexesReady = false
 
-    override suspend fun register(userId: String, token: String, platform: String, model: String?, deviceId: String?, sessionId: String?) {
-        if (sessionId != null && (sessionId.isBlank() || sessionId.length > 128 || sessionId.any(Char::isISOControl)))
+    override suspend fun register(
+        userId: String,
+        token: String,
+        platform: String,
+        model: String?,
+        deviceId: String?,
+        sessionId: String?,
+        appDistribution: String?,
+        packageName: String?,
+    ) {
+        if (sessionId != null && (sessionId.isBlank() || sessionId.length > 128 || sessionId.any(Char::isISOControl))) {
             throw ApiException.Validation("Invalid session binding")
+        }
+        val sanitizedDistribution = appDistribution?.take(64)?.filterNot(Char::isISOControl)
+        val sanitizedPackage = packageName?.take(128)?.filterNot(Char::isISOControl)
         val device = validateDevice(userId, token, platform, model, deviceId)
         ensureIndexes()
         val now = clock.instant()
-        val document = Document("_id", device.key)
-            .append("ownerId", userId)
-            .append("deviceId", device.id)
-            .append("sessionId", sessionId)
-            .append("platform", platform)
-            .append("model", model)
-            .append("token", token)
-            .append("tokenHash", device.hash)
-            .append("lastSeenAt", Date.from(now))
-            .append("expiresAt", Date.from(now.plus(90, ChronoUnit.DAYS)))
+        val document =
+            Document("_id", device.key)
+                .append("ownerId", userId)
+                .append("deviceId", device.id)
+                .append("sessionId", sessionId)
+                .append("platform", platform)
+                .append("model", model)
+                .append("token", token)
+                .append("tokenHash", device.hash)
+                .append("appDistribution", sanitizedDistribution)
+                .append("packageName", sanitizedPackage)
+                .append("lastSeenAt", Date.from(now))
+                .append("expiresAt", Date.from(now.plus(90, ChronoUnit.DAYS)))
         // A device's rotated token must not remain subscribed to its former account.
         // Unique tokenHash protects concurrent transfers across API instances.
         collection.deleteMany(and(eq("tokenHash", device.hash), ne("_id", device.key)))
@@ -57,27 +73,52 @@ class MongoDeviceTokenRepository(
         }
     }
 
-    override suspend fun unregister(userId: String, token: String): Boolean {
+    override suspend fun unregister(
+        userId: String,
+        token: String,
+    ): Boolean {
         if (userId.isBlank() || token.isBlank()) return false
         ensureIndexes()
-        return collection.deleteMany(and(eq("ownerId", userId), eq("tokenHash", tokenDigest(token))))
+        return collection
+            .deleteMany(and(eq("ownerId", userId), eq("tokenHash", tokenDigest(token))))
             .deletedCount > 0
     }
 
-    override suspend fun listTokens(userIds: Set<String>): List<String> {
+    override suspend fun listTokens(
+        userIds: Set<String>,
+        appDistribution: String?,
+    ): List<String> {
         if (userIds.isEmpty()) return emptyList()
-        if (userIds.size > 1000 || userIds.any { it.isBlank() })
+        if (userIds.size > 1000 || userIds.any { it.isBlank() }) {
             throw ApiException.Validation("Invalid notification recipient batch")
+        }
         ensureIndexes()
-        return collection.find(and(`in`("ownerId", userIds.toList()), gt("expiresAt", Date.from(clock.instant()))))
-            .toList().mapNotNull { it.getString("token") }.distinct()
+        val baseFilter = and(`in`("ownerId", userIds.toList()), gt("expiresAt", Date.from(clock.instant())))
+        val filter =
+            if (appDistribution != null) {
+                and(baseFilter, or(eq("appDistribution", appDistribution), eq("appDistribution", null)))
+            } else {
+                baseFilter
+            }
+        return collection
+            .find(filter)
+            .toList()
+            .mapNotNull { it.getString("token") }
+            .distinct()
     }
 
-    override suspend fun sessionIdFor(userId: String, token: String): String? {
+    override suspend fun sessionIdFor(
+        userId: String,
+        token: String,
+    ): String? {
         if (userId.isBlank() || token.isBlank()) return null
         ensureIndexes()
-        return collection.find(and(eq("ownerId", userId), eq("tokenHash", tokenDigest(token))))
-            .toList().firstOrNull()?.getString("sessionId")?.takeIf(String::isNotBlank)
+        return collection
+            .find(and(eq("ownerId", userId), eq("tokenHash", tokenDigest(token))))
+            .toList()
+            .firstOrNull()
+            ?.getString("sessionId")
+            ?.takeIf(String::isNotBlank)
     }
 
     override suspend fun deactivateInvalid(token: String): Boolean {
@@ -86,61 +127,121 @@ class MongoDeviceTokenRepository(
         return collection.deleteMany(eq("tokenHash", tokenDigest(token))).deletedCount > 0
     }
 
-    private suspend fun ensureIndexes() = indexMutex.withLock {
-        if (indexesReady) return@withLock
-        collection.createIndex(Indexes.ascending("tokenHash"), IndexOptions().unique(true).name("ux_fcm_token_hash"))
-        collection.createIndex(Indexes.ascending("ownerId"), IndexOptions().name("ix_fcm_owner"))
-        collection.createIndex(Indexes.ascending("expiresAt"),
-            IndexOptions().name("ttl_fcm_expiry").expireAfter(0L, TimeUnit.SECONDS))
-        indexesReady = true
-    }
+    private suspend fun ensureIndexes() =
+        indexMutex.withLock {
+            if (indexesReady) return@withLock
+            collection.createIndex(Indexes.ascending("tokenHash"), IndexOptions().unique(true).name("ux_fcm_token_hash"))
+            collection.createIndex(Indexes.ascending("ownerId"), IndexOptions().name("ix_fcm_owner"))
+            collection.createIndex(
+                Indexes.ascending("expiresAt"),
+                IndexOptions().name("ttl_fcm_expiry").expireAfter(0L, TimeUnit.SECONDS),
+            )
+            indexesReady = true
+        }
 }
 
 /** Local/test behavior matches Mongo ownership, device rotation and revocation. */
 class InMemoryDeviceTokenRepository : DeviceTokenRepository {
     private val mutex = Mutex()
     private val devices = linkedMapOf<String, DeviceEntry>()
-    override suspend fun register(userId: String, token: String, platform: String, model: String?, deviceId: String?, sessionId: String?) {
+
+    override suspend fun register(
+        userId: String,
+        token: String,
+        platform: String,
+        model: String?,
+        deviceId: String?,
+        sessionId: String?,
+        appDistribution: String?,
+        packageName: String?,
+    ) {
         val device = validateDevice(userId, token, platform, model, deviceId)
         mutex.withLock {
             devices.entries.removeAll { it.value.hash == device.hash && it.key != device.key }
-            devices[device.key] = DeviceEntry(userId, token, device.hash, sessionId)
+            devices[device.key] =
+                DeviceEntry(userId, token, device.hash, sessionId, appDistribution, packageName)
         }
     }
-    override suspend fun unregister(userId: String, token: String): Boolean = mutex.withLock {
-        val hash = tokenDigest(token)
-        val before = devices.size
-        devices.entries.removeAll { it.value.owner == userId && it.value.hash == hash }
-        before != devices.size
-    }
-    override suspend fun listTokens(userIds: Set<String>): List<String> = mutex.withLock {
-        devices.values.filter { it.owner in userIds }.map { it.token }.distinct()
-    }
-    override suspend fun deactivateInvalid(token: String): Boolean = mutex.withLock {
-        val hash = tokenDigest(token)
-        val before = devices.size
-        devices.entries.removeAll { it.value.hash == hash }
-        before != devices.size
-    }
-    override suspend fun sessionIdFor(userId: String, token: String): String? = mutex.withLock {
-        devices.values.firstOrNull { it.owner == userId && it.hash == tokenDigest(token) }?.sessionId
-    }
-    private data class DeviceEntry(val owner: String, val token: String, val hash: String, val sessionId: String?)
+
+    override suspend fun unregister(
+        userId: String,
+        token: String,
+    ): Boolean =
+        mutex.withLock {
+            val hash = tokenDigest(token)
+            val before = devices.size
+            devices.entries.removeAll { it.value.owner == userId && it.value.hash == hash }
+            before != devices.size
+        }
+
+    override suspend fun listTokens(
+        userIds: Set<String>,
+        appDistribution: String?,
+    ): List<String> =
+        mutex.withLock {
+            devices.values
+                .filter { it.owner in userIds }
+                .filter { appDistribution == null || it.appDistribution == null || it.appDistribution == appDistribution }
+                .map { it.token }
+                .distinct()
+        }
+
+    override suspend fun deactivateInvalid(token: String): Boolean =
+        mutex.withLock {
+            val hash = tokenDigest(token)
+            val before = devices.size
+            devices.entries.removeAll { it.value.hash == hash }
+            before != devices.size
+        }
+
+    override suspend fun sessionIdFor(
+        userId: String,
+        token: String,
+    ): String? =
+        mutex.withLock {
+            devices.values.firstOrNull { it.owner == userId && it.hash == tokenDigest(token) }?.sessionId
+        }
+
+    private data class DeviceEntry(
+        val owner: String,
+        val token: String,
+        val hash: String,
+        val sessionId: String?,
+        val appDistribution: String? = null,
+        val packageName: String? = null,
+    )
 }
 
-private data class DeviceIdentity(val key: String, val id: String, val hash: String)
+private data class DeviceIdentity(
+    val key: String,
+    val id: String,
+    val hash: String,
+)
 
-private fun validateDevice(userId: String, token: String, platform: String, model: String?, deviceId: String?): DeviceIdentity {
-    if (userId.isBlank() || userId.length > 512 || userId.any(Char::isISOControl))
+private fun validateDevice(
+    userId: String,
+    token: String,
+    platform: String,
+    model: String?,
+    deviceId: String?,
+): DeviceIdentity {
+    if (userId.isBlank() || userId.length > 512 || userId.any(Char::isISOControl)) {
         throw ApiException.Validation("Invalid device owner")
-    if (token.length !in 16..4096 || token.any { it.isISOControl() || it.isWhitespace() })
+    }
+    if (token.length !in 16..4096 || token.any { it.isISOControl() || it.isWhitespace() }) {
         throw ApiException.Validation("Invalid FCM token")
-    if (platform !in setOf("android", "ios"))
+    }
+    if (platform !in setOf("android", "ios")) {
         throw ApiException.Validation("Unsupported device platform")
-    if (model != null && (model.length > 128 || model.any(Char::isISOControl)))
+    }
+    if (model != null && (model.length > 128 || model.any(Char::isISOControl))) {
         throw ApiException.Validation("Invalid device model")
-    if (deviceId != null && (deviceId.isBlank() || deviceId.length > 128 || deviceId.any { !it.isLetterOrDigit() && it !in setOf('-', '_', '.') }))
+    }
+    if (deviceId != null &&
+        (deviceId.isBlank() || deviceId.length > 128 || deviceId.any { !it.isLetterOrDigit() && it !in setOf('-', '_', '.') })
+    ) {
         throw ApiException.Validation("Invalid device ID")
+    }
     val hash = tokenDigest(token)
     // Old clients lacking an installation ID cannot rotate by device; they can unregister by token.
     val id = deviceId ?: "token-${hash.take(32)}"
@@ -148,5 +249,7 @@ private fun validateDevice(userId: String, token: String, platform: String, mode
 }
 
 private fun tokenDigest(token: String): String =
-    MessageDigest.getInstance("SHA-256").digest(token.toByteArray(Charsets.UTF_8))
+    MessageDigest
+        .getInstance("SHA-256")
+        .digest(token.toByteArray(Charsets.UTF_8))
         .joinToString("") { "%02x".format(it) }

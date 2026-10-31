@@ -21,6 +21,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import org.companerodeescuela.core.designsystem.theme.CompaneroAccentPalette
+import org.companerodeescuela.core.designsystem.theme.LocalCompaneroAccentPalette
 import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 
 /**
@@ -58,16 +60,25 @@ fun Modifier.v8GlassSurface(
     val light = themeAware && MaterialTheme.colorScheme.background.luminance() > 0.5f
     val finish = v8SurfaceFinish(light, LocalCompaneroHighContrast.current)
     val scheme = MaterialTheme.colorScheme
+    val palette = LocalCompaneroAccentPalette.current
 
     val tint =
         when (finish) {
             V8SurfaceFinish.LIGHT_CLEAN ->
-                listOf(Color.White, Color(0xFFFCFCFE))
+                if (emphasized && palette != CompaneroAccentPalette.CRIMSON) {
+                    listOf(Color.White, palette.lightContainer.copy(alpha = 0.35f))
+                } else {
+                    listOf(Color.White, Color(0xFFFCFCFE))
+                }
             V8SurfaceFinish.LIGHT_HIGH_CONTRAST ->
                 listOf(Color.White, Color.White)
             V8SurfaceFinish.DARK_MATTE ->
                 listOf(
-                    if (emphasized) Color(0xF8241B24) else Color(0xF816171D),
+                    when {
+                        !emphasized -> Color(0xF816171D)
+                        palette == CompaneroAccentPalette.CRIMSON -> Color(0xF8241B24)
+                        else -> palette.darkContainer.copy(alpha = 0.28f)
+                    },
                     Color(0xFA101116),
                 )
             V8SurfaceFinish.DARK_HIGH_CONTRAST ->
@@ -81,12 +92,20 @@ fun Modifier.v8GlassSurface(
     val edge =
         when (finish) {
             V8SurfaceFinish.LIGHT_CLEAN ->
-                listOf(Color(0xFFD1D5DD), Color(0xFFE0E3E9))
+                if (emphasized) {
+                    listOf(scheme.primary.copy(alpha = 0.45f), Color(0xFFE0E3E9))
+                } else {
+                    listOf(Color(0xFFD1D5DD), Color(0xFFE0E3E9))
+                }
             V8SurfaceFinish.LIGHT_HIGH_CONTRAST ->
                 listOf(scheme.onSurface, scheme.onSurface)
             V8SurfaceFinish.DARK_MATTE ->
                 listOf(
-                    if (emphasized) Color(0x665E3943) else Color(0x4D555966),
+                    when {
+                        !emphasized -> Color(0x4D555966)
+                        palette == CompaneroAccentPalette.CRIMSON -> Color(0x665E3943)
+                        else -> scheme.primary.copy(alpha = 0.45f)
+                    },
                     Color(0x33373A44),
                 )
             V8SurfaceFinish.DARK_HIGH_CONTRAST ->

@@ -17,13 +17,15 @@ class CoordinatorRepository(
     private val refreshCoordinator: SessionRefreshCoordinator = SessionRefreshCoordinator(client, tokenStore),
 ) {
     suspend fun overview(): Outcome<CoordinationOverview> {
-        val token = when (val current = refreshCoordinator.currentAccessToken()) {
-            is Outcome.Success -> current.value
-            is Outcome.Failure -> return current
-        }
+        val token =
+            when (val current = refreshCoordinator.currentAccessToken()) {
+                is Outcome.Success -> current.value
+                is Outcome.Failure -> return current
+            }
         return refreshCoordinator.execute(token) { authorized ->
             apiCall {
-                client.get("coordination/overview") { bearerAuth(authorized) }
+                client
+                    .get("coordination/overview") { bearerAuth(authorized) }
                     .requireBody<ApiResponse<CoordinationOverview>>()
             }.map { it.data }
         }

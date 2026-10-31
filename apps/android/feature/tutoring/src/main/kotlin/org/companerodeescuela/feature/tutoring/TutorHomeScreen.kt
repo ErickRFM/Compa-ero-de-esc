@@ -1,6 +1,5 @@
 package org.companerodeescuela.feature.tutoring
 
-import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,12 +17,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
-import org.companerodeescuela.core.ui.component.CompaneroHeroSurface
-import org.companerodeescuela.core.ui.component.CompaneroSurface
-import org.companerodeescuela.core.ui.component.CompaneroSurfaceRole
+import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ExcuseStatus
 
@@ -34,14 +31,17 @@ fun TutorHomeScreen(
     viewModel: TutorViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val pending = state.requests.count {
-        it.status == ExcuseStatus.PENDING || it.status == ExcuseStatus.UNDER_REVIEW
-    }
+    val pending =
+        state.requests.count {
+            it.status == ExcuseStatus.PENDING || it.status == ExcuseStatus.UNDER_REVIEW
+        }
     Column(
-        modifier = modifier.fillMaxSize()
-            .widthIn(max = CompaneroSize.homeContentMaxWidth)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .widthIn(max = CompaneroSize.homeContentMaxWidth)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
         V8ScreenHeader {
@@ -55,16 +55,18 @@ fun TutorHomeScreen(
         if (state.loading) CircularProgressIndicator()
         state.error?.let { StatusNotice(title = "No pudimos actualizar", message = it) }
         state.notice?.let { StatusNotice(title = "Tutorías", message = it) }
-        CompaneroHeroSurface(
+        V8GlassCard(
             modifier = Modifier.fillMaxWidth(),
-            containerColor = CompanionColors.graphite,
+            emphasized = true,
         ) {
             Column(
-                modifier = Modifier.padding(CompaneroSpacing.md),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
-                Text("MI GRUPO TUTORADO", style = MaterialTheme.typography.labelLarge,
-                    color = CompanionColors.crimsonContainer)
+                Text(
+                    "MI GRUPO TUTORADO",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
                 Text(
                     when {
                         state.loading -> "Consultando asignaciones"
@@ -72,7 +74,7 @@ fun TutorHomeScreen(
                         else -> state.groups.joinToString(" · ") { it.name }
                     },
                     style = MaterialTheme.typography.titleLarge,
-                    color = CompanionColors.onDarkSurface,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     if (state.groups.isEmpty()) {
@@ -81,21 +83,30 @@ fun TutorHomeScreen(
                         "$pending solicitudes pendientes de revisión"
                     },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = CompanionColors.onDarkSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Button(onClick = onOpenRequests, enabled = state.groups.isNotEmpty() && !state.loading,
-                    modifier = Modifier.fillMaxWidth()) { Text("Revisar solicitudes") }
+                Button(
+                    onClick = onOpenRequests,
+                    enabled = state.groups.isNotEmpty() && !state.loading,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Revisar solicitudes")
+                }
             }
         }
         if (state.groups.isNotEmpty()) {
             Text("Grupos a mi cargo", style = MaterialTheme.typography.titleMedium)
             state.groups.forEach { group ->
-                CompaneroSurface(modifier = Modifier.fillMaxWidth(), role = CompaneroSurfaceRole.CARD) {
-                    Column(modifier = Modifier.padding(CompaneroSpacing.md),
-                        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
+                V8GlassCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                    ) {
                         Text(group.name, style = MaterialTheme.typography.titleMedium)
-                        Text("Asignación activa", style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "Asignación activa",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }

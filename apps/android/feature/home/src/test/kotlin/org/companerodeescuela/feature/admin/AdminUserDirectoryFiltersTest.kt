@@ -1,22 +1,27 @@
 package org.companerodeescuela.feature.admin
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
 import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.AdminUserSummary
 import org.companerodeescuela.shared.contracts.UserSummary
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class AdminUserDirectoryFiltersTest {
-    private val users = listOf(
-        entry("A", "Ana López", "ana@school.test", AccountStatus.ACTIVE),
-        entry("B", "Elena Ríos", "elena@school.test", AccountStatus.PENDING_APPROVAL),
-        entry("C", "María Prado", "maria@school.test", AccountStatus.PENDING_VERIFICATION),
-        entry("D", "Luis Torres", null, AccountStatus.SUSPENDED),
-        entry("E", "Sara Vega", null, AccountStatus.REVOKED),
-    )
+    private val users =
+        listOf(
+            entry("A", "Ana López", "ana@school.test", AccountStatus.ACTIVE),
+            entry("B", "Elena Ríos", "elena@school.test", AccountStatus.PENDING_APPROVAL),
+            entry("C", "María Prado", "maria@school.test", AccountStatus.PENDING_VERIFICATION),
+            entry("D", "Luis Torres", null, AccountStatus.SUSPENDED),
+            entry("E", "Sara Vega", null, AccountStatus.REVOKED),
+        )
 
-    private fun entry(id: String, name: String, email: String?, status: AccountStatus) =
-        AdminUserSummary(UserSummary(id = id, displayName = name, email = email, accountStatus = status), emptyList())
+    private fun entry(
+        id: String,
+        name: String,
+        email: String?,
+        status: AccountStatus,
+    ) = AdminUserSummary(UserSummary(id = id, displayName = name, email = email, accountStatus = status), emptyList())
 
     @Test fun `search ignores case and supports email`() {
         assertEquals(listOf("A"), filterAdminDirectoryUsers(users, "ANA", AdminDirectoryFilter.ALL).map { it.user.id })

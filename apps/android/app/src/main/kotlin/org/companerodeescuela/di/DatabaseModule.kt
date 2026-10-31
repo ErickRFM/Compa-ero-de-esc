@@ -6,7 +6,6 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import javax.inject.Singleton
 import org.companerodeescuela.core.database.AcademicSnapshotCache
 import org.companerodeescuela.core.database.AcademicSnapshotCacheFactory
 import org.companerodeescuela.core.database.AttendanceLocalStore
@@ -15,11 +14,11 @@ import org.companerodeescuela.core.database.CompaneroDatabase
 import org.companerodeescuela.core.database.CompaneroDatabaseFactory
 import org.companerodeescuela.core.database.PersonalScheduleStore
 import org.companerodeescuela.core.database.PersonalScheduleStoreFactory
+import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
-
     @Provides
     @Singleton
     fun provideDatabase(
@@ -28,19 +27,13 @@ object DatabaseModule {
 
     @Provides
     @Singleton
-    fun provideAttendanceLocalStore(
-        database: CompaneroDatabase,
-    ): AttendanceLocalStore = AttendanceLocalStoreFactory.create(database)
+    fun provideAttendanceLocalStore(database: CompaneroDatabase): AttendanceLocalStore = AttendanceLocalStoreFactory.create(database)
 
     @Provides
     @Singleton
-    fun provideAcademicSnapshotCache(
-        database: CompaneroDatabase,
-    ): AcademicSnapshotCache = AcademicSnapshotCacheFactory.create(database)
+    fun provideAcademicSnapshotCache(database: CompaneroDatabase): AcademicSnapshotCache = AcademicSnapshotCacheFactory.create(database)
 
     @Provides
     @Singleton
-    fun providePersonalScheduleStore(
-        database: CompaneroDatabase,
-    ): PersonalScheduleStore = PersonalScheduleStoreFactory.create(database)
+    fun providePersonalScheduleStore(database: CompaneroDatabase): PersonalScheduleStore = PersonalScheduleStoreFactory.create(database)
 }

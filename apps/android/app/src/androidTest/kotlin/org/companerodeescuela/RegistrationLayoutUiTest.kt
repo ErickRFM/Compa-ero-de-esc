@@ -29,9 +29,14 @@ class RegistrationLayoutUiTest {
         val teacher = compose.onNodeWithText("Docente", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertTrue("Large text options need separate rows", teacher.top > student.bottom)
         compose.onNodeWithText("Docente").performScrollTo().performClick()
-        compose.onNodeWithText("Docentes y tutores requieren verificación de correo y aprobación administrativa.").performScrollTo().assertExists()
+        compose
+            .onNodeWithText(
+                "Docentes y tutores requieren verificación de correo y aprobación administrativa.",
+            ).performScrollTo()
+            .assertExists()
         compose.onNodeWithText("Ya tengo cuenta").performScrollTo().assertExists()
     }
+
     @Test fun normalFontPreservesTwoAccountOptionsInOneRow() {
         render(1f)
         assertWholeLabel("Alumno")
@@ -40,6 +45,7 @@ class RegistrationLayoutUiTest {
         val teacher = compose.onNodeWithText("Docente", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertEquals(student.center.y, teacher.center.y, 1f)
     }
+
     @Test fun universalRegistrationOffersTutorAndParticipantWithoutPrivilegedProfiles() {
         render(1f)
         compose.onNodeWithText("Tutor").performScrollTo().performClick()
@@ -50,6 +56,7 @@ class RegistrationLayoutUiTest {
         compose.onNodeWithText("Administrador").assertDoesNotExist()
         compose.onNodeWithText("Superadministrador").assertDoesNotExist()
     }
+
     @Test fun tutorRequiresActualInstitutionAndSendsPreferenceWithoutRoleGrant() {
         var submitted: RegisterRequest? = null
         render(1f, SessionUiState(checking = false, institutions = listOf(InstitutionSummary("campus", "Test campus")))) { submitted = it }
@@ -66,6 +73,7 @@ class RegistrationLayoutUiTest {
         assertEquals("preferred-group", submitted?.preferredGroup)
         assertEquals("qa@example.test", submitted?.email)
     }
+
     @Test fun participantDoesNotSendPreviouslyEnteredAcademicPreferences() {
         var submitted: RegisterRequest? = null
         render(1f, SessionUiState(checking = false, institutions = listOf(InstitutionSummary("campus", "Test campus")))) { submitted = it }
@@ -80,29 +88,37 @@ class RegistrationLayoutUiTest {
         assertNull(submitted?.requestedInstitutionId)
         assertNull(submitted?.preferredGroup)
     }
+
     private fun fillCredentials() {
         compose.onNodeWithTag("registration_name").performScrollTo().performTextInput("QA Native")
         compose.onNodeWithTag("registration_email").performScrollTo().performTextInput("qa@example.test")
         compose.onNodeWithTag("registration_password").performScrollTo().performTextInput("test-password")
         compose.onNodeWithTag("registration_confirmation").performScrollTo().performTextInput("test-password")
     }
+
     private fun assertWholeLabel(label: String) {
         compose.onNodeWithText(label).performScrollTo()
         val layouts = mutableListOf<TextLayoutResult>()
         compose.onNodeWithText(label, useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         assertEquals("$label must remain a whole word", 1, layouts.single().lineCount)
     }
-    private fun render(fontScale: Float, state: SessionUiState = SessionUiState(checking = false),
-        submit: (RegisterRequest) -> Unit = { error("Empty form cannot register") }) {
-        compose.setContent { AuthTestLocale {
-            CompaneroTheme {
-                BoxWithConstraints(Modifier.fillMaxSize()) {
-                    val density = constraints.maxWidth / 360f
-                    CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides Density(density, fontScale)) {
-                        Box(Modifier.width(360.dp)) { RegistrationScreen(state, submit, {}) }
+
+    private fun render(
+        fontScale: Float,
+        state: SessionUiState = SessionUiState(checking = false),
+        submit: (RegisterRequest) -> Unit = { error("Empty form cannot register") },
+    ) {
+        compose.setContent {
+            AuthTestLocale {
+                CompaneroTheme {
+                    BoxWithConstraints(Modifier.fillMaxSize()) {
+                        val density = constraints.maxWidth / 360f
+                        CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides Density(density, fontScale)) {
+                            Box(Modifier.width(360.dp)) { RegistrationScreen(state, submit, {}) }
+                        }
                     }
                 }
             }
-        } }
+        }
     }
 }

@@ -1,14 +1,14 @@
 package org.companerodeescuela.feature.home
 
+import org.companerodeescuela.shared.contracts.AcademicLoadResponse
+import org.companerodeescuela.shared.contracts.ScheduleEntry
+import org.companerodeescuela.shared.contracts.ScheduleRecurrence
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.temporal.ChronoUnit
 import java.util.Locale
-import org.companerodeescuela.shared.contracts.AcademicLoadResponse
-import org.companerodeescuela.shared.contracts.ScheduleEntry
-import org.companerodeescuela.shared.contracts.ScheduleRecurrence
 
 data class TodayOverview(
     val studentName: String,

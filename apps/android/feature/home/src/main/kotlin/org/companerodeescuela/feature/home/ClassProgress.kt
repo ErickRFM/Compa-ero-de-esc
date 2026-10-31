@@ -1,8 +1,8 @@
 package org.companerodeescuela.feature.home
 
+import org.companerodeescuela.shared.contracts.ScheduleEntry
 import java.time.Duration
 import java.time.LocalTime
-import org.companerodeescuela.shared.contracts.ScheduleEntry
 
 internal fun classProgress(
     entry: ScheduleEntry,

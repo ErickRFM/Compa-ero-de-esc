@@ -103,6 +103,8 @@ class PushDeviceRegistrar
                             .take(100),
                     )
                     put("deviceId", installation)
+                    put("appDistribution", BuildConfig.APP_DISTRIBUTION)
+                    put("packageName", context.packageName)
                 }
             return when (val access = refresh.currentAccessToken()) {
                 is Outcome.Failure -> pushRegistrationFailure(access.error)

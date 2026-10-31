@@ -29,6 +29,8 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import org.companerodeescuela.core.designsystem.theme.LocalCompaneroAccentPalette
+import org.companerodeescuela.core.designsystem.theme.LocalCompaneroDynamicColor
 import org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled
 import org.companerodeescuela.core.designsystem.v8.LocalV8HeaderAction
 import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
@@ -41,6 +43,7 @@ fun CompaneroScaffold(
     startDestination: Destination = Destination.Home,
     topLevelDestinations: List<TopLevelDestination> = TopLevelDestination.entries,
     highContrast: Boolean = false,
+    campusBackdropEnabled: Boolean = true,
     destinations: NavGraphBuilder.() -> Unit,
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -63,15 +66,28 @@ fun CompaneroScaffold(
             Destination.Schedule.route -> "Horario"
             Destination.Attendance.route -> "Asistencia"
             Destination.RepresentativeInvitations.route -> "Representantes"
+            Destination.Mfa.route -> "Seguridad y MFA"
+            Destination.StaffApplication.route -> "Solicitud de tutoría"
+            Destination.TutorRequests.route -> "Solicitudes de tutoría"
+            Destination.TutorGroups.route -> "Grupos tutorados"
             else -> "Volver"
         }
 
     val parentColors = MaterialTheme.colorScheme
     val lightTheme = parentColors.background.luminance() > 0.5f
+    val accentPalette = LocalCompaneroAccentPalette.current
+    val dynamicColor = LocalCompaneroDynamicColor.current
     // Every role uses the same V9 palette and matte surfaces. Only the
     // student/teacher home screens keep the campus photograph as a backdrop.
-    val v9Colors = v8ResolvedColorScheme(parentColors, highContrast)
-    val showCampusBackdrop = startDestination == Destination.Home || startDestination == Destination.TeacherHome
+    val v9Colors =
+        v8ResolvedColorScheme(
+            parent = parentColors,
+            highContrast = highContrast,
+            accentPalette = accentPalette,
+            preserveDynamicPrimary = dynamicColor,
+        )
+    val showCampusBackdrop =
+        campusBackdropEnabled && (startDestination == Destination.Home || startDestination == Destination.TeacherHome)
     val headerAction: (@Composable () -> Unit)? =
         if (!onSecondaryScreen && topLevelDestinations.none { it.destination == Destination.Profile }) {
             {

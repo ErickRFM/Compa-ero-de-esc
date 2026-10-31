@@ -8,9 +8,17 @@ plugins {
 
 android {
     namespace = "org.companerodeescuela.feature.channel"
-    compileSdk = libs.versions.compileSdk.get().toInt()
+    compileSdk =
+        libs.versions.compileSdk
+            .get()
+            .toInt()
 
-    defaultConfig { minSdk = libs.versions.minSdk.get().toInt() }
+    defaultConfig {
+        minSdk =
+            libs.versions.minSdk
+                .get()
+                .toInt()
+    }
     buildFeatures { compose = true }
 
     compileOptions {

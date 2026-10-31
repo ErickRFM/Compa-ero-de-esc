@@ -32,8 +32,8 @@ import org.companerodeescuela.core.network.SessionRefreshCoordinator
 import org.companerodeescuela.core.network.createApiClient
 import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.feature.attendance.AttendanceMode
-import org.companerodeescuela.feature.attendance.attendanceScreen
 import org.companerodeescuela.feature.attendance.AttendanceViewModel
+import org.companerodeescuela.feature.attendance.attendanceScreen
 import org.companerodeescuela.shared.contracts.AcademicWeekResponse
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.AttendanceDisposition

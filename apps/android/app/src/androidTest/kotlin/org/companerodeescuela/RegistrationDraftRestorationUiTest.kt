@@ -12,13 +12,23 @@ import org.junit.Test
 
 class RegistrationDraftRestorationUiTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+
     private fun registration() {
-        compose.activityRule.scenario.onActivity { activity -> activity.setContent {
-            AuthTestLocale { CompaneroTheme {
-                RegistrationScreen(SessionUiState(checking=false, institutions=listOf(InstitutionSummary("qa-campus","QA campus"))), {}, {})
-            } }
-        } }
+        compose.activityRule.scenario.onActivity { activity ->
+            activity.setContent {
+                AuthTestLocale {
+                    CompaneroTheme {
+                        RegistrationScreen(
+                            SessionUiState(checking = false, institutions = listOf(InstitutionSummary("qa-campus", "QA campus"))),
+                            {},
+                            {},
+                        )
+                    }
+                }
+            }
+        }
     }
+
     @Test fun populatedTutorSecretsSurviveActualActivityRecreation() {
         registration()
         compose.onNodeWithTag("registration_type_TUTOR").performScrollTo().performClick()
@@ -32,13 +42,31 @@ class RegistrationDraftRestorationUiTest {
         compose.onNodeWithTag("registration_confirmation").performScrollTo().assertTextContains("draft-password")
         compose.onNodeWithTag("registration_identity").performScrollTo().assertTextContains("professional-reference")
     }
+
     private fun onboarding() {
-        compose.activityRule.scenario.onActivity { activity -> activity.setContent {
-            AuthTestLocale { CompaneroTheme {
-                AccountOnboardingScreen(SessionUiState(checking=false,authenticated=true,userId="qa-pending",accountStatus=AccountStatus.PENDING_VERIFICATION),{}, {}, {}, {})
-            } }
-        } }
+        compose.activityRule.scenario.onActivity { activity ->
+            activity.setContent {
+                AuthTestLocale {
+                    CompaneroTheme {
+                        AccountOnboardingScreen(
+                            SessionUiState(
+                                checking = false,
+                                authenticated = true,
+                                userId = "qa-pending",
+                                accountStatus = AccountStatus.PENDING_VERIFICATION,
+                            ),
+                            {
+                            },
+                            {},
+                            {},
+                            {},
+                        )
+                    }
+                }
+            }
+        }
     }
+
     @Test fun pastedVerificationCodeSurvivesActualActivityRecreation() {
         onboarding()
         compose.onNodeWithTag("verification_code").performScrollTo().performTextInput("A".repeat(43))

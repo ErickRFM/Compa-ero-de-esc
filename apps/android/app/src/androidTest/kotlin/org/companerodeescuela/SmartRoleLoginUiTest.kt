@@ -1,31 +1,33 @@
+@file:Suppress("ktlint:standard:no-wildcard-imports")
+
 package org.companerodeescuela
 
 import android.content.res.Configuration
 import android.graphics.Bitmap
-import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.test.platform.app.InstrumentationRegistry
-import java.io.File
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.toPixelMap
-import org.companerodeescuela.feature.auth.RegistrationScreen
-import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.test.platform.app.InstrumentationRegistry
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
 import org.companerodeescuela.core.motion.ProvideCompaneroMotionPreferences
 import org.companerodeescuela.core.navigation.AppExperience
 import org.companerodeescuela.feature.auth.LoginScreen
+import org.companerodeescuela.feature.auth.RegistrationScreen
 import org.companerodeescuela.feature.auth.SessionUiState
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import java.io.File
 import java.util.Locale
 
 class SmartRoleLoginUiTest {
@@ -41,6 +43,7 @@ class SmartRoleLoginUiTest {
         val background = compose.onRoot().captureToImage().toPixelMap()[0, 0]
         org.junit.Assert.assertTrue("Registration background follows light theme", background.luminance() > 0.5f)
     }
+
     @Test fun roleChangesPreserveOneFormAndOnlySendDesiredAccess() {
         var submitted: Triple<String, String, AppExperience>? = null
         compose.setContent { loginTestContent(onLogin = { u, p, role -> submitted = Triple(u, p, role) }) }

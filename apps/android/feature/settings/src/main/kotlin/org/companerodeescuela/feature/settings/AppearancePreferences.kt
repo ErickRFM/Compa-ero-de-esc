@@ -5,12 +5,14 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.edit
 import androidx.core.os.LocaleListCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import javax.inject.Inject
+import javax.inject.Singleton
+
+import org.companerodeescuela.core.designsystem.theme.CompaneroAccentPalette
 
 enum class AppThemeMode {
     SYSTEM,
@@ -18,7 +20,9 @@ enum class AppThemeMode {
     DARK,
 }
 
-enum class AppLanguage(val languageTag: String) {
+enum class AppLanguage(
+    val languageTag: String,
+) {
     SYSTEM(""),
     SPANISH("es"),
     ENGLISH("en"),
@@ -27,90 +31,130 @@ enum class AppLanguage(val languageTag: String) {
 data class AppearanceSettings(
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
     val language: AppLanguage = AppLanguage.SYSTEM,
+    val accentPalette: CompaneroAccentPalette = CompaneroAccentPalette.CRIMSON,
+    val dynamicColor: Boolean = false,
+    val campusBackdropEnabled: Boolean = true,
     val textScale: Float = 1f,
     val reducedMotion: Boolean = false,
     val highContrast: Boolean = false,
 )
 
 @Singleton
-class AppearancePreferences @Inject constructor(
-    @ApplicationContext context: Context,
-) {
-    private val preferences = context.getSharedPreferences(
-        PREFS_NAME,
-        Context.MODE_PRIVATE,
-    )
+class AppearancePreferences
+    @Inject
+    constructor(
+        @ApplicationContext context: Context,
+    ) {
+        private val preferences =
+            context.getSharedPreferences(
+                PREFS_NAME,
+                Context.MODE_PRIVATE,
+            )
 
-    private val _state = MutableStateFlow(read())
-    val state: StateFlow<AppearanceSettings> = _state.asStateFlow()
+        private val _state = MutableStateFlow(read())
+        val state: StateFlow<AppearanceSettings> = _state.asStateFlow()
 
-    /** Apply after the host has completed Activity.onCreate; constructors must not recreate it. */
-    fun applySavedLanguage() { applyLocale(_state.value.language) }
-
-    fun setThemeMode(mode: AppThemeMode) {
-        preferences.edit { putString(KEY_THEME, mode.name) }
-        _state.update { it.copy(themeMode = mode) }
-    }
-
-    fun setLanguage(language: AppLanguage) {
-        preferences.edit { putString(KEY_LANGUAGE, language.name) }
-        _state.update { it.copy(language = language) }
-        applyLocale(language)
-    }
-
-    fun setTextScale(scale: Float) {
-        val normalized = scale.coerceIn(MIN_TEXT_SCALE, MAX_TEXT_SCALE)
-        preferences.edit { putFloat(KEY_TEXT_SCALE, normalized) }
-        _state.update { it.copy(textScale = normalized) }
-    }
-
-    fun setReducedMotion(enabled: Boolean) {
-        preferences.edit { putBoolean(KEY_REDUCED_MOTION, enabled) }
-        _state.update { it.copy(reducedMotion = enabled) }
-    }
-
-    fun setHighContrast(enabled: Boolean) {
-        preferences.edit { putBoolean(KEY_HIGH_CONTRAST, enabled) }
-        _state.update { it.copy(highContrast = enabled) }
-    }
-
-    private fun applyLocale(language: AppLanguage) {
-        val localeList = if (language.languageTag.isEmpty()) {
-            LocaleListCompat.getEmptyLocaleList()
-        } else {
-            LocaleListCompat.forLanguageTags(language.languageTag)
+        /** Apply after the host has completed Activity.onCreate; constructors must not recreate it. */
+        fun applySavedLanguage() {
+            applyLocale(_state.value.language)
         }
-        AppCompatDelegate.setApplicationLocales(localeList)
-    }
 
-    private fun read(): AppearanceSettings =
-        AppearanceSettings(
-            themeMode = runCatching {
-                AppThemeMode.valueOf(
-                    preferences.getString(KEY_THEME, AppThemeMode.SYSTEM.name)
-                        ?: AppThemeMode.SYSTEM.name,
-                )
-            }.getOrDefault(AppThemeMode.SYSTEM),
-            language = runCatching {
-                AppLanguage.valueOf(
-                    preferences.getString(KEY_LANGUAGE, AppLanguage.SYSTEM.name)
-                        ?: AppLanguage.SYSTEM.name,
-                )
-            }.getOrDefault(AppLanguage.SYSTEM),
-            textScale = preferences.getFloat(KEY_TEXT_SCALE, 1f)
-                .coerceIn(MIN_TEXT_SCALE, MAX_TEXT_SCALE),
-            reducedMotion = preferences.getBoolean(KEY_REDUCED_MOTION, false),
-            highContrast = preferences.getBoolean(KEY_HIGH_CONTRAST, false),
-        )
+        fun setThemeMode(mode: AppThemeMode) {
+            preferences.edit { putString(KEY_THEME, mode.name) }
+            _state.update { it.copy(themeMode = mode) }
+        }
 
-    private companion object {
-        const val PREFS_NAME = "appearance_preferences"
-        const val KEY_THEME = "theme"
-        const val KEY_LANGUAGE = "language"
-        const val KEY_TEXT_SCALE = "text_scale"
-        const val KEY_REDUCED_MOTION = "reduced_motion"
-        const val KEY_HIGH_CONTRAST = "high_contrast"
-        const val MIN_TEXT_SCALE = 0.9f
-        const val MAX_TEXT_SCALE = 1.2f
+        fun setAccentPalette(palette: CompaneroAccentPalette) {
+            preferences.edit { putString(KEY_ACCENT_PALETTE, palette.name) }
+            _state.update { it.copy(accentPalette = palette) }
+        }
+
+        fun setDynamicColor(enabled: Boolean) {
+            preferences.edit { putBoolean(KEY_DYNAMIC_COLOR, enabled) }
+            _state.update { it.copy(dynamicColor = enabled) }
+        }
+
+        fun setCampusBackdropEnabled(enabled: Boolean) {
+            preferences.edit { putBoolean(KEY_CAMPUS_BACKDROP, enabled) }
+            _state.update { it.copy(campusBackdropEnabled = enabled) }
+        }
+
+        fun setLanguage(language: AppLanguage) {
+            preferences.edit { putString(KEY_LANGUAGE, language.name) }
+            _state.update { it.copy(language = language) }
+            applyLocale(language)
+        }
+
+        fun setTextScale(scale: Float) {
+            val normalized = scale.coerceIn(MIN_TEXT_SCALE, MAX_TEXT_SCALE)
+            preferences.edit { putFloat(KEY_TEXT_SCALE, normalized) }
+            _state.update { it.copy(textScale = normalized) }
+        }
+
+        fun setReducedMotion(enabled: Boolean) {
+            preferences.edit { putBoolean(KEY_REDUCED_MOTION, enabled) }
+            _state.update { it.copy(reducedMotion = enabled) }
+        }
+
+        fun setHighContrast(enabled: Boolean) {
+            preferences.edit { putBoolean(KEY_HIGH_CONTRAST, enabled) }
+            _state.update { it.copy(highContrast = enabled) }
+        }
+
+        private fun applyLocale(language: AppLanguage) {
+            val localeList =
+                if (language.languageTag.isEmpty()) {
+                    LocaleListCompat.getEmptyLocaleList()
+                } else {
+                    LocaleListCompat.forLanguageTags(language.languageTag)
+                }
+            AppCompatDelegate.setApplicationLocales(localeList)
+        }
+
+        private fun read(): AppearanceSettings =
+            AppearanceSettings(
+                themeMode =
+                    runCatching {
+                        AppThemeMode.valueOf(
+                            preferences.getString(KEY_THEME, AppThemeMode.SYSTEM.name)
+                                ?: AppThemeMode.SYSTEM.name,
+                        )
+                    }.getOrDefault(AppThemeMode.SYSTEM),
+                language =
+                    runCatching {
+                        AppLanguage.valueOf(
+                            preferences.getString(KEY_LANGUAGE, AppLanguage.SYSTEM.name)
+                                ?: AppLanguage.SYSTEM.name,
+                        )
+                    }.getOrDefault(AppLanguage.SYSTEM),
+                accentPalette =
+                    runCatching {
+                        CompaneroAccentPalette.valueOf(
+                            preferences.getString(KEY_ACCENT_PALETTE, CompaneroAccentPalette.CRIMSON.name)
+                                ?: CompaneroAccentPalette.CRIMSON.name,
+                        )
+                    }.getOrDefault(CompaneroAccentPalette.CRIMSON),
+                dynamicColor = preferences.getBoolean(KEY_DYNAMIC_COLOR, false),
+                campusBackdropEnabled = preferences.getBoolean(KEY_CAMPUS_BACKDROP, true),
+                textScale =
+                    preferences
+                        .getFloat(KEY_TEXT_SCALE, 1f)
+                        .coerceIn(MIN_TEXT_SCALE, MAX_TEXT_SCALE),
+                reducedMotion = preferences.getBoolean(KEY_REDUCED_MOTION, false),
+                highContrast = preferences.getBoolean(KEY_HIGH_CONTRAST, false),
+            )
+
+        private companion object {
+            const val PREFS_NAME = "appearance_preferences"
+            const val KEY_THEME = "theme"
+            const val KEY_LANGUAGE = "language"
+            const val KEY_ACCENT_PALETTE = "accent_palette"
+            const val KEY_DYNAMIC_COLOR = "dynamic_color"
+            const val KEY_CAMPUS_BACKDROP = "campus_backdrop"
+            const val KEY_TEXT_SCALE = "text_scale"
+            const val KEY_REDUCED_MOTION = "reduced_motion"
+            const val KEY_HIGH_CONTRAST = "high_contrast"
+            const val MIN_TEXT_SCALE = 0.9f
+            const val MAX_TEXT_SCALE = 1.2f
+        }
     }
-}

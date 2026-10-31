@@ -48,7 +48,9 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -109,6 +111,7 @@ fun attendanceScreen(
         onConsumeRequestedSession()
     }
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val imageReader = remember(context) { AttendanceQrImageReader(context) }
     val imageLauncher =
@@ -122,6 +125,7 @@ fun attendanceScreen(
                         if (token.isNullOrBlank()) {
                             viewModel.inspectQr("")
                         } else {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             viewModel.inspectQr(token)
                         }
                     }.onFailure { viewModel.inspectQr("") }
@@ -138,7 +142,10 @@ fun attendanceScreen(
                 ),
         ) {
             AttendanceQrScanner(
-                onToken = viewModel::inspectQr,
+                onToken = { token ->
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    viewModel.inspectQr(token)
+                },
                 onClose = viewModel::dismissScanner,
                 modifier = Modifier.fillMaxSize(),
             )
@@ -154,7 +161,10 @@ fun attendanceScreen(
                 onScan = viewModel::openScanner,
                 onPrepareClassContingency = viewModel::prepareClassContingency,
                 onStartSchoolDay = viewModel::openSchoolDayScanner,
-                onConfirmClassCall = viewModel::confirmClassCall,
+                onConfirmClassCall = { id ->
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    viewModel.confirmClassCall(id)
+                },
                 onPickImage = { imageLauncher.launch(arrayOf("image/*")) },
                 onInspectToken = viewModel::inspectQr,
                 onDismissInspection = viewModel::clearQrInspection,
@@ -255,6 +265,22 @@ fun studentAttendanceContent(
                     title = "No pudimos completar la acción",
                     message = it,
                     tone = NoticeTone.ERROR,
+                )
+            }
+            val pendingSyncCount =
+                remember(state.localRecords) {
+                    state.localRecords.count { it.syncState == LocalAttendanceSyncState.PENDING }
+                }
+            if (pendingSyncCount > 0) {
+                StatusNotice(
+                    title = "Sincronización pendiente",
+                    message =
+                        if (pendingSyncCount == 1) {
+                            "Tienes 1 pase registrado sin conexión. Se enviará automáticamente en cuanto el dispositivo recupere acceso a la red."
+                        } else {
+                            "Tienes $pendingSyncCount pases registrados sin conexión. Se enviarán automáticamente en cuanto el dispositivo recupere acceso a la red."
+                        },
+                    tone = NoticeTone.INFO,
                 )
             }
             state.requestedStudentSessionId?.let { selectedId ->

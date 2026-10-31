@@ -7,10 +7,14 @@ import org.companerodeescuela.shared.contracts.ChannelPostType
 internal enum class ChannelFeedTab { POSTS, RESOURCES }
 
 /** Explicit resource filter; regular publications remain visible in the primary feed. */
-internal fun channelPostsForTab(posts: List<ChannelPost>, tab: ChannelFeedTab): List<ChannelPost> =
+internal fun channelPostsForTab(
+    posts: List<ChannelPost>,
+    tab: ChannelFeedTab,
+): List<ChannelPost> =
     when (tab) {
         ChannelFeedTab.POSTS -> posts
-        ChannelFeedTab.RESOURCES -> posts.filter {
-            it.type == ChannelPostType.MATERIAL || it.attachments.isNotEmpty()
-        }
+        ChannelFeedTab.RESOURCES ->
+            posts.filter {
+                it.type == ChannelPostType.MATERIAL || it.attachments.isNotEmpty()
+            }
     }

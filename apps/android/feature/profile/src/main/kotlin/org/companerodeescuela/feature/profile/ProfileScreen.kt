@@ -34,6 +34,7 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
+import org.companerodeescuela.core.designsystem.theme.LocalCompaneroAccentPalette
 import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
@@ -59,6 +60,8 @@ fun ProfileScreen(
     notificationsStatus: String? = null,
     onTutorRequest: (() -> Unit)? = null,
     onRepresentatives: (() -> Unit)? = null,
+    /** Version string shown in "Acerca de Compañero", e.g. "1.4.2". Pass from app module via BuildConfig.VERSION_NAME. */
+    appVersion: String? = null,
     modifier: Modifier = Modifier,
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -97,17 +100,18 @@ fun ProfileScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
                 ) {
+                    val avatarBg = LocalCompaneroAccentPalette.current.darkContainer
                     Surface(
                         modifier = Modifier.size(CompaneroSize.avatar),
                         shape = CircleShape,
-                        color = V8RedColors.DeepCrimson,
+                        color = avatarBg,
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
                                 text = initials(displayName),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
+                                color = androidx.compose.ui.graphics.Color.White,
                             )
                         }
                     }
@@ -152,7 +156,7 @@ fun ProfileScreen(
                 GroupDivider()
                 ProfileRow(
                     title = "Privacidad",
-                    detail = "Datos académicos separados por cuenta.",
+                    detail = "Tus datos académicos solo se comparten con tu institución. Compañero no vende información personal.",
                 )
             }
 
@@ -214,7 +218,7 @@ fun ProfileScreen(
                 GroupDivider()
                 ProfileRow(
                     title = "Acerca de Compañero",
-                    detail = "Compañero de Clase · interfaz V8",
+                    detail = if (appVersion != null) "v$appVersion · Compañero de Clase" else "Compañero de Clase · interfaz V8",
                 )
             }
 

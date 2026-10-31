@@ -1,16 +1,18 @@
 package org.companerodeescuela.api.application
 
 import org.companerodeescuela.api.academic.groups.AcademicGroupRepository
+import org.companerodeescuela.api.auth.RefreshSessionRepository
+import org.companerodeescuela.api.auth.SessionIdentitySource
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.database.MongoConnection
 import org.companerodeescuela.api.devices.DeviceTokenRepository
-import org.companerodeescuela.api.devices.InMemoryDeviceTokenRepository
-import org.companerodeescuela.api.devices.MongoDeviceTokenRepository
-import org.companerodeescuela.api.devices.MongoPushOutboxRepository
-import org.companerodeescuela.api.devices.InMemoryPushOutboxRepository
 import org.companerodeescuela.api.devices.FcmHttpV1Gateway
 import org.companerodeescuela.api.devices.FirebaseServiceAccount
+import org.companerodeescuela.api.devices.InMemoryDeviceTokenRepository
+import org.companerodeescuela.api.devices.InMemoryPushOutboxRepository
+import org.companerodeescuela.api.devices.MongoDeviceTokenRepository
+import org.companerodeescuela.api.devices.MongoPushOutboxRepository
 import org.companerodeescuela.api.devices.PushOutboxService
 import org.companerodeescuela.api.devices.UnavailablePushGateway
 import org.companerodeescuela.api.events.AcademicEventService
@@ -21,8 +23,6 @@ import org.companerodeescuela.api.excuses.InMemoryExcuseRepository
 import org.companerodeescuela.api.excuses.MongoExcuseRepository
 import org.companerodeescuela.api.tutoring.TutorAssignmentService
 import org.companerodeescuela.shared.contracts.UserRole
-import org.companerodeescuela.api.auth.RefreshSessionRepository
-import org.companerodeescuela.api.auth.SessionIdentitySource
 import java.time.Instant
 
 data class OperationsFeatureGraph(
@@ -37,67 +37,98 @@ fun buildOperationsFeatureGraph(
     mongoConnection: MongoConnection,
     tutoringService: TutorAssignmentService,
     groupRepository: AcademicGroupRepository? = null,
-    accounts:org.companerodeescuela.api.auth.PlatformAccountRepository?=null,
-    classrooms:org.companerodeescuela.api.classroom.ClassroomService?=null,
-    institutions:org.companerodeescuela.api.institutions.InstitutionRepository?=null,
-    mfa:org.companerodeescuela.api.security.MfaService?=null,
+    accounts: org.companerodeescuela.api.auth.PlatformAccountRepository? = null,
+    classrooms: org.companerodeescuela.api.classroom.ClassroomService? = null,
+    institutions: org.companerodeescuela.api.institutions.InstitutionRepository? = null,
+    mfa: org.companerodeescuela.api.security.MfaService? = null,
     refreshSessions: RefreshSessionRepository? = null,
 ): OperationsFeatureGraph {
-    val eventRepository = when {
-        !settings.hasAuthentication -> InMemoryAcademicEventRepository()
-        settings.mongo.isConfigured -> MongoAcademicEventRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemoryAcademicEventRepository()
-        else -> error("Academic events require MONGODB_URI outside local development")
-    }
-    val excuseRepository = when {
-        !settings.hasAuthentication -> InMemoryExcuseRepository()
-        settings.mongo.isConfigured -> MongoExcuseRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemoryExcuseRepository()
-        else -> error("Excuse requests require MONGODB_URI outside local development")
-    }
+    val eventRepository =
+        when {
+            !settings.hasAuthentication -> InMemoryAcademicEventRepository()
+            settings.mongo.isConfigured -> MongoAcademicEventRepository(mongoConnection.database())
+            settings.environment == Environment.LOCAL -> InMemoryAcademicEventRepository()
+            else -> error("Academic events require MONGODB_URI outside local development")
+        }
+    val excuseRepository =
+        when {
+            !settings.hasAuthentication -> InMemoryExcuseRepository()
+            settings.mongo.isConfigured -> MongoExcuseRepository(mongoConnection.database())
+            settings.environment == Environment.LOCAL -> InMemoryExcuseRepository()
+            else -> error("Excuse requests require MONGODB_URI outside local development")
+        }
 
-    val devices: DeviceTokenRepository = when {
-        !settings.hasAuthentication -> InMemoryDeviceTokenRepository()
-        settings.mongo.isConfigured -> MongoDeviceTokenRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemoryDeviceTokenRepository()
-        else -> error("FCM device registration requires MongoDB outside local development")
-    }
-    val outbox = when {
-        !settings.hasAuthentication -> InMemoryPushOutboxRepository()
-        settings.mongo.isConfigured -> MongoPushOutboxRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemoryPushOutboxRepository()
-        else -> error("Push outbox requires MongoDB outside local development")
-    }
-    val pushSender = settings.firebaseServiceAccountJson?.let {
-        FcmHttpV1Gateway(FirebaseServiceAccount.parse(it.concatToString()))
-    } ?: UnavailablePushGateway
-    val pushService = PushOutboxService(
-        devices = devices,
-        outbox = outbox,
-        sender = pushSender,
-        authorizeRecipient = { owner ->
-            val id = owner.takeIf { it.startsWith("NATIVE:") }?.removePrefix("NATIVE:")
-            val current = id?.let { accounts?.findById(it) }
-            current?.permitsSession == true && current.emailVerifiedAt != null &&
-                UserRole.STUDENT in current.roles
-        },
-        authorizeSession = { owner, token ->
-            val sessionId = devices.sessionIdFor(owner, token)
-            val session = sessionId?.let { refreshSessions?.find(it) }
-            session != null && session.revokedAt == null &&
-                session.expiresAt.isAfter(Instant.now()) &&
-                session.identitySource == SessionIdentitySource.NATIVE &&
-                owner == "NATIVE:${session.user.id}"
-        },
-    )
+    val devices: DeviceTokenRepository =
+        when {
+            !settings.hasAuthentication -> InMemoryDeviceTokenRepository()
+            settings.mongo.isConfigured -> MongoDeviceTokenRepository(mongoConnection.database())
+            settings.environment == Environment.LOCAL -> InMemoryDeviceTokenRepository()
+            else -> error("FCM device registration requires MongoDB outside local development")
+        }
+    val outbox =
+        when {
+            !settings.hasAuthentication -> InMemoryPushOutboxRepository()
+            settings.mongo.isConfigured -> MongoPushOutboxRepository(mongoConnection.database())
+            settings.environment == Environment.LOCAL -> InMemoryPushOutboxRepository()
+            else -> error("Push outbox requires MongoDB outside local development")
+        }
+    val pushSender =
+        settings.firebaseServiceAccountJson?.let {
+            FcmHttpV1Gateway(FirebaseServiceAccount.parse(it.concatToString()))
+        } ?: UnavailablePushGateway
+    val pushService =
+        PushOutboxService(
+            devices = devices,
+            outbox = outbox,
+            sender = pushSender,
+            authorizeRecipient = { owner ->
+                // Validates that the push recipient is an active, email-verified account.
+                // Event scopes already enforce which roles receive which event types;
+                // this gate only checks that the account itself is in good standing.
+                val id = owner.takeIf { it.startsWith("NATIVE:") }?.removePrefix("NATIVE:")
+                val current = id?.let { accounts?.findById(it) }
+                val allowedRoles =
+                    setOf(
+                        UserRole.STUDENT,
+                        UserRole.TEACHER,
+                        UserRole.TUTOR,
+                        UserRole.PRINCIPAL,
+                        UserRole.COORDINATOR,
+                        UserRole.ADMIN,
+                        UserRole.SUPER_ADMIN,
+                    )
+                current?.permitsSession == true &&
+                    current.emailVerifiedAt != null &&
+                    current.roles.any { it in allowedRoles }
+            },
+            authorizeSession = { owner, token ->
+                val sessionId = devices.sessionIdFor(owner, token)
+                val session = sessionId?.let { refreshSessions?.find(it) }
+                session != null &&
+                    session.revokedAt == null &&
+                    session.expiresAt.isAfter(Instant.now()) &&
+                    session.identitySource == SessionIdentitySource.NATIVE &&
+                    owner == "NATIVE:${session.user.id}"
+            },
+        )
 
     return OperationsFeatureGraph(
-        eventService = AcademicEventService(repository=eventRepository,accounts=accounts,groups=groupRepository,classrooms=classrooms,institutions=institutions,mfa=mfa,notifications=pushService),
-        excuseService = ExcuseService(
-            repository = excuseRepository,
-            tutoring = tutoringService,
-            groupRepository = groupRepository,
-        ),
+        eventService =
+            AcademicEventService(
+                repository = eventRepository,
+                accounts = accounts,
+                groups = groupRepository,
+                classrooms = classrooms,
+                institutions = institutions,
+                mfa = mfa,
+                notifications = pushService,
+            ),
+        excuseService =
+            ExcuseService(
+                repository = excuseRepository,
+                tutoring = tutoringService,
+                groupRepository = groupRepository,
+            ),
         deviceTokenRepository = devices,
         pushService = pushService,
     )

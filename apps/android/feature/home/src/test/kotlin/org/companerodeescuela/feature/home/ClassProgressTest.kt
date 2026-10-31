@@ -1,9 +1,9 @@
 package org.companerodeescuela.feature.home
 
+import org.companerodeescuela.shared.contracts.ScheduleEntry
 import java.time.LocalTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import org.companerodeescuela.shared.contracts.ScheduleEntry
 
 class ClassProgressTest {
     @Test
@@ -25,7 +25,10 @@ class ClassProgressTest {
         assertEquals(0f, classProgress(entry("23:30", "00:30"), LocalTime.of(23, 45)))
     }
 
-    private fun entry(start: String, end: String) = ScheduleEntry(
+    private fun entry(
+        start: String,
+        end: String,
+    ) = ScheduleEntry(
         courseId = "course-1",
         subjectCode = "PROG",
         subjectName = "Programación",

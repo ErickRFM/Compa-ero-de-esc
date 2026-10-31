@@ -51,3 +51,65 @@ object CompanionColors {
     val onDarkSurfaceVariant = Color(0xFFC9C4C0)
     val darkOutline = Color(0xFF938C88)
 }
+
+/**
+ * Curated accent palettes that preserve WCAG AA contrast across light, dark,
+ * and high-contrast surfaces while letting users personalize the app.
+ */
+enum class CompaneroAccentPalette(
+    val displayName: String,
+    val lightPrimary: Color,
+    val lightContainer: Color,
+    val darkPrimary: Color,
+    val darkContainer: Color,
+    val previewColor: Color,
+) {
+    CRIMSON(
+        displayName = "Carmesí UPTlax",
+        lightPrimary = Color(0xFF9B1C31),
+        lightContainer = Color(0xFFF5DADF),
+        darkPrimary = Color(0xFFFF303F),
+        darkContainer = Color(0xFFB31328),
+        previewColor = Color(0xFFD91E36),
+    ),
+    COBALT(
+        displayName = "Azul Cobalto",
+        lightPrimary = Color(0xFF1D4ED8),
+        lightContainer = Color(0xFFDBEAFE),
+        darkPrimary = Color(0xFF60A5FA),
+        darkContainer = Color(0xFF1E40AF),
+        previewColor = Color(0xFF2563EB),
+    ),
+    EMERALD(
+        displayName = "Esmeralda",
+        lightPrimary = Color(0xFF0F766E),
+        lightContainer = Color(0xFFCCFBF1),
+        darkPrimary = Color(0xFF34D399),
+        darkContainer = Color(0xFF065F46),
+        previewColor = Color(0xFF10B981),
+    ),
+    VIOLET(
+        displayName = "Violeta",
+        lightPrimary = Color(0xFF6D28D9),
+        lightContainer = Color(0xFFEDE9FE),
+        darkPrimary = Color(0xFFA78BFA),
+        darkContainer = Color(0xFF5B21B6),
+        previewColor = Color(0xFF7C3AED),
+    ),
+    AMBER(
+        displayName = "Ámbar Dorado",
+        lightPrimary = Color(0xFFB45309),
+        lightContainer = Color(0xFFFEF3C7),
+        darkPrimary = Color(0xFFFBBF24),
+        darkContainer = Color(0xFF92400E),
+        previewColor = Color(0xFFD97706),
+    ),
+    ROSE(
+        displayName = "Rosa Coral",
+        lightPrimary = Color(0xFFBE123C),
+        lightContainer = Color(0xFFFFE4E6),
+        darkPrimary = Color(0xFFFB7185),
+        darkContainer = Color(0xFF9F1239),
+        previewColor = Color(0xFFE11D48),
+    ),
+}

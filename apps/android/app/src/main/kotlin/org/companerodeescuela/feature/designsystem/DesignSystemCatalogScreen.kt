@@ -1,6 +1,10 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.feature.designsystem
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -18,16 +23,24 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.brand.UptlaxBrand
-import org.companerodeescuela.core.designsystem.theme.CompanionColors
+import org.companerodeescuela.core.designsystem.theme.CompaneroAccentPalette
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
+import org.companerodeescuela.core.designsystem.theme.CompanionColors
+import org.companerodeescuela.core.designsystem.theme.LocalCompaneroAccentPalette
+import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.ui.component.AcademicClassCard
 import org.companerodeescuela.core.ui.component.AcademicTimelineItem
 import org.companerodeescuela.core.ui.component.AnimatedCountBadge
@@ -37,24 +50,25 @@ import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 
 @Composable
-fun DesignSystemCatalogScreen(
-    modifier: Modifier = Modifier,
-) {
+fun DesignSystemCatalogScreen(modifier: Modifier = Modifier) {
     var selectedMode by remember { mutableIntStateOf(0) }
     var badgeCount by remember { mutableIntStateOf(4) }
+    var activeCatalogPalette by remember { mutableStateOf(CompaneroAccentPalette.CRIMSON) }
 
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = CompaneroSpacing.lg, vertical = CompaneroSpacing.md),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xl),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs)) {
             UptlaxBrand(
-                modifier = Modifier
-                    .fillMaxWidth(0.5f)
-                    .height(CompaneroSize.brandLogoCompactHeight),
+                modifier =
+                    Modifier
+                        .fillMaxWidth(0.5f)
+                        .height(CompaneroSize.brandLogoCompactHeight),
                 tint = CompanionColors.crimson,
             )
             Text("UPTlax · UI V5", style = MaterialTheme.typography.labelLarge, color = CompanionColors.crimson)
@@ -62,22 +76,23 @@ fun DesignSystemCatalogScreen(
         }
 
         CatalogSection(title = "Colores") {
-            val colors = listOf(
-                "Crimson" to CompanionColors.crimson,
-                "Crimson container" to CompanionColors.crimsonContainer,
-                "Crimson subtle" to CompanionColors.crimsonSubtle,
-                "Graphite" to CompanionColors.graphite,
-                "Graphite raised" to CompanionColors.graphiteRaised,
-                "Graphite soft" to CompanionColors.graphiteSoft,
-                "Warm background" to CompanionColors.warmBackground,
-                "Warm surface" to CompanionColors.warmSurface,
-                "Warm variant" to CompanionColors.warmSurfaceVariant,
-                "Institutional gold" to CompanionColors.institutionalGold,
-                "Semantic green" to CompanionColors.semanticGreen,
-                "Semantic blue" to CompanionColors.semanticBlue,
-                "Semantic amber" to CompanionColors.semanticAmber,
-                "Semantic red" to CompanionColors.semanticRed,
-            )
+            val colors =
+                listOf(
+                    "Crimson" to CompanionColors.crimson,
+                    "Crimson container" to CompanionColors.crimsonContainer,
+                    "Crimson subtle" to CompanionColors.crimsonSubtle,
+                    "Graphite" to CompanionColors.graphite,
+                    "Graphite raised" to CompanionColors.graphiteRaised,
+                    "Graphite soft" to CompanionColors.graphiteSoft,
+                    "Warm background" to CompanionColors.warmBackground,
+                    "Warm surface" to CompanionColors.warmSurface,
+                    "Warm variant" to CompanionColors.warmSurfaceVariant,
+                    "Institutional gold" to CompanionColors.institutionalGold,
+                    "Semantic green" to CompanionColors.semanticGreen,
+                    "Semantic blue" to CompanionColors.semanticBlue,
+                    "Semantic amber" to CompanionColors.semanticAmber,
+                    "Semantic red" to CompanionColors.semanticRed,
+                )
             colors.chunked(2).forEach { pair ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -85,6 +100,63 @@ fun DesignSystemCatalogScreen(
                 ) {
                     pair.forEach { (name, color) ->
                         ColorToken(name, color, Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+
+        CatalogSection(title = "Paletas de acento V8") {
+            Text(
+                text = "Toca una paleta para previsualizar los componentes V8 con ese acento:",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+            ) {
+                CompaneroAccentPalette.entries.forEach { palette ->
+                    val isSelected = palette == activeCatalogPalette
+                    Surface(
+                        modifier =
+                            Modifier
+                                .size(42.dp)
+                                .clickable { activeCatalogPalette = palette },
+                        shape = CircleShape,
+                        color = palette.previewColor,
+                        tonalElevation = if (isSelected) 6.dp else 0.dp,
+                        shadowElevation = if (isSelected) 4.dp else 0.dp,
+                    ) {
+                        if (isSelected) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Surface(
+                                    modifier = Modifier.size(14.dp),
+                                    shape = CircleShape,
+                                    color = Color.White,
+                                ) {}
+                            }
+                        }
+                    }
+                }
+            }
+            CompositionLocalProvider(LocalCompaneroAccentPalette provides activeCatalogPalette) {
+                V8GlassCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
+                        Text(
+                            text = "Paleta activa: ${activeCatalogPalette.displayName}",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = activeCatalogPalette.previewColor,
+                        )
+                        Text(
+                            text = "Modo de alto contraste y gradiente V8 adaptativo.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        V8RedPrimaryButton(
+                            text = "Botón con acento ${activeCatalogPalette.displayName}",
+                            onClick = {},
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
             }

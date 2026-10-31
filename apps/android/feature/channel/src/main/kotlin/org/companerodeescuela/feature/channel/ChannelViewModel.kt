@@ -3,7 +3,6 @@ package org.companerodeescuela.feature.channel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,6 +17,7 @@ import org.companerodeescuela.shared.contracts.ChannelPresetResponse
 import org.companerodeescuela.shared.contracts.ClassChannelSummary
 import org.companerodeescuela.shared.contracts.CreateChannelPostRequest
 import org.companerodeescuela.shared.contracts.TeacherClassContext
+import javax.inject.Inject
 
 data class ChannelUiState(
     val loading: Boolean = true,
@@ -33,252 +33,283 @@ data class ChannelUiState(
 )
 
 @HiltViewModel
-class ChannelViewModel @Inject constructor(
-    private val repository: ChannelRepository,
-) : ViewModel() {
-    private val _state = MutableStateFlow(ChannelUiState())
-    val state: StateFlow<ChannelUiState> = _state.asStateFlow()
-    private var requestedClassroom: TeacherClassContext? = null
+class ChannelViewModel
+    @Inject
+    constructor(
+        private val repository: ChannelRepository,
+    ) : ViewModel() {
+        private val _state = MutableStateFlow(ChannelUiState())
+        val state: StateFlow<ChannelUiState> = _state.asStateFlow()
+        private var requestedClassroom: TeacherClassContext? = null
 
-    fun requestClassroom(selection: TeacherClassContext) {
-        requestedClassroom = selection
-        if (_state.value.channels.isNotEmpty()) resolveRequestedChannel()
-    }
-
-    private fun resolveRequestedChannel(): String? {
-        val context = requestedClassroom ?: return _state.value.selectedChannelId
-        val match = _state.value.channels.singleOrNull {
-            it.canPublish && it.id == context.classroomId && it.courseId == context.classroomId
+        fun requestClassroom(selection: TeacherClassContext) {
+            requestedClassroom = selection
+            if (_state.value.channels.isNotEmpty()) resolveRequestedChannel()
         }
-        if (match != null) {
-            selectChannel(match.id)
-            requestedClassroom = null
-        }
-        else {
-            transitionTo(null)
-            _state.update { it.copy(loading = false,
-                errorMessage = "No hay un canal autorizado para ${context.subjectName} · ${context.groupName.orEmpty()}.") }
-        }
-        return match?.id
-    }
 
-    init { refreshChannels() }
-
-    fun refreshChannels() {
-        if (_state.value.actionInProgress || _state.value.loading && _state.value.channels.isNotEmpty()) return
-        _state.update { it.copy(loading = true, errorMessage = null) }
-        viewModelScope.launch {
-            when (val result = repository.channels()) {
-                is Outcome.Success -> {
-                    val previous = _state.value.selectedChannelId
-                    val selected = result.value.firstOrNull { it.id == previous }
-                        ?: result.value.firstOrNull()
-                    _state.update {
-                        it.copy(
-                            loading = false,
-                            channels = result.value,
-                            errorMessage = null,
-                        )
-                    }
-                    if (requestedClassroom != null) resolveRequestedChannel()?.let(::loadPosts)
-                    else {
-                        transitionTo(selected?.id)
-                        selected?.let { loadPosts(it.id) }
-                    }
+        private fun resolveRequestedChannel(): String? {
+            val context = requestedClassroom ?: return _state.value.selectedChannelId
+            val match =
+                _state.value.channels.singleOrNull {
+                    it.canPublish && it.id == context.classroomId && it.courseId == context.classroomId
                 }
-                is Outcome.Failure -> {
-                    transitionTo(null)
-                    _state.update { it.copy(
+            if (match != null) {
+                selectChannel(match.id)
+                requestedClassroom = null
+            } else {
+                transitionTo(null)
+                _state.update {
+                    it.copy(
                         loading = false,
-                        channels = emptyList(),
-                        selectedChannelId = null,
-                        posts = emptyList(),
-                        errorMessage = result.error.userMessage,
-                    ) }
-                }
-            }
-        }
-    }
-
-    fun selectChannel(channelId: String) {
-        if (_state.value.actionInProgress || _state.value.channels.none { it.id == channelId }) return
-        if (_state.value.selectedChannelId == channelId) return
-        transitionTo(channelId)
-        loadPosts(channelId)
-    }
-
-    private fun transitionTo(channelId: String?) {
-        if (_state.value.selectedChannelId == channelId) return
-        _state.update {
-            it.copy(
-                selectedChannelId = channelId,
-                posts = emptyList(),
-                draftBody = "",
-                draftResourceLabel = "",
-                draftResourceUrl = "",
-                successMessage = null,
-                errorMessage = null,
-            )
-        }
-    }
-
-    fun refreshPosts() {
-        _state.value.selectedChannelId?.let(::loadPosts)
-    }
-
-    fun updateDraftBody(value: String) {
-        _state.update { it.copy(draftBody = value.take(MAX_DRAFT_BODY)) }
-    }
-
-    fun updateDraftResourceLabel(value: String) {
-        _state.update { it.copy(draftResourceLabel = value.take(MAX_RESOURCE_LABEL)) }
-    }
-
-    fun updateDraftResourceUrl(value: String) {
-        _state.update { it.copy(draftResourceUrl = value.trim().take(MAX_RESOURCE_URL)) }
-    }
-
-    fun publish() {
-        val snapshot = _state.value
-        val channelId = snapshot.selectedChannelId ?: return
-        val selected = snapshot.channels.firstOrNull { it.id == channelId } ?: return
-        if (!selected.canPublish || snapshot.actionInProgress || snapshot.loading) return
-
-        val body = snapshot.draftBody.trim()
-        val resourceUrl = snapshot.draftResourceUrl.trim()
-        val resourceLabel = snapshot.draftResourceLabel.trim()
-
-        if (body.isBlank() && resourceUrl.isBlank()) {
-            _state.update { it.copy(errorMessage = "Escribe un aviso o agrega un recurso.") }
-            return
-        }
-        if (resourceUrl.isNotBlank() && !resourceUrl.startsWith("https://")) {
-            _state.update { it.copy(errorMessage = "El recurso debe usar un enlace HTTPS.") }
-            return
-        }
-
-        val attachments = if (resourceUrl.isBlank()) {
-            emptyList()
-        } else {
-            listOf(
-                ChannelAttachment(
-                    type = attachmentType(resourceUrl),
-                    label = resourceLabel.ifBlank { defaultResourceLabel(resourceUrl) },
-                    url = resourceUrl,
-                ),
-            )
-        }
-
-        _state.update { it.copy(actionInProgress = true, errorMessage = null, successMessage = null) }
-        viewModelScope.launch {
-            when (
-                val result = repository.publish(
-                    channelId = channelId,
-                    request = CreateChannelPostRequest(
-                        body = body.ifBlank { null },
-                        attachments = attachments,
-                        allowedResponses = setOf(ChannelPresetResponse.ACKNOWLEDGED),
-                    ),
-                )
-            ) {
-                is Outcome.Success -> if (_state.value.selectedChannelId == channelId) _state.update {
-                    it.copy(
-                        actionInProgress = false,
-                        posts = listOf(result.value) + it.posts.filterNot { post ->
-                            post.id == result.value.id
-                        },
-                        draftBody = "",
-                        draftResourceLabel = "",
-                        draftResourceUrl = "",
-                        successMessage = "Publicado para el grupo.",
-                        errorMessage = null,
-                    )
-                }
-                is Outcome.Failure -> if (_state.value.selectedChannelId == channelId) _state.update {
-                    it.copy(
-                        actionInProgress = false,
-                        errorMessage = result.error.userMessage,
+                        errorMessage = "No hay un canal autorizado para ${context.subjectName} · ${context.groupName.orEmpty()}.",
                     )
                 }
             }
+            return match?.id
         }
-    }
 
-    fun acknowledge(post: ChannelPost, response: ChannelPresetResponse) {
-        val channelId = _state.value.selectedChannelId ?: return
-        if (response !in post.allowedResponses || _state.value.actionInProgress) return
-        if (_state.value.loading || post.channelId != channelId) return
-
-        _state.update { it.copy(actionInProgress = true, errorMessage = null, successMessage = null) }
-        viewModelScope.launch {
-            when (
-                val result = repository.acknowledge(
-                    channelId = channelId,
-                    postId = post.id,
-                    request = ChannelAcknowledgementRequest(response),
-                )
-            ) {
-                is Outcome.Success -> _state.update {
-                    it.copy(
-                        actionInProgress = false,
-                        successMessage = "Respuesta registrada.",
-                    )
-                }
-                is Outcome.Failure -> _state.update {
-                    it.copy(
-                        actionInProgress = false,
-                        errorMessage = result.error.userMessage,
-                    )
-                }
-            }
+        init {
+            refreshChannels()
         }
-    }
 
-    private fun loadPosts(channelId: String) {
-        viewModelScope.launch {
+        fun refreshChannels() {
+            if (_state.value.actionInProgress || _state.value.loading && _state.value.channels.isNotEmpty()) return
             _state.update { it.copy(loading = true, errorMessage = null) }
-            when (val result = repository.posts(channelId)) {
-                is Outcome.Success -> if (_state.value.selectedChannelId == channelId) {
-                    _state.update {
-                        it.copy(
-                            loading = false,
-                            posts = result.value,
-                            errorMessage = null,
-                        )
+            viewModelScope.launch {
+                when (val result = repository.channels()) {
+                    is Outcome.Success -> {
+                        val previous = _state.value.selectedChannelId
+                        val selected =
+                            result.value.firstOrNull { it.id == previous }
+                                ?: result.value.firstOrNull()
+                        _state.update {
+                            it.copy(
+                                loading = false,
+                                channels = result.value,
+                                errorMessage = null,
+                            )
+                        }
+                        if (requestedClassroom != null) {
+                            resolveRequestedChannel()?.let(::loadPosts)
+                        } else {
+                            transitionTo(selected?.id)
+                            selected?.let { loadPosts(it.id) }
+                        }
                     }
-                }
-                is Outcome.Failure -> if (_state.value.selectedChannelId == channelId) {
-                    _state.update {
-                        it.copy(
-                            loading = false,
-                            posts = emptyList(),
-                            errorMessage = result.error.userMessage,
-                        )
+                    is Outcome.Failure -> {
+                        transitionTo(null)
+                        _state.update {
+                            it.copy(
+                                loading = false,
+                                channels = emptyList(),
+                                selectedChannelId = null,
+                                posts = emptyList(),
+                                errorMessage = result.error.userMessage,
+                            )
+                        }
                     }
                 }
             }
         }
-    }
 
-    private fun attachmentType(url: String): ChannelAttachmentType {
-        val clean = url.substringBefore('?').lowercase()
-        return when {
-            clean.endsWith(".pdf") -> ChannelAttachmentType.DOCUMENT
-            clean.endsWith(".png") ||
-                clean.endsWith(".jpg") ||
-                clean.endsWith(".jpeg") ||
-                clean.endsWith(".webp") -> ChannelAttachmentType.IMAGE
-            else -> ChannelAttachmentType.LINK
+        fun selectChannel(channelId: String) {
+            if (_state.value.actionInProgress || _state.value.channels.none { it.id == channelId }) return
+            if (_state.value.selectedChannelId == channelId) return
+            transitionTo(channelId)
+            loadPosts(channelId)
+        }
+
+        private fun transitionTo(channelId: String?) {
+            if (_state.value.selectedChannelId == channelId) return
+            _state.update {
+                it.copy(
+                    selectedChannelId = channelId,
+                    posts = emptyList(),
+                    draftBody = "",
+                    draftResourceLabel = "",
+                    draftResourceUrl = "",
+                    successMessage = null,
+                    errorMessage = null,
+                )
+            }
+        }
+
+        fun refreshPosts() {
+            _state.value.selectedChannelId?.let(::loadPosts)
+        }
+
+        fun updateDraftBody(value: String) {
+            _state.update { it.copy(draftBody = value.take(MAX_DRAFT_BODY)) }
+        }
+
+        fun updateDraftResourceLabel(value: String) {
+            _state.update { it.copy(draftResourceLabel = value.take(MAX_RESOURCE_LABEL)) }
+        }
+
+        fun updateDraftResourceUrl(value: String) {
+            _state.update { it.copy(draftResourceUrl = value.trim().take(MAX_RESOURCE_URL)) }
+        }
+
+        fun publish() {
+            val snapshot = _state.value
+            val channelId = snapshot.selectedChannelId ?: return
+            val selected = snapshot.channels.firstOrNull { it.id == channelId } ?: return
+            if (!selected.canPublish || snapshot.actionInProgress || snapshot.loading) return
+
+            val body = snapshot.draftBody.trim()
+            val resourceUrl = snapshot.draftResourceUrl.trim()
+            val resourceLabel = snapshot.draftResourceLabel.trim()
+
+            if (body.isBlank() && resourceUrl.isBlank()) {
+                _state.update { it.copy(errorMessage = "Escribe un aviso o agrega un recurso.") }
+                return
+            }
+            if (resourceUrl.isNotBlank() && !resourceUrl.startsWith("https://")) {
+                _state.update { it.copy(errorMessage = "El recurso debe usar un enlace HTTPS.") }
+                return
+            }
+
+            val attachments =
+                if (resourceUrl.isBlank()) {
+                    emptyList()
+                } else {
+                    listOf(
+                        ChannelAttachment(
+                            type = attachmentType(resourceUrl),
+                            label = resourceLabel.ifBlank { defaultResourceLabel(resourceUrl) },
+                            url = resourceUrl,
+                        ),
+                    )
+                }
+
+            _state.update { it.copy(actionInProgress = true, errorMessage = null, successMessage = null) }
+            viewModelScope.launch {
+                when (
+                    val result =
+                        repository.publish(
+                            channelId = channelId,
+                            request =
+                                CreateChannelPostRequest(
+                                    body = body.ifBlank { null },
+                                    attachments = attachments,
+                                    allowedResponses = setOf(ChannelPresetResponse.ACKNOWLEDGED),
+                                ),
+                        )
+                ) {
+                    is Outcome.Success ->
+                        if (_state.value.selectedChannelId == channelId) {
+                            _state.update {
+                                it.copy(
+                                    actionInProgress = false,
+                                    posts =
+                                        listOf(result.value) +
+                                            it.posts.filterNot { post ->
+                                                post.id == result.value.id
+                                            },
+                                    draftBody = "",
+                                    draftResourceLabel = "",
+                                    draftResourceUrl = "",
+                                    successMessage = "Publicado para el grupo.",
+                                    errorMessage = null,
+                                )
+                            }
+                        }
+                    is Outcome.Failure ->
+                        if (_state.value.selectedChannelId == channelId) {
+                            _state.update {
+                                it.copy(
+                                    actionInProgress = false,
+                                    errorMessage = result.error.userMessage,
+                                )
+                            }
+                        }
+                }
+            }
+        }
+
+        fun acknowledge(
+            post: ChannelPost,
+            response: ChannelPresetResponse,
+        ) {
+            val channelId = _state.value.selectedChannelId ?: return
+            if (response !in post.allowedResponses || _state.value.actionInProgress) return
+            if (_state.value.loading || post.channelId != channelId) return
+
+            _state.update { it.copy(actionInProgress = true, errorMessage = null, successMessage = null) }
+            viewModelScope.launch {
+                when (
+                    val result =
+                        repository.acknowledge(
+                            channelId = channelId,
+                            postId = post.id,
+                            request = ChannelAcknowledgementRequest(response),
+                        )
+                ) {
+                    is Outcome.Success ->
+                        _state.update {
+                            it.copy(
+                                actionInProgress = false,
+                                successMessage = "Respuesta registrada.",
+                            )
+                        }
+                    is Outcome.Failure ->
+                        _state.update {
+                            it.copy(
+                                actionInProgress = false,
+                                errorMessage = result.error.userMessage,
+                            )
+                        }
+                }
+            }
+        }
+
+        private fun loadPosts(channelId: String) {
+            viewModelScope.launch {
+                _state.update { it.copy(loading = true, errorMessage = null) }
+                when (val result = repository.posts(channelId)) {
+                    is Outcome.Success ->
+                        if (_state.value.selectedChannelId == channelId) {
+                            _state.update {
+                                it.copy(
+                                    loading = false,
+                                    posts = result.value,
+                                    errorMessage = null,
+                                )
+                            }
+                        }
+                    is Outcome.Failure ->
+                        if (_state.value.selectedChannelId == channelId) {
+                            _state.update {
+                                it.copy(
+                                    loading = false,
+                                    posts = emptyList(),
+                                    errorMessage = result.error.userMessage,
+                                )
+                            }
+                        }
+                }
+            }
+        }
+
+        private fun attachmentType(url: String): ChannelAttachmentType {
+            val clean = url.substringBefore('?').lowercase()
+            return when {
+                clean.endsWith(".pdf") -> ChannelAttachmentType.DOCUMENT
+                clean.endsWith(".png") ||
+                    clean.endsWith(".jpg") ||
+                    clean.endsWith(".jpeg") ||
+                    clean.endsWith(".webp") -> ChannelAttachmentType.IMAGE
+                else -> ChannelAttachmentType.LINK
+            }
+        }
+
+        private fun defaultResourceLabel(url: String): String =
+            url.substringBefore('?').substringAfterLast('/').takeIf(String::isNotBlank)
+                ?: "Recurso compartido"
+
+        private companion object {
+            const val MAX_DRAFT_BODY = 8_000
+            const val MAX_RESOURCE_LABEL = 160
+            const val MAX_RESOURCE_URL = 2_048
         }
     }
-
-    private fun defaultResourceLabel(url: String): String =
-        url.substringBefore('?').substringAfterLast('/').takeIf(String::isNotBlank)
-            ?: "Recurso compartido"
-
-    private companion object {
-        const val MAX_DRAFT_BODY = 8_000
-        const val MAX_RESOURCE_LABEL = 160
-        const val MAX_RESOURCE_URL = 2_048
-    }
-}

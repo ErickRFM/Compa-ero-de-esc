@@ -1,10 +1,11 @@
 package org.companerodeescuela.core.designsystem.v8
 
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.runtime.staticCompositionLocalOf
+import org.companerodeescuela.core.designsystem.theme.CompaneroAccentPalette
 
 /** Enables the V8 finish for shared surfaces inside the student scaffold. */
 val LocalV8GlassEnabled = staticCompositionLocalOf { false }
@@ -29,19 +30,36 @@ val V8ColorScheme = darkColorScheme(
 )
 
 /** V14: high contrast must change actual screen surfaces, not only the outlines. */
-fun v8EffectiveColorScheme(highContrast: Boolean): ColorScheme =
-    if (!highContrast) V8ColorScheme else V8ColorScheme.copy(
-        background = Color.Black,
-        onBackground = Color.White,
-        surface = Color(0xFF0F0E13),
-        onSurface = Color.White,
-        surfaceContainerLow = Color.Black,
-        surfaceContainer = Color(0xFF0F0E13),
-        surfaceVariant = Color(0xFF18171E),
-        onSurfaceVariant = Color.White,
-        outline = Color.White,
-        outlineVariant = Color(0xFFEEEEEE),
-    )
+fun v8EffectiveColorScheme(
+    highContrast: Boolean,
+    accentPalette: CompaneroAccentPalette = CompaneroAccentPalette.CRIMSON,
+): ColorScheme {
+    val accentedBase =
+        if (accentPalette == CompaneroAccentPalette.CRIMSON) {
+            V8ColorScheme
+        } else {
+            V8ColorScheme.copy(
+                primary = accentPalette.darkPrimary,
+                primaryContainer = accentPalette.darkContainer,
+            )
+        }
+    return if (!highContrast) {
+        accentedBase
+    } else {
+        accentedBase.copy(
+            background = Color.Black,
+            onBackground = Color.White,
+            surface = Color(0xFF0F0E13),
+            onSurface = Color.White,
+            surfaceContainerLow = Color.Black,
+            surfaceContainer = Color(0xFF0F0E13),
+            surfaceVariant = Color(0xFF18171E),
+            onSurfaceVariant = Color.White,
+            outline = Color.White,
+            outlineVariant = Color(0xFFEEEEEE),
+        )
+    }
+}
 
 /**
  * The V8 light edition is intentionally neutral, not the dim gray/pink surfaces
@@ -51,11 +69,17 @@ fun v8EffectiveColorScheme(highContrast: Boolean): ColorScheme =
 fun v8ResolvedColorScheme(
     parent: ColorScheme,
     highContrast: Boolean,
+    accentPalette: CompaneroAccentPalette = CompaneroAccentPalette.CRIMSON,
+    preserveDynamicPrimary: Boolean = false,
 ): ColorScheme =
     if (parent.background.luminance() > 0.5f) {
+        val resolvedPrimary = if (preserveDynamicPrimary) parent.primary else accentPalette.lightPrimary
+        val resolvedContainer = if (preserveDynamicPrimary) parent.primaryContainer else accentPalette.lightContainer
         parent.copy(
-            primary = Color(0xFF9B1C31),
+            primary = resolvedPrimary,
             onPrimary = Color.White,
+            primaryContainer = resolvedContainer,
+            onPrimaryContainer = resolvedPrimary,
             background = Color.White,
             onBackground = Color(0xFF141720),
             surface = Color.White,
@@ -71,5 +95,13 @@ fun v8ResolvedColorScheme(
             outlineVariant = if (highContrast) Color.Black else Color(0xFFC9CDD5),
         )
     } else {
-        v8EffectiveColorScheme(highContrast)
+        val darkResolved = v8EffectiveColorScheme(highContrast, accentPalette)
+        if (preserveDynamicPrimary) {
+            darkResolved.copy(
+                primary = parent.primary,
+                primaryContainer = parent.primaryContainer,
+            )
+        } else {
+            darkResolved
+        }
     }

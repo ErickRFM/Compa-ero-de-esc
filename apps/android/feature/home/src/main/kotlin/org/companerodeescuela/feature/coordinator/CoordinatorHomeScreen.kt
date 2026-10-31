@@ -24,8 +24,6 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
-import org.companerodeescuela.core.ui.component.CompaneroSurface
-import org.companerodeescuela.core.ui.component.CompaneroSurfaceRole
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.CoordinationOverview
 
@@ -117,12 +115,8 @@ fun coordinatorHomeScreen(
             style = MaterialTheme.typography.titleMedium,
         )
 
-        CompaneroSurface(
-            modifier = Modifier.fillMaxWidth(),
-            role = CompaneroSurfaceRole.CARD,
-        ) {
+        V8GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column(
-                modifier = Modifier.padding(CompaneroSpacing.sm),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
             ) {
                 Text(
@@ -139,12 +133,8 @@ fun coordinatorHomeScreen(
             }
         }
 
-        CompaneroSurface(
-            modifier = Modifier.fillMaxWidth(),
-            role = CompaneroSurfaceRole.CARD,
-        ) {
+        V8GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column(
-                modifier = Modifier.padding(CompaneroSpacing.sm),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
             ) {
                 Text("Agenda personal", style = MaterialTheme.typography.titleSmall)
@@ -157,18 +147,17 @@ fun coordinatorHomeScreen(
                     Text("Abrir mi agenda")
                 }
                 StatusNotice(
-                    title = "Gestión de horarios institucionales pendiente",
-                    message = "La asignación global de aulas y grupos se habilitará desde un módulo autorizado.",
+                    title = "Gestión institucional de horarios",
+                    message =
+                        "Las modificaciones y asignaciones oficiales de horarios a grupos y aulas requieren permiso " +
+                            "explícito (MANAGE_ACADEMICS) y confirmación con segundo factor (MFA Step-Up). " +
+                            "Para consultar horarios oficiales, utiliza la vista de grupos.",
                 )
             }
         }
 
-        CompaneroSurface(
-            modifier = Modifier.fillMaxWidth(),
-            role = CompaneroSurfaceRole.CARD,
-        ) {
+        V8GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column(
-                modifier = Modifier.padding(CompaneroSpacing.sm),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
             ) {
                 Text("Canal de avisos generales", style = MaterialTheme.typography.titleSmall)

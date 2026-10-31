@@ -3,7 +3,10 @@
 package org.companerodeescuela.feature.auth
 
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,9 +16,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,17 +39,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
@@ -144,7 +146,7 @@ internal fun LoginAccessCarousel(
     val accent = authAccent()
 
     fun select(index: Int) {
-        if (!enabled) return
+        if (!enabled || index !in 0..accesses.lastIndex) return
         scope.launch {
             if (!policy.allowSpatialMotion) {
                 pager.scrollToPage(index)
@@ -158,138 +160,153 @@ internal fun LoginAccessCarousel(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        // Compact Chips Row for fast direct role selection
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            IconButton(
-                onClick = { select(pager.currentPage - 1) },
-                enabled = enabled && pager.currentPage > 0,
-                modifier = Modifier.testTag("access_previous"),
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowBack,
-                    stringResource(R.string.auth_previous_access),
-                    tint = muted,
-                )
-            }
-            Text(
-                text = stringResource(R.string.auth_access_position, pager.currentPage + 1, accesses.size),
-                color = muted,
-                fontSize = 13.sp,
-                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-            )
-            IconButton(
-                onClick = { select(pager.currentPage + 1) },
-                enabled = enabled && pager.currentPage < accesses.lastIndex,
-                modifier = Modifier.testTag("access_next"),
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowForward,
-                    stringResource(R.string.auth_next_access),
-                    tint = muted,
-                )
-            }
-        }
-
-        HorizontalPager(
-            state = pager,
-            userScrollEnabled = enabled,
-            pageSpacing = 8.dp,
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height((172 * LocalDensity.current.fontScale.coerceAtLeast(1f)).dp)
-                    .testTag("role_pager"),
-        ) { index ->
-            val access = accesses[index]
-            V8FrostedGlassPanel(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .selectable(
-                            selected = pager.currentPage == index,
-                            enabled = enabled,
-                            role = Role.Tab,
-                            onClick = { select(index) },
-                        ),
-                emphasized = pager.currentPage == index,
-                themeAware = true,
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    .horizontalScroll(rememberScrollState())
+                    .selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            accesses.forEachIndexed { index, access ->
+                val selected = pager.currentPage == index
+                val description = stringResource(R.string.auth_select_access, stringResource(access.title))
+
+                Box(
+                    modifier =
+                        Modifier
+                            .testTag("role_" + access.experience.name)
+                            .selectable(
+                                selected = selected,
+                                enabled = enabled,
+                                role = Role.Tab,
+                                onClick = { select(index) },
+                            ).background(
+                                color =
+                                    if (selected) {
+                                        accent.copy(alpha = 0.2f)
+                                    } else if (authDark()) {
+                                        Color(0x14FFFFFF)
+                                    } else {
+                                        Color(0x0A000000)
+                                    },
+                                shape = RoundedCornerShape(20.dp),
+                            ).border(
+                                border =
+                                    BorderStroke(
+                                        width = if (selected) 1.5.dp else 1.dp,
+                                        color = if (selected) accent else muted.copy(alpha = 0.25f),
+                                    ),
+                                shape = RoundedCornerShape(20.dp),
+                            ).padding(horizontal = 14.dp, vertical = 9.dp)
+                            .semantics { contentDescription = description },
+                    contentAlignment = Alignment.Center,
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Icon(
-                            access.icon,
+                            imageVector = access.icon,
                             contentDescription = null,
-                            tint = accent,
-                            modifier = Modifier.size(32.dp),
+                            tint = if (selected) accent else muted,
+                            modifier = Modifier.size(18.dp),
                         )
                         Text(
                             text = stringResource(access.title),
-                            color = ink,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier =
-                                Modifier
-                                    .weight(1f)
-                                    .testTag("role_title_" + access.experience.name)
-                                    .semantics { heading() },
+                            color = if (selected) ink else muted,
+                            fontSize = 13.sp,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                         )
                     }
-                    Text(
-                        text = stringResource(access.description),
-                        color = muted,
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp,
-                    )
                 }
             }
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth().selectableGroup(),
-            horizontalArrangement = Arrangement.Center,
+        // Compact Info Banner & Pager Control
+        V8FrostedGlassPanel(
+            modifier = Modifier.fillMaxWidth(),
+            emphasized = true,
+            themeAware = true,
         ) {
-            accesses.forEachIndexed { index, access ->
-                val description = stringResource(R.string.auth_select_access, stringResource(access.title))
-                Box(
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(
+                    onClick = { select(pager.currentPage - 1) },
+                    enabled = enabled && pager.currentPage > 0,
                     modifier =
                         Modifier
-                            .size(48.dp)
-                            .testTag("role_" + access.experience.name)
-                            .selectable(
-                                selected = pager.currentPage == index,
-                                enabled = enabled,
-                                role = Role.Tab,
-                                onClick = { select(index) },
-                            ).semantics { contentDescription = description },
-                    contentAlignment = Alignment.Center,
+                            .size(36.dp)
+                            .testTag("access_previous"),
                 ) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .width(if (pager.currentPage == index) 22.dp else 8.dp)
-                                .height(6.dp)
-                                .background(
-                                    if (pager.currentPage == index) accent else muted.copy(alpha = 0.6f),
-                                    RoundedCornerShape(3.dp),
-                                ),
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        stringResource(R.string.auth_previous_access),
+                        tint = if (pager.currentPage > 0 && enabled) ink else muted.copy(alpha = 0.3f),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+
+                HorizontalPager(
+                    state = pager,
+                    userScrollEnabled = enabled,
+                    pageSpacing = 8.dp,
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .testTag("role_pager"),
+                ) { index ->
+                    val access = accesses[index]
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text(
+                            text = stringResource(access.title),
+                            color = ink,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            modifier =
+                                Modifier
+                                    .testTag("role_title_" + access.experience.name)
+                                    .semantics { heading() },
+                        )
+                        Text(
+                            text = stringResource(access.description),
+                            color = muted,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick = { select(pager.currentPage + 1) },
+                    enabled = enabled && pager.currentPage < accesses.lastIndex,
+                    modifier =
+                        Modifier
+                            .size(36.dp)
+                            .testTag("access_next"),
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        stringResource(R.string.auth_next_access),
+                        tint = if (pager.currentPage < accesses.lastIndex && enabled) ink else muted.copy(alpha = 0.3f),
+                        modifier = Modifier.size(18.dp),
                     )
                 }
             }
         }
-        Text(
-            text = stringResource(R.string.auth_access_is_intention),
-            color = muted,
-            fontSize = 12.sp,
-            lineHeight = 17.sp,
-        )
     }
 }

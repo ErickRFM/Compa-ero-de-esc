@@ -30,8 +30,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -49,9 +49,9 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.feature.home.R
+import org.companerodeescuela.shared.contracts.AcademicGroupSummary
 import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.AdminUserSummary
-import org.companerodeescuela.shared.contracts.AcademicGroupSummary
 import org.companerodeescuela.shared.contracts.StaffApplication
 import org.companerodeescuela.shared.contracts.StaffApplicationStatus
 import org.companerodeescuela.shared.contracts.StaffRole

@@ -3,31 +3,55 @@ package org.companerodeescuela.core.navigation
 /**
  * Every destination in the app, as data.
  */
-sealed class Destination(val route: String) {
+sealed class Destination(
+    val route: String,
+) {
     data object Home : Destination("home")
+
     data object TeacherHome : Destination("teacher-home")
+
     data object TutorHome : Destination("tutor-home")
+
     data object TutorGroups : Destination("tutor-groups")
+
     data object TutorRequests : Destination("tutor-requests")
+
     data object RepresentativeInvitations : Destination("representative-invitations")
+
     data object CoordinatorHome : Destination("coordinator-home")
+
     data object AdminHome : Destination("admin-home")
+
     data object Schedule : Destination("schedule")
+
     data object Attendance : Destination("attendance")
+
     data object Channel : Destination("channel")
+
     data object Classrooms : Destination("classrooms")
+
     data object Grading : Destination("grading")
+
     data object RoleUnavailable : Destination("role-unavailable")
+
     data object Profile : Destination("profile")
+
     data object Mfa : Destination("account-mfa")
+
     data object StaffApplication : Destination("staff-application")
+
     data object AppearanceSettings : Destination("appearance-settings")
+
     data object IntegrationSettings : Destination("integration-settings")
+
     data object DesignSystemCatalog : Destination("design-system-catalog")
 
     fun createRoute(vararg arguments: Any): String =
-        if (arguments.isEmpty()) route
-        else route + arguments.joinToString(separator = "/", prefix = "/")
+        if (arguments.isEmpty()) {
+            route
+        } else {
+            route + arguments.joinToString(separator = "/", prefix = "/")
+        }
 }
 
 /**

@@ -1,79 +1,73 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.feature.channel
 
-import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Campaign
-import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PushPin
-import org.companerodeescuela.core.designsystem.v8.V8GlassAssistChip
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import org.companerodeescuela.core.designsystem.v8.V8GlassFilterChip
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.LaunchedEffect
-import org.companerodeescuela.shared.contracts.TeacherClassContext
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.material3.ButtonDefaults
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
-import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
-import org.companerodeescuela.core.designsystem.v8.V8GlassCard
-import org.companerodeescuela.core.designsystem.v8.v8GlassSurface
-import org.companerodeescuela.core.designsystem.v8.V8RedColors
-import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
+import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
+import org.companerodeescuela.core.designsystem.v8.V8GlassAssistChip
+import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8GlassFilterChip
+import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
+import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
+import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
+import org.companerodeescuela.core.designsystem.v8.v8GlassSurface
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ChannelPost
 import org.companerodeescuela.shared.contracts.ChannelPostType
 import org.companerodeescuela.shared.contracts.ChannelPresetResponse
 import org.companerodeescuela.shared.contracts.ClassChannelSummary
+import org.companerodeescuela.shared.contracts.TeacherClassContext
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChannelScreen(
     requestedClassroom: TeacherClassContext? = null,
+    isAdministrativeSession: Boolean = false,
     viewModel: ChannelViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -81,83 +75,146 @@ fun ChannelScreen(
     val selected = state.channels.firstOrNull { it.id == state.selectedChannelId }
     var selectedTab by remember(state.selectedChannelId) { mutableIntStateOf(0) }
     var composerOpen by remember(state.selectedChannelId) { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
 
     Box(Modifier.fillMaxSize()) {
         if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current) {
             V8MatteBackdrop(Modifier.matchParentSize())
         }
-        LazyColumn(
-            modifier = Modifier.align(Alignment.TopCenter).widthIn(max = CompaneroSize.homeContentMaxWidth)
-                .fillMaxSize().padding(horizontal = CompaneroSpacing.page),
-            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = CompaneroSpacing.sm),
+        PullToRefreshBox(
+            isRefreshing = state.loading,
+            onRefresh = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                viewModel.refreshChannels()
+            },
+            modifier =
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .widthIn(max = CompaneroSize.homeContentMaxWidth)
+                    .fillMaxSize(),
         ) {
-            item { V8ScreenHeader { ChannelHeader(state.loading || state.actionInProgress, viewModel::refreshChannels) } }
-            if (state.channels.isNotEmpty()) item {
-                ChannelSelector(state.channels, state.selectedChannelId, viewModel::selectChannel)
-            }
-            state.successMessage?.let { message -> item {
-                StatusNotice(title = "Listo", message = message, tone = NoticeTone.SUCCESS)
-            } }
-            state.errorMessage?.let { message -> item {
-                StatusNotice(title = "No pudimos completar la acción", message = message, tone = NoticeTone.ERROR)
-            } }
-            if (selected == null) item {
-                if (state.loading) CircularProgressIndicator()
-                StatusNotice(
-                    title = if (state.loading) "Cargando tus canales…" else "Todavía no hay canales",
-                    message = "Cuando tengas materias asignadas, sus avisos aparecerán aquí.",
-                )
-            } else {
-                item { ChannelIdentity(selected) }
-                if (selected.canPublish) item {
-                    V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Comunica con tu grupo", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
-                            Text("Publica avisos y materiales. Los estudiantes responden con opciones predeterminadas.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Button(onClick = { composerOpen = !composerOpen }, modifier = Modifier.fillMaxWidth()) {
-                                Text(if (composerOpen) "Cerrar redacción" else "Redactar aviso")
+            LazyColumn(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = CompaneroSpacing.page),
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+                contentPadding =
+                    androidx.compose.foundation.layout
+                        .PaddingValues(vertical = CompaneroSpacing.sm),
+            ) {
+                item { V8ScreenHeader { ChannelHeader(state.loading || state.actionInProgress, viewModel::refreshChannels) } }
+                if (state.channels.isNotEmpty()) {
+                    item {
+                        ChannelSelector(state.channels, state.selectedChannelId, viewModel::selectChannel)
+                    }
+                }
+                state.successMessage?.let { message ->
+                    item {
+                        StatusNotice(title = "Listo", message = message, tone = NoticeTone.SUCCESS)
+                    }
+                }
+                state.errorMessage?.let { message ->
+                    item {
+                        StatusNotice(title = "No pudimos completar la acción", message = message, tone = NoticeTone.ERROR)
+                    }
+                }
+                if (selected == null) {
+                    item {
+                        if (state.loading) CircularProgressIndicator()
+                        StatusNotice(
+                            title =
+                                if (state.loading) {
+                                    "Cargando tus canales…"
+                                } else if (isAdministrativeSession) {
+                                    "Canal de clase no disponible"
+                                } else {
+                                    "Todavía no hay canales"
+                                },
+                            message =
+                                if (isAdministrativeSession) {
+                                    "Los canales de clase están reservados para perfiles académicos (docentes y alumnos). Las cuentas administrativas institucionales operan mediante avisos institucionales."
+                                } else {
+                                    "Cuando tengas materias asignadas, sus avisos aparecerán aquí."
+                                },
+                        )
+                    }
+                } else {
+                    item { ChannelIdentity(selected) }
+                    if (selected.canPublish) {
+                        item {
+                            V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text(
+                                        "Comunica con tu grupo",
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        style = MaterialTheme.typography.titleLarge,
+                                    )
+                                    Text(
+                                        "Publica avisos y materiales. Los estudiantes responden con opciones predeterminadas.",
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    V8RedPrimaryButton(
+                                        text = if (composerOpen) "Cerrar redacción" else "Redactar aviso",
+                                        onClick = { composerOpen = !composerOpen },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                    if (composerOpen) {
+                                        TeacherComposer(
+                                            state.draftBody,
+                                            state.draftResourceLabel,
+                                            state.draftResourceUrl,
+                                            state.actionInProgress,
+                                            viewModel::updateDraftBody,
+                                            viewModel::updateDraftResourceLabel,
+                                            viewModel::updateDraftResourceUrl,
+                                            viewModel::publish,
+                                        )
+                                    }
+                                }
                             }
-                            if (composerOpen) TeacherComposer(
-                                state.draftBody, state.draftResourceLabel, state.draftResourceUrl, state.actionInProgress,
-                                viewModel::updateDraftBody, viewModel::updateDraftResourceLabel,
-                                viewModel::updateDraftResourceUrl, viewModel::publish,
+                        }
+                    }
+                    if (!selected.canPublish) {
+                        item {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                listOf("Publicaciones", "Recursos").forEachIndexed { index, label ->
+                                    V8ChannelTab(label, selectedTab == index, { selectedTab = index }, Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
+                    // El canal es unidireccional: Recursos filtra adjuntos, no simula un chat libre.
+                    val visiblePosts =
+                        channelPostsForTab(
+                            posts = state.posts,
+                            tab = if (!selected.canPublish && selectedTab == 1) ChannelFeedTab.RESOURCES else ChannelFeedTab.POSTS,
+                        )
+                    if (visiblePosts.isEmpty()) {
+                        item {
+                            StatusNotice(
+                                title =
+                                    when {
+                                        state.loading -> "Cargando publicaciones…"
+                                        state.posts.isNotEmpty() -> "Sin recursos compartidos"
+                                        else -> "Sin publicaciones"
+                                    },
+                                message =
+                                    when {
+                                        state.loading -> "Consultando información de esta clase."
+                                        state.posts.isNotEmpty() -> "No hay documentos ni enlaces en las publicaciones de este canal."
+                                        selected.canPublish -> "Comparte el primer aviso o recurso con este grupo."
+                                        else -> "Tu docente todavía no ha publicado información para esta materia."
+                                    },
                             )
                         }
                     }
-                }
-                if (!selected.canPublish) item {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        listOf("Publicaciones", "Recursos").forEachIndexed { index, label ->
-                            V8ChannelTab(label, selectedTab == index, { selectedTab = index }, Modifier.weight(1f))
-                        }
+                    items(visiblePosts, key = ChannelPost::id) { post ->
+                        ChannelPostCard(post, !selected.canPublish, state.actionInProgress, viewModel::acknowledge)
                     }
-                }
-                // El canal es unidireccional: Recursos filtra adjuntos, no simula un chat libre.
-                val visiblePosts = channelPostsForTab(
-                    posts = state.posts,
-                    tab = if (!selected.canPublish && selectedTab == 1) ChannelFeedTab.RESOURCES else ChannelFeedTab.POSTS,
-                )
-                if (visiblePosts.isEmpty()) item {
-                    StatusNotice(
-                        title = when {
-                            state.loading -> "Cargando publicaciones…"
-                            state.posts.isNotEmpty() -> "Sin recursos compartidos"
-                            else -> "Sin publicaciones"
-                        },
-                        message = when {
-                            state.loading -> "Consultando información de esta clase."
-                            state.posts.isNotEmpty() -> "No hay documentos ni enlaces en las publicaciones de este canal."
-                            selected.canPublish -> "Comparte el primer aviso o recurso con este grupo."
-                            else -> "Tu docente todavía no ha publicado información para esta materia."
-                        },
-                    )
-                }
-                items(visiblePosts, key = ChannelPost::id) { post ->
-                    ChannelPostCard(post, !selected.canPublish, state.actionInProgress, viewModel::acknowledge)
-                }
-                item {
-                    if (!selected.canPublish) StudentChannelFooter()
+                    item {
+                        if (!selected.canPublish) StudentChannelFooter()
+                    }
                 }
             }
         }
@@ -169,6 +226,7 @@ private fun ChannelHeader(
     loading: Boolean,
     onRefresh: () -> Unit,
 ) {
+    val haptic = LocalHapticFeedback.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -188,10 +246,13 @@ private fun ChannelHeader(
             )
         }
         TextButton(
-            onClick = onRefresh,
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onRefresh()
+            },
             enabled = !loading,
         ) {
-            Text(if (loading) "…" else "Actualizar")
+            Text(if (loading) "Actualizando…" else "Actualizar")
         }
     }
 }
@@ -249,10 +310,11 @@ private fun V8ChannelTab(
     modifier: Modifier = Modifier,
 ) {
     Box(
-        modifier = modifier
-            .heightIn(min = 52.dp)
-            .v8GlassSurface(cornerRadius = 16.dp, emphasized = selected, elevation = 0.dp)
-            .clickable(onClick = onClick),
+        modifier =
+            modifier
+                .heightIn(min = 52.dp)
+                .v8GlassSurface(cornerRadius = 16.dp, emphasized = selected, elevation = 0.dp)
+                .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Row(
@@ -356,8 +418,12 @@ private fun ChannelPostCard(
                     horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
                 ) {
                     items(post.allowedResponses.toList(), key = { it.name }) { response ->
+                        val haptic = LocalHapticFeedback.current
                         V8GlassAssistChip(
-                            onClick = { onAcknowledge(post, response) },
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onAcknowledge(post, response)
+                            },
                             enabled = !busy,
                             label = { Text(responseLabel(response)) },
                         )
@@ -379,6 +445,7 @@ private fun TeacherComposer(
     onResourceUrlChange: (String) -> Unit,
     onPublish: () -> Unit,
 ) {
+    val haptic = LocalHapticFeedback.current
     V8GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -416,13 +483,15 @@ private fun TeacherComposer(
                 enabled = !busy,
                 label = { Text("Enlace HTTPS del recurso (opcional)") },
             )
-            Button(
-                onClick = onPublish,
+            V8RedPrimaryButton(
+                text = if (busy) "Publicando…" else "Publicar",
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onPublish()
+                },
                 enabled = !busy && (body.isNotBlank() || resourceUrl.isNotBlank()),
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(if (busy) "Publicando…" else "Publicar")
-            }
+            )
         }
     }
 }
@@ -431,7 +500,9 @@ private fun TeacherComposer(
 private fun StudentChannelFooter() {
     V8GlassCard(
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+        contentPadding =
+            androidx.compose.foundation.layout
+                .PaddingValues(0.dp),
     ) {
         Row(
             modifier = Modifier.padding(CompaneroSpacing.sm),
@@ -458,21 +529,23 @@ private fun StudentChannelFooter() {
     }
 }
 
-private fun postTypeLabel(type: ChannelPostType): String = when (type) {
-    ChannelPostType.ANNOUNCEMENT -> "Aviso"
-    ChannelPostType.MATERIAL -> "Material"
-    ChannelPostType.REMINDER -> "Recordatorio"
-    ChannelPostType.ROOM_CHANGE -> "Cambio de aula"
-    ChannelPostType.SCHEDULE_CHANGE -> "Cambio de horario"
-    ChannelPostType.CLASS_CANCELLED -> "Clase cancelada"
-    ChannelPostType.EVENT -> "Evento"
-    ChannelPostType.MEETING -> "Reunión"
-}
+private fun postTypeLabel(type: ChannelPostType): String =
+    when (type) {
+        ChannelPostType.ANNOUNCEMENT -> "Aviso"
+        ChannelPostType.MATERIAL -> "Material"
+        ChannelPostType.REMINDER -> "Recordatorio"
+        ChannelPostType.ROOM_CHANGE -> "Cambio de aula"
+        ChannelPostType.SCHEDULE_CHANGE -> "Cambio de horario"
+        ChannelPostType.CLASS_CANCELLED -> "Clase cancelada"
+        ChannelPostType.EVENT -> "Evento"
+        ChannelPostType.MEETING -> "Reunión"
+    }
 
-private fun responseLabel(response: ChannelPresetResponse): String = when (response) {
-    ChannelPresetResponse.ACKNOWLEDGED -> "Entendido"
-    ChannelPresetResponse.CONFIRMED -> "Confirmado"
-    ChannelPresetResponse.WILL_ATTEND -> "Asistiré"
-    ChannelPresetResponse.CANNOT_ATTEND -> "No podré asistir"
-    ChannelPresetResponse.NEED_CLARIFICATION -> "Necesito aclaración"
-}
+private fun responseLabel(response: ChannelPresetResponse): String =
+    when (response) {
+        ChannelPresetResponse.ACKNOWLEDGED -> "Entendido"
+        ChannelPresetResponse.CONFIRMED -> "Confirmado"
+        ChannelPresetResponse.WILL_ATTEND -> "Asistiré"
+        ChannelPresetResponse.CANNOT_ATTEND -> "No podré asistir"
+        ChannelPresetResponse.NEED_CLARIFICATION -> "Necesito aclaración"
+    }

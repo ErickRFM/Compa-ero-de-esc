@@ -36,6 +36,8 @@ import org.companerodeescuela.core.designsystem.v8.V8ClassSummary
 import org.companerodeescuela.core.designsystem.v8.V8DailyClassRow
 import org.companerodeescuela.core.designsystem.v8.V8DashboardStat
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
+import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.designsystem.v8.V8SectionTitle
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 import org.companerodeescuela.core.ui.component.AcademicClassCard
@@ -86,38 +88,66 @@ fun HomeScreen(
                     ?.replaceFirstChar {
                         if (it.isLowerCase()) it.titlecase(Locale("es", "MX")) else it.toString()
                     }
-            Text(
-                text =
-                    buildAnnotatedString {
-                        append("Hola")
-                        if (firstName != null) {
-                            append(", ")
-                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append(firstName) }
-                        }
-                    },
-                modifier = Modifier.padding(top = 8.dp, end = 42.dp),
-                fontSize = 37.sp,
-                lineHeight = 43.sp,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = "Un gran día para seguir construyendo tus metas. ✨",
-                fontSize = 16.sp,
-                lineHeight = 22.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            TextButton(onClick = onOpenAttendance, modifier = Modifier.align(Alignment.Start)) {
-                Text("Abrir pase de lista  ›", color = MaterialTheme.colorScheme.primary)
+            V8ScreenHeader {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text =
+                            buildAnnotatedString {
+                                append("Hola")
+                                if (firstName != null) {
+                                    append(", ")
+                                    withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append(firstName) }
+                                }
+                            },
+                        modifier = Modifier.padding(top = 8.dp),
+                        fontSize = 37.sp,
+                        lineHeight = 43.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = "Un gran día para seguir construyendo tus metas. ✨",
+                        fontSize = 16.sp,
+                        lineHeight = 22.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(todayLabel(), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
-                TextButton(onClick = onOpenClassrooms) {
-                    Text("Mis clases  ›", color = MaterialTheme.colorScheme.primary)
+            V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
+                Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            todayLabel(),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                        TextButton(onClick = onOpenClassrooms) {
+                            Text("Mis clases  ›", color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                    val activeOrNext = overview?.current ?: overview?.next
+                    if (activeOrNext != null) {
+                        Text(
+                            text = if (overview?.current != null) "EN CURSO · ${activeOrNext.subjectName}" else "PRÓXIMA · ${activeOrNext.subjectName}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = "${activeOrNext.startsAt} – ${activeOrNext.endsAt} · ${locationLabel(activeOrNext)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    V8RedPrimaryButton(
+                        text = "Abrir pase de lista  ›",
+                        onClick = onOpenAttendance,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
 

@@ -15,11 +15,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -47,6 +48,7 @@ import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.feature.home.R
 import org.companerodeescuela.shared.contracts.AcademicGroupSummary
@@ -112,19 +114,46 @@ fun adminHomeScreenContent(
             .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
-        V8ScreenHeader { Text(stringResource(R.string.admin_title), style = MaterialTheme.typography.headlineSmall) }
-        Text(stringResource(R.string.admin_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        V8ScreenHeader {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.admin_title),
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        stringResource(R.string.admin_description),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                OutlinedButton(
+                    onClick = onRefresh,
+                    enabled = !state.working,
+                    modifier = Modifier.testTag("admin_refresh"),
+                ) {
+                    Text(stringResource(R.string.admin_refresh))
+                }
+            }
+        }
         if (state.loading) CircularProgressIndicator(Modifier.testTag("admin_loading"))
         state.failure?.let { adminFailure(it) }
         if (state.completedOperationId != null) Text(stringResource(R.string.admin_done), modifier = Modifier.testTag("admin_done"))
-        Button(
-            onRefresh,
-            enabled = !state.working,
-            modifier = Modifier.testTag("admin_refresh"),
-        ) { Text(stringResource(R.string.admin_refresh)) }
         state.overview?.let { overview ->
-            V8GlassCard(Modifier.fillMaxWidth()) {
+            V8GlassCard(Modifier.fillMaxWidth(), emphasized = true) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("admin_metrics")) {
+                    Text(
+                        "Métricas institucionales",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
                     Text(stringResource(R.string.admin_metrics_total, overview.metrics.totalUsers))
                     Text(stringResource(R.string.admin_metrics_pending, overview.metrics.pendingStaff))
                     Text(stringResource(R.string.admin_metrics_teachers, overview.metrics.activeTeachers))
@@ -148,8 +177,9 @@ fun adminHomeScreenContent(
                         Text(stringResource(if (application.role == StaffRole.TEACHER) R.string.admin_teacher else R.string.admin_tutor))
                         Text(stringResource(R.string.admin_identity, application.identityReference))
                         application.preferredGroup?.let { Text(stringResource(R.string.admin_preference, it)) }
-                        Button(
-                            {
+                        V8RedPrimaryButton(
+                            text = stringResource(R.string.admin_approve),
+                            onClick = {
                                 if (application.role ==
                                     StaffRole.TUTOR
                                 ) {
@@ -163,7 +193,7 @@ fun adminHomeScreenContent(
                                 Modifier.fillMaxWidth().testTag(
                                     "admin_approve_" + application.id,
                                 ),
-                        ) { Text(stringResource(R.string.admin_approve)) }
+                        )
                     }
                 }
             }
@@ -199,11 +229,59 @@ fun adminHomeScreenContent(
         }
         Text(stringResource(R.string.admin_tools), style = MaterialTheme.typography.titleLarge)
         V8GlassCard(Modifier.fillMaxWidth()) {
-            Column {
-                TextButton(onOpenClassrooms) { Text(stringResource(R.string.admin_classrooms)) }
-                TextButton(onOpenChannel) { Text(stringResource(R.string.admin_channel)) }
-                TextButton(onOpenSchedule) { Text(stringResource(R.string.admin_schedule)) }
-                TextButton(onOpenSecurity, modifier = Modifier.testTag("admin_security")) { Text(stringResource(R.string.admin_security)) }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(
+                    onClick = onOpenClassrooms,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.admin_classrooms))
+                        Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                TextButton(
+                    onClick = onOpenChannel,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.admin_channel))
+                        Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                TextButton(
+                    onClick = onOpenSchedule,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.admin_schedule))
+                        Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                TextButton(
+                    onClick = onOpenSecurity,
+                    modifier = Modifier.fillMaxWidth().testTag("admin_security"),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.admin_security))
+                        Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
             }
         }
     }

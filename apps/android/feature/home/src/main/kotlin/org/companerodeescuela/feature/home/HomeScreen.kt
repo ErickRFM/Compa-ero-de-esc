@@ -14,13 +14,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -51,6 +55,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
@@ -67,270 +72,407 @@ fun HomeScreen(
 
     val overview = state.overview
     val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
+    val haptic = LocalHapticFeedback.current
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val splitLayout = maxWidth >= CompaneroWindowBreakpoints.medium
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .widthIn(max = CompaneroSize.homeContentMaxWidth)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm)
-                    .align(Alignment.TopCenter),
-            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
+        PullToRefreshBox(
+            isRefreshing = state.loading,
+            onRefresh = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                viewModel.refresh()
+            },
+            modifier = Modifier.fillMaxSize().align(Alignment.TopCenter),
         ) {
-            val firstName =
-                overview
-                    ?.studentName
-                    ?.trim()
-                    ?.substringBefore(" ")
-                    ?.takeIf { it.isNotBlank() }
-                    ?.replaceFirstChar {
-                        if (it.isLowerCase()) it.titlecase(Locale("es", "MX")) else it.toString()
-                    }
-            V8ScreenHeader {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text =
-                            buildAnnotatedString {
-                                append("Hola")
-                                if (firstName != null) {
-                                    append(", ")
-                                    withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append(firstName) }
-                                }
-                            },
-                        modifier = Modifier.padding(top = 8.dp),
-                        fontSize = 37.sp,
-                        lineHeight = 43.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        text = "Un gran día para seguir construyendo tus metas. ✨",
-                        fontSize = 16.sp,
-                        lineHeight = 22.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
-                Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            todayLabel(),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.labelMedium,
-                        )
-                        TextButton(onClick = onOpenClassrooms) {
-                            Text("Mis clases  ›", color = MaterialTheme.colorScheme.primary)
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .widthIn(max = CompaneroSize.homeContentMaxWidth)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm)
+                        .align(Alignment.TopCenter),
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
+            ) {
+                val firstName =
+                    overview
+                        ?.studentName
+                        ?.trim()
+                        ?.substringBefore(" ")
+                        ?.takeIf { it.isNotBlank() }
+                        ?.replaceFirstChar {
+                            if (it.isLowerCase()) it.titlecase(Locale("es", "MX")) else it.toString()
                         }
-                    }
-                    val activeOrNext = overview?.current ?: overview?.next
-                    if (activeOrNext != null) {
+                V8ScreenHeader {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
-                            text = if (overview?.current != null) "EN CURSO · ${activeOrNext.subjectName}" else "PRÓXIMA · ${activeOrNext.subjectName}",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
+                            text =
+                                buildAnnotatedString {
+                                    append("Hola")
+                                    if (firstName != null) {
+                                        append(", ")
+                                        withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append(firstName) }
+                                    }
+                                },
+                            modifier = Modifier.padding(top = 8.dp),
+                            fontSize = 37.sp,
+                            lineHeight = 43.sp,
                             color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            text = "${activeOrNext.startsAt} – ${activeOrNext.endsAt} · ${locationLabel(activeOrNext)}",
-                            style = MaterialTheme.typography.bodySmall,
+                            text = "Un gran día para seguir construyendo tus metas. ✨",
+                            fontSize = 16.sp,
+                            lineHeight = 22.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    V8RedPrimaryButton(
-                        text = "Abrir pase de lista  ›",
-                        onClick = onOpenAttendance,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
                 }
-            }
-
-            Text(
-                text =
-                    when {
-                        state.loading -> "Sincronizando información…"
-                        state.errorMessage != null && overview == null -> "Sin sincronizar · revisa tu sesión o conexión"
-                        state.institutionalAccessDenied -> "Agenda personal · acceso escolar no autorizado"
-                        state.personalOnly && state.errorMessage == null -> "Agenda personal · sin materias escolares asignadas"
-                        state.fromCache && state.errorMessage != null -> "Agenda personal disponible · sincronización escolar pendiente"
-                        state.fromCache -> "Agenda guardada · conexión escolar pendiente"
-                        overview != null && !overview.hasSchedule -> "Cuenta conectada · sin horario escolar asignado"
-                        overview != null -> "Información escolar actualizada"
-                        else -> "Sin información sincronizada"
-                    },
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            if (state.loading && overview == null) {
-                CircularProgressIndicator()
-            }
-
-            if (state.fromCache || (state.errorMessage != null && overview != null)) {
-                V8GlassCard(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
+                V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
+                    Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             Text(
-                                cacheStatusLabel(state.updatedAtEpochSeconds),
-                                style = MaterialTheme.typography.labelLarge,
+                                todayLabel(),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                            TextButton(onClick = onOpenClassrooms) {
+                                Text("Mis clases  ›", color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                        val activeOrNext = overview?.current ?: overview?.next
+                        if (activeOrNext != null) {
+                            Text(
+                                text =
+                                    if (overview?.current !=
+                                        null
+                                    ) {
+                                        "EN CURSO · ${activeOrNext.subjectName}"
+                                    } else {
+                                        "PRÓXIMA · ${activeOrNext.subjectName}"
+                                    },
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
                             Text(
-                                if (state.errorMessage != null) {
-                                    if (state.institutionalAccessDenied) {
-                                        "La cuenta aún no tiene acceso escolar. Tus clases personales están disponibles."
-                                    } else {
-                                        "No se pudo sincronizar con la escuela. Tu agenda personal está disponible."
-                                    }
-                                } else if (state.personalOnly) {
-                                    "Tu horario importado está disponible. Aún no hay clases oficiales asignadas a esta cuenta."
-                                } else {
-                                    "Puedes consultar tu horario mientras se restablece la sincronización."
-                                },
+                                text = "${activeOrNext.startsAt} – ${activeOrNext.endsAt} · ${locationLabel(activeOrNext)}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        TextButton(onClick = viewModel::refresh, enabled = !state.loading) {
-                            Text(if (state.loading) "Actualizando" else "Reintentar")
-                        }
-                    }
-                }
-            }
-
-            if (state.errorMessage != null && overview == null) {
-                StatusNotice(
-                    title = if (state.institutionalAccessDenied) "Acceso escolar pendiente" else "No pudimos actualizar",
-                    message =
-                        if (state.institutionalAccessDenied) {
-                            "Tu sesión funciona, pero no tienes permiso para consultar las clases oficiales. " +
-                                "Comprueba tu perfil y vinculación con SIII."
-                        } else {
-                            "No se pudieron cargar tus datos. Comprueba tu sesión o conexión y vuelve a intentarlo."
-                        },
-                    tone = NoticeTone.WARNING,
-                )
-                Button(onClick = viewModel::refresh) {
-                    Text("Reintentar")
-                }
-            }
-
-            overview?.let { day ->
-                val distinctSubjectCount =
-                    day.classes
-                        .distinctBy(::scheduleSubjectKey)
-                        .size
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    V8DashboardStat(
-                        label = "Clases hoy",
-                        value = day.classes.size.toString(),
-                        onClick = onOpenSchedule,
-                        modifier = Modifier.weight(1f),
-                    )
-                    V8DashboardStat(
-                        label = "Materias hoy",
-                        value = distinctSubjectCount.toString(),
-                        onClick = onOpenClassrooms,
-                        modifier = Modifier.weight(1f),
-                    )
-                    V8DashboardStat(
-                        label = "Próxima clase",
-                        value = nextClassStatLabel(day),
-                        onClick = onOpenSchedule,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                when {
-                    !day.hasSchedule -> {
-                        StatusNotice(
-                            title = "Aún no hay clases en tu horario",
-                            message =
-                                "Importa una imagen o PDF o crea tu agenda personal; " +
-                                    "las clases asignadas desde SIII aparecerán al sincronizar.",
-                        )
-                        Button(
-                            onClick = onOpenSchedule,
+                        V8RedPrimaryButton(
+                            text = "Abrir pase de lista  ›",
+                            onClick = onOpenAttendance,
                             modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text("Preparar mi agenda")
-                        }
-                        Text(
-                            text =
-                                "La agenda local funciona sin integración escolar y conserva " +
-                                    "tus bloques personales, importaciones y recordatorios.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                    }
-                    day.classes.isEmpty() -> {
-                        StatusNotice(
-                            title = "Día libre",
-                            message = "Hoy no tienes clases. Tu próxima actividad académica sigue visible abajo.",
-                        )
-                        day.nextScheduled?.let { upcoming ->
-                            Column(
-                                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
-                            ) {
-                                Text(
-                                    text = "Próxima clase",
-                                    style = MaterialTheme.typography.titleMedium,
-                                )
-                                AcademicClassCard(
-                                    subject = upcoming.subjectName,
-                                    time =
-                                        upcomingDayLabel(day.nextScheduledDaysAway) +
-                                            " · " + upcoming.startsAt + " – " + upcoming.endsAt,
-                                    location = locationLabel(upcoming),
-                                    teacher = upcoming.teacherName,
-                                    subjectKey = scheduleSubjectKey(upcoming),
-                                )
-                            }
-                        }
-                    }
-                    else -> {
-                        DayTimeline(day, onOpenSchedule)
                     }
                 }
 
                 Text(
-                    "Avisos",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Bold,
+                    text =
+                        when {
+                            state.loading -> "Sincronizando información…"
+                            state.errorMessage != null && overview == null -> "Sin sincronizar · revisa tu sesión o conexión"
+                            state.institutionalAccessDenied -> "Agenda personal · acceso escolar no autorizado"
+                            state.personalOnly && state.errorMessage == null -> "Agenda personal · sin materias escolares asignadas"
+                            state.fromCache && state.errorMessage != null -> "Agenda personal disponible · sincronización escolar pendiente"
+                            state.fromCache -> "Agenda guardada · conexión escolar pendiente"
+                            overview != null && !overview.hasSchedule -> "Cuenta conectada · sin horario escolar asignado"
+                            overview != null -> "Información escolar actualizada"
+                            else -> "Sin información sincronizada"
+                        },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                V8GlassCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            text = "Canal de tus clases",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Text(
-                            text = "Consulta avisos y materiales publicados por tus docentes.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        TextButton(onClick = onOpenChannel) {
-                            Text("Ver canales y avisos  ›", color = MaterialTheme.colorScheme.primary)
+
+                if (state.loading && overview == null) {
+                    CircularProgressIndicator()
+                }
+
+                if (state.fromCache || (state.errorMessage != null && overview != null)) {
+                    V8GlassCard(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    cacheStatusLabel(state.updatedAtEpochSeconds),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    if (state.errorMessage != null) {
+                                        if (state.institutionalAccessDenied) {
+                                            "La cuenta aún no tiene acceso escolar. Tus clases personales están disponibles."
+                                        } else {
+                                            "No se pudo sincronizar con la escuela. Tu agenda personal está disponible."
+                                        }
+                                    } else if (state.personalOnly) {
+                                        "Tu horario importado está disponible. Aún no hay clases oficiales asignadas a esta cuenta."
+                                    } else {
+                                        "Puedes consultar tu horario mientras se restablece la sincronización."
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            TextButton(onClick = viewModel::refresh, enabled = !state.loading) {
+                                Text(if (state.loading) "Actualizando" else "Reintentar")
+                            }
                         }
                     }
                 }
-                TextButton(
-                    onClick = viewModel::refresh,
-                    enabled = !state.loading,
-                    modifier = Modifier.align(Alignment.End),
-                ) {
-                    Text(if (state.loading) "Actualizando…" else "Actualizar", color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                if (state.errorMessage != null && overview == null) {
+                    StatusNotice(
+                        title = if (state.institutionalAccessDenied) "Acceso escolar pendiente" else "No pudimos actualizar",
+                        message =
+                            if (state.institutionalAccessDenied) {
+                                "Tu sesión funciona, pero no tienes permiso para consultar las clases oficiales. " +
+                                    "Comprueba tu perfil y vinculación con SIII."
+                            } else {
+                                "No se pudieron cargar tus datos. Comprueba tu sesión o conexión y vuelve a intentarlo."
+                            },
+                        tone = NoticeTone.WARNING,
+                    )
+                    Button(onClick = viewModel::refresh) {
+                        Text("Reintentar")
+                    }
+                }
+
+                overview?.let { day ->
+                    val distinctSubjectCount =
+                        day.classes
+                            .distinctBy(::scheduleSubjectKey)
+                            .size
+
+                    if (splitLayout) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
+                        ) {
+                            Column(
+                                modifier = Modifier.weight(1.2f),
+                                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
+                            ) {
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    V8DashboardStat(
+                                        label = "Clases hoy",
+                                        value = day.classes.size.toString(),
+                                        onClick = onOpenSchedule,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    V8DashboardStat(
+                                        label = "Materias hoy",
+                                        value = distinctSubjectCount.toString(),
+                                        onClick = onOpenClassrooms,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    V8DashboardStat(
+                                        label = "Próxima clase",
+                                        value = nextClassStatLabel(day),
+                                        onClick = onOpenSchedule,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
+                                when {
+                                    !day.hasSchedule -> {
+                                        StatusNotice(
+                                            title = "Aún no hay clases en tu horario",
+                                            message =
+                                                "Importa una imagen o PDF o crea tu agenda personal; " +
+                                                    "las clases asignadas desde SIII aparecerán al sincronizar.",
+                                        )
+                                        Button(
+                                            onClick = onOpenSchedule,
+                                            modifier = Modifier.fillMaxWidth(),
+                                        ) {
+                                            Text("Preparar mi agenda")
+                                        }
+                                    }
+                                    day.classes.isEmpty() -> {
+                                        StatusNotice(
+                                            title = "Día libre",
+                                            message = "Hoy no tienes clases. Tu próxima actividad académica sigue visible abajo.",
+                                        )
+                                        day.nextScheduled?.let { upcoming ->
+                                            Column(
+                                                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                                            ) {
+                                                Text(
+                                                    text = "Próxima clase",
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                )
+                                                AcademicClassCard(
+                                                    subject = upcoming.subjectName,
+                                                    time =
+                                                        upcomingDayLabel(day.nextScheduledDaysAway) +
+                                                            " · " + upcoming.startsAt + " – " + upcoming.endsAt,
+                                                    location = locationLabel(upcoming),
+                                                    teacher = upcoming.teacherName,
+                                                    subjectKey = scheduleSubjectKey(upcoming),
+                                                )
+                                            }
+                                        }
+                                    }
+                                    else -> {
+                                        DayTimeline(day, onOpenSchedule)
+                                    }
+                                }
+                            }
+
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
+                            ) {
+                                Text(
+                                    "Avisos y accesos",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                V8GlassCard(modifier = Modifier.fillMaxWidth()) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text(
+                                            text = "Canal de tus clases",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                        )
+                                        Text(
+                                            text = "Consulta avisos y materiales publicados por tus docentes.",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                        TextButton(onClick = onOpenChannel) {
+                                            Text("Ver canales y avisos  ›", color = MaterialTheme.colorScheme.primary)
+                                        }
+                                    }
+                                }
+                                TextButton(
+                                    onClick = viewModel::refresh,
+                                    enabled = !state.loading,
+                                    modifier = Modifier.align(Alignment.End),
+                                ) {
+                                    Text(
+                                        if (state.loading) "Actualizando…" else "Actualizar",
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            V8DashboardStat(
+                                label = "Clases hoy",
+                                value = day.classes.size.toString(),
+                                onClick = onOpenSchedule,
+                                modifier = Modifier.weight(1f),
+                            )
+                            V8DashboardStat(
+                                label = "Materias hoy",
+                                value = distinctSubjectCount.toString(),
+                                onClick = onOpenClassrooms,
+                                modifier = Modifier.weight(1f),
+                            )
+                            V8DashboardStat(
+                                label = "Próxima clase",
+                                value = nextClassStatLabel(day),
+                                onClick = onOpenSchedule,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        when {
+                            !day.hasSchedule -> {
+                                StatusNotice(
+                                    title = "Aún no hay clases en tu horario",
+                                    message =
+                                        "Importa una imagen o PDF o crea tu agenda personal; " +
+                                            "las clases asignadas desde SIII aparecerán al sincronizar.",
+                                )
+                                Button(
+                                    onClick = onOpenSchedule,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Text("Preparar mi agenda")
+                                }
+                                Text(
+                                    text =
+                                        "La agenda local funciona sin integración escolar y conserva " +
+                                            "tus bloques personales, importaciones y recordatorios.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            day.classes.isEmpty() -> {
+                                StatusNotice(
+                                    title = "Día libre",
+                                    message = "Hoy no tienes clases. Tu próxima actividad académica sigue visible abajo.",
+                                )
+                                day.nextScheduled?.let { upcoming ->
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                                    ) {
+                                        Text(
+                                            text = "Próxima clase",
+                                            style = MaterialTheme.typography.titleMedium,
+                                        )
+                                        AcademicClassCard(
+                                            subject = upcoming.subjectName,
+                                            time =
+                                                upcomingDayLabel(day.nextScheduledDaysAway) +
+                                                    " · " + upcoming.startsAt + " – " + upcoming.endsAt,
+                                            location = locationLabel(upcoming),
+                                            teacher = upcoming.teacherName,
+                                            subjectKey = scheduleSubjectKey(upcoming),
+                                        )
+                                    }
+                                }
+                            }
+                            else -> {
+                                DayTimeline(day, onOpenSchedule)
+                            }
+                        }
+
+                        Text(
+                            "Avisos",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        V8GlassCard(modifier = Modifier.fillMaxWidth()) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    text = "Canal de tus clases",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    text = "Consulta avisos y materiales publicados por tus docentes.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                TextButton(onClick = onOpenChannel) {
+                                    Text("Ver canales y avisos  ›", color = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                        }
+                        TextButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                viewModel.refresh()
+                            },
+                            enabled = !state.loading,
+                            modifier = Modifier.align(Alignment.End),
+                        ) {
+                            Text(if (state.loading) "Actualizando…" else "Actualizar", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
             }
         }

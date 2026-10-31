@@ -1,15 +1,14 @@
 package org.companerodeescuela.core.ui.state
 
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
-import kotlin.test.assertTrue
 import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class ContentStateTest {
-
     @Test
     @DisplayName("A non-empty success becomes Content")
     fun successBecomesContent() {
@@ -54,15 +53,16 @@ class ContentStateTest {
     @Test
     @DisplayName("Every failure carries a message that is safe to show a user")
     fun failuresAreUserPresentable() {
-        val errors = listOf(
-            AppError.Network(),
-            AppError.Http(401),
-            AppError.Http(404),
-            AppError.Http(503),
-            AppError.Http(418),
-            AppError.Serialization(),
-            AppError.Unknown(),
-        )
+        val errors =
+            listOf(
+                AppError.Network(),
+                AppError.Http(401),
+                AppError.Http(404),
+                AppError.Http(503),
+                AppError.Http(418),
+                AppError.Serialization(),
+                AppError.Unknown(),
+            )
 
         errors.forEach { error ->
             assertTrue(error.userMessage.isNotBlank(), "$error has no user message")

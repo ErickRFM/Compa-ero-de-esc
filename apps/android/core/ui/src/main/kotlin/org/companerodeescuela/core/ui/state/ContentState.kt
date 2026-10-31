@@ -12,9 +12,16 @@ import org.companerodeescuela.core.common.result.Outcome
  */
 sealed interface ContentState<out T> {
     data object Loading : ContentState<Nothing>
+
     data object Empty : ContentState<Nothing>
-    data class Content<T>(val value: T) : ContentState<T>
-    data class Failed(val error: AppError) : ContentState<Nothing>
+
+    data class Content<T>(
+        val value: T,
+    ) : ContentState<T>
+
+    data class Failed(
+        val error: AppError,
+    ) : ContentState<Nothing>
 }
 
 /**
@@ -24,7 +31,8 @@ sealed interface ContentState<out T> {
  * a list with no items is empty, but a schedule with no items today might
  * still want to show the next day.
  */
-fun <T> Outcome<T>.toContentState(isEmpty: (T) -> Boolean): ContentState<T> = when (this) {
-    is Outcome.Success -> if (isEmpty(value)) ContentState.Empty else ContentState.Content(value)
-    is Outcome.Failure -> ContentState.Failed(error)
-}
+fun <T> Outcome<T>.toContentState(isEmpty: (T) -> Boolean): ContentState<T> =
+    when (this) {
+        is Outcome.Success -> if (isEmpty(value)) ContentState.Empty else ContentState.Content(value)
+        is Outcome.Failure -> ContentState.Failed(error)
+    }

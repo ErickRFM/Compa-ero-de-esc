@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.feature.tutoring
 
 import androidx.compose.foundation.layout.Arrangement
@@ -24,12 +26,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
-import org.companerodeescuela.core.ui.component.CompaneroSurface
-import org.companerodeescuela.core.ui.component.CompaneroSurfaceRole
+import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
+import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.RepresentativePosition
 
@@ -81,12 +86,21 @@ private fun TutorGroupsContent(
                 .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
-        Text("Mi grupo", style = MaterialTheme.typography.headlineSmall)
-        Text(
-            "Alumnos asignados, nombramiento de representantes y seguimiento académico.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        V8ScreenHeader {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    "Mi grupo",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    "Alumnos asignados, nombramiento de representantes y seguimiento académico.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         if (state.loading) CircularProgressIndicator()
         state.error?.let { StatusNotice(title = "No pudimos actualizar", message = it) }
         state.notice?.let { StatusNotice(title = "Tutorías", message = it) }
@@ -107,7 +121,7 @@ private fun TutorGroupsContent(
         val overview = state.representativesOverview
         if (groupId != null && overview != null) {
             Text("Representantes del grupo", style = MaterialTheme.typography.titleMedium)
-            CompaneroSurface(modifier = Modifier.fillMaxWidth(), role = CompaneroSurfaceRole.CARD) {
+            V8GlassCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(CompaneroSpacing.md),
                     verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
@@ -156,7 +170,7 @@ private fun TutorGroupsContent(
         }
         if (state.rosterGroupId == groupId) {
             state.roster.forEach { student ->
-                CompaneroSurface(modifier = Modifier.fillMaxWidth(), role = CompaneroSurfaceRole.CARD) {
+                V8GlassCard(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.padding(CompaneroSpacing.md),
                         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
@@ -223,19 +237,21 @@ private fun TutorGroupsContent(
                 label = { Text("Motivo de acompañamiento") },
                 minLines = 2,
             )
-            Button(
+            V8RedPrimaryButton(
+                text = "Crear seguimiento",
                 onClick = {
-                    val activeGroup = groupId ?: return@Button
+                    val activeGroup = groupId ?: return@V8RedPrimaryButton
                     viewModel.createCase(activeGroup, selected.userId, caseSummary, state.scopeGeneration)
                     caseSummary = ""
                 },
                 enabled = !state.submitting && caseSummary.trim().length in 8..500,
-            ) { Text("Crear seguimiento") }
+                modifier = Modifier.fillMaxWidth(),
+            )
 
             state.cases
                 .filter { it.studentId == selected.userId && it.academicGroupId == groupId }
                 .forEach { case ->
-                    CompaneroSurface(modifier = Modifier.fillMaxWidth(), role = CompaneroSurfaceRole.CARD) {
+                    V8GlassCard(modifier = Modifier.fillMaxWidth()) {
                         Column(
                             modifier = Modifier.padding(CompaneroSpacing.md),
                             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),

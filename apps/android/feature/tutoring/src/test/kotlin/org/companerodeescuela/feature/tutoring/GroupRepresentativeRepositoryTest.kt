@@ -201,7 +201,8 @@ class GroupRepresentativeRepositoryTest {
         session: String,
         nonce: String = "old",
     ): String {
-        val payload = """{"sub":"$owner","session_id":"$session","exp":${System.currentTimeMillis() / 1000 + 3600},"roles":["STUDENT"],"nonce":"$nonce"}"""
+        val exp = System.currentTimeMillis() / 1000 + 3600
+        val payload = """{"sub":"$owner","session_id":"$session","exp":$exp,"roles":["STUDENT"],"nonce":"$nonce"}"""
         return "e30." + Base64.getUrlEncoder().withoutPadding().encodeToString(payload.toByteArray()) + ".test"
     }
 }

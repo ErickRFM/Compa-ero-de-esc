@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.feature.settings
 
 import androidx.compose.foundation.layout.Arrangement
@@ -53,7 +55,9 @@ fun IntegrationSettingsScreen(
             )
         }
         Text(
-            text = "La integración es opcional. Compañero puede funcionar con horario importado o manual aunque el sistema escolar no esté disponible.",
+            text =
+                "La integración es opcional. Compañero puede funcionar con horario importado o " +
+                    "manual aunque el sistema escolar no esté disponible.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -112,7 +116,9 @@ fun IntegrationSettingsScreen(
         }
 
         Text(
-            text = "Si tu escuela habilita una API institucional, aquí se mostrará su estado. Si no existe, puedes seguir importando PDF o imágenes y editar tu horario desde Agenda.",
+            text =
+                "Si tu escuela habilita una API institucional, aquí se mostrará su estado. " +
+                    "Si no existe, puedes seguir importando PDF o imágenes y editar tu horario desde Agenda.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

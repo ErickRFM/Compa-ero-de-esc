@@ -1,21 +1,22 @@
 package org.companerodeescuela.feature.schedule
 
+import org.companerodeescuela.shared.contracts.ScheduleEntry
+import org.companerodeescuela.shared.contracts.ScheduleSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.companerodeescuela.shared.contracts.ScheduleEntry
-import org.companerodeescuela.shared.contracts.ScheduleSource
 
 class AgendaEditingRulesTest {
     @Test
     fun `move preserves duration and snaps to fifteen minutes`() {
         val entry = entry("A", "MONDAY", "19:00", "20:30")
-        val proposal = AgendaEditingRules.proposeMove(
-            entry = entry,
-            targetDay = "WEDNESDAY",
-            targetStart = "17:07",
-            existing = listOf(entry),
-        )!!
+        val proposal =
+            AgendaEditingRules.proposeMove(
+                entry = entry,
+                targetDay = "WEDNESDAY",
+                targetStart = "17:07",
+                existing = listOf(entry),
+            )!!
 
         assertEquals("17:00", proposal.targetStart)
         assertEquals("18:30", proposal.targetEnd)
@@ -32,12 +33,13 @@ class AgendaEditingRulesTest {
         val moving = entry("A", "MONDAY", "09:00", "10:00")
         val existing = entry("B", "TUESDAY", "10:00", "11:00")
 
-        val proposal = AgendaEditingRules.proposeMove(
-            moving,
-            targetDay = "TUESDAY",
-            targetStart = "10:15",
-            existing = listOf(moving, existing),
-        )!!
+        val proposal =
+            AgendaEditingRules.proposeMove(
+                moving,
+                targetDay = "TUESDAY",
+                targetStart = "10:15",
+                existing = listOf(moving, existing),
+            )!!
 
         assertEquals(1, proposal.conflicts.size)
     }
@@ -71,9 +73,13 @@ class AgendaEditingRulesTest {
     fun `move detects second occurrence of same course`() {
         val moving = entry("A", "MONDAY", "09:00", "10:00")
         val later = entry("A", "MONDAY", "12:00", "13:00")
-        val proposal = AgendaEditingRules.proposeMove(
-            moving, "MONDAY", "12:00", listOf(moving, later),
-        )!!
+        val proposal =
+            AgendaEditingRules.proposeMove(
+                moving,
+                "MONDAY",
+                "12:00",
+                listOf(moving, later),
+            )!!
         assertEquals(1, proposal.conflicts.size)
     }
 

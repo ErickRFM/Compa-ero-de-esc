@@ -240,7 +240,7 @@ fun GradebookScreen(
                                     style = MaterialTheme.typography.labelSmall,
                                 )
                                 BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                                    if (maxWidth < 340.dp) {
+                                    if (maxWidth < 380.dp) {
                                         Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
                                             CategoryNameField(
                                                 category.name,

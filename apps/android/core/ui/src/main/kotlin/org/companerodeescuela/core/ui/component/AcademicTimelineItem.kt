@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -31,10 +31,11 @@ fun AcademicTimelineItem(
     subjectKey: String = title,
     continuousRail: Boolean = false,
 ) {
-    val accent = AcademicSubjectColors.accent(
-        key = subjectKey,
-        surface = MaterialTheme.colorScheme.surface,
-    )
+    val accent =
+        AcademicSubjectColors.accent(
+            key = subjectKey,
+            surface = MaterialTheme.colorScheme.surface,
+        )
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.Top,
@@ -44,30 +45,32 @@ fun AcademicTimelineItem(
             modifier = Modifier.width(48.dp),
             style = MaterialTheme.typography.labelMedium,
             maxLines = 1,
-            color = if (highlighted) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
+            color =
+                if (highlighted) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
         )
         Spacer(Modifier.width(6.dp))
         Box(
-            modifier = if (continuousRail) {
-                Modifier
-                    .size(if (highlighted) 12.dp else 10.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (highlighted) MaterialTheme.colorScheme.primary else accent,
-                    )
-            } else {
-                Modifier
-                    .width(if (highlighted) 5.dp else 4.dp)
-                    .height(48.dp)
-                    .clip(MaterialTheme.shapes.extraSmall)
-                    .background(
-                        if (highlighted) MaterialTheme.colorScheme.primary else accent,
-                    )
-            },
+            modifier =
+                if (continuousRail) {
+                    Modifier
+                        .size(if (highlighted) 12.dp else 10.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (highlighted) MaterialTheme.colorScheme.primary else accent,
+                        )
+                } else {
+                    Modifier
+                        .width(if (highlighted) 5.dp else 4.dp)
+                        .height(48.dp)
+                        .clip(MaterialTheme.shapes.extraSmall)
+                        .background(
+                            if (highlighted) MaterialTheme.colorScheme.primary else accent,
+                        )
+                },
         )
         Spacer(Modifier.width(10.dp))
         Column(

@@ -19,10 +19,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import org.companerodeescuela.core.motion.CompaneroMotion
-import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 import org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled
 import org.companerodeescuela.core.designsystem.v8.v8GlassSurface
+import org.companerodeescuela.core.motion.CompaneroMotion
+import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 
 @Composable
 fun ExpressiveSegmentedControl(
@@ -37,54 +37,69 @@ fun ExpressiveSegmentedControl(
     val glass = LocalV8GlassEnabled.current
 
     BoxWithConstraints(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(48.dp)
-            .clip(MaterialTheme.shapes.extraLarge)
-            .then(if (glass) Modifier.v8GlassSurface(cornerRadius = 26.dp, elevation = 0.dp)
-                else Modifier.background(MaterialTheme.colorScheme.surfaceVariant)),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .clip(MaterialTheme.shapes.extraLarge)
+                .then(
+                    if (glass) {
+                        Modifier.v8GlassSurface(cornerRadius = 26.dp, elevation = 0.dp)
+                    } else {
+                        Modifier.background(MaterialTheme.colorScheme.surfaceVariant)
+                    },
+                ),
     ) {
         val segmentWidth = maxWidth / options.size
         val targetOffset = segmentWidth * safeIndex
         val selectionOffset by animateDpAsState(
             targetValue = targetOffset,
-            animationSpec = if (reducedMotion) {
-                CompaneroMotion.fast()
-            } else {
-                CompaneroMotion.snappySpring()
-            },
+            animationSpec =
+                if (reducedMotion) {
+                    CompaneroMotion.fast()
+                } else {
+                    CompaneroMotion.snappySpring()
+                },
             label = "segmentedSelectionOffset",
         )
 
         Box(
-            modifier = Modifier
-                .offset(x = selectionOffset)
-                .width(segmentWidth)
-                .height(48.dp)
-                .clip(MaterialTheme.shapes.extraLarge)
-                .then(if (glass) Modifier.v8GlassSurface(cornerRadius = 26.dp, emphasized = true, elevation = 0.dp)
-                    else Modifier.background(MaterialTheme.colorScheme.primaryContainer)),
+            modifier =
+                Modifier
+                    .offset(x = selectionOffset)
+                    .width(segmentWidth)
+                    .height(48.dp)
+                    .clip(MaterialTheme.shapes.extraLarge)
+                    .then(
+                        if (glass) {
+                            Modifier.v8GlassSurface(cornerRadius = 26.dp, emphasized = true, elevation = 0.dp)
+                        } else {
+                            Modifier.background(MaterialTheme.colorScheme.primaryContainer)
+                        },
+                    ),
         )
 
         Row(modifier = Modifier.fillMaxWidth()) {
             options.forEachIndexed { index, label ->
                 Box(
-                    modifier = Modifier
-                        .width(segmentWidth)
-                        .height(48.dp)
-                        .clip(MaterialTheme.shapes.extraLarge)
-                        .clickable { onSelected(index) },
+                    modifier =
+                        Modifier
+                            .width(segmentWidth)
+                            .height(48.dp)
+                            .clip(MaterialTheme.shapes.extraLarge)
+                            .clickable { onSelected(index) },
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = label,
                         style = MaterialTheme.typography.labelLarge,
                         textAlign = TextAlign.Center,
-                        color = if (index == safeIndex) {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
+                        color =
+                            if (index == safeIndex) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
                     )
                 }
             }

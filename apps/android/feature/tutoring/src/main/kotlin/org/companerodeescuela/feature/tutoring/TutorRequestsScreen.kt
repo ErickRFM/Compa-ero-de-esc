@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.feature.tutoring
 
 import androidx.compose.foundation.layout.Arrangement
@@ -28,9 +30,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
+import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
-import org.companerodeescuela.core.ui.component.CompaneroSurface
-import org.companerodeescuela.core.ui.component.CompaneroSurfaceRole
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ExcuseRequestSummary
 import org.companerodeescuela.shared.contracts.ExcuseStatus
@@ -79,7 +81,11 @@ private fun TutorRequestsContent(
             StatusNotice(title = "Sin solicitudes", message = "No hay justificantes registrados para tus grupos.")
         }
         state.requests.forEach { request ->
-            CompaneroSurface(modifier = Modifier.fillMaxWidth(), role = CompaneroSurfaceRole.CARD) {
+            val isPending = request.status in setOf(ExcuseStatus.PENDING, ExcuseStatus.UNDER_REVIEW)
+            V8GlassCard(
+                modifier = Modifier.fillMaxWidth(),
+                emphasized = isPending,
+            ) {
                 Column(
                     modifier = Modifier.padding(CompaneroSpacing.md),
                     verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
@@ -100,15 +106,16 @@ private fun TutorRequestsContent(
                         },
                         style = MaterialTheme.typography.labelLarge,
                     )
-                    if (request.status in setOf(ExcuseStatus.PENDING, ExcuseStatus.UNDER_REVIEW)) {
+                    if (isPending) {
                         Row(horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
-                            Button(
+                            V8RedPrimaryButton(
+                                text = "Aprobar",
                                 enabled = !state.submitting,
                                 onClick = {
                                     comment = ""
                                     selected = request to true
                                 },
-                            ) { Text("Aprobar") }
+                            )
                             OutlinedButton(
                                 enabled = !state.submitting,
                                 onClick = {

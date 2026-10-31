@@ -1,8 +1,8 @@
 package org.companerodeescuela.feature.schedule
 
+import org.companerodeescuela.shared.contracts.ScheduleEntry
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import org.companerodeescuela.shared.contracts.ScheduleEntry
 
 class AgendaGridLayoutTest {
     @Test
@@ -15,9 +15,17 @@ class AgendaGridLayoutTest {
     @Test
     fun `Saturday stays visible even if a partially recognized import has no Saturday class`() {
         val days = weeklyAgendaDays(listOf(entry("monday", "08:00", "09:00")))
-        assertEquals(listOf(
-            "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY",
-        ), days)
+        assertEquals(
+            listOf(
+                "MONDAY",
+                "TUESDAY",
+                "WEDNESDAY",
+                "THURSDAY",
+                "FRIDAY",
+                "SATURDAY",
+            ),
+            days,
+        )
     }
 
     @Test
@@ -28,6 +36,7 @@ class AgendaGridLayoutTest {
         assertEquals("THURSDAY", weeklyDragTargetDay(days, widths, 0, 0, 2, 350f))
         assertEquals("MONDAY", weeklyDragTargetDay(days, widths, 3, 0, 1, -1000f))
     }
+
     @Test
     fun `simultaneous blocks use distinct lanes and touching blocks share a lane`() {
         val entries = listOf(entry("A", "08:00", "10:00"), entry("B", "09:00", "11:00"), entry("C", "11:00", "12:00"))
@@ -40,14 +49,25 @@ class AgendaGridLayoutTest {
 
     @Test
     fun `short late blocks preserve their duration and malformed blocks are rejected`() {
-        val layout = agendaGridLayout(listOf(entry("short", "23:30", "23:45"), entry("bad", "xx", "10:00"), entry("reverse", "12:00", "11:00")))
+        val layout =
+            agendaGridLayout(listOf(entry("short", "23:30", "23:45"), entry("bad", "xx", "10:00"), entry("reverse", "12:00", "11:00")))
         assertEquals(1, layout.size)
         assertEquals(15, layout.single().durationMinutes)
         assertEquals(1410, layout.single().startMinute)
     }
 
-    private fun entry(id: String, start: String, end: String) = ScheduleEntry(
-        courseId = id, subjectCode = id, subjectName = id, groupName = "", teacherName = "",
-        dayOfWeek = "MONDAY", startsAt = start, endsAt = end,
+    private fun entry(
+        id: String,
+        start: String,
+        end: String,
+    ) = ScheduleEntry(
+        courseId = id,
+        subjectCode = id,
+        subjectName = id,
+        groupName = "",
+        teacherName = "",
+        dayOfWeek = "MONDAY",
+        startsAt = start,
+        endsAt = end,
     )
 }

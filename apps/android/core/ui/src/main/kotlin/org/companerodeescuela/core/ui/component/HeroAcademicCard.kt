@@ -38,24 +38,25 @@ fun HeroAcademicCard(
     val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
     val animatedProgress by animateFloatAsState(
         targetValue = progress.coerceIn(0f, 1f),
-        animationSpec = if (reducedMotion) {
-            CompaneroMotion.fast()
-        } else {
-            CompaneroMotion.standard()
-        },
+        animationSpec =
+            if (reducedMotion) {
+                CompaneroMotion.fast()
+            } else {
+                CompaneroMotion.standard()
+            },
         label = "heroClassProgress",
     )
 
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .shadow(
-                elevation = CompaneroElevation.raised,
-                shape = MaterialTheme.shapes.extraLarge,
-                clip = false,
-            )
-            .clip(MaterialTheme.shapes.extraLarge)
-            .background(CompaneroExpressive.heroBrush()),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .shadow(
+                    elevation = CompaneroElevation.raised,
+                    shape = MaterialTheme.shapes.extraLarge,
+                    clip = false,
+                ).clip(MaterialTheme.shapes.extraLarge)
+                .background(CompaneroExpressive.heroBrush()),
     ) {
         Column(
             modifier = Modifier.padding(CompaneroSpacing.lg),
@@ -89,11 +90,12 @@ fun HeroAcademicCard(
 
             LinearProgressIndicator(
                 progress = { animatedProgress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = CompaneroSpacing.sm)
-                    .height(CompaneroSpacing.xxs)
-                    .clip(RoundedCornerShape(percent = 50)),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = CompaneroSpacing.sm)
+                        .height(CompaneroSpacing.xxs)
+                        .clip(RoundedCornerShape(percent = 50)),
                 color = Color.White,
                 trackColor = Color.White.copy(alpha = 0.24f),
                 drawStopIndicator = {},

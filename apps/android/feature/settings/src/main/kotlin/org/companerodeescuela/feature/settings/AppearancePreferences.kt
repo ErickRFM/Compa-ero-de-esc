@@ -9,10 +9,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import org.companerodeescuela.core.designsystem.theme.CompaneroAccentPalette
 import javax.inject.Inject
 import javax.inject.Singleton
-
-import org.companerodeescuela.core.designsystem.theme.CompaneroAccentPalette
 
 enum class AppThemeMode {
     SYSTEM,

@@ -8,12 +8,16 @@ import kotlin.test.assertTrue
 
 class DigitalPdfTimetableParserTest {
     private val dayNames = listOf("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
-    private val headers = listOf(
-        Triple(112.8f, 163.4f, 0), Triple(208.4f, 265.2f, 1),
-        Triple(295.8f, 375.4f, 2), Triple(404.8f, 463.6f, 3),
-        Triple(501.4f, 564.3f, 4), Triple(599.6f, 663.7f, 5),
-        Triple(693.1f, 767.5f, 6),
-    )
+    private val headers =
+        listOf(
+            Triple(112.8f, 163.4f, 0),
+            Triple(208.4f, 265.2f, 1),
+            Triple(295.8f, 375.4f, 2),
+            Triple(404.8f, 463.6f, 3),
+            Triple(501.4f, 564.3f, 4),
+            Triple(599.6f, 663.7f, 5),
+            Triple(693.1f, 767.5f, 6),
+        )
     private val dayStarts = listOf(88.9f, 187.6f, 286.2f, 384.8f, 483.5f, 582.1f, 680.8f)
     private val dayEnds = listOf(187.6f, 286.2f, 384.8f, 483.5f, 582.1f, 680.8f, 779.7f)
 
@@ -43,15 +47,28 @@ class DigitalPdfTimetableParserTest {
                 val subject = value.substringAfter(' ')
                 val cellLeft = dayStarts[day]
                 val size = if (day == 4 && hour == 14) 8.07f else 9.04f
-                lines += DigitalPdfLine(subject, cellLeft + 5f, cellLeft + 83f,
-                    131f + (hour - 7) * 36f - 9f, size)
+                lines +=
+                    DigitalPdfLine(
+                        subject,
+                        cellLeft + 5f,
+                        cellLeft + 83f,
+                        131f + (hour - 7) * 36f - 9f,
+                        size,
+                    )
             } else {
-                val previous = rawLines.take(index + 1).lastOrNull {
-                    it.matches(Regex("""\d{1,2}:\d{2}-\d{1,2}:\d{2} .*"""))
-                } ?: error("Teacher without subject")
+                val previous =
+                    rawLines.take(index + 1).lastOrNull {
+                        it.matches(Regex("""\d{1,2}:\d{2}-\d{1,2}:\d{2} .*"""))
+                    } ?: error("Teacher without subject")
                 val hour = previous.substringBefore(':').toInt()
-                lines += DigitalPdfLine(value, dayEnds[day] - 65f, dayEnds[day] - 5f,
-                    131f + (hour - 7) * 36f + 10f, 8.72f)
+                lines +=
+                    DigitalPdfLine(
+                        value,
+                        dayEnds[day] - 65f,
+                        dayEnds[day] - 5f,
+                        131f + (hour - 7) * 36f + 10f,
+                        8.72f,
+                    )
             }
         }
         val output = assertNotNull(DigitalPdfTimetableParser.parseLines(lines.shuffled()))
@@ -70,11 +87,12 @@ class DigitalPdfTimetableParserTest {
     @Test
     fun shuffledGlyphsStillReconstructCorrectWordOrder() {
         var x = 93f
-        val letters = "Inglés IX".map { c ->
-            val glyph = DigitalPdfGlyph(c.toString(), x, 375f, if (c == ' ') 2.5f else 4f, 9.04f)
-            x += if (c == ' ') 2.5f else 4f
-            glyph
-        }
+        val letters =
+            "Inglés IX".map { c ->
+                val glyph = DigitalPdfGlyph(c.toString(), x, 375f, if (c == ' ') 2.5f else 4f, 9.04f)
+                x += if (c == ' ') 2.5f else 4f
+                glyph
+            }
         val result = DigitalPdfTimetableParser.assembleLines(letters.shuffled())
         assertEquals(listOf("Inglés IX"), result.map { it.text })
     }

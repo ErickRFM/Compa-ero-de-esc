@@ -74,12 +74,13 @@ class Schedule9AFixtureTest {
         subject: String,
         teacher: String,
     ) {
-        val block = result.firstOrNull {
-            it.dayOfWeek == day &&
-                it.startsAt == start &&
-                it.endsAt == end &&
-                it.subjectName == subject
-        }
+        val block =
+            result.firstOrNull {
+                it.dayOfWeek == day &&
+                    it.startsAt == start &&
+                    it.endsAt == end &&
+                    it.subjectName == subject
+            }
         assertNotNull(block, "Missing $day $start-$end $subject")
         assertEquals(teacher, block.teacherName)
     }

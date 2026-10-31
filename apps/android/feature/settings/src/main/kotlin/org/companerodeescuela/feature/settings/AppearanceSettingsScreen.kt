@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.feature.settings
 
 import android.os.Build
@@ -26,11 +28,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.CompaneroAccentPalette
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 
 @Composable
@@ -67,6 +71,8 @@ fun AppearanceSettingsScreen(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+
+        LiveAppearancePreviewCard()
 
         SettingsGroup(title = "Tema e idioma") {
             SettingsContentRow(
@@ -299,4 +305,37 @@ private fun ToggleRow(
 @Composable
 private fun GroupDivider() {
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+}
+
+@Composable
+private fun LiveAppearancePreviewCard() {
+    V8GlassCard(
+        modifier = Modifier.fillMaxWidth(),
+        emphasized = true,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
+            Text(
+                text = "Previsualización en tiempo real",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = "Cálculo Diferencial",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "08:00 – 10:00 · Edificio B, Aula 102",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            V8RedPrimaryButton(
+                text = "Acción de ejemplo",
+                onClick = {},
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
 }

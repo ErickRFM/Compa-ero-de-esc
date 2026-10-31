@@ -6,8 +6,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -35,23 +35,33 @@ fun AcademicClassCard(
     subjectKey: String = subject,
 ) {
     val glass = LocalV8GlassEnabled.current
-    val containerColor = if (emphasized) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.surfaceContainer
-    }
-    val accent = AcademicSubjectColors.accent(
-        key = subjectKey,
-        surface = MaterialTheme.colorScheme.surface,
-    )
+    val containerColor =
+        if (emphasized) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainer
+        }
+    val accent =
+        AcademicSubjectColors.accent(
+            key = subjectKey,
+            surface = MaterialTheme.colorScheme.surface,
+        )
 
     Card(
         modifier = modifier.fillMaxWidth().then(if (glass) Modifier.v8GlassSurface(emphasized = emphasized) else Modifier),
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = if (glass) Color.Transparent else containerColor),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = if (glass) 0.dp else if (emphasized) CompaneroElevation.raised else CompaneroElevation.card,
-        ),
+        elevation =
+            CardDefaults.cardElevation(
+                defaultElevation =
+                    if (glass) {
+                        0.dp
+                    } else if (emphasized) {
+                        CompaneroElevation.raised
+                    } else {
+                        CompaneroElevation.card
+                    },
+            ),
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
@@ -61,11 +71,12 @@ fun AcademicClassCard(
                 Text(
                     text = it.uppercase(),
                     style = MaterialTheme.typography.labelLarge,
-                    color = if (emphasized) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        accent
-                    },
+                    color =
+                        if (emphasized) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            accent
+                        },
                 )
             }
             Row(
@@ -73,9 +84,10 @@ fun AcademicClassCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .background(accent, CircleShape),
+                    modifier =
+                        Modifier
+                            .size(8.dp)
+                            .background(accent, CircleShape),
                 )
                 Text(
                     text = subject,

@@ -9,9 +9,11 @@ import kotlin.test.assertNull
 class AttendanceQrTokenParserTest {
     @Test
     fun `extracts only the session routing hint from a v1 token`() {
-        val encodedSession = Base64.getUrlEncoder()
-            .withoutPadding()
-            .encodeToString("session-123".toByteArray(StandardCharsets.UTF_8))
+        val encodedSession =
+            Base64
+                .getUrlEncoder()
+                .withoutPadding()
+                .encodeToString("session-123".toByteArray(StandardCharsets.UTF_8))
         val token = "v1." + encodedSession + ".nonce.100.120.signature"
 
         assertEquals("session-123", AttendanceQrTokenParser.sessionId(token))

@@ -738,6 +738,7 @@ private fun ExperiencePickerScreen(
     onSelect: (AppExperience) -> Unit,
     onLogout: (() -> Unit)? = null,
 ) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     Column(
         modifier =
             Modifier
@@ -772,16 +773,21 @@ private fun ExperiencePickerScreen(
                     ),
             ) {
                 experiences.forEach { experience ->
-                    Button(
-                        onClick = { onSelect(experience) },
+                    org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton(
+                        text = experienceLabel(experience),
+                        onClick = {
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                            onSelect(experience)
+                        },
                         modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(experienceLabel(experience))
-                    }
+                    )
                 }
                 onLogout?.let { logout ->
                     androidx.compose.material3.TextButton(
-                        onClick = logout,
+                        onClick = {
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                            logout()
+                        },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(stringResource(R.string.role_unavailable_logout))

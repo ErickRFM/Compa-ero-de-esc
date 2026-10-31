@@ -10,9 +10,10 @@ class TimetableGridGeometryTest {
     fun `detects seven columns and a separate hour rail from a PDF table`() {
         // Proportional to the rendered 792 x 612pt digital 9A PDF at 3x.
         val rules = listOf(36, 266, 562, 858, 1154, 1450, 1746, 2042, 2339)
-        val columns = detectWeeklyPdfGrid(2376, 1836) { x, _ ->
-            rules.any { rule -> x in rule - 1..rule + 1 }
-        }
+        val columns =
+            detectWeeklyPdfGrid(2376, 1836) { x, _ ->
+                rules.any { rule -> x in rule - 1..rule + 1 }
+            }
         requireNotNull(columns)
         assertEquals(7, columns.size)
         assertEquals(266f, columns[0].first)

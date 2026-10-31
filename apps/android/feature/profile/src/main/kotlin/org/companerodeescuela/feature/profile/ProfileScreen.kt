@@ -26,6 +26,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -64,6 +66,7 @@ fun ProfileScreen(
     appVersion: String? = null,
     modifier: Modifier = Modifier,
 ) {
+    val haptic = LocalHapticFeedback.current
     Box(modifier = modifier.fillMaxSize()) {
         if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current &&
             MaterialTheme.colorScheme.background.luminance() < 0.5f &&
@@ -196,7 +199,10 @@ fun ProfileScreen(
                     ProfileRow(
                         title = "Cambiar perfil activo",
                         detail = "Alterna entre tus roles autorizados sin cerrar sesión.",
-                        onClick = onSwitchExperience,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onSwitchExperience()
+                        },
                     )
                 }
             }
@@ -205,7 +211,10 @@ fun ProfileScreen(
                 ProfileRow(
                     title = "Tema y accesibilidad",
                     detail = "Tema, texto, contraste y movimiento.",
-                    onClick = onAppearance,
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onAppearance()
+                    },
                 )
                 onNotifications?.let { action ->
                     GroupDivider()
@@ -224,7 +233,10 @@ fun ProfileScreen(
 
             V8RedPrimaryButton(
                 text = "Cerrar sesión",
-                onClick = onLogout,
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onLogout()
+                },
                 modifier = Modifier.fillMaxWidth(),
             )
         }

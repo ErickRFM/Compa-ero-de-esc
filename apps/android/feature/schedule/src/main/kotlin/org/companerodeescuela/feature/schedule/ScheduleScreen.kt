@@ -61,6 +61,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -70,9 +71,11 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
 import org.companerodeescuela.core.designsystem.v8.V8DaySelector
+import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8GlassFilterChip
 import org.companerodeescuela.core.designsystem.v8.V8HeroTitle
 import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
+import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.motion.CompaneroMotionDuration
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
@@ -103,6 +106,7 @@ fun ScheduleScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val importProcessor = remember(context) { ScheduleImportProcessor(context) }
     var mode by rememberSaveable { mutableStateOf(AgendaMode.WEEK) }
@@ -170,7 +174,10 @@ fun ScheduleScreen(
             ExpressiveSegmentedControl(
                 options = listOf("Semana", "Día"),
                 selectedIndex = if (mode == AgendaMode.WEEK) 0 else 1,
-                onSelected = { mode = if (it == 0) AgendaMode.WEEK else AgendaMode.DAY },
+                onSelected = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    mode = if (it == 0) AgendaMode.WEEK else AgendaMode.DAY
+                },
             )
 
             val monday = LocalDate.now().minusDays((LocalDate.now().dayOfWeek.value - 1).toLong())
@@ -191,6 +198,7 @@ fun ScheduleScreen(
                     },
                 selectedIndex = displayedDays.indexOf(visibleSelectedDay).coerceAtLeast(0),
                 onSelect = { index ->
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     selectedDay = displayedDays[index]
                     mode = AgendaMode.DAY
                 },
@@ -462,9 +470,8 @@ private fun InstitutionSyncCard(
     loading: Boolean,
     onSync: () -> Unit,
 ) {
-    CompaneroSurface(
+    V8GlassCard(
         modifier = Modifier.fillMaxWidth(),
-        role = CompaneroSurfaceRole.CARD,
     ) {
         Row(
             modifier = Modifier.padding(CompaneroSpacing.sm),
@@ -518,13 +525,12 @@ private fun EmptyScheduleActions(
         message =
             "No encontramos clases asociadas a tu cuenta. UPTlax sigue siendo la fuente oficial; también puedes agregar una copia personal.",
     )
-    Button(
+    V8RedPrimaryButton(
+        text = "Sincronizar con UPTlax",
         onClick = onSync,
         enabled = !loading,
         modifier = Modifier.fillMaxWidth(),
-    ) {
-        Text("Sincronizar con UPTlax")
-    }
+    )
     OutlinedButton(
         onClick = onImport,
         enabled = !loading,
@@ -749,6 +755,9 @@ private fun DayTimeGrid(
 
             var dragOffset by remember(entry.courseId) { mutableStateOf(Offset.Zero) }
             val draggable = entry.source != ScheduleSource.INSTITUTIONAL
+            val isDragging = dragOffset != Offset.Zero
+            val shiftedStart = if (isDragging) AgendaEditingRules.shiftFromDrag(entry, dragOffset.y, quarterHourPx) else null
+
             val dragModifier =
                 if (!draggable) {
                     Modifier
@@ -757,6 +766,9 @@ private fun DayTimeGrid(
                         .graphicsLayer {
                             translationX = dragOffset.x
                             translationY = dragOffset.y
+                            scaleX = if (isDragging) 1.04f else 1f
+                            scaleY = if (isDragging) 1.04f else 1f
+                            alpha = if (isDragging) 0.92f else 1f
                         }.pointerInput(entry.courseId, allEntries) {
                             detectDragGesturesAfterLongPress(
                                 onDragStart = {
@@ -814,18 +826,27 @@ private fun DayTimeGrid(
                             },
                         ),
                 shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                tonalElevation = 1.dp,
+                color = if (isDragging) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+                tonalElevation = if (isDragging) 8.dp else 1.dp,
             ) {
                 Column(
                     modifier = Modifier.padding(CompaneroSpacing.sm),
                     verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
                 ) {
-                    Text(
-                        entry.startsAt + "–" + entry.endsAt,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+                    if (isDragging && shiftedStart != null) {
+                        Text(
+                            "↳ Mover a $shiftedStart",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    } else {
+                        Text(
+                            entry.startsAt + "–" + entry.endsAt,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                     Text(
                         entry.subjectName,
                         style = MaterialTheme.typography.titleSmall,

@@ -11,12 +11,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import org.companerodeescuela.core.designsystem.theme.CompanionColors
+import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
+import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled
 import org.companerodeescuela.core.designsystem.v8.v8GlassSurface
-import androidx.compose.ui.unit.dp
 
 enum class NoticeTone {
     NEUTRAL,
@@ -35,47 +35,55 @@ fun StatusNotice(
 ) {
     val glass = LocalV8GlassEnabled.current && tone == NoticeTone.NEUTRAL
     val darkSurface = MaterialTheme.colorScheme.surface.luminance() < 0.5f
-    val container = when (tone) {
-        NoticeTone.NEUTRAL -> MaterialTheme.colorScheme.surfaceContainerLow
-        NoticeTone.INFO -> MaterialTheme.colorScheme.secondaryContainer
-        NoticeTone.SUCCESS -> if (darkSurface) {
-            CompanionColors.semanticGreenDarkContainer
-        } else {
-            CompanionColors.semanticGreenContainer
+    val container =
+        when (tone) {
+            NoticeTone.NEUTRAL -> MaterialTheme.colorScheme.surfaceContainerLow
+            NoticeTone.INFO -> MaterialTheme.colorScheme.secondaryContainer
+            NoticeTone.SUCCESS ->
+                if (darkSurface) {
+                    CompanionColors.semanticGreenDarkContainer
+                } else {
+                    CompanionColors.semanticGreenContainer
+                }
+            NoticeTone.WARNING -> MaterialTheme.colorScheme.tertiaryContainer
+            NoticeTone.ERROR -> MaterialTheme.colorScheme.errorContainer
         }
-        NoticeTone.WARNING -> MaterialTheme.colorScheme.tertiaryContainer
-        NoticeTone.ERROR -> MaterialTheme.colorScheme.errorContainer
-    }
-    val content = when (tone) {
-        NoticeTone.NEUTRAL -> MaterialTheme.colorScheme.onSurface
-        NoticeTone.INFO -> MaterialTheme.colorScheme.onSecondaryContainer
-        NoticeTone.SUCCESS -> if (darkSurface) {
-            CompanionColors.semanticGreenDark
-        } else {
-            CompanionColors.semanticGreen
+    val content =
+        when (tone) {
+            NoticeTone.NEUTRAL -> MaterialTheme.colorScheme.onSurface
+            NoticeTone.INFO -> MaterialTheme.colorScheme.onSecondaryContainer
+            NoticeTone.SUCCESS ->
+                if (darkSurface) {
+                    CompanionColors.semanticGreenDark
+                } else {
+                    CompanionColors.semanticGreen
+                }
+            NoticeTone.WARNING -> MaterialTheme.colorScheme.onTertiaryContainer
+            NoticeTone.ERROR -> MaterialTheme.colorScheme.onErrorContainer
         }
-        NoticeTone.WARNING -> MaterialTheme.colorScheme.onTertiaryContainer
-        NoticeTone.ERROR -> MaterialTheme.colorScheme.onErrorContainer
-    }
-    val border = if (tone == NoticeTone.NEUTRAL) {
-        BorderStroke(
-            width = CompaneroElevation.subtle,
-            color = MaterialTheme.colorScheme.outlineVariant,
-        )
-    } else {
-        null
-    }
+    val border =
+        if (tone == NoticeTone.NEUTRAL) {
+            BorderStroke(
+                width = CompaneroElevation.subtle,
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
+        } else {
+            null
+        }
 
     Surface(
         modifier = modifier.fillMaxWidth().then(if (glass) Modifier.v8GlassSurface() else Modifier),
         color = if (glass) Color.Transparent else container,
         shape = MaterialTheme.shapes.large,
         tonalElevation = if (glass) 0.dp else CompaneroElevation.subtle,
-        shadowElevation = if (glass) 0.dp else if (tone == NoticeTone.NEUTRAL) {
-            CompaneroElevation.subtle
-        } else {
-            CompaneroElevation.card
-        },
+        shadowElevation =
+            if (glass) {
+                0.dp
+            } else if (tone == NoticeTone.NEUTRAL) {
+                CompaneroElevation.subtle
+            } else {
+                CompaneroElevation.card
+            },
         border = if (glass) null else border,
     ) {
         Column(modifier = Modifier.padding(CompaneroSpacing.sm)) {

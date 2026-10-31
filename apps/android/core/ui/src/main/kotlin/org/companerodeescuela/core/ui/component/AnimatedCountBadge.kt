@@ -42,10 +42,11 @@ fun AnimatedCountBadge(
     ) { value ->
         if (value > 0) {
             Box(
-                modifier = Modifier
-                    .clip(MaterialTheme.shapes.extraLarge)
-                    .background(MaterialTheme.colorScheme.error)
-                    .padding(horizontal = 7.dp, vertical = 2.dp),
+                modifier =
+                    Modifier
+                        .clip(MaterialTheme.shapes.extraLarge)
+                        .background(MaterialTheme.colorScheme.error)
+                        .padding(horizontal = 7.dp, vertical = 2.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(

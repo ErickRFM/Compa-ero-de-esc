@@ -1,10 +1,10 @@
 package org.companerodeescuela.feature.schedule
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.test.runTest
 import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.io.InputStream
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -36,11 +36,18 @@ class PdfInputTest {
     }
 
     @Test fun `intermittent zero progress cannot cause a spin or unbounded read`() {
-        val input = object : InputStream() {
-            val delegate = CountingInput(ByteArray(512))
-            override fun read() = delegate.read()
-            override fun read(buffer: ByteArray, offset: Int, length: Int) = 0
-        }
+        val input =
+            object : InputStream() {
+                val delegate = CountingInput(ByteArray(512))
+
+                override fun read() = delegate.read()
+
+                override fun read(
+                    buffer: ByteArray,
+                    offset: Int,
+                    length: Int,
+                ) = 0
+            }
         assertNull(readPdfBytes(input, 64))
         assertEquals(65, input.delegate.bytesRead)
     }
@@ -53,21 +60,31 @@ class PdfInputTest {
         assertEquals(3, input.bytesRead)
     }
 
-    @Test fun `native reader cancellation propagates instead of enabling OCR`() = runTest {
-        assertFailsWith<CancellationException> { readNativePdfOrNull<Unit> { throw CancellationException("Cancelled") } }
-    }
+    @Test fun `native reader cancellation propagates instead of enabling OCR`() =
+        runTest {
+            assertFailsWith<CancellationException> { readNativePdfOrNull<Unit> { throw CancellationException("Cancelled") } }
+        }
 
-    @Test fun `unsupported native PDF still permits existing OCR fallback`() = runTest {
-        assertNull(readNativePdfOrNull<Unit> { throw IOException("Unsupported native PDF") })
-        assertEquals("native text", readNativePdfOrNull { "native text" })
-    }
+    @Test fun `unsupported native PDF still permits existing OCR fallback`() =
+        runTest {
+            assertNull(readNativePdfOrNull<Unit> { throw IOException("Unsupported native PDF") })
+            assertEquals("native text", readNativePdfOrNull { "native text" })
+        }
 
-    private class CountingInput(bytes: ByteArray, private val chunkSize: Int = Int.MAX_VALUE) : InputStream() {
+    private class CountingInput(
+        bytes: ByteArray,
+        private val chunkSize: Int = Int.MAX_VALUE,
+    ) : InputStream() {
         private val delegate = ByteArrayInputStream(bytes)
         var bytesRead = 0
             private set
+
         override fun read(): Int = delegate.read().also { if (it != -1) bytesRead++ }
-        override fun read(buffer: ByteArray, offset: Int, length: Int): Int =
-            delegate.read(buffer, offset, minOf(length, chunkSize)).also { if (it > 0) bytesRead += it }
+
+        override fun read(
+            buffer: ByteArray,
+            offset: Int,
+            length: Int,
+        ): Int = delegate.read(buffer, offset, minOf(length, chunkSize)).also { if (it > 0) bytesRead += it }
     }
 }

@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.core.ui.component
 
 import androidx.compose.foundation.layout.Column
@@ -34,28 +36,31 @@ fun CompaneroSurface(
         }
         return
     }
-    val color = when (role) {
-        CompaneroSurfaceRole.BASE -> MaterialTheme.colorScheme.surface
-        CompaneroSurfaceRole.INSET -> MaterialTheme.colorScheme.surfaceContainerLow
-        CompaneroSurfaceRole.CARD -> MaterialTheme.colorScheme.surfaceContainer
-        CompaneroSurfaceRole.RAISED -> MaterialTheme.colorScheme.surfaceContainerHigh
-        CompaneroSurfaceRole.FLOATING -> MaterialTheme.colorScheme.surfaceContainerHighest
-    }
-    val elevation: Dp = when (role) {
-        CompaneroSurfaceRole.BASE -> 0.dp
-        CompaneroSurfaceRole.INSET -> CompaneroElevation.subtle
-        CompaneroSurfaceRole.CARD -> CompaneroElevation.card
-        CompaneroSurfaceRole.RAISED -> CompaneroElevation.raised
-        CompaneroSurfaceRole.FLOATING -> CompaneroElevation.immersive
-    }
-    val shape = when (role) {
-        CompaneroSurfaceRole.BASE -> MaterialTheme.shapes.small
-        CompaneroSurfaceRole.INSET -> MaterialTheme.shapes.medium
-        CompaneroSurfaceRole.CARD -> MaterialTheme.shapes.large
-        CompaneroSurfaceRole.RAISED,
-        CompaneroSurfaceRole.FLOATING,
-        -> MaterialTheme.shapes.extraLarge
-    }
+    val color =
+        when (role) {
+            CompaneroSurfaceRole.BASE -> MaterialTheme.colorScheme.surface
+            CompaneroSurfaceRole.INSET -> MaterialTheme.colorScheme.surfaceContainerLow
+            CompaneroSurfaceRole.CARD -> MaterialTheme.colorScheme.surfaceContainer
+            CompaneroSurfaceRole.RAISED -> MaterialTheme.colorScheme.surfaceContainerHigh
+            CompaneroSurfaceRole.FLOATING -> MaterialTheme.colorScheme.surfaceContainerHighest
+        }
+    val elevation: Dp =
+        when (role) {
+            CompaneroSurfaceRole.BASE -> 0.dp
+            CompaneroSurfaceRole.INSET -> CompaneroElevation.subtle
+            CompaneroSurfaceRole.CARD -> CompaneroElevation.card
+            CompaneroSurfaceRole.RAISED -> CompaneroElevation.raised
+            CompaneroSurfaceRole.FLOATING -> CompaneroElevation.immersive
+        }
+    val shape =
+        when (role) {
+            CompaneroSurfaceRole.BASE -> MaterialTheme.shapes.small
+            CompaneroSurfaceRole.INSET -> MaterialTheme.shapes.medium
+            CompaneroSurfaceRole.CARD -> MaterialTheme.shapes.large
+            CompaneroSurfaceRole.RAISED,
+            CompaneroSurfaceRole.FLOATING,
+            -> MaterialTheme.shapes.extraLarge
+        }
 
     Surface(
         modifier = modifier,

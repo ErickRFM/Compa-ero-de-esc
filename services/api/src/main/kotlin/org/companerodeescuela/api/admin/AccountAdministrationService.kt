@@ -480,10 +480,7 @@ class AccountAdministrationService(
             account.toUserSummary(),
             account.staffApplications(),
             account.adminCapabilities,
-            account.registrationIntent?.requestedInstitutionId.takeIf {
-                account.institutionId == null &&
-                    account.registrationIntent?.profile == org.companerodeescuela.shared.contracts.RegistrationAccountType.STUDENT
-            },
+            effectiveInstitution(account).takeIf { account.institutionId == null },
         )
 
     private fun effectiveInstitution(account: PlatformAccount) =

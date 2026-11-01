@@ -75,6 +75,46 @@ class ChannelRepository(
             }.map { it.data }
         }
 
+    suspend fun tasks(channelId: String): Outcome<List<org.companerodeescuela.shared.contracts.ChannelTask>> =
+        authorized { token ->
+            apiCall {
+                client
+                    .get("channels/$channelId/tasks") { bearerAuth(token) }
+                    .requireBody<ApiResponse<List<org.companerodeescuela.shared.contracts.ChannelTask>>>()
+            }.map { it.data }
+        }
+
+    suspend fun createTask(
+        channelId: String,
+        request: org.companerodeescuela.shared.contracts.CreateChannelTaskRequest,
+    ): Outcome<org.companerodeescuela.shared.contracts.ChannelTask> =
+        authorized { token ->
+            apiCall {
+                client
+                    .post("channels/$channelId/tasks") {
+                        bearerAuth(token)
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }.requireBody<ApiResponse<org.companerodeescuela.shared.contracts.ChannelTask>>()
+            }.map { it.data }
+        }
+
+    suspend fun submitTask(
+        channelId: String,
+        taskId: String,
+        request: org.companerodeescuela.shared.contracts.SubmitTaskRequest,
+    ): Outcome<org.companerodeescuela.shared.contracts.TaskSubmission> =
+        authorized { token ->
+            apiCall {
+                client
+                    .post("channels/$channelId/tasks/$taskId/submissions") {
+                        bearerAuth(token)
+                        contentType(ContentType.Application.Json)
+                        setBody(request)
+                    }.requireBody<ApiResponse<org.companerodeescuela.shared.contracts.TaskSubmission>>()
+            }.map { it.data }
+        }
+
     private suspend fun <T> authorized(block: suspend (String) -> Outcome<T>): Outcome<T> {
         val token =
             when (val result = refreshCoordinator.currentAccessToken()) {

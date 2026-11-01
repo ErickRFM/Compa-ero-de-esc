@@ -25,9 +25,13 @@ data class ChannelUiState(
     val channels: List<ClassChannelSummary> = emptyList(),
     val selectedChannelId: String? = null,
     val posts: List<ChannelPost> = emptyList(),
+    val tasks: List<org.companerodeescuela.shared.contracts.ChannelTask> = emptyList(),
+    val submissions: Map<String, org.companerodeescuela.shared.contracts.TaskSubmission> = emptyMap(),
     val draftBody: String = "",
     val draftResourceLabel: String = "",
     val draftResourceUrl: String = "",
+    val draftTaskTitle: String = "",
+    val draftTaskInstructions: String = "",
     val successMessage: String? = null,
     val errorMessage: String? = null,
 )
@@ -263,6 +267,92 @@ class ChannelViewModel
             }
         }
 
+        fun updateDraftTaskTitle(value: String) {
+            _state.update { it.copy(draftTaskTitle = value.take(200)) }
+        }
+
+        fun updateDraftTaskInstructions(value: String) {
+            _state.update { it.copy(draftTaskInstructions = value.take(MAX_DRAFT_BODY)) }
+        }
+
+        fun createTask(dueDateSeconds: Long) {
+            val snapshot = _state.value
+            val channelId = snapshot.selectedChannelId ?: return
+            val title = snapshot.draftTaskTitle.trim()
+            val instructions = snapshot.draftTaskInstructions.trim()
+            if (title.isBlank()) {
+                _state.update { it.copy(errorMessage = "Ingresa el título de la tarea.") }
+                return
+            }
+            _state.update { it.copy(actionInProgress = true, errorMessage = null, successMessage = null) }
+            viewModelScope.launch {
+                when (
+                    val result =
+                        repository.createTask(
+                            channelId = channelId,
+                            request =
+                                org.companerodeescuela.shared.contracts.CreateChannelTaskRequest(
+                                    title = title,
+                                    instructions = instructions,
+                                    dueDateEpochSeconds = dueDateSeconds,
+                                ),
+                        )
+                ) {
+                    is Outcome.Success ->
+                        _state.update {
+                            it.copy(
+                                actionInProgress = false,
+                                tasks = listOf(result.value) + it.tasks,
+                                draftTaskTitle = "",
+                                draftTaskInstructions = "",
+                                successMessage = "Tarea publicada para la clase.",
+                            )
+                        }
+                    is Outcome.Failure ->
+                        _state.update {
+                            it.copy(
+                                actionInProgress = false,
+                                errorMessage = result.error.userMessage,
+                            )
+                        }
+                }
+            }
+        }
+
+        fun submitTask(taskId: String, comment: String) {
+            val channelId = _state.value.selectedChannelId ?: return
+            _state.update { it.copy(actionInProgress = true, errorMessage = null, successMessage = null) }
+            viewModelScope.launch {
+                when (
+                    val result =
+                        repository.submitTask(
+                            channelId = channelId,
+                            taskId = taskId,
+                            request =
+                                org.companerodeescuela.shared.contracts.SubmitTaskRequest(
+                                    comment = comment.ifBlank { null },
+                                ),
+                        )
+                ) {
+                    is Outcome.Success ->
+                        _state.update {
+                            it.copy(
+                                actionInProgress = false,
+                                submissions = it.submissions + (taskId to result.value),
+                                successMessage = "Entrega registrada correctamente.",
+                            )
+                        }
+                    is Outcome.Failure ->
+                        _state.update {
+                            it.copy(
+                                actionInProgress = false,
+                                errorMessage = result.error.userMessage,
+                            )
+                        }
+                }
+            }
+        }
+
         private fun loadPosts(channelId: String) {
             viewModelScope.launch {
                 _state.update { it.copy(loading = true, errorMessage = null) }
@@ -276,6 +366,7 @@ class ChannelViewModel
                                     errorMessage = null,
                                 )
                             }
+                            loadTasks(channelId)
                         }
                     is Outcome.Failure ->
                         if (_state.value.selectedChannelId == channelId) {
@@ -287,6 +378,22 @@ class ChannelViewModel
                                 )
                             }
                         }
+                }
+            }
+        }
+
+        private fun loadTasks(channelId: String) {
+            viewModelScope.launch {
+                when (val result = repository.tasks(channelId)) {
+                    is Outcome.Success ->
+                        if (_state.value.selectedChannelId == channelId) {
+                            _state.update {
+                                it.copy(
+                                    tasks = result.value,
+                                )
+                            }
+                        }
+                    is Outcome.Failure -> { }
                 }
             }
         }

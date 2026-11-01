@@ -122,3 +122,62 @@ data class ChannelPostStats(
     val responded: Int,
     val byResponse: Map<ChannelPresetResponse, Int>,
 )
+
+@Serializable
+enum class TaskStatus {
+    @SerialName("pending") PENDING,
+    @SerialName("submitting") SUBMITTING,
+    @SerialName("submitted") SUBMITTED,
+    @SerialName("overdue") OVERDUE,
+    @SerialName("returned") RETURNED,
+    @SerialName("reviewed") REVIEWED,
+    @SerialName("error") ERROR,
+}
+
+@Serializable
+data class ChannelTask(
+    val id: String,
+    val channelId: String,
+    val teacherId: String,
+    val teacherDisplayName: String,
+    val title: String,
+    val instructions: String,
+    val dueDateEpochSeconds: Long,
+    val attachments: List<ChannelAttachment> = emptyList(),
+    val createdAtEpochSeconds: Long,
+    val closed: Boolean = false,
+)
+
+@Serializable
+data class TaskSubmission(
+    val id: String,
+    val taskId: String,
+    val studentId: String,
+    val studentDisplayName: String,
+    val status: TaskStatus,
+    val comment: String? = null,
+    val attachments: List<ChannelAttachment> = emptyList(),
+    val submittedAtEpochSeconds: Long,
+    val feedback: String? = null,
+    val reviewedAtEpochSeconds: Long? = null,
+)
+
+@Serializable
+data class CreateChannelTaskRequest(
+    val title: String,
+    val instructions: String,
+    val dueDateEpochSeconds: Long,
+    val attachments: List<ChannelAttachment> = emptyList(),
+)
+
+@Serializable
+data class SubmitTaskRequest(
+    val comment: String? = null,
+    val attachments: List<ChannelAttachment> = emptyList(),
+)
+
+@Serializable
+data class ReviewSubmissionRequest(
+    val status: TaskStatus,
+    val feedback: String? = null,
+)

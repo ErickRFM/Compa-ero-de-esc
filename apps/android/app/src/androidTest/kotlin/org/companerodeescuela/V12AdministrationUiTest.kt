@@ -514,9 +514,7 @@ class V12AdministrationUiTest {
                 .performScrollTo()
                 .assertIsDisplayed()
                 .assertIsEnabled()
-                // Exercise the exposed accessibility action once. Native IME animations on API35
-                // can still move the touch target after Compose has reported its own layout idle.
-                .performSemanticsAction(SemanticsActions.OnClick) { click -> click() }
+                .performClick()
             try {
                 waitTag("staff_application_status")
             } catch (timeout: ComposeTimeoutException) {

@@ -23,11 +23,11 @@ import org.companerodeescuela.core.designsystem.theme.LocalCompaneroAccentPalett
  *  Keep semantic success/error colors independent of the crimson brand accent.
  */
 object V8RedColors {
-    val Background = Color(0xFF08090C)
-    val Surface = Color(0xFF15171C)
-    val Card = Color(0xFF252730)
-    val Crimson = Color(0xFFFF303F)
-    val DeepCrimson = Color(0xFFB31328)
+    val Background = Color(0xFF191A1C)
+    val Surface = Color(0xFF222326)
+    val Card = Color(0xFF2B2D30)
+    val Crimson = Color(0xFF8A1538)
+    val DeepCrimson = Color(0xFF8A1538)
     val TextPrimary = Color(0xFFF8F8FA)
     val TextSecondary = Color(0xFFABB0BE)
     val Outline = Color(0xFF454650)
@@ -36,10 +36,10 @@ object V8RedColors {
 }
 
 object V8RedDimensions {
-    val ScreenHorizontal = 20.dp
-    val CardCorner = 22.dp
-    val FieldCorner = 18.dp
-    val ControlCorner = 16.dp
+    val ScreenHorizontal = 16.dp
+    val CardCorner = 20.dp
+    val FieldCorner = 16.dp
+    val ControlCorner = 14.dp
     val CardSpacing = 12.dp
 }
 
@@ -82,7 +82,7 @@ fun V8RedPrimaryButton(
                 contentColor = Color.White,
                 disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             ),
-        contentPadding = PaddingValues(horizontal = 22.dp, vertical = 16.dp),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
     ) {
         Text(text = text, fontWeight = FontWeight.SemiBold)
     }

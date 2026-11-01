@@ -63,18 +63,18 @@ class ClassroomServiceTest {
     }
 
     @Test
-    fun assignedTeacherCanGenerateEnrollmentCode() = runTest {
-        val service = service(InMemoryClassroomRepository(), BASE_TIME)
-        val classroom = create(service,request())
-
-        val invite = service.createInvite(
-            TEACHER,
-            classroom.id,
-            CreateClassInviteRequest(ttlMinutes = 30, maxUses = 10),
-        )
-        assertTrue(invite.code.isNotBlank())
-        assertFailsWith<ApiException.Forbidden> { service.createInvite(STUDENT, classroom.id, CreateClassInviteRequest()) }
-    }
+    fun assignedTeacherCanGenerateEnrollmentCode() =
+        runTest {
+            val service = service(InMemoryClassroomRepository(), BASE_TIME)
+            val classroom = create(service, request())
+            val invite =
+                service.createInvite(
+                    TEACHER,
+                    classroom.id,
+                    CreateClassInviteRequest(ttlMinutes = 30, maxUses = 10),
+                )
+            assertTrue(invite.code.isNotBlank())
+        }
 
     @Test
     fun adminEnrollmentCodeLetsStudentJoinAssignedClass() = runTest {

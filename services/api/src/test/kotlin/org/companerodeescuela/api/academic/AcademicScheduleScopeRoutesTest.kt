@@ -42,6 +42,8 @@ class AcademicScheduleScopeRoutesTest {
         val created=post(request);assertEquals(HttpStatusCode.OK,created.status)
         val managed=Json.decodeFromString<ApiResponse<ManagedScheduleBlock>>(created.bodyAsText()).data
         assertEquals("Actual Class",managed.block.subjectName);assertEquals(1,managed.revision)
+        // Native administrative edits must never impersonate SIII institutional publication.
+        assertEquals(AcademicDataSource.ADMIN_MANUAL, managed.block.provenance.source)
         assertEquals(HttpStatusCode.Forbidden,post(request.copy(endTime="08:00")).status)
         assertEquals(HttpStatusCode.OK,client.get("/academic/manual-schedule/teacher") { header(HttpHeaders.Authorization,"Bearer $token") }.status)
         assertEquals(HttpStatusCode.Forbidden,client.delete("/academic/manual-schedule/${managed.block.id}") { header(HttpHeaders.Authorization,"Bearer $token");contentType(ContentType.Application.Json);setBody(Json.encodeToString(AcademicOperationRequest("cancel",managed.revision,""))) }.status)

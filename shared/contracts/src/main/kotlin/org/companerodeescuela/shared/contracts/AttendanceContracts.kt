@@ -125,6 +125,7 @@ data class AttendanceSessionResponse(
     val groupId: String? = null,
     val groupScopeRevision: Long = -1,
     val academicSource: String? = null,
+    val closedByTeacher: Boolean = false,
 )
 
 @Serializable
@@ -194,6 +195,7 @@ data class AttendanceRecordResponse(
     val originalStatus: AttendanceStatus? = null,
     val originalReasonCode: AttendanceReasonCode? = null,
     val reviewHistory: List<AttendanceReviewEntry> = emptyList(),
+    val recordRevision: Long = 1,
 )
 
 @Serializable

@@ -17,8 +17,6 @@ import kotlinx.serialization.json.Json
 import org.companerodeescuela.api.academic.groups.AcademicGroupMembershipRecord
 import org.companerodeescuela.api.academic.groups.InMemoryAcademicGroupRepository
 import org.companerodeescuela.api.attendance.AttendanceAccessPolicy
-import org.companerodeescuela.api.attendance.TeacherCampusRosterService
-import org.companerodeescuela.api.attendance.attendanceRoutes
 import org.companerodeescuela.api.attendance.AttendanceAdministrationPolicy
 import org.companerodeescuela.api.attendance.AttendanceEnrollmentResolver
 import org.companerodeescuela.api.attendance.AttendanceReviewService
@@ -26,6 +24,8 @@ import org.companerodeescuela.api.attendance.AttendanceSessionService
 import org.companerodeescuela.api.attendance.AttendanceStudentService
 import org.companerodeescuela.api.attendance.InMemoryAttendanceRepository
 import org.companerodeescuela.api.attendance.ProviderAttendanceOccurrenceResolver
+import org.companerodeescuela.api.attendance.TeacherCampusRosterService
+import org.companerodeescuela.api.attendance.attendanceRoutes
 import org.companerodeescuela.api.auth.AuthTokenService
 import org.companerodeescuela.api.auth.InMemoryPlatformAccountRepository
 import org.companerodeescuela.api.auth.InMemoryRefreshSessionRepository
@@ -48,26 +48,26 @@ import org.companerodeescuela.api.plugins.configurePlugins
 import org.companerodeescuela.api.test.ScopedAcademicFixtures
 import org.companerodeescuela.api.test.TestFixtures
 import org.companerodeescuela.shared.contracts.AcademicDataSource
-import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
-import org.companerodeescuela.shared.contracts.BlockStatus
-import org.companerodeescuela.shared.contracts.ClassroomStatus
-import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
-import org.companerodeescuela.shared.contracts.NetworkVerificationMethod
-import org.companerodeescuela.shared.contracts.SchoolPresenceIdentitySource
-import org.companerodeescuela.shared.contracts.SchoolPresenceResponse
-import org.companerodeescuela.shared.contracts.SchoolPresenceStatus
 import org.companerodeescuela.shared.contracts.AcademicLoadResponse
 import org.companerodeescuela.shared.contracts.AcademicProvenance
 import org.companerodeescuela.shared.contracts.AcademicWeekResponse
 import org.companerodeescuela.shared.contracts.ApiResponse
+import org.companerodeescuela.shared.contracts.AttendanceAttemptRequest
 import org.companerodeescuela.shared.contracts.AttendanceIdentitySource
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
+import org.companerodeescuela.shared.contracts.BlockStatus
 import org.companerodeescuela.shared.contracts.ClassOccurrenceStatusContract
 import org.companerodeescuela.shared.contracts.ClassroomMemberRole
+import org.companerodeescuela.shared.contracts.ClassroomStatus
+import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
 import org.companerodeescuela.shared.contracts.ManagedScheduleBlock
+import org.companerodeescuela.shared.contracts.NetworkVerificationMethod
 import org.companerodeescuela.shared.contracts.ScheduleBlock
 import org.companerodeescuela.shared.contracts.ScheduleSource
+import org.companerodeescuela.shared.contracts.SchoolPresenceIdentitySource
+import org.companerodeescuela.shared.contracts.SchoolPresenceResponse
+import org.companerodeescuela.shared.contracts.SchoolPresenceStatus
 import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
 import java.time.Clock
@@ -76,10 +76,10 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlin.test.assertFailsWith
 
 class NativeAcademicProjectionTest {
     private val now = Instant.parse("2026-10-05T07:00:00Z")
@@ -95,6 +95,7 @@ class NativeAcademicProjectionTest {
         lateinit var accounts: InMemoryPlatformAccountRepository
         lateinit var classes: ClassroomService
         lateinit var projection: NativeAcademicProjection
+        lateinit var presence: org.companerodeescuela.api.presence.SchoolPresenceService
 
         suspend fun initialize() {
             accounts = ScopedAcademicFixtures.accounts(teacher, student)
@@ -120,6 +121,9 @@ class NativeAcademicProjectionTest {
             classes = ClassroomService(classRepo, groups, clock, accounts = accounts)
             schedules.save(record())
             projection = NativeAcademicProjection(accounts, classes, groups, schedules, clock)
+            presence =
+                org.companerodeescuela.api.test
+                    .campusPresenceFixture(accounts, clock, "campus", listOf(teacher, student))
         }
 
         fun record(id: String = "native-block") =
@@ -266,6 +270,7 @@ class NativeAcademicProjectionTest {
                     ProviderAttendanceOccurrenceResolver(provider),
                     clock = clock,
                     nativeProjection = f.projection,
+                    schoolPresenceService = f.presence,
                 )
             assertFailsWith<ApiException.NotFound> {
                 service.openSession(f.teacher.id, CreateAttendanceSessionRequest(external.id, date.toString()), f.teacher)
@@ -324,6 +329,7 @@ class NativeAcademicProjectionTest {
                     ProviderAttendanceOccurrenceResolver(provider),
                     clock = clock,
                     nativeProjection = f.projection,
+                    schoolPresenceService = f.presence,
                 )
             val session = sessions.openSession(f.teacher.id, CreateAttendanceSessionRequest(occurrence.id, date.toString()), f.teacher)
             assertEquals(AttendanceIdentitySource.NATIVE, session.identitySource)
@@ -377,6 +383,7 @@ class NativeAcademicProjectionTest {
                     ProviderAttendanceOccurrenceResolver(MockAcademicProvider()),
                     clock = clock,
                     nativeProjection = f.projection,
+                    schoolPresenceService = f.presence,
                     pushService = push,
                 )
             val session = sessions.openSession(f.teacher.id, CreateAttendanceSessionRequest(occurrence.id, date.toString()), f.teacher)
@@ -545,6 +552,7 @@ class NativeAcademicProjectionTest {
                     access,
                     clock,
                     nativeProjection = f.projection,
+                    schoolPresenceService = f.presence,
                 )
             val students =
                 AttendanceStudentService(
@@ -739,5 +747,155 @@ class NativeAcademicProjectionTest {
                         it.studentId
                     }.toSet(),
             )
+        }
+
+    private fun campusSessions(
+        f: Fixture,
+        repository: InMemoryAttendanceRepository,
+        push: PushOutboxService? = null,
+    ): AttendanceSessionService {
+        val resolver = ProviderAttendanceOccurrenceResolver(MockAcademicProvider())
+        val access = AttendanceAccessPolicy(repository, resolver, AttendanceAdministrationPolicy(f.accounts, f.classes, f.projection))
+        return AttendanceSessionService(
+            repository,
+            resolver,
+            access,
+            clock,
+            nativeProjection = f.projection,
+            pushService = push,
+            schoolPresenceService = f.presence,
+        )
+    }
+
+    @Test fun `native teacher must scan institutional QR before opening a pass`() =
+        runTest {
+            val f = Fixture().also { it.initialize() }
+            val repository = InMemoryAttendanceRepository()
+            val occurrence =
+                f.projection
+                    .week(f.teacher, date)
+                    .occurrences
+                    .single()
+            f.presence.close(f.teacher.id, f.teacher)
+            assertFailsWith<ApiException.Forbidden> {
+                campusSessions(
+                    f,
+                    repository,
+                ).openSession(f.teacher.id, CreateAttendanceSessionRequest(occurrence.id, date.toString()), f.teacher)
+            }
+            assertTrue(repository.findOpenSessions().isEmpty())
+        }
+
+    @Test fun `only enrolled students with an active entry receive one reminder per retry window`() =
+        runTest {
+            val f = Fixture().also { it.initialize() }
+            val repository = InMemoryAttendanceRepository()
+            val devices = InMemoryDeviceTokenRepository()
+            devices.register("NATIVE:${f.student.id}", "synthetic-token-student-123456", "android", null, "student-session")
+            devices.register("NATIVE:outsider", "synthetic-token-outsider-123456", "android", null, "outsider-session")
+            val outbox = InMemoryPushOutboxRepository()
+            val push = PushOutboxService(devices, outbox, PushGateway { _, _, _ -> error("Opening must never send inline") }, clock)
+            val service = campusSessions(f, repository, push)
+            val occurrence =
+                f.projection
+                    .week(f.teacher, date)
+                    .occurrences
+                    .single()
+            f.presence.close(f.student.id, f.student)
+            val request = CreateAttendanceSessionRequest(occurrence.id, date.toString())
+            val session = service.openSession(f.teacher.id, request, f.teacher)
+            assertEquals(null, outbox.claim(now), "Unscanned students must not be notified")
+            f.presence.start(
+                f.student.id,
+                org.companerodeescuela.shared.contracts.StartSchoolPresenceRequest(
+                    "later-entry",
+                    "synthetic-entry-campus",
+                    org.companerodeescuela.shared.contracts
+                        .SchoolNetworkEvidence(ssid = "School"),
+                    now.epochSecond,
+                ),
+                f.student,
+            )
+            assertEquals(1, service.resendSessionNotice(f.teacher.id, session.id, nativeActor = f.teacher))
+            assertEquals(0, service.resendSessionNotice(f.teacher.id, session.id, nativeActor = f.teacher))
+            assertEquals("NATIVE:${f.student.id}", assertNotNull(outbox.claim(now)).owner)
+            assertEquals(null, outbox.claim(now))
+            assertTrue(repository.recordsForSession(session.id).isEmpty(), "Neither entry nor FCM confirms class attendance")
+            assertEquals(session.id, service.openSession(f.teacher.id, request, f.teacher).id)
+        }
+
+    @Test fun `teacher close persists missing confirmations as absent without overwriting a reviewed correction`() =
+        runTest {
+            val f = Fixture().also { it.initialize() }
+            val repository = InMemoryAttendanceRepository()
+            val service = campusSessions(f, repository)
+            val occurrence =
+                f.projection
+                    .week(f.teacher, date)
+                    .occurrences
+                    .single()
+            val session = service.openSession(f.teacher.id, CreateAttendanceSessionRequest(occurrence.id, date.toString()), f.teacher)
+            val closed = service.closeSession(f.teacher.id, session.id, nativeActor = f.teacher)
+            assertEquals(AttendanceSessionStatus.CLOSED, closed.status)
+            val absent = repository.recordsForSession(session.id).single()
+            assertEquals(org.companerodeescuela.shared.contracts.AttendanceDisposition.ABSENT, absent.disposition)
+            assertEquals(f.teacher.id, absent.reviewedBy)
+            assertEquals(org.companerodeescuela.shared.contracts.AttendanceStatus.REVIEW_REQUIRED, absent.status)
+            val resolver = ProviderAttendanceOccurrenceResolver(MockAcademicProvider())
+            val review =
+                AttendanceReviewService(
+                    repository,
+                    AttendanceAccessPolicy(repository, resolver, AttendanceAdministrationPolicy(f.accounts, f.classes, f.projection)),
+                    clock,
+                )
+            val corrected =
+                review.review(
+                    f.teacher.id,
+                    absent.id,
+                    org.companerodeescuela.shared.contracts.ReviewAttendanceRequest(
+                        org.companerodeescuela.shared.contracts.AttendanceStatus.REVIEW_REQUIRED,
+                        disposition = org.companerodeescuela.shared.contracts.AttendanceDisposition.LATE,
+                        note = "Confirmación revisada por docente",
+                    ),
+                    nativeActor = f.teacher,
+                )
+            service.closeSession(f.teacher.id, session.id, nativeActor = f.teacher)
+            assertEquals(listOf(corrected), repository.recordsForSession(session.id))
+            assertEquals(2, corrected.reviewHistory.size)
+        }
+
+    @Test fun `queued class notice is rejected after school entry closes or session ends`() =
+        runTest {
+            val f = Fixture().also { it.initialize() }
+            val repository = InMemoryAttendanceRepository()
+            val service = campusSessions(f, repository)
+            val occurrence =
+                f.projection
+                    .week(f.teacher, date)
+                    .occurrences
+                    .single()
+            val session = service.openSession(f.teacher.id, CreateAttendanceSessionRequest(occurrence.id, date.toString()), f.teacher)
+            val gate =
+                org.companerodeescuela.api.attendance
+                    .AttendancePushEligibility(repository, f.projection, f.accounts, f.presence, clock)
+            val item =
+                org.companerodeescuela.api.devices.PushOutboxItem(
+                    "notice",
+                    "NATIVE:${f.student.id}",
+                    "synthetic-token",
+                    "Pase",
+                    "Confirmar",
+                    data =
+                        mapOf(
+                            "type" to "attendance_session_opened",
+                            "sessionId" to session.id,
+                        ),
+                )
+            assertTrue(gate.allows(item))
+            assertEquals(false, gate.allows(item.copy(owner = "NATIVE:outsider")))
+            f.presence.close(f.student.id, f.student)
+            assertEquals(false, gate.allows(item))
+            service.closeSession(f.teacher.id, session.id, nativeActor = f.teacher)
+            assertEquals(false, gate.allows(item))
         }
 }

@@ -2,8 +2,6 @@
 
 package org.companerodeescuela.core.designsystem.v8
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,15 +11,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.LocalCompaneroAccentPalette
-import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 
 /** V8 Red Edition — fixed visual baseline for the five approved student mockups.
  *  The mockups are references, not runtime screen backgrounds.
@@ -73,43 +68,19 @@ fun V8RedPrimaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    val shape = RoundedCornerShape(V8RedDimensions.ControlCorner)
     val light = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    val glossy = LocalCompaneroHighContrast.current && !light
     val palette = LocalCompaneroAccentPalette.current
-    val deepAccent = palette.darkContainer
-    val brightAccent = palette.darkPrimary
-    val solidAccent = if (light) MaterialTheme.colorScheme.primary else deepAccent
-    val fills =
-        when {
-            !enabled -> listOf(solidAccent.copy(alpha = 0.35f), solidAccent.copy(alpha = 0.35f))
-            glossy -> listOf(deepAccent, brightAccent)
-            else -> listOf(solidAccent, solidAccent)
-        }
-    val shaded =
-        modifier.shadow(
-            if (enabled && glossy) 8.dp else 0.dp,
-            shape,
-            ambientColor = brightAccent.copy(alpha = 0.25f),
-            spotColor = brightAccent.copy(alpha = 0.25f),
-        )
-    val tinted = shaded.background(Brush.horizontalGradient(fills), shape)
-    val framed =
-        tinted.border(
-            1.dp,
-            if (glossy) brightAccent else solidAccent.copy(alpha = 0.45f),
-            shape,
-        )
+    val solidAccent = if (light) MaterialTheme.colorScheme.primary else palette.darkContainer
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = framed,
+        modifier = modifier,
         shape = RoundedCornerShape(V8RedDimensions.ControlCorner),
         colors =
             ButtonDefaults.buttonColors(
-                containerColor = Color.Transparent,
+                containerColor = solidAccent,
                 contentColor = Color.White,
-                disabledContainerColor = Color.Transparent,
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             ),
         contentPadding = PaddingValues(horizontal = 22.dp, vertical = 16.dp),
     ) {

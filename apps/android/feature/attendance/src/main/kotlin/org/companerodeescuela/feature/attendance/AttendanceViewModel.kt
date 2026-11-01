@@ -117,6 +117,13 @@ class AttendanceViewModel
         private var modeGeneration = 0L
         private var teacherRequests = SupervisorJob(viewModelScope.coroutineContext[Job])
 
+        private fun cancelTeacherRequests() {
+            teacherRequests.cancel()
+            teacherRequests = SupervisorJob(viewModelScope.coroutineContext[Job])
+            qrRotationJob?.cancel()
+            rosterPollingJob?.cancel()
+        }
+
         private fun cancelStudentHistory() {
             studentHistoryVersion++
             studentHistoryJob?.cancel()
@@ -132,10 +139,7 @@ class AttendanceViewModel
         ) {
             modeGeneration++
             cancelStudentHistory()
-            teacherRequests.cancel()
-            teacherRequests = SupervisorJob(viewModelScope.coroutineContext[Job])
-            qrRotationJob?.cancel()
-            rosterPollingJob?.cancel()
+            cancelTeacherRequests()
             _state.update {
                 AttendanceUiState(
                     teacherScopeGeneration = it.teacherScopeGeneration + 1,
@@ -211,6 +215,7 @@ class AttendanceViewModel
             val generation = ++modeGeneration
             cancelStudentHistory()
             studentPollingJob?.cancel()
+            cancelTeacherRequests()
 
             viewModelScope.launch {
                 val claimsResult = repository.localSessionClaims()
@@ -236,7 +241,7 @@ class AttendanceViewModel
                         }
 
                         _state.update {
-                            val scoped = if (it.userId != null && it.userId != claims.userId) AttendanceUiState() else it
+                            val scoped = if (it.userId != claims.userId || it.mode != requestedMode) AttendanceUiState() else it
                             scoped.copy(
                                 mode = requestedMode,
                                 userId = claims.userId,
@@ -313,6 +318,7 @@ class AttendanceViewModel
         }
 
         fun openSchoolDayScanner() {
+            if (_state.value.mode !in setOf(AttendanceMode.STUDENT, AttendanceMode.TEACHER) || _state.value.actionInProgress) return
             val network = repository.currentSchoolNetwork()
             if (network == null) {
                 _state.update {
@@ -320,7 +326,7 @@ class AttendanceViewModel
                         schoolNetworkSsid = null,
                         errorMessage =
                             "Sin Wi-Fi escolar no se verifica la jornada. " +
-                                "Para tu clase escanea el QR de contingencia del docente.",
+                                "Conéctate a la red institucional para registrar tu ingreso.",
                     )
                 }
                 return
@@ -407,6 +413,9 @@ class AttendanceViewModel
         }
 
         private fun startSchoolDay(rawToken: String) {
+            if (_state.value.actionInProgress) return
+            val generation = modeGeneration
+            val ownerId = _state.value.userId ?: return
             val token = rawToken.trim()
             if (token.isBlank()) {
                 _state.update {
@@ -418,8 +427,25 @@ class AttendanceViewModel
                 return
             }
             viewModelScope.launch {
+                val identity = repository.localSessionClaims().valueOrNull() ?: return@launch
+                if (generation != modeGeneration || identity.userId != ownerId) return@launch
                 _state.update { it.copy(actionInProgress = true, errorMessage = null) }
-                when (val result = repository.startSchoolPresence(token)) {
+                val result = repository.startSchoolPresence(token)
+                ensureActive()
+                val current = repository.localSessionClaims().valueOrNull()
+                if (generation != modeGeneration || _state.value.userId != ownerId) return@launch
+                if (current?.userId != ownerId || current.sessionId != identity.sessionId) {
+                    _state.update {
+                        it.copy(
+                            actionInProgress = false,
+                            scannerOpen = false,
+                            schoolPresence = null,
+                            schoolPresenceReceivedRealtime = null,
+                        )
+                    }
+                    return@launch
+                }
+                when (result) {
                     is Outcome.Success ->
                         _state.update {
                             it.copy(
@@ -459,6 +485,23 @@ class AttendanceViewModel
                 return
             }
             launchTeacherRequest {
+                val presence = repository.schoolPresence()
+                ensureActive()
+                if (presence is Outcome.Failure) {
+                    teacherActionFailed(presence.error)
+                    return@launchTeacherRequest
+                }
+                val recorded = presence.valueOrNull()
+                _state.update {
+                    it.copy(
+                        schoolPresence = recorded,
+                        schoolPresenceReceivedRealtime = android.os.SystemClock.elapsedRealtime(),
+                    )
+                }
+                if (recorded?.serverTimeEpochSeconds?.let { schoolDayRecorded(recorded, it) } != true) {
+                    _state.update { it.copy(errorMessage = "Escanea el QR institucional antes de iniciar la clase.") }
+                    return@launchTeacherRequest
+                }
                 val availability = teacherPassOpenStatus(occurrence, LocalDateTime.now())
                 if (availability != TeacherPassOpenStatus.AVAILABLE) {
                     _state.update {
@@ -615,9 +658,11 @@ class AttendanceViewModel
         fun resendTeacherSessionNotice() {
             val sessionId = _state.value.teacherSession?.id ?: return
             if (_state.value.actionInProgress) return
-            viewModelScope.launch {
+            launchTeacherRequest {
                 _state.update { it.copy(actionInProgress = true, errorMessage = null, successMessage = null) }
-                when (val result = repository.resendSessionNotice(sessionId)) {
+                val result = repository.resendSessionNotice(sessionId)
+                ensureActive()
+                when (result) {
                     is Outcome.Success ->
                         _state.update {
                             it.copy(
@@ -630,19 +675,18 @@ class AttendanceViewModel
                                     },
                             )
                         }
-                    is Outcome.Failure ->
-                        _state.update {
-                            it.copy(actionInProgress = false, errorMessage = result.error.userMessage)
-                        }
+                    is Outcome.Failure -> teacherActionFailed(result.error)
                 }
             }
         }
 
         fun loadTeacherHistory() {
             if (_state.value.mode != AttendanceMode.TEACHER || _state.value.actionInProgress) return
-            viewModelScope.launch {
+            launchTeacherRequest {
                 _state.update { it.copy(actionInProgress = true, errorMessage = null) }
-                when (val result = repository.teacherSessionHistory()) {
+                val result = repository.teacherSessionHistory()
+                ensureActive()
+                when (result) {
                     is Outcome.Success ->
                         _state.update {
                             it.copy(actionInProgress = false, teacherHistory = result.value, teacherHistoryLoaded = true)
@@ -651,6 +695,39 @@ class AttendanceViewModel
                         _state.update {
                             it.copy(actionInProgress = false, errorMessage = result.error.userMessage)
                         }
+                }
+            }
+        }
+
+        fun selectTeacherHistory(session: AttendanceSessionResponse) {
+            if (_state.value.mode != AttendanceMode.TEACHER ||
+                _state.value.actionInProgress ||
+                _state.value.teacherHistory.none { it.id == session.id }
+            ) {
+                return
+            }
+            clearTeacherScope(loading = true)
+            launchTeacherRequest {
+                val result = repository.roster(session.id)
+                ensureActive()
+                when (result) {
+                    is Outcome.Success -> {
+                        _state.update {
+                            it.copy(loading = false, teacherSession = result.value.session, roster = result.value)
+                        }
+                        val selected = result.value.session
+                        if (selected.closedAtEpochSeconds == null &&
+                            selected.status == org.companerodeescuela.shared.contracts.AttendanceSessionStatus.OPEN &&
+                            selected.closesAtEpochSeconds > System.currentTimeMillis() / 1000
+                        ) {
+                            startQrRotation(selected.id)
+                            startRosterPolling(selected.id)
+                        }
+                    }
+                    is Outcome.Failure -> {
+                        teacherActionFailed(result.error)
+                        _state.update { it.copy(loading = false) }
+                    }
                 }
             }
         }
@@ -952,7 +1029,12 @@ class AttendanceViewModel
             launchTeacherRequest {
                 val week = repository.academicWeek(LocalDate.now().toString())
                 val active = repository.activeTeacherSessions()
+                val presence = repository.schoolPresence()
                 ensureActive()
+                if (presence is Outcome.Failure && (presence.error as? AppError.Http)?.status in setOf(401, 403)) {
+                    clearTeacherScope(presence.error)
+                    return@launchTeacherRequest
+                }
                 val context = requestedClassroom
                 val failures =
                     listOfNotNull(
@@ -1059,6 +1141,9 @@ class AttendanceViewModel
                         sessionsLoaded = active is Outcome.Success,
                         activeSessions = activeSessions,
                         teacherSession = activeSession,
+                        schoolPresence = presence.valueOrNull(),
+                        schoolPresenceReceivedRealtime = presence.valueOrNull()?.let { android.os.SystemClock.elapsedRealtime() },
+                        schoolNetworkSsid = repository.currentSchoolNetwork()?.ssid,
                         offlineQrPrepared = if (it.teacherSession?.id == activeSession?.id) it.offlineQrPrepared else false,
                         errorMessage =
                             when {

@@ -53,8 +53,8 @@ object SiiiPilotCredentialBootstrap {
         }
         // A key has exactly one purpose. Never widen the existing producer key.
         val scope = env("SIII_INBOUND_SCOPE") ?: "group:write"
-        require(scope in setOf("group:write", "attendance:read")) {
-            "SIII_INBOUND_SCOPE must be group:write or attendance:read"
+        require(scope in setOf("group:write", "attendance:read", "attendance:archive")) {
+            "SIII_INBOUND_SCOPE must select one supported integration purpose"
         }
         return IntegrationCredential(
             keyId = keyId,

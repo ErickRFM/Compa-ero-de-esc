@@ -32,6 +32,7 @@ data class ScheduleUiState(
     val successMessage: String? = null,
     val syncMessage: String? = null,
     val errorMessage: String? = null,
+    val institutionalAccessDenied: Boolean = false,
 )
 
 @HiltViewModel
@@ -59,6 +60,7 @@ class ScheduleViewModel
                             loading = true,
                             syncMessage = null,
                             errorMessage = null,
+                            institutionalAccessDenied = false,
                         )
                     val result = repository.load()
                     currentCoroutineContext().ensureActive()
@@ -76,7 +78,9 @@ class ScheduleViewModel
                         }
                         is Outcome.Failure -> {
                             if (result.error !is AppError.Network) {
-                                val personal = personalRepository.list()
+                                val denied = (result.error as? AppError.Http)?.status == 403
+                                val expired = (result.error as? AppError.Http)?.status == 401
+                                val personal = if (expired) Outcome.Success(emptyList()) else personalRepository.list()
                                 currentCoroutineContext().ensureActive()
                                 _state.value =
                                     _state.value.copy(
@@ -88,7 +92,9 @@ class ScheduleViewModel
                                             },
                                         fromCache = false,
                                         lastUpdatedAtEpochSeconds = null,
-                                        errorMessage = result.error.userMessage,
+                                        institutionalAccessDenied = denied,
+                                        syncMessage = if (denied) "Vincula tu cuenta con SIII para ver tu horario oficial." else null,
+                                        errorMessage = if (denied) null else result.error.userMessage,
                                     )
                                 return@launch
                             }

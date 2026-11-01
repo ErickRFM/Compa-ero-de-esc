@@ -449,6 +449,8 @@ class AttendanceStudentService(
     internal suspend fun <T> withHistory(
         studentId: String,
         nativeActor: org.companerodeescuela.shared.contracts.UserSummary?,
+        page: Int? = null,
+        nextPage: (Int?) -> Unit = {},
         read: suspend (List<HistoryEntry>) -> T,
     ): T {
         if (nativeActor != null && nativeActor.id != studentId) {
@@ -465,7 +467,9 @@ class AttendanceStudentService(
                 enrollmentResolver.courseGroupsFor(studentId, nativeActor)
             }
         val history = mutableListOf<HistoryEntry>()
-        for (record in repository.recordsForStudent(studentId)) {
+        val candidates = if (page == null) repository.recordsForStudent(studentId) else repository.studentHistoryPage(studentId, page)
+        nextPage(if (page != null && candidates.size > 100) page + 1 else null)
+        for (record in candidates.take(100)) {
             if (record.studentId != studentId) continue
             val session = repository.findSession(record.sessionId) ?: continue
             if ((nativeActor == null && session.academicSource != null) ||

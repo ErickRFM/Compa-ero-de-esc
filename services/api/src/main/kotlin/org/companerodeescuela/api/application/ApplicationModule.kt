@@ -2,6 +2,7 @@ package org.companerodeescuela.api.application
 
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
+import io.ktor.server.application.log
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -122,6 +123,25 @@ fun Application.module(
         }
     }
     // One-time provisioning is an explicit operator action and blocks startup on mismatch.
+    org.companerodeescuela.api.admin.QaAdminBootstrap.parse(System::getenv)?.let { desired ->
+        require(
+            settings.mongo.isConfigured && settings.hasAuthentication,
+        ) { "QA admin bootstrap requires persistent authenticated identity" }
+        runBlocking {
+            withTimeout(15_000L) {
+                org.companerodeescuela.api.admin.QaAdminBootstrap.provision(
+                    desired,
+                    settings.environment.name.lowercase(),
+                    settings.mongo.databaseName,
+                    identityGraph.accounts,
+                    identityGraph.institutions,
+                    identityGraph.mfa,
+                    org.companerodeescuela.api.admin
+                        .MongoQaAdminBootstrapClaims(mongoConnection.database()),
+                )
+            }
+        }
+    }
     // Do not start an HTTP listener before the encrypted credential is persisted.
     SiiiPilotCredentialBootstrap.parse(System::getenv)?.let { desired ->
         try {
@@ -204,35 +224,6 @@ fun Application.module(
                 institutionalAuthorityTargets.keys,
             )
         }
-    val institutionalProjectionWorker =
-        if (settings.hasAuthentication) {
-            institutionalPushRepository?.let { repository ->
-                val sections = checkNotNull(institutionalSections)
-                InstitutionalEventProjectionWorker(
-                    repository = repository,
-                    identityResolver =
-                        InstitutionalProjectionIdentityResolver { institutionId, reference ->
-                            institutionalIdentityLinkService
-                                .resolve(
-                                    institutionId,
-                                    reference.kind,
-                                    reference.externalId,
-                                )?.id
-                        },
-                    commandHandler = sections.handler,
-                    adapters = listOf(sections.adapter),
-                    leaseDurationSeconds = 120,
-                )
-            }
-        } else {
-            null
-        }
-    launchManagedWorker(
-        enabled = institutionalProjectionWorker != null,
-        context = Dispatchers.IO,
-    ) {
-        institutionalProjectionWorker?.runForever()
-    }
     val classroomGraph =
         buildClassroomFeatureGraph(
             settings = settings,
@@ -277,6 +268,15 @@ fun Application.module(
             mfa = identityGraph.mfa,
             institutions = identityGraph.institutions,
         )
+    val attendanceRepository = buildAttendanceRepository(settings, mongoConnection)
+    val attendancePushEligibility =
+        org.companerodeescuela.api.attendance.AttendancePushEligibility(
+            attendanceRepository,
+            nativeAcademic,
+            identityGraph.accounts,
+            presenceGraph?.service,
+            institutions = identityGraph.institutions,
+        )
     val operationsGraph =
         buildOperationsFeatureGraph(
             settings = settings,
@@ -288,6 +288,7 @@ fun Application.module(
             institutions = identityGraph.institutions,
             mfa = identityGraph.mfa,
             refreshSessions = identityGraph.refreshSessions,
+            authorizePushMessage = attendancePushEligibility::allows,
         )
     val attendanceGraph =
         buildAttendanceFeatureGraph(
@@ -300,7 +301,63 @@ fun Application.module(
             classrooms = classroomGraph.classroomService,
             nativeProjection = nativeAcademic,
             pushService = operationsGraph.pushService,
+            repository = attendanceRepository,
         )
+
+    val academicChangeNotifier =
+        org.companerodeescuela.api.integrations.academic.siii.SiiiAcademicChangeNotifier(
+            institutionalIdentityLinkService,
+            operationsGraph.pushService,
+        )
+    val institutionalProjectionWorker =
+        if (settings.hasAuthentication) {
+            institutionalPushRepository?.let { repository ->
+                val sections = checkNotNull(institutionalSections)
+                InstitutionalEventProjectionWorker(
+                    repository = repository,
+                    identityResolver =
+                        InstitutionalProjectionIdentityResolver { institutionId, reference ->
+                            institutionalIdentityLinkService
+                                .resolve(
+                                    institutionId,
+                                    reference.kind,
+                                    reference.externalId,
+                                )?.id
+                        },
+                    commandHandler =
+                        org.companerodeescuela.api.integrations.academic.siii.SiiiSectionProjectionHandler(
+                            sections.repository,
+                            notificationOwners = academicChangeNotifier::owners,
+                            notifyChange = academicChangeNotifier::enqueue,
+                        ),
+                    adapters = listOf(sections.adapter),
+                    leaseDurationSeconds = 120,
+                )
+            }
+        } else {
+            null
+        }
+    launchManagedWorker(
+        enabled = institutionalProjectionWorker != null,
+        context = Dispatchers.IO,
+    ) {
+        institutionalProjectionWorker?.runForever()
+    }
+
+    launchManagedWorker(enabled = settings.hasAuthentication && settings.mongo.isConfigured, context = Dispatchers.IO) {
+        while (kotlin.coroutines.coroutineContext[kotlinx.coroutines.Job]?.isActive == true) {
+            try {
+                attendanceGraph.sessionService.reconcileClosures()
+            } catch (
+                cancelled: kotlinx.coroutines.CancellationException,
+            ) {
+                throw cancelled
+            } catch (_: Exception) {
+                log.warn("Attendance closure replay unavailable; durable work retained")
+            }
+            kotlinx.coroutines.delay(15_000)
+        }
+    }
 
     // Only a fully configured, authenticated Mongo deployment starts the durable worker.
     // A local/test instance never sends live Firebase notifications.
@@ -357,6 +414,7 @@ fun Application.module(
                 institutionalIdentityLinkService,
                 attendanceGraph.studentService,
                 nativeAcademic.institutionalAttendance,
+                archivalRecords = attendanceRepository,
             ),
             institutionalPushRepository,
         )

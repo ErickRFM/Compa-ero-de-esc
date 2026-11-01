@@ -140,7 +140,13 @@ class ScheduleAuthorityTest {
                     status.set(failure)
                     vm.load()
                     val denied = loaded()
-                    assertNotNull(denied.errorMessage)
+                    if (failure == 403) {
+                        assertEquals(true, denied.institutionalAccessDenied)
+                        assertNotNull(denied.syncMessage)
+                        assertNull(denied.errorMessage)
+                    } else {
+                        assertNotNull(denied.errorMessage)
+                    }
                     assertEquals(listOf("Personal import"), denied.entries.map { it.subjectName })
                 }
                 status.set(503)

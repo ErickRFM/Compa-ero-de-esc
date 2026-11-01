@@ -230,6 +230,20 @@ class FcmHttpV1Gateway(
                                             }
                                         },
                                     )
+                                } else if (data["type"] == org.companerodeescuela.shared.contracts.AcademicChangePushContract.TYPE) {
+                                    put(
+                                        "notification",
+                                        buildJsonObject {
+                                            put("channel_id", AttendancePushContract.CHANNEL_ID)
+                                            data[org.companerodeescuela.shared.contracts.AcademicChangePushContract.INSTITUTION_ID]?.let {
+                                                put(
+                                                    "tag",
+                                                    org.companerodeescuela.shared.contracts.AcademicChangePushContract
+                                                        .notificationTag(it),
+                                                )
+                                            }
+                                        },
+                                    )
                                 }
                             },
                         )

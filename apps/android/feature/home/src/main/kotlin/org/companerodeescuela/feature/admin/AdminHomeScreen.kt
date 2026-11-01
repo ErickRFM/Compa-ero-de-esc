@@ -54,9 +54,11 @@ import org.companerodeescuela.feature.home.R
 import org.companerodeescuela.shared.contracts.AcademicGroupSummary
 import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.AdminUserSummary
+import org.companerodeescuela.shared.contracts.RegistrationAccountType
 import org.companerodeescuela.shared.contracts.StaffApplication
 import org.companerodeescuela.shared.contracts.StaffApplicationStatus
 import org.companerodeescuela.shared.contracts.StaffRole
+import org.companerodeescuela.shared.contracts.UserRole
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -86,6 +88,8 @@ fun adminHomeScreen(
         onOpenClassrooms,
         onOpenSecurity,
         modifier,
+        onStudentAffiliation = viewModel::prepareStudentAffiliation,
+        onInstitutionalLink = viewModel::prepareInstitutionalLink,
     )
 }
 
@@ -104,7 +108,11 @@ fun adminHomeScreenContent(
     onOpenClassrooms: () -> Unit,
     onOpenSecurity: () -> Unit,
     modifier: Modifier = Modifier,
+    onStudentAffiliation: (String, String) -> Unit = { _, _ -> },
+    onInstitutionalLink: (String, String) -> Unit = { _, _ -> },
 ) {
+    var linkTarget by remember(state.ownerKey) { mutableStateOf<AdminUserSummary?>(null) }
+    var externalReference by remember(state.ownerKey, linkTarget?.user?.id) { mutableStateOf("") }
     var tutorSelection by remember(state.ownerKey) { mutableStateOf<Pair<AdminUserSummary, StaffApplication>?>(null) }
     Column(
         modifier
@@ -203,6 +211,8 @@ fun adminHomeScreenContent(
                 loading = state.loading,
                 working = state.working,
                 onLifecycle = onLifecycle,
+                onStudentAffiliation = onStudentAffiliation,
+                onInstitutionalLink = { id -> linkTarget = overview.users.find { it.user.id == id } },
             )
             Text(stringResource(R.string.admin_assignments), style = MaterialTheme.typography.titleLarge)
             state.assignmentFailure?.let { adminFailure(it) }
@@ -285,6 +295,31 @@ fun adminHomeScreenContent(
             }
         }
     }
+    linkTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { linkTarget = null },
+            properties = DialogProperties(securePolicy = SecureFlagPolicy.SecureOn),
+            title = { Text(stringResource(R.string.admin_link_siii)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(target.user.displayName)
+                    Text(stringResource(R.string.admin_link_reference_help))
+                    OutlinedTextField(externalReference, {
+                        externalReference = it.take(32)
+                    }, label = { Text(stringResource(R.string.admin_link_reference)) }, singleLine = true)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onInstitutionalLink(target.user.id, externalReference)
+                    linkTarget = null
+                }, enabled = externalReference.trim().uppercase(java.util.Locale.ROOT).matches(Regex("[A-Z0-9][A-Z0-9_-]{1,31}"))) {
+                    Text(stringResource(R.string.admin_link_siii))
+                }
+            },
+            dismissButton = { TextButton({ linkTarget = null }) { Text(stringResource(R.string.admin_cancel)) } },
+        )
+    }
     tutorSelection?.let { (user, application) ->
         tutorApprovalDialog(
             state.groups.filter { it.institutionId == application.requestedInstitutionId },
@@ -312,6 +347,8 @@ private fun adminUserDirectory(
     loading: Boolean,
     working: Boolean,
     onLifecycle: (String, AccountStatus) -> Unit,
+    onStudentAffiliation: (String, String) -> Unit,
+    onInstitutionalLink: (String) -> Unit,
 ) {
     var query by rememberSaveable(ownerKey) { mutableStateOf("") }
     var filter by rememberSaveable(ownerKey) { mutableStateOf(AdminDirectoryFilter.ALL) }
@@ -372,6 +409,32 @@ private fun adminUserDirectory(
                         Text(email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Text(stringResource(statusResource(user.user.accountStatus)))
+                    val pendingInstitution = user.requestedInstitutionId
+                    if (user.user.emailVerified &&
+                        user.user.accountStatus == AccountStatus.ACTIVE &&
+                        user.user.roles == setOf(UserRole.STUDENT) &&
+                        user.user.institutionId == null &&
+                        pendingInstitution != null &&
+                        user.user.registrationAccountType == RegistrationAccountType.STUDENT
+                    ) {
+                        TextButton(onClick = {
+                            onStudentAffiliation(user.user.id, pendingInstitution)
+                        }, enabled = !loading && !working, modifier = Modifier.testTag("admin_student_affiliation")) {
+                            Text(stringResource(R.string.admin_student_affiliation))
+                        }
+                    }
+                    if (user.user.emailVerified &&
+                        user.user.accountStatus == AccountStatus.ACTIVE &&
+                        user.user.institutionId != null &&
+                        user.user.roles.any { it == UserRole.STUDENT || it == UserRole.TEACHER } &&
+                        user.user.roles.none { it == UserRole.ADMIN || it == UserRole.SUPER_ADMIN }
+                    ) {
+                        TextButton(onClick = {
+                            onInstitutionalLink(user.user.id)
+                        }, enabled = !loading && !working, modifier = Modifier.testTag("admin_institutional_link")) {
+                            Text(stringResource(R.string.admin_link_siii))
+                        }
+                    }
                     if (user.user.accountStatus != AccountStatus.REVOKED) {
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             TextButton(

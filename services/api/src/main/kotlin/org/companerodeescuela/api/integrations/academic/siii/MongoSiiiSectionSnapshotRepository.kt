@@ -24,7 +24,17 @@ class MongoSiiiSectionSnapshotRepository(
         sectionId: String,
     ): StoredSiiiSection? = sections.find(identity(institutionId, sectionId)).firstOrNull()?.stored()
 
-    override suspend fun apply(value: StoredSiiiSection) {
+    override suspend fun apply(value: StoredSiiiSection) = applyFenced(value, null)
+
+    override suspend fun applyExpected(
+        value: StoredSiiiSection,
+        expectedPreviousVersion: Long,
+    ) = applyFenced(value, expectedPreviousVersion)
+
+    private suspend fun applyFenced(
+        value: StoredSiiiSection,
+        expectedPreviousVersion: Long?,
+    ) {
         require(
             value.institutionId.isNotBlank() &&
                 value.institutionId.length <= 128 &&
@@ -52,6 +62,8 @@ class MongoSiiiSectionSnapshotRepository(
                 .append("snapshotJson", canonical)
                 .append("tombstone", canonical == null)
                 .append("syncedAt", Date.from(value.syncedAt))
+                .append("notificationOwners", value.notificationOwners)
+                .append("notificationsQueued", value.notificationsQueued)
 
         // The target CAS also fences workers whose inbox lease expired after validation.
         repeat(32) {
@@ -67,6 +79,9 @@ class MongoSiiiSectionSnapshotRepository(
                     }
                     return
                 }
+                if (expectedPreviousVersion != null && currentVersion != expectedPreviousVersion) {
+                    throw InstitutionalProjectionTransientFailure("SNAPSHOT_RECIPIENT_REVISION_CHANGED")
+                }
                 val result =
                     sections.replaceOne(
                         and(identity(value.institutionId, value.sectionId), eq("sourceVersion", currentVersion)),
@@ -74,6 +89,9 @@ class MongoSiiiSectionSnapshotRepository(
                     )
                 if (result.matchedCount == 1L) return
             } else {
+                if (expectedPreviousVersion != null && expectedPreviousVersion != 0L) {
+                    throw InstitutionalProjectionTransientFailure("SNAPSHOT_RECIPIENT_REVISION_CHANGED")
+                }
                 try {
                     sections.insertOne(replacement)
                     return
@@ -83,6 +101,19 @@ class MongoSiiiSectionSnapshotRepository(
             }
         }
         throw InstitutionalProjectionTransientFailure("SNAPSHOT_CAS_CONTENTION")
+    }
+
+    override suspend fun markNotificationsQueued(
+        institutionId: String,
+        sectionId: String,
+        sourceVersion: Long,
+        eventId: String,
+    ) {
+        sections.updateOne(
+            and(identity(institutionId, sectionId), eq("sourceVersion", sourceVersion), eq("eventId", eventId)),
+            com.mongodb.client.model.Updates
+                .set("notificationsQueued", true),
+        )
     }
 
     private fun identity(
@@ -111,6 +142,8 @@ class MongoSiiiSectionSnapshotRepository(
             digest,
             snapshot,
             getDate("syncedAt").toInstant(),
+            getList("notificationOwners", String::class.java).orEmpty(),
+            getBoolean("notificationsQueued", false),
         )
     }
 }

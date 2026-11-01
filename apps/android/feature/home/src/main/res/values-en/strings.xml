@@ -62,4 +62,8 @@
 <string name="admin_directory_no_results">No accounts match the search and filter.</string>
 <string name="admin_directory_previous">Previous</string>
 <string name="admin_directory_next">Next</string>
+<string name="admin_student_affiliation">Approve school affiliation</string>
+<string name="admin_link_siii">Link with SIII</string>
+<string name="admin_link_reference">Student or teacher identifier</string>
+<string name="admin_link_reference_help">Enter the student or teacher identifier recorded in SIII.</string>
 </resources>

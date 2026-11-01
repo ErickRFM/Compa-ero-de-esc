@@ -19,7 +19,10 @@ import org.companerodeescuela.shared.contracts.AdminUserSummary
 import org.companerodeescuela.shared.contracts.AdministrationOverview
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.ApproveStaffRequest
+import org.companerodeescuela.shared.contracts.ApproveStudentAffiliationRequest
 import org.companerodeescuela.shared.contracts.InstitutionSummary
+import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkRequest
+import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkSummary
 import org.companerodeescuela.shared.contracts.RevokeTutorAssignmentRequest
 import org.companerodeescuela.shared.contracts.TutorAssignmentSummary
 import org.companerodeescuela.shared.contracts.UserSummary
@@ -50,6 +53,14 @@ class AdminRepository(
             "admin/accounts/" + segment(target) + "/staff-approval",
             request,
         )
+
+    suspend fun affiliateStudent(
+        target: String,
+        request: ApproveStudentAffiliationRequest,
+    ): Outcome<AdminUserSummary> = post("admin/accounts/" + segment(target) + "/student-affiliation", request)
+
+    suspend fun linkInstitutionalIdentity(request: InstitutionalIdentityLinkRequest): Outcome<InstitutionalIdentityLinkSummary> =
+        post("admin/accounts/institutional-identity-links", request)
 
     suspend fun lifecycle(
         target: String,

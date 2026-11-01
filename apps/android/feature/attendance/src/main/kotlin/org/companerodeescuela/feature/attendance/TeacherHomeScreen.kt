@@ -159,7 +159,7 @@ fun TeacherHomeScreen(
                                     "${active.scheduledStartsAt} – ${active.scheduledEndsAt} · " +
                                         (if (state.roster == null) "Actualizando registros…" else "${records.size} registros recibidos")
                                 } else {
-                                    "El QR se genera desde el servidor y se renueva automáticamente."
+                                    "Registra tu ingreso con el QR institucional y después inicia una clase de tu horario oficial."
                                 },
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium,

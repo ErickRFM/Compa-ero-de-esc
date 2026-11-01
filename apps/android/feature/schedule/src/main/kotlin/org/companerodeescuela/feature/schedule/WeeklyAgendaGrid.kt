@@ -22,7 +22,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
 import org.companerodeescuela.core.designsystem.v8.*
 import org.companerodeescuela.shared.contracts.ScheduleEntry
 import org.companerodeescuela.shared.contracts.ScheduleSource
@@ -33,6 +32,7 @@ internal fun WeeklyAgendaGrid(
     onEdit: (ScheduleEntry) -> Unit,
     onDelete: (ScheduleEntry) -> Unit,
     onMoveRequest: (AgendaMoveProposal) -> Unit,
+    focusDay: String = "MONDAY",
 ) {
     val days =
         remember(entries) {
@@ -40,178 +40,178 @@ internal fun WeeklyAgendaGrid(
         }
     val layouts = remember(entries, days) { days.map { day -> agendaGridLayout(entries.filter { it.dayOfWeek == day }) } }
     val placements = layouts.flatten()
-    val startHour = (placements.minOfOrNull { it.startMinute / 60 } ?: 8).coerceAtMost(8)
-    val endHour = ((placements.maxOfOrNull { it.startMinute + it.durationMinutes } ?: 1080) + 59) / 60
-    val lastHour = endHour.coerceAtLeast(18)
-    val hourHeight = if (LocalDensity.current.fontScale > 1.2f) 58.dp else 36.dp
-    val rail = 38.dp
+    val hours = agendaVisibleHours(placements)
+    val startHour = hours.first
+    val lastHour = hours.last + 1
+    val hourHeight = (52f * LocalDensity.current.fontScale).coerceAtLeast(56f).dp
+    val rail = 44.dp
+    val headerHeight = if (LocalDensity.current.fontScale >= 1.5f) 56.dp else 44.dp
     var detail by remember { mutableStateOf<ScheduleEntry?>(null) }
     val density = LocalDensity.current
     val haptics = LocalHapticFeedback.current
     val quarterHourPx = with(density) { hourHeight.toPx() / 4 }
     val gridScroll = rememberScrollState()
-    val coroutineScope = rememberCoroutineScope()
     var showAllDetails by remember { mutableStateOf(false) }
     val colors = MaterialTheme.colorScheme
     val gridLineColor = colors.outline.copy(alpha = 0.4f)
-    LaunchedEffect(entries) { gridScroll.scrollTo(0) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("Lunes a sábado · desplaza a los lados", fontSize = 11.sp, color = colors.onSurfaceVariant)
-            TextButton(onClick = {
-                coroutineScope.launch { gridScroll.animateScrollTo(gridScroll.maxValue) }
-            }) { Text("Ver sábado →") }
-        }
         BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val normalWidth = ((maxWidth - rail) / days.size).coerceAtLeast(116.dp)
+            val normalWidth = ((maxWidth - rail) / days.size).coerceAtLeast(132.dp)
             val widths =
                 layouts.map { layout ->
                     val lanes = layout.maxOfOrNull { it.laneCount } ?: 1
-                    if (lanes > 1) (normalWidth * lanes).coerceAtLeast(96.dp * lanes) else normalWidth
+                    if (lanes > 1) (normalWidth * lanes).coerceAtLeast(104.dp * lanes) else normalWidth
                 }
-            val gridWidth = widths.fold(rail) { total, width -> total + width }
+            val gridWidth = widths.fold(0.dp) { total, width -> total + width }
             val widthsPx = widths.map { with(density) { it.toPx() } }
-            // The viewport must scroll, not the oversized child itself; otherwise
-            // Compose can clip the final Saturday column on a narrow device.
-            Box(Modifier.fillMaxWidth().horizontalScroll(gridScroll)) {
-                Column(
-                    Modifier
-                        .width(gridWidth)
-                        .v8GlassSurface(cornerRadius = 14.dp, elevation = 0.dp),
-                ) {
-                    Row(Modifier.padding(vertical = 12.dp)) {
-                        Text("Hora", Modifier.width(rail).padding(start = 4.dp), fontSize = 10.sp, color = colors.onSurfaceVariant)
-                        days.forEachIndexed {
-                            i,
-                            day,
-                            ->
-                            Text(
-                                dayLabelGrid(day),
-                                Modifier.width(widths[i]).padding(start = 4.dp),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        }
+            LaunchedEffect(focusDay, widths) {
+                withFrameNanos { }
+                val index = days.indexOf(focusDay).coerceAtLeast(0)
+                gridScroll.scrollTo(
+                    widthsPx
+                        .take(index)
+                        .sum()
+                        .toInt()
+                        .coerceAtMost(gridScroll.maxValue),
+                )
+            }
+            Row(Modifier.fillMaxWidth().v8GlassSurface(cornerRadius = 14.dp, elevation = 0.dp)) {
+                // Hours remain visible while the day columns move horizontally.
+                Column(Modifier.width(rail)) {
+                    Box(Modifier.height(headerHeight).fillMaxWidth(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                        Text("Hora", fontSize = 10.sp, color = colors.onSurfaceVariant)
                     }
-                    Row {
-                        Column(Modifier.width(rail)) {
-                            for (hour in startHour until lastHour) {
+                    for (hour in startHour until lastHour) {
+                        Text(
+                            "%02d:00".format(hour),
+                            Modifier.height(hourHeight).padding(start = 5.dp, top = 6.dp),
+                            fontSize = 10.sp,
+                            color = colors.onSurfaceVariant,
+                        )
+                    }
+                }
+                Box(Modifier.weight(1f).horizontalScroll(gridScroll)) {
+                    Column(Modifier.width(gridWidth)) {
+                        Row(Modifier.height(headerHeight), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            days.forEachIndexed { i, day ->
                                 Text(
-                                    "$hour:00",
-                                    Modifier.height(hourHeight).padding(start = 4.dp, top = 4.dp),
-                                    fontSize = 9.sp,
-                                    color = colors.onSurfaceVariant,
+                                    dayLabelGrid(day),
+                                    Modifier.width(widths[i]).padding(horizontal = 8.dp),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (day == focusDay) colors.primary else colors.onSurface,
                                 )
                             }
                         }
-                        layouts.forEachIndexed { dayIndex, layout ->
-                            Box(
-                                Modifier
-                                    .width(widths[dayIndex])
-                                    .height(hourHeight * (lastHour - startHour))
-                                    .drawBehind {
-                                        for (hour in 0..(lastHour - startHour)) {
-                                            val y = hourHeight.toPx() * hour
-                                            drawLine(
-                                                gridLineColor,
-                                                Offset(0f, y),
-                                                Offset(size.width, y),
-                                                1.dp.toPx(),
-                                            )
-                                        }
-                                        drawLine(gridLineColor, Offset.Zero, Offset(0f, size.height), 1.dp.toPx())
-                                    },
-                            ) {
-                                layout.forEach { placement ->
-                                    val laneWidth = widths[dayIndex] / placement.laneCount
-                                    val entry = placement.entry
-                                    var dragOffset by remember(entry) { mutableStateOf(Offset.Zero) }
-                                    val dragModifier =
-                                        if (entry.source == ScheduleSource.INSTITUTIONAL) {
-                                            Modifier
-                                        } else {
-                                            Modifier
-                                                .graphicsLayer {
-                                                    translationX = dragOffset.x
-                                                    translationY = dragOffset.y
-                                                }.pointerInput(entry, entries, quarterHourPx, widthsPx) {
-                                                    detectDragGesturesAfterLongPress(
-                                                        onDragStart = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
-                                                        onDragCancel = { dragOffset = Offset.Zero },
-                                                        onDragEnd = {
-                                                            val target =
-                                                                AgendaEditingRules.shiftFromDrag(
-                                                                    entry,
-                                                                    dragOffset.y,
-                                                                    quarterHourPx,
-                                                                )
-                                                            val targetDay =
-                                                                weeklyDragTargetDay(
-                                                                    days,
-                                                                    widthsPx,
-                                                                    dayIndex,
-                                                                    placement.lane,
-                                                                    placement.laneCount,
-                                                                    dragOffset.x,
-                                                                )
-                                                            if (target != null &&
-                                                                (target != entry.startsAt || targetDay != entry.dayOfWeek)
-                                                            ) {
-                                                                AgendaEditingRules
-                                                                    .proposeMove(
-                                                                        entry,
-                                                                        targetDay,
-                                                                        target,
-                                                                        entries,
-                                                                    )?.let(onMoveRequest)
-                                                            }
-                                                            dragOffset = Offset.Zero
-                                                        },
-                                                        onDrag = { change, amount ->
-                                                            change.consume()
-                                                            dragOffset += amount
-                                                        },
-                                                    )
-                                                }
-                                        }
-                                    val accent = entry.source != ScheduleSource.INSTITUTIONAL || entry.subjectCode.hashCode() % 2 == 0
-                                    Box(
-                                        Modifier
-                                            .offset(
-                                                x = laneWidth * placement.lane,
-                                                y =
-                                                    hourHeight * ((placement.startMinute - startHour * 60) / 60f),
-                                            ).width(laneWidth)
-                                            .height(hourHeight * (placement.durationMinutes / 60f))
-                                            .then(dragModifier)
-                                            .padding(2.dp)
-                                            .v8GlassSurface(cornerRadius = 8.dp, emphasized = accent, elevation = 0.dp)
-                                            .clickable { detail = entry }
-                                            .padding(5.dp),
-                                    ) {
-                                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                            Text(
-                                                entry.subjectName,
-                                                fontSize = 10.sp,
-                                                lineHeight = 12.sp,
-                                                maxLines = if (placement.durationMinutes >= 120) 3 else 2,
-                                                overflow = TextOverflow.Ellipsis,
-                                                fontWeight = FontWeight.Bold,
-                                            )
-                                            if (placement.durationMinutes >= 90) {
-                                                Text(
-                                                    entry.startsAt + "–" + entry.endsAt,
-                                                    fontSize = 9.sp,
-                                                    lineHeight = 11.sp,
-                                                    color = colors.onSurfaceVariant,
+                        Row {
+                            layouts.forEachIndexed { dayIndex, layout ->
+                                Box(
+                                    Modifier
+                                        .width(widths[dayIndex])
+                                        .height(hourHeight * (lastHour - startHour))
+                                        .drawBehind {
+                                            for (hour in 0..(lastHour - startHour)) {
+                                                val y = hourHeight.toPx() * hour
+                                                drawLine(
+                                                    gridLineColor,
+                                                    Offset(0f, y),
+                                                    Offset(size.width, y),
+                                                    1.dp.toPx(),
                                                 )
-                                                entry.classroomName?.let {
+                                            }
+                                            drawLine(gridLineColor, Offset.Zero, Offset(0f, size.height), 1.dp.toPx())
+                                        },
+                                ) {
+                                    layout.forEach { placement ->
+                                        val laneWidth = widths[dayIndex] / placement.laneCount
+                                        val entry = placement.entry
+                                        var dragOffset by remember(entry) { mutableStateOf(Offset.Zero) }
+                                        val dragModifier =
+                                            if (entry.source == ScheduleSource.INSTITUTIONAL) {
+                                                Modifier
+                                            } else {
+                                                Modifier
+                                                    .graphicsLayer {
+                                                        translationX = dragOffset.x
+                                                        translationY = dragOffset.y
+                                                    }.pointerInput(entry, entries, quarterHourPx, widthsPx) {
+                                                        detectDragGesturesAfterLongPress(
+                                                            onDragStart = { haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
+                                                            onDragCancel = { dragOffset = Offset.Zero },
+                                                            onDragEnd = {
+                                                                val target =
+                                                                    AgendaEditingRules.shiftFromDrag(
+                                                                        entry,
+                                                                        dragOffset.y,
+                                                                        quarterHourPx,
+                                                                    )
+                                                                val targetDay =
+                                                                    weeklyDragTargetDay(
+                                                                        days,
+                                                                        widthsPx,
+                                                                        dayIndex,
+                                                                        placement.lane,
+                                                                        placement.laneCount,
+                                                                        dragOffset.x,
+                                                                    )
+                                                                if (target != null &&
+                                                                    (target != entry.startsAt || targetDay != entry.dayOfWeek)
+                                                                ) {
+                                                                    AgendaEditingRules
+                                                                        .proposeMove(
+                                                                            entry,
+                                                                            targetDay,
+                                                                            target,
+                                                                            entries,
+                                                                        )?.let(onMoveRequest)
+                                                                }
+                                                                dragOffset = Offset.Zero
+                                                            },
+                                                            onDrag = { change, amount ->
+                                                                change.consume()
+                                                                dragOffset += amount
+                                                            },
+                                                        )
+                                                    }
+                                            }
+                                        Box(
+                                            Modifier
+                                                .offset(
+                                                    x = laneWidth * placement.lane,
+                                                    y =
+                                                        hourHeight * ((placement.startMinute - startHour * 60) / 60f),
+                                                ).width(laneWidth)
+                                                .height(hourHeight * (placement.durationMinutes / 60f))
+                                                .then(dragModifier)
+                                                .padding(2.dp)
+                                                .v8GlassSurface(cornerRadius = 10.dp, emphasized = true, elevation = 0.dp)
+                                                .clickable { detail = entry }
+                                                .padding(5.dp),
+                                        ) {
+                                            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                                Text(
+                                                    entry.subjectName,
+                                                    fontSize = 11.sp,
+                                                    lineHeight = 13.sp,
+                                                    maxLines = if (placement.durationMinutes >= 120) 3 else 2,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    fontWeight = FontWeight.Bold,
+                                                )
+                                                if (placement.durationMinutes >= 60) {
                                                     Text(
-                                                        it,
-                                                        fontSize = 9.sp,
-                                                        lineHeight = 11.sp,
+                                                        entry.startsAt + "–" + entry.endsAt,
+                                                        fontSize = 10.sp,
+                                                        lineHeight = 12.sp,
                                                         color = colors.onSurfaceVariant,
                                                     )
+                                                    entry.classroomName?.takeIf { placement.durationMinutes >= 120 }?.let {
+                                                        Text(
+                                                            it,
+                                                            fontSize = 9.sp,
+                                                            lineHeight = 11.sp,
+                                                            color = colors.onSurfaceVariant,
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
@@ -225,9 +225,8 @@ internal fun WeeklyAgendaGrid(
         }
         // Keep a compact grid. The full readable list is opt-in, not 25
         // duplicated rows that push the rest of the screen below the bottom bar.
-        Text("Toca un bloque para sus detalles o desliza para ver los demás días.", fontSize = 11.sp, color = colors.onSurfaceVariant)
         TextButton(onClick = { showAllDetails = !showAllDetails }) {
-            Text(if (showAllDetails) "Ocultar lista accesible" else "Ver horario como lista")
+            Text(if (showAllDetails) "Ocultar lista" else "Vista de lista")
         }
         if (showAllDetails) {
             entries.forEach { entry ->

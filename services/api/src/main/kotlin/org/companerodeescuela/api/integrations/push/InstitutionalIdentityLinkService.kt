@@ -82,6 +82,22 @@ class InstitutionalIdentityLinkService(
         }
     }
 
+    /** Dedicated institution-owned archival export only; never authorizes mobile or live academic operations. */
+    internal suspend fun historicalStudentId(
+        institutionId: String,
+        externalId: String,
+    ): String? = repository.findByExternalId(institutionId, InstitutionalIdentityKind.STUDENT, externalId)?.nativeUserId
+
+    internal suspend fun historicalTeacherId(
+        institutionId: String,
+        externalId: String,
+    ): String? = repository.findByExternalId(institutionId, InstitutionalIdentityKind.TEACHER, externalId)?.nativeUserId
+
+    internal suspend fun historicalTeacherExternalId(
+        institutionId: String,
+        nativeId: String,
+    ): String? = repository.findByNativeUserId(institutionId, InstitutionalIdentityKind.TEACHER, nativeId)?.externalId
+
     /** Internal projector lookup. The returned account is revalidated against current authority. */
     suspend fun resolve(
         institutionId: String,

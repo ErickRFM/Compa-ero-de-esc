@@ -36,6 +36,14 @@ data class AgendaGridPlacement(
     val laneCount: Int,
 )
 
+/** Show the hours occupied by classes rather than several blank morning hours. */
+internal fun agendaVisibleHours(placements: List<AgendaGridPlacement>): IntRange {
+    if (placements.isEmpty()) return 8 until 18
+    val first = placements.minOf { it.startMinute / 60 }.coerceIn(0, 23)
+    val end = ((placements.maxOf { it.startMinute + it.durationMinutes } + 59) / 60).coerceIn(first + 1, 24)
+    return first until end
+}
+
 /** Called per day. Separate connected overlap groups so free blocks regain full width. */
 fun agendaGridLayout(entries: List<ScheduleEntry>): List<AgendaGridPlacement> {
     val parsed =

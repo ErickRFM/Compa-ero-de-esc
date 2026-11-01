@@ -1,10 +1,10 @@
 package org.companerodeescuela.shared.contracts
 
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
 import java.security.MessageDigest
 
@@ -16,6 +16,11 @@ object PrivilegedCommandDigests {
         targetId: String,
         request: ApproveStaffRequest,
     ): String = digest("staff-approval-v1", targetId, json.encodeToJsonElement(request.copy(proof = "")))
+
+    fun studentAffiliation(
+        targetId: String,
+        request: ApproveStudentAffiliationRequest,
+    ): String = digest("student-affiliation-v1", targetId, json.encodeToJsonElement(request.copy(proof = "")))
 
     fun accountLifecycle(
         targetId: String,

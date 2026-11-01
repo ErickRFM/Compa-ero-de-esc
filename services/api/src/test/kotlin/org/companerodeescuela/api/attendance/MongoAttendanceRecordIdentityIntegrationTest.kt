@@ -71,6 +71,55 @@ class MongoAttendanceRecordIdentityIntegrationTest {
             assertEquals(1, repository.recordsForSession(sessionId).size)
         }
 
+    @Test
+    fun `independent servers cannot overwrite another reviewed revision`() =
+        withDatabase { database ->
+            val original = record("revision-record", "revision-operation")
+            MongoAttendanceRepository(database).writeAttempt(original)
+            val winners =
+                coroutineScope {
+                    (1..16)
+                        .map { index ->
+                            async {
+                                MongoAttendanceRepository(
+                                    database,
+                                ).compareAndSetRecord(original.copy(recordRevision = 2, reviewedBy = "teacher-$index"), 1)
+                            }
+                        }.awaitAll()
+                }
+            assertEquals(1, winners.count { it })
+            assertEquals(2, MongoAttendanceRepository(database).findRecord(original.id)?.recordRevision)
+        }
+
+    @Test
+    fun `independent servers preserve the first closure and durable roster`() =
+        withDatabase { database ->
+            val repository = MongoAttendanceRepository(database)
+            val session =
+                org.companerodeescuela.shared.contracts.AttendanceSessionResponse(
+                    "pass",
+                    "occurrence",
+                    "section",
+                    "group",
+                    "2026-10-05",
+                    "2026-10-05T08:00:00Z",
+                    "2026-10-05T09:00:00Z",
+                    "teacher",
+                    100,
+                    300,
+                    status = org.companerodeescuela.shared.contracts.AttendanceSessionStatus.OPEN,
+                )
+            repository.createSession(session)
+            repository.closeSessionIfOpen(session.id, "teacher", true, 200, listOf("a", "b"))
+            val repeat = MongoAttendanceRepository(database).closeSessionIfOpen(session.id, "admin", false, 250, null)!!
+            assertEquals(200, repeat.closedAtEpochSeconds)
+            assertEquals(true, repeat.closedByTeacher)
+            assertEquals(listOf("a", "b"), MongoAttendanceRepository(database).closureWork(session.id)!!.studentIds)
+            MongoAttendanceRepository(database).completeClosure(session.id)
+            assertEquals(null, repository.closureWork(session.id))
+            assertEquals(repeat, repository.findSession(session.id))
+        }
+
     private fun record(
         id: String,
         operationId: String,

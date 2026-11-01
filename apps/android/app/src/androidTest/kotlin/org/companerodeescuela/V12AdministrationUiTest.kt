@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -20,6 +21,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -332,7 +334,11 @@ class V12AdministrationUiTest {
         try {
             compose.waitUntil(10000) {
                 val insets = ViewCompat.getRootWindowInsets(compose.activity.window.decorView)
-                insets != null && !insets.isVisible(WindowInsetsCompat.Type.ime())
+                insets != null &&
+                    !insets.isVisible(WindowInsetsCompat.Type.ime()) &&
+                    insets.getInsets(WindowInsetsCompat.Type.ime()).bottom == 0 &&
+                    compose.activity.window.decorView
+                        .hasWindowFocus()
             }
         } catch (timeout: ComposeTimeoutException) {
             val view = compose.activity.window.decorView
@@ -508,7 +514,9 @@ class V12AdministrationUiTest {
                 .performScrollTo()
                 .assertIsDisplayed()
                 .assertIsEnabled()
-                .performClick()
+                // Exercise the exposed accessibility action once. Native IME animations on API35
+                // can still move the touch target after Compose has reported its own layout idle.
+                .performSemanticsAction(SemanticsActions.OnClick) { click -> click() }
             try {
                 waitTag("staff_application_status")
             } catch (timeout: ComposeTimeoutException) {

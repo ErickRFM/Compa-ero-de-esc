@@ -5,9 +5,12 @@ package org.companerodeescuela.feature.home
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -23,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -44,7 +48,7 @@ import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.designsystem.v8.V8SectionTitle
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 import org.companerodeescuela.core.ui.component.AcademicClassCard
-import org.companerodeescuela.core.ui.component.NoticeTone
+import org.companerodeescuela.core.ui.component.AcademicSyncStatusCard
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ScheduleEntry
 import java.time.Instant
@@ -113,22 +117,16 @@ fun HomeScreen(
                                     }
                                 },
                             modifier = Modifier.padding(top = 8.dp),
-                            fontSize = 37.sp,
-                            lineHeight = 43.sp,
+                            fontSize = 32.sp,
+                            lineHeight = 38.sp,
                             color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            text = "Un gran día para seguir construyendo tus metas. ✨",
-                            fontSize = 16.sp,
-                            lineHeight = 22.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
                 V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
                     Column(
-                        modifier = Modifier.padding(CompaneroSpacing.md),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
                     ) {
                         Row(
@@ -167,86 +165,36 @@ fun HomeScreen(
                             )
                         }
                         V8RedPrimaryButton(
-                            text = "Abrir pase de lista  ›",
-                            onClick = onOpenAttendance,
+                            text = if (state.personalOnly || state.institutionalAccessDenied) "Ver mi horario" else "Ver pase de lista",
+                            onClick = if (state.personalOnly || state.institutionalAccessDenied) onOpenSchedule else onOpenAttendance,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 }
 
-                Text(
-                    text =
-                        when {
-                            state.loading -> "Sincronizando información…"
-                            state.errorMessage != null && overview == null -> "Sin sincronizar · revisa tu sesión o conexión"
-                            state.institutionalAccessDenied -> "Agenda personal · acceso escolar no autorizado"
-                            state.personalOnly && state.errorMessage == null -> "Agenda personal · sin materias escolares asignadas"
-                            state.fromCache && state.errorMessage != null -> "Agenda personal disponible · sincronización escolar pendiente"
-                            state.fromCache -> "Agenda guardada · conexión escolar pendiente"
-                            overview != null && !overview.hasSchedule -> "Cuenta conectada · sin horario escolar asignado"
-                            overview != null -> "Información escolar actualizada"
-                            else -> "Sin información sincronizada"
-                        },
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-
-                if (state.loading && overview == null) {
-                    CircularProgressIndicator()
-                }
-
-                if (state.fromCache || (state.errorMessage != null && overview != null)) {
-                    V8GlassCard(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(CompaneroSpacing.md),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    cacheStatusLabel(state.updatedAtEpochSeconds),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                )
-                                Text(
-                                    if (state.errorMessage != null) {
-                                        if (state.institutionalAccessDenied) {
-                                            "La cuenta aún no tiene acceso escolar. Tus clases personales están disponibles."
-                                        } else {
-                                            "No se pudo sincronizar con la escuela. Tu agenda personal está disponible."
-                                        }
-                                    } else if (state.personalOnly) {
-                                        "Tu horario importado está disponible. Aún no hay clases oficiales asignadas a esta cuenta."
-                                    } else {
-                                        "Puedes consultar tu horario mientras se restablece la sincronización."
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            TextButton(onClick = viewModel::refresh, enabled = !state.loading) {
-                                Text(if (state.loading) "Actualizando" else "Reintentar")
-                            }
-                        }
-                    }
-                }
-
-                if (state.errorMessage != null && overview == null) {
-                    StatusNotice(
-                        title = if (state.institutionalAccessDenied) "Acceso escolar pendiente" else "No pudimos actualizar",
-                        message =
-                            if (state.institutionalAccessDenied) {
-                                "Tu sesión funciona, pero no tienes permiso para consultar las clases oficiales. " +
-                                    "Comprueba tu perfil y vinculación con SIII."
-                            } else {
-                                "No se pudieron cargar tus datos. Comprueba tu sesión o conexión y vuelve a intentarlo."
+                if (state.loading && overview == null) CircularProgressIndicator()
+                if (state.fromCache || state.personalOnly || state.errorMessage != null) {
+                    AcademicSyncStatusCard(
+                        title =
+                            when {
+                                state.institutionalAccessDenied -> "Vinculación escolar pendiente"
+                                state.errorMessage != null -> "Sincronización pendiente"
+                                state.personalOnly -> "Agenda personal"
+                                state.fromCache -> cacheStatusLabel(state.updatedAtEpochSeconds)
+                                else -> "No pudimos actualizar"
                             },
-                        tone = NoticeTone.WARNING,
-                    )
-                    V8RedPrimaryButton(
-                        text = "Reintentar",
-                        onClick = viewModel::refresh,
-                        modifier = Modifier.fillMaxWidth(),
+                        message =
+                            when {
+                                state.institutionalAccessDenied -> "Vincula tu cuenta con SIII para consultar las clases oficiales."
+                                state.errorMessage != null && overview != null ->
+                                    "No pudimos consultar SIII. Tu agenda guardada sigue disponible."
+                                state.errorMessage != null -> "Comprueba tu sesión o conexión y vuelve a intentarlo."
+                                state.personalOnly -> "No hay clases oficiales asignadas a esta cuenta."
+                                state.fromCache -> "Tu agenda está disponible mientras recuperas la conexión."
+                                else -> "Comprueba tu sesión o conexión y vuelve a intentarlo."
+                            },
+                        refreshing = state.loading,
+                        onRefresh = viewModel::refresh,
                     )
                 }
 
@@ -265,26 +213,7 @@ fun HomeScreen(
                                 modifier = Modifier.weight(1.2f),
                                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
                             ) {
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    V8DashboardStat(
-                                        label = "Clases hoy",
-                                        value = day.classes.size.toString(),
-                                        onClick = onOpenSchedule,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                    V8DashboardStat(
-                                        label = "Materias hoy",
-                                        value = distinctSubjectCount.toString(),
-                                        onClick = onOpenClassrooms,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                    V8DashboardStat(
-                                        label = "Próxima clase",
-                                        value = nextClassStatLabel(day),
-                                        onClick = onOpenSchedule,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                }
+                                HomeDailyStats(day, distinctSubjectCount, onOpenSchedule, onOpenClassrooms)
                                 when {
                                     !day.hasSchedule -> {
                                         StatusNotice(
@@ -370,26 +299,7 @@ fun HomeScreen(
                             }
                         }
                     } else {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            V8DashboardStat(
-                                label = "Clases hoy",
-                                value = day.classes.size.toString(),
-                                onClick = onOpenSchedule,
-                                modifier = Modifier.weight(1f),
-                            )
-                            V8DashboardStat(
-                                label = "Materias hoy",
-                                value = distinctSubjectCount.toString(),
-                                onClick = onOpenClassrooms,
-                                modifier = Modifier.weight(1f),
-                            )
-                            V8DashboardStat(
-                                label = "Próxima clase",
-                                value = nextClassStatLabel(day),
-                                onClick = onOpenSchedule,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
+                        HomeDailyStats(day, distinctSubjectCount, onOpenSchedule, onOpenClassrooms)
                         when {
                             !day.hasSchedule -> {
                                 StatusNotice(
@@ -502,6 +412,24 @@ private fun DayTimeline(
             statusLabel = status.label,
             onClick = { onOpenSchedule() },
         )
+    }
+}
+
+@Composable
+private fun HomeDailyStats(
+    day: TodayOverview,
+    subjectCount: Int,
+    onSchedule: () -> Unit,
+    onClasses: () -> Unit,
+) {
+    val largeText = LocalDensity.current.fontScale >= 1.3f
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            V8DashboardStat("Clases hoy", day.classes.size.toString(), onSchedule, Modifier.weight(1f).fillMaxHeight())
+            V8DashboardStat("Materias hoy", subjectCount.toString(), onClasses, Modifier.weight(1f).fillMaxHeight())
+            if (!largeText) V8DashboardStat("Próxima", nextClassStatLabel(day), onSchedule, Modifier.weight(1f).fillMaxHeight())
+        }
+        if (largeText) V8DashboardStat("Próxima clase", nextClassStatLabel(day), onSchedule, Modifier.fillMaxWidth(), compact = true)
     }
 }
 

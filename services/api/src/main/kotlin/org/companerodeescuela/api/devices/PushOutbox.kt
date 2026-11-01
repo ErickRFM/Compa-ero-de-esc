@@ -261,6 +261,8 @@ class PushOutboxService(
     private val authorizeRecipient: suspend (String) -> Boolean = { false },
     /** A device must still belong to a non-revoked refresh session. */
     private val authorizeSession: suspend (String, String) -> Boolean = { _, _ -> false },
+    /** Business scope can change after enqueue, especially class enrollment and cancellation. */
+    private val authorizeMessage: suspend (PushOutboxItem) -> Boolean = { true },
 ) {
     suspend fun enqueueForOwner(
         eventId: String,
@@ -291,7 +293,7 @@ class PushOutboxService(
         val item = outbox.claim(clock.instant()) ?: return false
         val permitted =
             try {
-                authorizeRecipient(item.owner) && authorizeSession(item.owner, item.token)
+                authorizeRecipient(item.owner) && authorizeSession(item.owner, item.token) && authorizeMessage(item)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {

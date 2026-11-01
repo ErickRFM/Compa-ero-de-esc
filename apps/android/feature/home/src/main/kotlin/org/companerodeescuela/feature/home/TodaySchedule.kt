@@ -37,7 +37,7 @@ internal fun nextClassStatLabel(day: TodayOverview): String {
     return when (val away = day.nextScheduledDaysAway) {
         1 -> "Mañana"
         null, 0 -> upcoming.startsAt
-        else -> "En $away días"
+        else -> "$away días"
     }
 }
 

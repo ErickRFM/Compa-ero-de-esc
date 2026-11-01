@@ -11,8 +11,8 @@ import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.companerodeescuela.api.academic.groups.InMemoryAcademicGroupRepository
-import org.companerodeescuela.api.auth.AuthTokenService
 import org.companerodeescuela.api.auth.AccountIdentityChange
+import org.companerodeescuela.api.auth.AuthTokenService
 import org.companerodeescuela.api.auth.InMemoryPlatformAccountRepository
 import org.companerodeescuela.api.auth.InMemoryRefreshSessionRepository
 import org.companerodeescuela.api.auth.PlatformSessionAuthority
@@ -27,13 +27,13 @@ import org.companerodeescuela.api.integrations.mock.MockIdentityProvider
 import org.companerodeescuela.api.plugins.configurePlugins
 import org.companerodeescuela.api.test.ScopedAcademicFixtures
 import org.companerodeescuela.api.test.TestFixtures
-import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.AccountStatus
-import org.companerodeescuela.shared.contracts.ClassroomStatus
+import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.AttendanceIdentitySource
 import org.companerodeescuela.shared.contracts.AttendanceNotificationEnqueueResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
+import org.companerodeescuela.shared.contracts.ClassroomStatus
 import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
 import java.time.Clock
@@ -66,7 +66,16 @@ class AttendanceNativeRoutesTest {
                 resolver,
                 AttendanceAdministrationPolicy(accounts, ClassroomService(classes, groups, clock, accounts = accounts)),
             )
-        val service = AttendanceSessionService(repository, resolver, policy, clock)
+        val projection =
+            org.companerodeescuela.api.academic.NativeAcademicProjection(
+                accounts,
+                ClassroomService(classes, groups, clock, accounts = accounts),
+                groups,
+                org.companerodeescuela.api.academic
+                    .InMemoryAcademicScheduleOverrideRepository(),
+                clock,
+            )
+        val service = AttendanceSessionService(repository, resolver, policy, clock, nativeProjection = projection)
 
         suspend fun initialize() {
             accounts.create(ScopedAcademicFixtures.account(admin))
@@ -206,7 +215,12 @@ class AttendanceNativeRoutesTest {
             )
             assertEquals(HttpStatusCode.Forbidden, client.post("/attendance/sessions/own/reminders") { bearerAuth(student) }.status)
             assertEquals(HttpStatusCode.NotFound, client.post("/attendance/sessions/missing/reminders") { bearerAuth(teacher) }.status)
-            assertEquals(HttpStatusCode.OK, client.post("/attendance/sessions/own/close") { bearerAuth(teacher) }.status)
+            // This route-only fixture has no published native occurrence. Closing must now fail
+            // before committing a roster; the reminder's terminal-state behavior is independent.
+            assertEquals(HttpStatusCode.Forbidden, client.post("/attendance/sessions/own/close") { bearerAuth(teacher) }.status)
+            val stored = assertNotNull(f.repository.findSession("own"))
+            assertEquals(AttendanceSessionStatus.OPEN, stored.status)
+            f.repository.replaceSession(stored.copy(status = AttendanceSessionStatus.CLOSED, closedAtEpochSeconds = f.now.epochSecond))
             assertEquals(HttpStatusCode.Conflict, client.post("/attendance/sessions/own/reminders") { bearerAuth(teacher) }.status)
         }
 

@@ -62,7 +62,13 @@ fun V8DashboardStat(
                 )
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(value, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    Text(
+                        value,
+                        fontSize = 18.sp,
+                        lineHeight = 23.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
                 }
             }
         } else {
@@ -79,7 +85,8 @@ fun V8DashboardStat(
                                     "siguiente",
                                     ignoreCase = true,
                                 ) ||
-                                    label.contains("horario", ignoreCase = true) -> Icons.Filled.DateRange
+                                    label.contains("horario", ignoreCase = true) ||
+                                    label.contains("próxima", ignoreCase = true) -> Icons.Filled.DateRange
                                 else -> Icons.Filled.CheckCircle
                             },
                         contentDescription = null,
@@ -89,8 +96,8 @@ fun V8DashboardStat(
                 }
                 Text(
                     text = value,
-                    fontSize = if (value.length > 11) 15.sp else 24.sp,
-                    lineHeight = if (value.length > 11) 18.sp else 27.sp,
+                    fontSize = if (value.length > 4) 17.sp else 24.sp,
+                    lineHeight = if (value.length > 4) 22.sp else 28.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 2,

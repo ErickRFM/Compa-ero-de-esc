@@ -207,6 +207,80 @@ class MongoAttendanceRepository(
             .map { it.toSession() }
     }
 
+    override suspend fun closeSessionIfOpen(
+        sessionId: String,
+        actorId: String,
+        closedByTeacher: Boolean,
+        atEpochSeconds: Long,
+        authorizedStudentIds: List<String>?,
+    ): AttendanceSessionResponse? {
+        ensureIndexes()
+        val changed =
+            sessions.findOneAndUpdate(
+                and(eq("_id", sessionId), eq("status", AttendanceSessionStatus.OPEN.name)),
+                Updates.combine(
+                    Updates.set("status", AttendanceSessionStatus.CLOSED.name),
+                    Updates.set("closedAtEpochSeconds", atEpochSeconds),
+                    Updates.set("closedByTeacher", closedByTeacher),
+                    Updates.set("closedByAuditActor", actorId),
+                    Updates.set("closurePending", authorizedStudentIds != null),
+                    Updates.set("closureStudentIds", authorizedStudentIds?.distinct()),
+                ),
+                FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
+            )
+        return changed?.toSession() ?: sessions.find(eq("_id", sessionId)).firstOrNull()?.toSession()
+    }
+
+    override suspend fun pendingClosures(limit: Int): List<AttendanceClosureWork> {
+        ensureIndexes()
+        return sessions
+            .find(
+                eq("closurePending", true),
+            ).sort(Sorts.ascending("closureLastAttemptAt", "_id"))
+            .limit(limit.coerceIn(1, 100))
+            .toList()
+            .map {
+                AttendanceClosureWork(
+                    it.toSession(),
+                    it.getList("closureStudentIds", String::class.java) ?: emptyList(),
+                )
+            }
+    }
+
+    override suspend fun closureWork(sessionId: String): AttendanceClosureWork? {
+        ensureIndexes()
+        return sessions.find(and(eq("_id", sessionId), eq("closurePending", true))).firstOrNull()?.let {
+            AttendanceClosureWork(
+                it.toSession(),
+                it.getList("closureStudentIds", String::class.java) ?: emptyList(),
+            )
+        }
+    }
+
+    override suspend fun deferClosure(sessionId: String) {
+        ensureIndexes()
+        sessions.updateOne(and(eq("_id", sessionId), eq("closurePending", true)), Updates.currentDate("closureLastAttemptAt"))
+    }
+
+    override suspend fun completeClosure(sessionId: String) {
+        ensureIndexes()
+        sessions.updateOne(
+            and(eq("_id", sessionId), eq("status", AttendanceSessionStatus.CLOSED.name)),
+            Updates.combine(Updates.set("closurePending", false), Updates.unset("closureStudentIds")),
+        )
+    }
+
+    override suspend fun teacherHistoryPage(
+        teacherId: String,
+        page: Int,
+    ): List<AttendanceSessionResponse> {
+        require(page in 1..10_000)
+        ensureIndexes()
+        return sessions.find(eq("openedBy", teacherId)).sort(Sorts.ascending("_id")).skip((page - 1) * 100).limit(101).toList().map {
+            it.toSession()
+        }
+    }
+
     override suspend fun replaceSession(session: AttendanceSessionResponse) {
         ensureIndexes()
         sessions.replaceOne(
@@ -401,15 +475,17 @@ class MongoAttendanceRepository(
 
     override suspend fun replaceRejectedRecord(record: AttendanceRecordResponse): AttendanceRecordResponse {
         ensureIndexes()
+        val current = records.find(eq("_id", record.id)).firstOrNull()?.toRecord() ?: return record
         val replaced =
             records
                 .findOneAndReplace(
                     and(
                         eq("_id", record.id),
+                        revisionFilter(current.recordRevision),
                         eq("status", AttendanceStatus.REJECTED.name),
                         or(exists("reviewedBy", false), eq("reviewedBy", null)),
                     ),
-                    record.toDocument(),
+                    record.copy(recordRevision = current.recordRevision + 1).toDocument(),
                     FindOneAndReplaceOptions().returnDocument(ReturnDocument.AFTER),
                 )?.toRecord()
         return replaced ?: records.find(eq("_id", record.id)).firstOrNull()?.toRecord() ?: record
@@ -441,6 +517,29 @@ class MongoAttendanceRepository(
             ReplaceOptions().upsert(false),
         )
     }
+
+    override suspend fun studentHistoryPage(
+        studentId: String,
+        page: Int,
+    ): List<AttendanceRecordResponse> {
+        require(page in 1..10_000)
+        ensureIndexes()
+        return records.find(eq("studentId", studentId)).sort(Sorts.ascending("_id")).skip((page - 1) * 100).limit(101).toList().map {
+            it.toRecord()
+        }
+    }
+
+    override suspend fun compareAndSetRecord(
+        record: AttendanceRecordResponse,
+        expectedRevision: Long,
+    ): Boolean {
+        ensureIndexes()
+        if (record.recordRevision != expectedRevision + 1) return false
+        return records.replaceOne(and(eq("_id", record.id), revisionFilter(expectedRevision)), record.toDocument()).modifiedCount == 1L
+    }
+
+    private fun revisionFilter(revision: Long) =
+        if (revision == 1L) or(eq("recordRevision", revision), exists("recordRevision", false)) else eq("recordRevision", revision)
 
     override suspend fun findRecord(id: String): AttendanceRecordResponse? {
         ensureIndexes()
@@ -514,6 +613,7 @@ class MongoAttendanceRepository(
                 ),
                 IndexOptions().name("ix_attendance_institution_overview"),
             )
+            sessions.createIndex(Indexes.ascending("openedBy", "_id"), IndexOptions().name("ix_attendance_teacher_archive_scan"))
             records.createIndex(
                 Indexes.ascending("operationId"),
                 IndexOptions().unique(true).name("uq_attendance_operation_id"),
@@ -538,6 +638,7 @@ class MongoAttendanceRepository(
                 ),
                 IndexOptions().name("ix_attendance_student_history"),
             )
+            records.createIndex(Indexes.ascending("studentId", "_id"), IndexOptions().name("ix_attendance_reconciliation_scan"))
             qrNonceUses.createIndex(
                 Indexes.ascending("sessionId", "nonce", "studentId"),
                 IndexOptions().unique(true).name("uq_attendance_qr_nonce_student"),
@@ -571,6 +672,7 @@ class MongoAttendanceRepository(
             .append("openedAtEpochSeconds", openedAtEpochSeconds)
             .append("closesAtEpochSeconds", closesAtEpochSeconds)
             .append("closedAtEpochSeconds", closedAtEpochSeconds)
+            .append("closedByTeacher", closedByTeacher)
             .append("status", status.name)
             .append("identitySource", identitySource?.name)
             .append("institutionId", institutionId)
@@ -591,6 +693,7 @@ class MongoAttendanceRepository(
             openedAtEpochSeconds = requireLong("openedAtEpochSeconds"),
             closesAtEpochSeconds = requireLong("closesAtEpochSeconds"),
             closedAtEpochSeconds = numberAsLong("closedAtEpochSeconds"),
+            closedByTeacher = getBoolean("closedByTeacher") == true,
             status = AttendanceSessionStatus.valueOf(getString("status")),
             identitySource =
                 (get("identitySource") as? String)?.let { raw ->
@@ -626,6 +729,7 @@ class MongoAttendanceRepository(
             .append("originalStatus", originalStatus?.name)
             .append("originalReasonCode", originalReasonCode?.name)
             .append("reviewHistory", Json.encodeToString(reviewHistory))
+            .append("recordRevision", recordRevision)
 
     private fun Document.toRecord(): AttendanceRecordResponse =
         AttendanceRecordResponse(
@@ -644,6 +748,7 @@ class MongoAttendanceRepository(
             originalStatus = getString("originalStatus")?.let(AttendanceStatus::valueOf),
             originalReasonCode = getString("originalReasonCode")?.let(AttendanceReasonCode::valueOf),
             reviewHistory = getString("reviewHistory")?.let { Json.decodeFromString<List<AttendanceReviewEntry>>(it) }.orEmpty(),
+            recordRevision = numberAsLong("recordRevision") ?: 1,
         )
 
     private fun Document.requireLong(name: String): Long = numberAsLong(name) ?: error("Missing numeric field: $name")

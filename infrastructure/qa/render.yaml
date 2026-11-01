@@ -1,0 +1,41 @@
+# New QA resource only. Never import the shared Compa-ero-de-esc service into this Blueprint.
+# Temporary institution/admin/credential bootstrap flags are deliberately managed outside this file.
+services:
+  - type: web
+    name: companero-qa-univ-v25
+    runtime: docker
+    repo: https://github.com/ErickRFM/Compa-ero-de-esc
+    branch: main
+    region: oregon
+    plan: free
+    autoDeployTrigger: checksPass
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /ready
+    envVars:
+      - key: APP_ENV
+        value: staging
+      - key: API_HOST
+        value: 0.0.0.0
+      - key: MONGODB_DATABASE
+        value: companero_qa
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_ISSUER
+        value: companero-qa-univ
+      - key: JWT_AUDIENCE
+        value: companero-qa-android
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ATTENDANCE_QR_SECRET
+        generateValue: true
+      - key: MFA_ENCRYPTION_KEY
+        sync: false
+      - key: INSTITUTION_INTEGRATION_ENCRYPTION_KEY
+        sync: false
+      - key: VERIFICATION_EMAIL_API_KEY
+        sync: false
+      - key: VERIFICATION_EMAIL_SENDER
+        sync: false
+      - key: CURRENT_USER_CACHE_TTL_MILLIS
+        value: '0'

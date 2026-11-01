@@ -35,6 +35,12 @@ sealed interface SessionWriteResult {
     ) : SessionWriteResult
 }
 
+/** Private durable continuation of an already-authorized teacher closure. Never an API DTO. */
+data class AttendanceClosureWork(
+    val session: AttendanceSessionResponse,
+    val studentIds: List<String>,
+)
+
 interface AttendanceRepository {
     suspend fun institutionOverview(
         institutionId: String,
@@ -63,6 +69,27 @@ interface AttendanceRepository {
         limit: Int = MAX_OPEN_SESSION_RESULTS,
     ): List<AttendanceSessionResponse>
 
+    suspend fun closeSessionIfOpen(
+        sessionId: String,
+        actorId: String,
+        closedByTeacher: Boolean,
+        atEpochSeconds: Long,
+        authorizedStudentIds: List<String>? = null,
+    ): AttendanceSessionResponse?
+
+    suspend fun pendingClosures(limit: Int = 100): List<AttendanceClosureWork>
+
+    suspend fun closureWork(sessionId: String): AttendanceClosureWork?
+
+    suspend fun deferClosure(sessionId: String)
+
+    suspend fun completeClosure(sessionId: String)
+
+    suspend fun teacherHistoryPage(
+        teacherId: String,
+        page: Int,
+    ): List<AttendanceSessionResponse>
+
     suspend fun replaceSession(session: AttendanceSessionResponse)
 
     suspend fun writeAttempt(record: AttendanceRecordResponse): AttemptWriteResult
@@ -87,6 +114,18 @@ interface AttendanceRepository {
 
     suspend fun replaceRecord(record: AttendanceRecordResponse)
 
+    /** Stable identity order allows complete repeated scans, including old corrected records. */
+    suspend fun studentHistoryPage(
+        studentId: String,
+        page: Int,
+    ): List<AttendanceRecordResponse>
+
+    /** Atomic across server instances. A stale reviewer must reload before deciding again. */
+    suspend fun compareAndSetRecord(
+        record: AttendanceRecordResponse,
+        expectedRevision: Long,
+    ): Boolean
+
     suspend fun findRecord(id: String): AttendanceRecordResponse?
 
     suspend fun findStudentSessionRecord(
@@ -106,6 +145,7 @@ interface AttendanceRepository {
 class InMemoryAttendanceRepository : AttendanceRepository {
     private val mutex = Mutex()
     private val sessions = linkedMapOf<String, AttendanceSessionResponse>()
+    private val closureRosters = linkedMapOf<String, List<String>>()
     private val occurrenceToSession = linkedMapOf<String, String>()
     private val records = linkedMapOf<String, AttendanceRecordResponse>()
     private val operationToRecord = linkedMapOf<String, String>()
@@ -191,6 +231,62 @@ class InMemoryAttendanceRepository : AttendanceRepository {
                 .toList()
         }
 
+    override suspend fun closeSessionIfOpen(
+        sessionId: String,
+        actorId: String,
+        closedByTeacher: Boolean,
+        atEpochSeconds: Long,
+        authorizedStudentIds: List<String>?,
+    ): AttendanceSessionResponse? =
+        mutex.withLock {
+            val current = sessions[sessionId] ?: return@withLock null
+            if (current.status == AttendanceSessionStatus.CLOSED) return@withLock current
+            val closed =
+                current.copy(
+                    status = AttendanceSessionStatus.CLOSED,
+                    closedAtEpochSeconds = atEpochSeconds,
+                    closedByTeacher = closedByTeacher,
+                )
+            sessions[sessionId] = closed
+            if (authorizedStudentIds != null) closureRosters[sessionId] = authorizedStudentIds.distinct()
+            closed
+        }
+
+    override suspend fun pendingClosures(limit: Int): List<AttendanceClosureWork> =
+        mutex.withLock {
+            closureRosters.entries.take(limit.coerceIn(1, 100)).mapNotNull { (id, roster) ->
+                sessions[id]?.let { AttendanceClosureWork(it, roster) }
+            }
+        }
+
+    override suspend fun closureWork(sessionId: String): AttendanceClosureWork? =
+        mutex.withLock {
+            closureRosters[sessionId]?.let { roster -> sessions[sessionId]?.let { AttendanceClosureWork(it, roster) } }
+        }
+
+    override suspend fun deferClosure(sessionId: String) {
+        mutex.withLock {
+            closureRosters.remove(sessionId)?.let { closureRosters[sessionId] = it }
+        }
+    }
+
+    override suspend fun completeClosure(sessionId: String) {
+        mutex.withLock { closureRosters.remove(sessionId) }
+    }
+
+    override suspend fun teacherHistoryPage(
+        teacherId: String,
+        page: Int,
+    ): List<AttendanceSessionResponse> =
+        mutex.withLock {
+            require(page in 1..10_000)
+            sessions.values
+                .filter { it.openedBy == teacherId }
+                .sortedBy { it.id }
+                .drop((page - 1) * 100)
+                .take(101)
+        }
+
     override suspend fun replaceSession(session: AttendanceSessionResponse) {
         mutex.withLock {
             sessions[session.id] = session
@@ -260,9 +356,10 @@ class InMemoryAttendanceRepository : AttendanceRepository {
         mutex.withLock {
             val current = records[record.id] ?: return@withLock record
             if (current.status == org.companerodeescuela.shared.contracts.AttendanceStatus.REJECTED && current.reviewedBy == null) {
-                records[record.id] = record
+                val next = record.copy(recordRevision = current.recordRevision + 1)
+                records[record.id] = next
                 operationToRecord[record.operationId] = record.id
-                record
+                next
             } else {
                 current
             }
@@ -292,6 +389,32 @@ class InMemoryAttendanceRepository : AttendanceRepository {
             operationToRecord[record.operationId] = record.id
         }
     }
+
+    override suspend fun studentHistoryPage(
+        studentId: String,
+        page: Int,
+    ): List<AttendanceRecordResponse> =
+        mutex.withLock {
+            require(page in 1..10_000)
+            records.values
+                .filter { it.studentId == studentId }
+                .sortedBy { it.id }
+                .drop((page - 1) * 100)
+                .take(101)
+        }
+
+    override suspend fun compareAndSetRecord(
+        record: AttendanceRecordResponse,
+        expectedRevision: Long,
+    ): Boolean =
+        mutex.withLock {
+            if (record.recordRevision != expectedRevision + 1 || records[record.id]?.recordRevision != expectedRevision) {
+                return@withLock false
+            }
+            records[record.id] = record
+            operationToRecord[record.operationId] = record.id
+            true
+        }
 
     override suspend fun findRecord(id: String): AttendanceRecordResponse? = mutex.withLock { records[id] }
 

@@ -100,7 +100,9 @@ private suspend fun ApplicationCall.attendanceHistory(
         respond(HttpStatusCode.Unauthorized)
         return
     }
-    if (InstitutionalAttendanceHistoryContract.SCOPE !in institution.scopes) {
+    if (InstitutionalAttendanceHistoryContract.SCOPE !in institution.scopes &&
+        InstitutionalAttendanceHistoryContract.ARCHIVE_SCOPE !in institution.scopes
+    ) {
         respond(HttpStatusCode.Forbidden)
         return
     }

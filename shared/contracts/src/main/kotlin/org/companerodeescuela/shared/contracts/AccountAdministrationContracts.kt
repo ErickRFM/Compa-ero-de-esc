@@ -83,10 +83,21 @@ import kotlinx.serialization.Serializable
     override fun toString() = "AccountLifecycleRequest(operationId=$operationId, status=$status, proof=[redacted])"
 }
 
+/** Native affiliation only; the institutional link and official enrollment remain separate approvals. */
+@Serializable data class ApproveStudentAffiliationRequest(
+    val operationId: String,
+    val expectedAuthRevision: Long,
+    val institutionId: String,
+    val proof: String,
+) {
+    override fun toString() = "ApproveStudentAffiliationRequest(operationId=$operationId, proof=[redacted])"
+}
+
 @Serializable data class AdminUserSummary(
     val user: UserSummary,
     val applications: List<StaffApplication>,
     val capabilities: Set<AdminCapability> = emptySet(),
+    val requestedInstitutionId: String? = null,
 )
 
 @Serializable data class AdministrationMetrics(

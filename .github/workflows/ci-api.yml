@@ -119,7 +119,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import xml.etree.ElementTree as ET
-          for name, count in [('SiiiAcademicRoutesTest', 5), ('SiiiHttpAcademicAuthorityTest', 3), ('SiiiAttendanceTest', 1), ('InstitutionalAttendanceHistoryRoutesTest', 7)]:
+          for name, count in [('SiiiAcademicRoutesTest', 5), ('SiiiHttpAcademicAuthorityTest', 3), ('SiiiAttendanceTest', 1), ('InstitutionalAttendanceHistoryRoutesTest', 8)]:
               path = Path(f'services/api/build/test-results/test/TEST-org.companerodeescuela.api.academic.{name}.xml')
               suite = ET.parse(path).getroot()
               assert int(suite.get('tests', '0')) == count, f'{name}: expected {count} executed tests'
@@ -132,7 +132,7 @@ jobs:
           python3 - <<'PY'
           import xml.etree.ElementTree as ET
           from pathlib import Path
-          suites = (("auth", "MongoAccountLifecycleIntegrationTest"), ("auth", "MongoEmailVerificationIntegrationTest"), ("security", "MongoMfaIntegrationTest"), ("auth", "MongoStaffApplicationsIntegrationTest"), ("tutoring", "MongoTutorAssignmentIntegrationTest"), ("academic.groups", "MongoAcademicGroupScopeIntegrationTest"), ("classroom", "MongoClassroomScopeIntegrationTest"), ("academic", "MongoScheduleScopeIntegrationTest"), ("presence", "MongoSchoolQrScopeIntegrationTest"), ("events", "MongoAcademicEventScopeIntegrationTest"), ("presence", "MongoSchoolPresenceScopeIntegrationTest"), ("tutoring", "MongoTutorCaseScopeIntegrationTest"), ("attendance", "MongoAttendanceSourceIntegrationTest"))
+          suites = (("auth", "MongoAccountLifecycleIntegrationTest"), ("auth", "MongoEmailVerificationIntegrationTest"), ("security", "MongoMfaIntegrationTest"), ("auth", "MongoStaffApplicationsIntegrationTest"), ("tutoring", "MongoTutorAssignmentIntegrationTest"), ("academic.groups", "MongoAcademicGroupScopeIntegrationTest"), ("classroom", "MongoClassroomScopeIntegrationTest"), ("academic", "MongoScheduleScopeIntegrationTest"), ("presence", "MongoSchoolQrScopeIntegrationTest"), ("events", "MongoAcademicEventScopeIntegrationTest"), ("presence", "MongoSchoolPresenceScopeIntegrationTest"), ("tutoring", "MongoTutorCaseScopeIntegrationTest"), ("attendance", "MongoAttendanceSourceIntegrationTest"), ("attendance", "MongoAttendanceRecordIdentityIntegrationTest"), ("admin", "MongoQaAdminBootstrapIntegrationTest"))
           executed = 0
           for package, name in suites + (("representatives", "MongoGroupRepresentativeConcurrencyTest"), ("devices", "MongoDeviceTokenRegistryIntegrationTest"), ("devices", "MongoPushOutboxIntegrationTest"), ("attendance", "MongoAttendanceStudentHistoryIntegrationTest"), ("attendance", "MongoAttendanceInstitutionOverviewIntegrationTest")):
               report = Path(f"services/api/build/test-results/test/TEST-org.companerodeescuela.api.{package}.{name}.xml")

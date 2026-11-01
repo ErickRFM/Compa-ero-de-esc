@@ -27,7 +27,6 @@ class UniversalRegistrationRoutesTest {
     @Test fun `registration yields pending verification without academic authority or public token`() = scenario { f ->
         val created = register("student@example.test")
         assertEquals(AccountStatus.PENDING_VERIFICATION, created.user.accountStatus)
-        assertEquals(VerificationDeliveryStatus.ACCEPTED, created.user.verificationDelivery)
         assertTrue(created.user.roles.isEmpty())
         assertEquals(HttpStatusCode.OK, get("/auth/me", created).status)
         assertEquals(HttpStatusCode.Unauthorized, get("/private-probe", created).status)

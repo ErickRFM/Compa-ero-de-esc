@@ -85,7 +85,8 @@ internal fun authMuted(): Color =
     }
 
 @Composable
-internal fun authAccent(): Color = if (authDark()) V8RedColors.Crimson else V8RedColors.DeepCrimson
+internal fun authAccent(): Color =
+    if (authDark()) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.primary
 
 /** Same campus, geometry and tokens; colors come from the existing CompaneroTheme. */
 @Composable
@@ -190,6 +191,7 @@ internal fun AuthV8PrimaryAction(
 ) {
     val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
     val duration = CompaneroMotionPolicy.resolve(MotionRole.STATE_CHANGE, reducedMotion).durationMillis
+    val accent = authAccent()
     Button(
         onClick = onClick,
         enabled = enabled,
@@ -197,9 +199,9 @@ internal fun AuthV8PrimaryAction(
         shape = RoundedCornerShape(18.dp),
         colors =
             ButtonDefaults.buttonColors(
-                containerColor = V8RedColors.DeepCrimson,
+                containerColor = accent,
                 contentColor = Color.White,
-                disabledContainerColor = V8RedColors.DeepCrimson.copy(alpha = 0.3f),
+                disabledContainerColor = accent.copy(alpha = 0.3f),
                 disabledContentColor = authMuted(),
             ),
     ) {

@@ -149,12 +149,14 @@ fun adminHomeScreenContent(
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             AdminShortcutTile(
                 title = stringResource(R.string.admin_schedule),
+                tag = "admin_schedule",
                 description = stringResource(R.string.admin_shortcut_schedule),
                 onClick = onOpenSchedule,
                 modifier = Modifier.weight(1f),
             )
             AdminShortcutTile(
                 title = stringResource(R.string.admin_classrooms),
+                tag = "admin_classrooms",
                 description = stringResource(R.string.admin_shortcut_classrooms),
                 onClick = onOpenClassrooms,
                 modifier = Modifier.weight(1f),
@@ -163,15 +165,17 @@ fun adminHomeScreenContent(
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             AdminShortcutTile(
                 title = stringResource(R.string.admin_channel),
+                tag = "admin_channel",
                 description = stringResource(R.string.admin_shortcut_channel),
                 onClick = onOpenChannel,
                 modifier = Modifier.weight(1f),
             )
             AdminShortcutTile(
                 title = stringResource(R.string.admin_security),
+                tag = "admin_security",
                 description = stringResource(R.string.admin_shortcut_security),
                 onClick = onOpenSecurity,
-                modifier = Modifier.weight(1f).testTag("admin_security"),
+                modifier = Modifier.weight(1f),
             )
         }
         state.overview?.let { overview ->
@@ -279,6 +283,7 @@ fun adminHomeScreenContent(
 private fun AdminShortcutTile(
     title: String,
     description: String,
+    tag: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -291,7 +296,7 @@ private fun AdminShortcutTile(
             )
             TextButton(
                 onClick = onClick,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag(tag),
             ) {
                 Text(
                     title,

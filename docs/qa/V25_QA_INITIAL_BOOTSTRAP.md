@@ -27,6 +27,8 @@ Referencia del proveedor: [Blueprints](https://render.com/docs/blueprint-spec), 
 
 ## Alumno y docente
 
+El propietario confirmó `erik55509@gmail.com` para el alumno y `richis.4571@gmail.com` para el docente. Estos son destinos de verificación, no credenciales compartidas de SIII. No se ha confirmado un correo independiente para el operador administrador. La cuenta personal existente se conserva; el alta QA ocurre en la base aislada.
+
 1. En Académico QA, **Crear cuenta → Estudiante**, elegir `QA-UNIV`, indicar la matrícula oficial y un correo verificable. Elegir una contraseña independiente y verificar el correo.
 2. Crear de igual modo **Docente**, con `QA-UNIV` y `EMP-QA-2026`; verificar su correo. Queda pendiente de aprobación.
 3. En Gestión, abrir el directorio de usuarios. Para el alumno, pulsar **Autorizar afiliación escolar** y completar contraseña/MFA. Para el docente, usar la aprobación de personal existente. Ambas acciones revisan intención, correo, institución, rol y revisión actuales; no inventan matrícula, inscripción ni grupo.

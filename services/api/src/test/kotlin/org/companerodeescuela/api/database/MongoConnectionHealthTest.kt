@@ -1,5 +1,6 @@
 package org.companerodeescuela.api.database
 
+import com.mongodb.connection.NettyTransportSettings
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -13,6 +14,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.time.measureTimedValue
 
@@ -96,8 +98,9 @@ class MongoConnectionHealthTest {
     }
 
     @Test
-    fun `TLS recovery keeps certificate and hostname validation enabled`() {
+    fun `TLS recovery selects Netty with certificate and hostname validation enabled`() {
         val options = mongoClientSettings(MongoSettings("mongodb://localhost:27017/?tls=true&retryWrites=false", "readiness_test"))
+        assertIs<NettyTransportSettings>(options.transportSettings)
         assertTrue(options.sslSettings.isEnabled)
         assertFalse(options.sslSettings.isInvalidHostNameAllowed)
         assertFalse(options.retryWrites)

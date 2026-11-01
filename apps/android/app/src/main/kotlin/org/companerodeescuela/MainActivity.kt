@@ -551,10 +551,8 @@ class MainActivity : AppCompatActivity() {
                                         composable(Destination.Profile.route) {
                                             val adminProfile =
                                                 appDistribution == AppDistribution.MANAGEMENT &&
-                                                    roleConfig.experience in setOf(
-                                                        AppExperience.ADMIN,
-                                                        AppExperience.SUPER_ADMIN,
-                                                    )
+                                                    (roleConfig.experience == AppExperience.ADMIN ||
+                                                        roleConfig.experience == AppExperience.SUPER_ADMIN)
                                             ProfileScreen(
                                                 displayName = session.displayName,
                                                 roles = session.roles,

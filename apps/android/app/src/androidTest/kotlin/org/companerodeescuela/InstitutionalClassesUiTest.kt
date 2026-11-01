@@ -51,6 +51,30 @@ class InstitutionalClassesUiTest {
     @Test
     fun teacherSeesOfficialAssignmentsInManagementCompatibleScreen() = catalog(UserRole.TEACHER, "teacher")
 
+    @Test
+    fun multiRoleStudentExperienceNeverDisplaysAdministrativeEditor() {
+        val f = Fixture(UserRole.STUDENT)
+        try {
+            compose.setContent {
+                AuthTestLocale {
+                    CompaneroTheme {
+                        ClassroomScreen(
+                            roles = setOf(UserRole.STUDENT, UserRole.ADMIN, UserRole.TEACHER),
+                            studentExperience = true,
+                            teacherExperience = false,
+                            administrativeExperience = false,
+                            viewModel = f.model,
+                        )
+                    }
+                }
+            }
+            compose.onNodeWithText("Accesos académicos").assertIsDisplayed()
+            compose.onNodeWithText("Administración académica").assertDoesNotExist()
+        } finally {
+            compose.runOnIdle { f.close() }
+        }
+    }
+
     private fun catalog(
         role: UserRole,
         name: String,

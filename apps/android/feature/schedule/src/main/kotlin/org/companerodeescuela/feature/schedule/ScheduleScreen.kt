@@ -71,7 +71,6 @@ import kotlinx.coroutines.launch
 import org.companerodeescuela.core.academic.PersonalScheduleDraft
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
-import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
 import org.companerodeescuela.core.designsystem.v8.V8DaySelector
 import org.companerodeescuela.core.designsystem.v8.V8GlassFilterChip
 import org.companerodeescuela.core.designsystem.v8.V8HeroTitle

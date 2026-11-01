@@ -117,3 +117,43 @@
 - No pasar lista automáticamente por escanear QR, pulsar notificación o conectarse a Wi-Fi.
 - No crear asignaciones docentes, inscripciones o credenciales de producción para «hacer que se vea bien».
 - No declarar PR merged, CI verde, QA física o producción desplegada hasta comprobar.
+
+## X. NUEVO ALCANCE APROBADO: tareas y entregas en el canal de clase (NO duplicar chat)
+**Hallazgo verificado en `main`**: `shared/contracts/ChannelContracts.kt` ya define `ANNOUNCEMENT`, `MATERIAL`, `REMINDER`, `ChannelAttachment` y acuses; `ChannelService.kt` admite hasta 8 enlaces de recurso HTTPS por publicación y `ChannelScreen.kt` deja al docente publicar avisos/materiales y al alumno leer y responder con presets. **Eso NO equivale a un sistema de tareas entregables**: no se identificó contrato oficial de asignación, fecha de entrega, entrega estudiantil o devolución docente para este canal. Reutilizar este canal como origen de tareas; ampliar dominio de forma compatible con Mongo/Ktor y versiones Android anteriores, en lugar de crear un chat nuevo.
+
+### X.1 Experiencia visual a entregar (misma UI aprobada)
+- **Canal de clase**: header compacto de materia, grupo, docente; pestañas «Publicaciones», «Materiales» y «Tareas» en control segmentado existente. Mostrar tarjetas de publicación a lo DailyFlutterUI: avatar/docente, título, fecha, etiquetas sutiles y adjuntos en chips.
+- **Crear tarea docente**: botón contextual «Nueva tarea» solo para clase asignada y rol válido. Abrir **bottom sheet** sólido blanco/carbón con título, instrucciones enriquecidas en texto simple (sin editor pesado), fecha/hora límite con zona, adjuntos y público destinatario = miembros autorizados de la clase/grupo. Draft/preview antes de publicar. No permitir seleccionar grupo ajeno.
+- **Tarea alumno**: tarjeta con título, materia, fecha de entrega, estado «Sin entregar / Entregada / Devuelta / Vencida», badge semántico, botón «Ver tarea». Vista detalle con instrucciones, recursos del docente y **Enviar entrega** usando selector de documentos Android (Storage Access Framework), picker de fotos si permitido, y campo de comentario; progreso de carga real y opción cancelar/reintentar con seguridad.
+- **Revisión docente**: lista de alumnos de **su** clase, entregas, marca de tiempo, adjuntos, comentario y acción «Revisar / Devolver para corregir / Marcar como revisada». Estados de revisión rastreables. Descargar archivos a través de autorización de servidor. No mostrar entregas de compañeros a alumnos.
+- **En inicio**: tile «Tareas» y resumen «Pendientes» con número real, próxima fecha, atrasadas, enviadas y correcciones; no inventar pendientes en ausencia de enlace institucional. La agenda puede mostrar una tarea solo como evento personal/operativo, sin alterar horario institucional.
+- **Notificación**: FCM al publicar/modificar/devolver una tarea; deep link con clase/tarea + revalidación en backend; badge no leído real. No garantizar entrega de push: al abrir app, reconciliar con API.
+- **Adjuntos**: mantener los recursos HTTPS existentes como referencias; si «cargar archivo» exige subir binarios, implementar flujo autenticado backend → almacenamiento privado (p. ej. proveedor aprobado) → metadata inmutable/versionada → URL firmada efímera para ver/descargar. No asumir que Mongo guarda blobs, ni exponer buckets públicos o enlaces arbitrarios. Validar tipo, tamaño, MIME real, cuota, titular, ruta, malware cuando aplique, privacidad, expiración, borrado y reintentos. Nunca registrar contenido o tokens.
+- **Calificaciones**: una revisión/comentario en Compañero **no** publica automáticamente nota oficial en SIII; si se desea calificar, requerir un contrato y aprobación institucional explícitos separados del flujo de entrega. Reusar `feature/grading` solo cuando su autoridad lo permita.
+- **Sincronización**: SIII controla cursos/grupos/adscripciones; Compañero controla tareas colaborativas, archivos y comentarios. SIII podrá consumir **indicadores agregados/autorizados**, nunca asumir control del canal ni ver datos de estudiantes fuera de ámbito.
+
+### X.2 Contratos y modelo incremental propuesto
+- Definir IDs estables de institución, aula/sección/grupo, tarea y autor; no duplicar catálogo académico.
+- Tabla/colección de `ClassTask`: id, institutionalScope, channelId, teacherId, title, description, resources, dueAt UTC+tz, publishedAt, status (DRAFT/PUBLISHED/CLOSED/CANCELLED), revision, audit.
+- `TaskSubmission`: id, taskId, studentId, version, text, file refs, submittedAt, state (DRAFT/UPLOADING/SUBMITTED/RETURNED/REVIEWED), reviewer, reviewedAt, feedback; clave de idempotencia y reglas explícitas para reenviar y entregas tardías.
+- Proteger con actor autenticado y roles actuales; checks de adscripción/inscripción, estado de clase, periodo, límites y ownership en **cada endpoint**, lectura, descarga, mutación y webhooks.
+- No confiar en client-supplied authorId, studentId, MIME ni adjuntos; deduplicación, revisión por versión/ETag y reglas de concurrencia al calificar/editar. Preferir `ETag/If-Match` o revision.
+- Compatibilidad hacia atrás con `ChannelPost` y sus enums serializados: no reinterpretar `MATERIAL` como tarea sin migración o campo/discriminante aditivo. No romper apps instaladas ni sync de otras rutas.
+- Si no hay proveedor de archivos seguro, permitir tarea solo texto/enlaces en QA y marcar carga binaria como **bloqueada**, sin simular subida exitosa.
+
+### X.3 Criterios específicos E2E de tareas
+1. Docente con clase asignada publica tarea válida (texto, fecha, recursos); otro docente recibe 403.
+2. Alumno matriculado ve tarea y recurso; estudiante de otro grupo/invitado no puede verla ni acceder a URL.
+3. Alumno adjunta archivo permitido, envía, recibe confirmación solo tras persistencia; offline/error no muestra «Entregada».
+4. Intentos duplicados, reintentos y doble clic no producen entregas duplicadas.
+5. Docente revisa y devuelve; estudiante ve retroalimentación y reenvía nueva revisión sin destruir la anterior.
+6. Reasignación de grupo/expulsión/revocación invalida permisos del recurso y URLs previamente emitidas según política.
+7. Tarea editada o cerrada, deadline pasada, reloj del cliente incorrecto y entregas tardías no elevan permisos.
+8. FCM puede faltar o llegar repetida: feed autoritativo API mantiene estado de tareas.
+9. Comprobar accesibilidad TalkBack, reducción de movimiento, 360/390/430 dp, texto 200%, tema claro/oscuro y pruebas de seguridad/almacenamiento.
+10. El contador «Tareas» y las métricas de administración son **reales y agregadas**, con privacidad y aislamiento multiinstitución.
+
+### X.4 Dónde entrar en el roadmap
+- Tras F2/F3, añadir subfase **F4-Tareas (backend/API/contracts, Android UI y upload seguro)** en paralelo conceptual con F4-Asistencia, pero con PRs separados.
+- Extender F5 para que «Tareas» en Hoy y en Canal correspondan al mismo estado; no crear pantalla y repositorio duplicados.
+- Extender F6 con test de autoría, permisos, archivos, revisión, idempotencia, URLs firmadas y flujo Ktor ↔ Android. QA E2E no se marca verde hasta verificar carga/descarga de archivo desde dispositivo real.

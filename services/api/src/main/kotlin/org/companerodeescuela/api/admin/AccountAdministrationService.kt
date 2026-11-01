@@ -325,7 +325,15 @@ class AccountAdministrationService(
                         request.operationId,
                         currentActor.id,
                         AccountStatus.ACTIVE,
-                        target.roles + role,
+                        if (application.role == StaffRole.TEACHER &&
+                            target.roles == setOf(UserRole.STUDENT) &&
+                            target.institutionId == null
+                        ) {
+                            // A teacher conversion must not imply previously unapproved student affiliation.
+                            setOf(UserRole.TEACHER)
+                        } else {
+                            target.roles + role
+                        },
                         request.institutionId,
                         clock.instant(),
                         digest,

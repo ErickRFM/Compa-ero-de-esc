@@ -118,6 +118,7 @@ class InstitutionalClassesUiTest {
                 CompaneroTheme {
                     ClassroomScreen(
                         setOf(role),
+                        studentExperience = role == UserRole.STUDENT,
                         teacherExperience = role == UserRole.TEACHER,
                         teacherUserId = "qa-user",
                         viewModel = f.model,

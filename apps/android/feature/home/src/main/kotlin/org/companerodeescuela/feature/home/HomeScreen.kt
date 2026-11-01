@@ -2,6 +2,19 @@
 
 package org.companerodeescuela.feature.home
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Icon
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -124,53 +137,89 @@ fun HomeScreen(
                         )
                     }
                 }
-                V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
+
+                // V25: prominent solid hero, driven strictly by the authorized overview.
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(24.dp),
+                    color = Color(0xFF8A1538),
+                    shadowElevation = 6.dp,
+                ) {
                     Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+                        modifier = Modifier.fillMaxWidth().padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                todayLabel(),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.labelMedium,
-                            )
-                            TextButton(onClick = onOpenClassrooms) {
-                                Text("Mis clases  ›", color = MaterialTheme.colorScheme.primary)
-                            }
-                        }
                         val activeOrNext = overview?.current ?: overview?.next
+                        val institutionalReady =
+                            !state.personalOnly && !state.institutionalAccessDenied &&
+                                !state.fromCache && state.errorMessage == null
+                        Text(
+                            text =
+                                when {
+                                    activeOrNext == null -> "TU VIDA ACADÉMICA"
+                                    overview?.current != null && institutionalReady -> "CLASE EN CURSO"
+                                    else -> "PRÓXIMA CLASE"
+                                },
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White.copy(alpha = 0.88f),
+                        )
+                        Text(
+                            text = activeOrNext?.subjectName ?: "Organiza tu próxima clase",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                        )
                         if (activeOrNext != null) {
+                            activeOrNext.teacherName?.takeIf { it.isNotBlank() }?.let { teacher ->
+                                Text(
+                                    text = "Docente · $teacher",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.White.copy(alpha = 0.92f),
+                                )
+                            }
+                            HorizontalDivider(color = Color.White.copy(alpha = 0.24f))
                             Text(
                                 text =
-                                    if (overview?.current !=
-                                        null
-                                    ) {
-                                        "EN CURSO · ${activeOrNext.subjectName}"
-                                    } else {
-                                        "PRÓXIMA · ${activeOrNext.subjectName}"
-                                    },
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
+                                    "${activeOrNext.startsAt} – ${activeOrNext.endsAt}   ·   ${locationLabel(activeOrNext)}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White,
                             )
+                        } else {
                             Text(
-                                text = "${activeOrNext.startsAt} – ${activeOrNext.endsAt} · ${locationLabel(activeOrNext)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                text = "Cuando haya clases disponibles, aparecerán aquí.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White.copy(alpha = 0.9f),
                             )
                         }
-                        V8RedPrimaryButton(
-                            text = if (state.personalOnly || state.institutionalAccessDenied) "Ver mi horario" else "Ver pase de lista",
-                            onClick = if (state.personalOnly || state.institutionalAccessDenied) onOpenSchedule else onOpenAttendance,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                        TextButton(
+                            onClick =
+                                if (institutionalReady && activeOrNext != null) {
+                                    onOpenAttendance
+                                } else {
+                                    onOpenSchedule
+                                },
+                            modifier = Modifier.align(Alignment.End),
+                            colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
+                        ) {
+                            Text(
+                                if (institutionalReady && activeOrNext != null) {
+                                    "Ver asistencia  ›"
+                                } else {
+                                    "Abrir horario  ›"
+                                },
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
                     }
                 }
+
+                V25QuickAccessGrid(
+                    onOpenSchedule = onOpenSchedule,
+                    onOpenAttendance = onOpenAttendance,
+                    onOpenChannel = onOpenChannel,
+                    onOpenClassrooms = onOpenClassrooms,
+                )
 
                 if (state.loading && overview == null) CircularProgressIndicator()
                 if (state.fromCache || state.personalOnly || state.errorMessage != null) {
@@ -496,5 +545,54 @@ private fun todayLabel(): String {
     val date = LocalDate.now().format(formatter)
     return date.replaceFirstChar {
         if (it.isLowerCase()) it.titlecase(Locale("es", "MX")) else it.toString()
+    }
+}
+
+
+@Composable
+private fun V25QuickAccessGrid(
+    onOpenSchedule: () -> Unit,
+    onOpenAttendance: () -> Unit,
+    onOpenChannel: () -> Unit,
+    onOpenClassrooms: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        val actions = listOf(
+            Triple("Horario", Icons.Filled.DateRange, onOpenSchedule),
+            Triple("Asistencia", Icons.Filled.CheckCircle, onOpenAttendance),
+            Triple("Avisos", Icons.Filled.Campaign, onOpenChannel),
+            Triple("Clases", Icons.Filled.School, onOpenClassrooms),
+        )
+        actions.forEach { (label, icon, action) ->
+            Surface(
+                modifier = Modifier.weight(1f).clickable(onClickLabel = "Abrir $label", onClick = action),
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 2.dp,
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 3.dp, vertical = 14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(23.dp),
+                        tint = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
     }
 }

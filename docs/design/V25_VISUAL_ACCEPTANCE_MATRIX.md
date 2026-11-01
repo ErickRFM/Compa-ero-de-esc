@@ -55,3 +55,17 @@ Las implementaciones existentes prevalecen si el flujo concreto está más prote
 - QR expirado, sesión revocada, push denegado, inicio desde app cerrada y duplicados idempotentes.
 - Unit + Ktlint + UI instrumentation API31/API35 + ambas variantes.
 - Estado de integración SIII ↔ Ktor ↔ Android documentado y CI final verde.
+
+## F4-Tareas — verificaciones adicionales (2026-10-31)
+El nuevo requerimiento de **tareas asignadas por docente y entregas con archivos por estudiante** se implementa sobre el canal de clase existente; NO está terminado solo porque el canal admita enlaces HTTPS. `ChannelPostType` tiene MATERIAL/REMINDER pero no un contrato de tarea ni entrega.
+
+| ID | Escenario | Visual/operación esperada | Verificación |
+|---|---|---|---|
+| TASK-01 | Publicación docente | Bottom sheet «Nueva tarea» desde clase autorizada, vencimiento y adjuntos | Crear/listar/editar/cerrar; 403 docente externo |
+| TASK-02 | Vista estudiante | Feed «Tareas», badge verdadero, card de tarea y CTA entregable | Inscrito sí; visitante/otro grupo no |
+| TASK-03 | Carga real | Picker Android + progreso + envío autenticado | MIME/tamaño y cuota, error, retry, offline, reenvío |
+| TASK-04 | Privacidad | Cada alumno ve solo su entrega, docente ve únicamente clase asignada | IDOR multiinstitución, URL firmada, expiración |
+| TASK-05 | Revisión | Docente revisa/devuelve y alumno ve comentarios y corrige | Revisionado, timestamps, auditable, concurrencia |
+| TASK-06 | Alertas | Publicación, fecha y devolución generan FCM según elegibilidad | Push duplicado/denegado/ausente + feed consistente |
+| TASK-07 | Integración | «Tareas» de Hoy y del canal son la misma fuente | Sin duplicados, sin modificar evaluación oficial SIII |
+| TASK-08 | QA visual | Mismo sistema de tarjetas/espacios/hojas de la referencia aprobada | 360/390/430 dp, 200% font, Día/Noche, TalkBack |

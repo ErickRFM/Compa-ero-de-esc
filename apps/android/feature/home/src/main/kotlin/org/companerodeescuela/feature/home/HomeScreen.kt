@@ -80,6 +80,7 @@ fun HomeScreen(
     onOpenTasks: () -> Unit = onOpenChannel,
     onOpenAttendance: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
+    displayName: String? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
@@ -109,9 +110,9 @@ fun HomeScreen(
                         .align(Alignment.TopCenter),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
             ) {
+                // The registered account name remains available when SIII returns 403 or is offline.
                 val firstName =
-                    overview
-                        ?.studentName
+                    (displayName?.takeIf(String::isNotBlank) ?: overview?.studentName)
                         ?.trim()
                         ?.substringBefore(" ")
                         ?.takeIf { it.isNotBlank() }

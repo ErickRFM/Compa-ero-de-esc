@@ -63,6 +63,7 @@ fun AttendanceQrScanner(
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
     purpose: ScannerPurpose = ScannerPurpose.ATTENDANCE,
+    schoolNetworkReady: Boolean = true,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -239,14 +240,23 @@ fun AttendanceQrScanner(
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
             ) {
                 Text(
-                    text = if (purpose == ScannerPurpose.SCHOOL_DAY) "Jornada escolar" else "Pase de clase",
+                    text =
+                        if (purpose == ScannerPurpose.SCHOOL_DAY && !schoolNetworkReady) {
+                            "Wi-Fi escolar necesario"
+                        } else if (purpose == ScannerPurpose.SCHOOL_DAY) {
+                            "Jornada escolar"
+                        } else {
+                            "Pase de clase"
+                        },
                     style = MaterialTheme.typography.labelLarge,
                     color = Color.White,
                 )
                 Text(
                     text =
-                        if (purpose == ScannerPurpose.SCHOOL_DAY) {
-                            "Conéctate al Wi-Fi escolar. El servidor validará el registro de ingreso."
+                        if (purpose == ScannerPurpose.SCHOOL_DAY && !schoolNetworkReady) {
+                            "Puedes leer el QR, pero el ingreso no se registrará hasta conectarte al Wi-Fi escolar."
+                        } else if (purpose == ScannerPurpose.SCHOOL_DAY) {
+                            "El servidor validará el registro de ingreso con la red escolar."
                         } else {
                             "Escanear aporta evidencia; el pase lo confirma el servidor."
                         },

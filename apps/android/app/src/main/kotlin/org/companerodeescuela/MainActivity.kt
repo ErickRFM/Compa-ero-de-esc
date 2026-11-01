@@ -605,20 +605,6 @@ class MainActivity : AppCompatActivity() {
                                                     } else {
                                                         null
                                                     },
-                                                onRepresentatives =
-                                                    if (appDistribution == AppDistribution.ACADEMIC &&
-                                                        AcademicRoutePolicy.studentActions(roleConfig.experience, session.roles)
-                                                    ) {
-                                                        {
-                                                            navController.navigate(Destination.RepresentativeInvitations.route) {
-                                                                launchSingleTop =
-                                                                    true
-                                                            }
-                                                        }
-                                                    } else {
-                                                        null
-                                                    },
-                                                appVersion = BuildConfig.VERSION_NAME,
                                                 onLogout = {
                                                     loginExperienceName = null
                                                     sessionViewModel.logout()

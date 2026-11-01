@@ -42,7 +42,7 @@ try {
     $payload = @('QA_ADMIN_BOOTSTRAP_ENABLED=true', "QA_ADMIN_BOOTSTRAP_INSTITUTION_ID=$NativeInstitutionId", "QA_ADMIN_BOOTSTRAP_ACCOUNT_ID=$($login.user.id)", "QA_ADMIN_BOOTSTRAP_EXPECTED_REVISION=$revision", "QA_ADMIN_BOOTSTRAP_OPERATION_ID=$operation", "QA_ADMIN_BOOTSTRAP_EXPIRES_AT=$expiry", "QA_ADMIN_BOOTSTRAP_PROOF=$($proof.proof)") -join "`n"
     Set-Clipboard -Value $payload
     $copied = $true
-    Write-Host 'En el servicio QA aislado de Render: Environment > Add from .env > pegar > Save, rebuild, and deploy. Conserva las demás variables. La prueba MFA vence en cinco minutos.'
+    Write-Host 'En el servicio QA aislado de Render: Environment > Add from .env > pegar > Save and deploy. Conserva las demás variables. La prueba MFA vence en cinco minutos.'
     Write-Host 'No pegues este portapapeles en el chat. Al confirmar el arranque, desactiva QA_ADMIN_BOOTSTRAP_ENABLED y elimina QA_ADMIN_BOOTSTRAP_PROOF.'
     Read-Host 'Pulsa Enter después de pegar para borrar el portapapeles' | Out-Null
 } catch {

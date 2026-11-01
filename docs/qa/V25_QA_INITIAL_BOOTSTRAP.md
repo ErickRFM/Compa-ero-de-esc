@@ -22,10 +22,12 @@ Referencia del proveedor: [Blueprints](https://render.com/docs/blueprint-spec), 
 2. En el servicio QA, registrar la institución con el bootstrap institucional existente: nombre `QA-UNIV`, UUID nativo independiente y validado, registro inicialmente cerrado. Activarlo durante un arranque, verificar persistencia, desactivar `SIII_PILOT_TENANT_BOOTSTRAP_ENABLED` y retirar sus dos valores temporales. No copiar por suposición el UUID de SIII.
 3. En el APK: **Perfil → Seguridad de la cuenta → Configurar autenticador**. Introducir la contraseña propia, agregar la clave al autenticador y pulsar **Confirmar autenticador** con su código. No enviar el código ni la clave por chat.
 4. Ejecutar localmente `infrastructure/scripts/Prepare-QaFirstAdmin.ps1` con el origen QA, su UUID institucional nativo y el correo del candidato. El script solicita contraseña y MFA de forma privada; obtiene una prueba ligada a cuenta, revisión, institución, operación, capacidades, vigencia y apertura del registro QA. No concede privilegios desde el cliente.
-5. El script deja temporalmente las variables de arranque en el portapapeles. En **Render → servicio QA → Environment → Add from .env**, pegarlas y pulsar **Save, rebuild, and deploy**. La prueba MFA vence en cinco minutos: si expira, generar otra; no ampliar ni omitir su control.
+5. El script deja temporalmente las variables de arranque en el portapapeles. En **Render → servicio QA → Environment → Add from .env**, pegarlas y pulsar **Save and deploy**. La prueba MFA vence en cinco minutos: si expira, generar otra; no ampliar ni omitir su control.
 6. Tras el arranque correcto, desactivar `QA_ADMIN_BOOTSTRAP_ENABLED` y eliminar `QA_ADMIN_BOOTSTRAP_PROOF`; guardar y desplegar. Volver a iniciar sesión en Gestión. El alta está auditada por CAS y reserva institucional permanente; no crea `SUPER_ADMIN`. Un reintento no restaura administración revocada ni reabre un registro cerrado después.
 
 ## Alumno y docente
+
+El propietario confirmó `erik55509@gmail.com` para el alumno y `richis.4571@gmail.com` para el docente. Estos son destinos de verificación, no credenciales compartidas de SIII. No se ha confirmado un correo independiente para el operador administrador. La cuenta personal existente se conserva; el alta QA ocurre en la base aislada.
 
 1. En Académico QA, **Crear cuenta → Estudiante**, elegir `QA-UNIV`, indicar la matrícula oficial y un correo verificable. Elegir una contraseña independiente y verificar el correo.
 2. Crear de igual modo **Docente**, con `QA-UNIV` y `EMP-QA-2026`; verificar su correo. Queda pendiente de aprobación.

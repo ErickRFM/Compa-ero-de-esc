@@ -48,6 +48,8 @@ dependencies {
     implementation(libs.ktor.serialization.kotlinx.json)
 
     implementation(libs.mongodb.driver.kotlin.coroutine)
+    implementation(platform(libs.netty.bom))
+    implementation(libs.netty.handler)
     implementation(libs.logback.classic)
 
     testImplementation(libs.kotlin.test)
@@ -60,8 +62,13 @@ dependencies {
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     // Cached results must distinguish real Mongo integration from local skipped tests.
-    inputs.property("v12MongoIntegrationEnabled", providers.environmentVariable("V12_TEST_MONGODB_URI")
-        .map { it.isNotBlank() }.orElse(false))
+    inputs.property(
+        "v12MongoIntegrationEnabled",
+        providers
+            .environmentVariable("V12_TEST_MONGODB_URI")
+            .map { it.isNotBlank() }
+            .orElse(false),
+    )
     testLogging {
         events("passed", "skipped", "failed")
     }

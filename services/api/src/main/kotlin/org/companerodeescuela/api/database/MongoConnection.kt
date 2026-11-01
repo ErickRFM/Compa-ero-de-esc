@@ -2,6 +2,7 @@ package org.companerodeescuela.api.database
 
 import com.mongodb.ConnectionString
 import com.mongodb.MongoClientSettings
+import com.mongodb.connection.TransportSettings
 import com.mongodb.kotlin.client.coroutine.MongoClient
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import kotlinx.coroutines.CoroutineDispatcher
@@ -167,6 +168,9 @@ internal fun mongoClientSettings(settings: MongoSettings): MongoClientSettings =
     MongoClientSettings
         .builder()
         .applyConnectionString(ConnectionString(settings.uri))
+        // Avoid the JDK async TLS selector's pending-registration failure loop after a
+        // connection timeout. Netty retains the driver's certificate/hostname checks.
+        .transportSettings(TransportSettings.nettyBuilder().build())
         .applyToSocketSettings { it.connectTimeout(settings.connectTimeoutMs.toLong(), TimeUnit.MILLISECONDS) }
         .applyToClusterSettings { it.serverSelectionTimeout(settings.serverSelectionTimeoutMs.toLong(), TimeUnit.MILLISECONDS) }
         .build()

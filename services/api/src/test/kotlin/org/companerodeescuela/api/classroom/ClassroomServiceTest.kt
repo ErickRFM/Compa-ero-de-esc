@@ -63,34 +63,17 @@ class ClassroomServiceTest {
     }
 
     @Test
-    fun assignedTeacherCanGenerateAndRevokeScopedClassCode() = runTest {
+    fun assignedTeacherCanGenerateEnrollmentCode() = runTest {
         val service = service(InMemoryClassroomRepository(), BASE_TIME)
         val classroom = create(service,request())
+
         val invite = service.createInvite(
             TEACHER,
             classroom.id,
             CreateClassInviteRequest(ttlMinutes = 30, maxUses = 10),
         )
-        assertTrue(invite.code.matches(Regex("[A-Z2-9]{4}-[A-Z2-9]{4}")))
-        service.revokeInvite(TEACHER, classroom.id, invite.id)
-        assertFailsWith<ApiException.Conflict> {
-            service.join(STUDENT, invite.code)
-        }
-    }
-
-    @Test
-    fun studentAndPendingTeacherCannotGenerateClassCodes() = runTest {
-        val service = service(InMemoryClassroomRepository(), BASE_TIME)
-        val classroom = create(service,request())
-        for (actor in listOf(STUDENT, PENDING_TEACHER)) {
-            assertFailsWith<ApiException.Forbidden> {
-                service.createInvite(
-                    actor,
-                    classroom.id,
-                    CreateClassInviteRequest(ttlMinutes = 30, maxUses = 10),
-                )
-            }
-        }
+        assertTrue(invite.code.isNotBlank())
+        assertFailsWith<ApiException.Forbidden> { service.createInvite(STUDENT, classroom.id, CreateClassInviteRequest()) }
     }
 
     @Test

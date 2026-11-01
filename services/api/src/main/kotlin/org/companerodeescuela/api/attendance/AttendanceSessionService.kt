@@ -284,62 +284,93 @@ class AttendanceSessionService(
     ): AttendanceSessionResponse {
         val session = accessPolicy.requireSession(sessionId)
         accessPolicy.requireOwnerOrAdministrative(actorId, session, allowCrossOwner, nativeActor)
-        val closed =
-            if (session.status == AttendanceSessionStatus.CLOSED) {
-                session
-            } else {
-                session.copy(
-                    status = AttendanceSessionStatus.CLOSED,
-                    closedAtEpochSeconds = clock.instant().epochSecond,
+        val confirmedTeacher =
+            actorId == session.openedBy &&
+                (
+                    nativeActor?.roles?.contains(org.companerodeescuela.shared.contracts.UserRole.TEACHER)
+                        ?: (session.identitySource != AttendanceIdentitySource.NATIVE)
                 )
+        // Freeze the authorized roster before committing CLOSED. A restart must not depend on
+        // the current section version or an interactive teacher retry to finish accepted work.
+        val roster =
+            if (session.status == AttendanceSessionStatus.OPEN &&
+                confirmedTeacher &&
+                nativeActor != null &&
+                session.identitySource == AttendanceIdentitySource.NATIVE
+            ) {
+                val projection = nativeProjection ?: throw ApiException.DependencyUnavailable("Native academic authority is unavailable")
+                val authorized = projection.activeStudentIdsForTeacher(nativeActor, session.courseId).distinct()
+                projection.requireSession(nativeActor, session)
+                authorized
+            } else {
+                null
             }
-        repository.replaceSession(closed)
-        if (nativeActor != null &&
-            nativeActor.id == closed.openedBy &&
-            org.companerodeescuela.shared.contracts.UserRole.TEACHER in nativeActor.roles &&
-            closed.identitySource == AttendanceIdentitySource.NATIVE
-        ) {
-            val projection = nativeProjection ?: throw ApiException.DependencyUnavailable("Native academic authority is unavailable")
-            val students = projection.activeStudentIdsForTeacher(nativeActor, closed.courseId).distinct()
-            if (students.isNotEmpty()) projection.requireSession(nativeActor, closed)
-            val reviewedAt = closed.closedAtEpochSeconds ?: clock.instant().epochSecond
-            for (studentId in students) {
-                // The unique session/student key preserves a concurrent confirmation or review.
-                // Repeating a partially completed close fills missing records without overwriting any.
-                val status = org.companerodeescuela.shared.contracts.AttendanceStatus.REVIEW_REQUIRED
-                val result =
-                    repository.writeAttempt(
-                        org.companerodeescuela.shared.contracts.AttendanceRecordResponse(
-                            id = AttendanceRecordIds.forStudentSession(closed.id, studentId),
-                            operationId = "close-absence:${AttendanceRecordIds.forStudentSession(closed.id, studentId)}",
-                            sessionId = closed.id,
-                            occurrenceId = closed.occurrenceId,
-                            studentId = studentId,
-                            status = status,
-                            reasonCode = org.companerodeescuela.shared.contracts.AttendanceReasonCode.TEACHER_REVIEW,
-                            attemptedAtEpochSeconds = reviewedAt,
-                            receivedAtEpochSeconds = clock.instant().epochSecond,
-                            reviewedBy = actorId,
-                            reviewedAtEpochSeconds = reviewedAt,
-                            disposition = org.companerodeescuela.shared.contracts.AttendanceDisposition.ABSENT,
-                            reviewHistory =
-                                listOf(
-                                    org.companerodeescuela.shared.contracts.AttendanceReviewEntry(
-                                        actorId,
-                                        reviewedAt,
-                                        "Sin confirmación al cerrar el pase de lista",
-                                        status,
-                                        org.companerodeescuela.shared.contracts.AttendanceDisposition.ABSENT,
-                                    ),
+        val closed =
+            repository.closeSessionIfOpen(session.id, actorId, confirmedTeacher, clock.instant().epochSecond, roster)
+                ?: throw ApiException.NotFound("Attendance session was not found")
+        repository.closureWork(closed.id)?.let { completeClosure(it) }
+        return closed
+    }
+
+    private suspend fun completeClosure(work: AttendanceClosureWork) {
+        val closed = work.session
+        check(closed.status == AttendanceSessionStatus.CLOSED && closed.closedByTeacher)
+        val reviewedAt = closed.closedAtEpochSeconds ?: clock.instant().epochSecond
+        for (studentId in work.studentIds) {
+            // The unique session/student key preserves a concurrent confirmation or review.
+            // Repeating a partially completed close fills missing records without overwriting any.
+            val status = org.companerodeescuela.shared.contracts.AttendanceStatus.REVIEW_REQUIRED
+            val result =
+                repository.writeAttempt(
+                    org.companerodeescuela.shared.contracts.AttendanceRecordResponse(
+                        id = AttendanceRecordIds.forStudentSession(closed.id, studentId),
+                        operationId = "close-absence:${AttendanceRecordIds.forStudentSession(closed.id, studentId)}",
+                        sessionId = closed.id,
+                        occurrenceId = closed.occurrenceId,
+                        studentId = studentId,
+                        status = status,
+                        reasonCode = org.companerodeescuela.shared.contracts.AttendanceReasonCode.TEACHER_REVIEW,
+                        attemptedAtEpochSeconds = reviewedAt,
+                        receivedAtEpochSeconds = clock.instant().epochSecond,
+                        reviewedBy = closed.openedBy,
+                        reviewedAtEpochSeconds = reviewedAt,
+                        disposition = org.companerodeescuela.shared.contracts.AttendanceDisposition.ABSENT,
+                        reviewHistory =
+                            listOf(
+                                org.companerodeescuela.shared.contracts.AttendanceReviewEntry(
+                                    closed.openedBy,
+                                    reviewedAt,
+                                    "Sin confirmación al cerrar el pase de lista",
+                                    status,
+                                    org.companerodeescuela.shared.contracts.AttendanceDisposition.ABSENT,
                                 ),
-                        ),
-                    )
-                if (result == AttemptWriteResult.OperationConflict) {
-                    throw ApiException.Conflict("Attendance close operation belongs to another record")
-                }
+                            ),
+                    ),
+                )
+            if (result == AttemptWriteResult.OperationConflict) {
+                throw ApiException.Conflict("Attendance close operation belongs to another record")
             }
         }
-        return closed
+        repository.completeClosure(closed.id)
+    }
+
+    /** Replay uses the durable, previously authorized intent; no new permissions are granted. */
+    suspend fun reconcileClosures(): Int {
+        var completed = 0
+        for (work in repository.pendingClosures()) {
+            try {
+                completeClosure(work)
+                completed++
+            } catch (
+                cancelled: kotlinx.coroutines.CancellationException,
+            ) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Rotate failed work so one unavailable record cannot block later closures.
+                repository.deferClosure(work.session.id)
+            }
+        }
+        return completed
     }
 
     suspend fun roster(

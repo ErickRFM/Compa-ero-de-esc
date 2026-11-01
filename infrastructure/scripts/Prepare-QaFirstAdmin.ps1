@@ -25,7 +25,7 @@ try {
     if ($QaApiOrigin.Scheme -ne 'https' -or $QaApiOrigin.UserInfo -or $QaApiOrigin.AbsolutePath -ne '/' -or $QaApiOrigin.Query -or $QaApiOrigin.Fragment) { throw 'Invalid QA origin' }
     $origin = $QaApiOrigin.GetLeftPart([UriPartial]::Authority)
     $health = Invoke-RestMethod "$origin/health" -TimeoutSec 20
-    if ($health.environment -notin @('local', 'development')) { throw 'Non-QA runtime' }
+    if ($health.environment -notin @('local', 'staging')) { throw 'Non-QA runtime' }
     $password = Read-PrivateValue 'Contraseña independiente de la cuenta candidata QA'
     $login = (Invoke-RestMethod "$origin/auth/login" -Method Post -ContentType 'application/json' -Body (@{ username = $CandidateEmail; password = $password } | ConvertTo-Json) -TimeoutSec 20).data
     if (-not $login.user.emailVerified) { throw 'Verified candidate required' }

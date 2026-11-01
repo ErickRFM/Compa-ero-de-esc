@@ -215,7 +215,12 @@ class AttendanceNativeRoutesTest {
             )
             assertEquals(HttpStatusCode.Forbidden, client.post("/attendance/sessions/own/reminders") { bearerAuth(student) }.status)
             assertEquals(HttpStatusCode.NotFound, client.post("/attendance/sessions/missing/reminders") { bearerAuth(teacher) }.status)
-            assertEquals(HttpStatusCode.OK, client.post("/attendance/sessions/own/close") { bearerAuth(teacher) }.status)
+            // This route-only fixture has no published native occurrence. Closing must now fail
+            // before committing a roster; the reminder's terminal-state behavior is independent.
+            assertEquals(HttpStatusCode.Forbidden, client.post("/attendance/sessions/own/close") { bearerAuth(teacher) }.status)
+            val stored = assertNotNull(f.repository.findSession("own"))
+            assertEquals(AttendanceSessionStatus.OPEN, stored.status)
+            f.repository.replaceSession(stored.copy(status = AttendanceSessionStatus.CLOSED, closedAtEpochSeconds = f.now.epochSecond))
             assertEquals(HttpStatusCode.Conflict, client.post("/attendance/sessions/own/reminders") { bearerAuth(teacher) }.status)
         }
 

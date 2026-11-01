@@ -313,6 +313,62 @@ class AccountAdministrationService(
         return summary(approved)
     }
 
+    suspend fun approveStudentAffiliation(
+        actor: PlatformAccount,
+        targetId: String,
+        request: org.companerodeescuela.shared.contracts.ApproveStudentAffiliationRequest,
+    ): AdminUserSummary {
+        identifier(targetId)
+        identifier(request.operationId)
+        identifier(request.institutionId)
+        val current = policy.require(actor.toUserSummary(), AdminCapability.MANAGE_ACADEMICS, request.institutionId)
+        if (institutions.findEnabled(request.institutionId) == null) throw ApiException.Validation("An enabled institution is required")
+        val target = accounts.findById(targetId) ?: throw ApiException.NotFound("Student applicant was not found")
+        if (target.id == current.id ||
+            !target.permitsSession ||
+            target.accountStatus != AccountStatus.ACTIVE ||
+            target.roles != setOf(UserRole.STUDENT) ||
+            target.emailVerifiedAt?.let { it <= clock.instant() } != true ||
+            target.registrationIntent?.profile != org.companerodeescuela.shared.contracts.RegistrationAccountType.STUDENT ||
+            target.registrationIntent.requestedInstitutionId != request.institutionId
+        ) {
+            throw ApiException.Forbidden("A verified student request for this institution is required")
+        }
+        val digest = PrivilegedCommandDigests.studentAffiliation(targetId, request)
+        mfa.requireStepUp(current, request.proof, StepUpAction.MANAGE_ACADEMICS, targetId, request.operationId, digest)
+        val prior = target.identityAudit.lastOrNull()
+        if (target.institutionId == request.institutionId &&
+            target.authRevision == request.expectedAuthRevision + 1 &&
+            prior?.operationId == request.operationId &&
+            prior.actorId == current.id &&
+            prior.scopeDigest == digest &&
+            prior.fromRevision == request.expectedAuthRevision
+        ) {
+            return summary(target)
+        }
+        if (target.institutionId != null ||
+            target.authRevision != request.expectedAuthRevision
+        ) {
+            throw ApiException.Conflict("Student affiliation changed; reload the account")
+        }
+        policy.require(current.toUserSummary(), AdminCapability.MANAGE_ACADEMICS, request.institutionId)
+        val approved =
+            accounts.changeIdentity(
+                targetId,
+                request.expectedAuthRevision,
+                AccountIdentityChange(
+                    request.operationId,
+                    current.id,
+                    AccountStatus.ACTIVE,
+                    setOf(UserRole.STUDENT),
+                    request.institutionId,
+                    clock.instant(),
+                    digest,
+                ),
+            ) ?: throw ApiException.Conflict("Student affiliation changed concurrently")
+        return summary(approved)
+    }
+
     suspend fun lifecycle(
         actor: PlatformAccount,
         targetId: String,
@@ -376,7 +432,15 @@ class AccountAdministrationService(
     }
 
     private fun summary(account: PlatformAccount) =
-        AdminUserSummary(account.toUserSummary(), account.staffApplications(), account.adminCapabilities)
+        AdminUserSummary(
+            account.toUserSummary(),
+            account.staffApplications(),
+            account.adminCapabilities,
+            account.registrationIntent?.requestedInstitutionId.takeIf {
+                account.institutionId == null &&
+                    account.registrationIntent?.profile == org.companerodeescuela.shared.contracts.RegistrationAccountType.STUDENT
+            },
+        )
 
     private fun effectiveInstitution(account: PlatformAccount) = account.institutionId ?: account.registrationIntent?.requestedInstitutionId
 

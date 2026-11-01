@@ -35,6 +35,12 @@ sealed interface SessionWriteResult {
     ) : SessionWriteResult
 }
 
+/** Private durable continuation of an already-authorized teacher closure. Never an API DTO. */
+data class AttendanceClosureWork(
+    val session: AttendanceSessionResponse,
+    val studentIds: List<String>,
+)
+
 interface AttendanceRepository {
     suspend fun institutionOverview(
         institutionId: String,
@@ -61,6 +67,27 @@ interface AttendanceRepository {
         afterEpochSeconds: Long = 0,
         unscopedInstitutionalOnly: Boolean = false,
         limit: Int = MAX_OPEN_SESSION_RESULTS,
+    ): List<AttendanceSessionResponse>
+
+    suspend fun closeSessionIfOpen(
+        sessionId: String,
+        actorId: String,
+        closedByTeacher: Boolean,
+        atEpochSeconds: Long,
+        authorizedStudentIds: List<String>? = null,
+    ): AttendanceSessionResponse?
+
+    suspend fun pendingClosures(limit: Int = 100): List<AttendanceClosureWork>
+
+    suspend fun closureWork(sessionId: String): AttendanceClosureWork?
+
+    suspend fun deferClosure(sessionId: String)
+
+    suspend fun completeClosure(sessionId: String)
+
+    suspend fun teacherHistoryPage(
+        teacherId: String,
+        page: Int,
     ): List<AttendanceSessionResponse>
 
     suspend fun replaceSession(session: AttendanceSessionResponse)
@@ -118,6 +145,7 @@ interface AttendanceRepository {
 class InMemoryAttendanceRepository : AttendanceRepository {
     private val mutex = Mutex()
     private val sessions = linkedMapOf<String, AttendanceSessionResponse>()
+    private val closureRosters = linkedMapOf<String, List<String>>()
     private val occurrenceToSession = linkedMapOf<String, String>()
     private val records = linkedMapOf<String, AttendanceRecordResponse>()
     private val operationToRecord = linkedMapOf<String, String>()
@@ -201,6 +229,62 @@ class InMemoryAttendanceRepository : AttendanceRepository {
                         (it.identitySource != AttendanceIdentitySource.NATIVE && it.groupId == null)
                 }.take(limit.coerceIn(1, MAX_OPEN_SESSION_RESULTS))
                 .toList()
+        }
+
+    override suspend fun closeSessionIfOpen(
+        sessionId: String,
+        actorId: String,
+        closedByTeacher: Boolean,
+        atEpochSeconds: Long,
+        authorizedStudentIds: List<String>?,
+    ): AttendanceSessionResponse? =
+        mutex.withLock {
+            val current = sessions[sessionId] ?: return@withLock null
+            if (current.status == AttendanceSessionStatus.CLOSED) return@withLock current
+            val closed =
+                current.copy(
+                    status = AttendanceSessionStatus.CLOSED,
+                    closedAtEpochSeconds = atEpochSeconds,
+                    closedByTeacher = closedByTeacher,
+                )
+            sessions[sessionId] = closed
+            if (authorizedStudentIds != null) closureRosters[sessionId] = authorizedStudentIds.distinct()
+            closed
+        }
+
+    override suspend fun pendingClosures(limit: Int): List<AttendanceClosureWork> =
+        mutex.withLock {
+            closureRosters.entries.take(limit.coerceIn(1, 100)).mapNotNull { (id, roster) ->
+                sessions[id]?.let { AttendanceClosureWork(it, roster) }
+            }
+        }
+
+    override suspend fun closureWork(sessionId: String): AttendanceClosureWork? =
+        mutex.withLock {
+            closureRosters[sessionId]?.let { roster -> sessions[sessionId]?.let { AttendanceClosureWork(it, roster) } }
+        }
+
+    override suspend fun deferClosure(sessionId: String) {
+        mutex.withLock {
+            closureRosters.remove(sessionId)?.let { closureRosters[sessionId] = it }
+        }
+    }
+
+    override suspend fun completeClosure(sessionId: String) {
+        mutex.withLock { closureRosters.remove(sessionId) }
+    }
+
+    override suspend fun teacherHistoryPage(
+        teacherId: String,
+        page: Int,
+    ): List<AttendanceSessionResponse> =
+        mutex.withLock {
+            require(page in 1..10_000)
+            sessions.values
+                .filter { it.openedBy == teacherId }
+                .sortedBy { it.id }
+                .drop((page - 1) * 100)
+                .take(101)
         }
 
     override suspend fun replaceSession(session: AttendanceSessionResponse) {

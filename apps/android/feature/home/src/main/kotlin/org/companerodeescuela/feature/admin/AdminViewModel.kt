@@ -14,14 +14,20 @@ import org.companerodeescuela.core.network.MfaRepository
 import org.companerodeescuela.shared.contracts.AccountLifecycleRequest
 import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.ApproveStaffRequest
+import org.companerodeescuela.shared.contracts.ApproveStudentAffiliationRequest
+import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
+import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkDigest
+import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkRequest
 import org.companerodeescuela.shared.contracts.MfaStepUpRequest
 import org.companerodeescuela.shared.contracts.PrivilegedCommandDigests
+import org.companerodeescuela.shared.contracts.RegistrationAccountType
 import org.companerodeescuela.shared.contracts.RevokeTutorAssignmentRequest
 import org.companerodeescuela.shared.contracts.StaffApplicationStatus
 import org.companerodeescuela.shared.contracts.StaffRole
 import org.companerodeescuela.shared.contracts.StepUpAction
 import org.companerodeescuela.shared.contracts.StepUpProof
 import org.companerodeescuela.shared.contracts.TutorApprovalScope
+import org.companerodeescuela.shared.contracts.UserRole
 import java.time.Clock
 import java.util.UUID
 import javax.inject.Inject
@@ -48,6 +54,7 @@ class AdminViewModel
             val operationId: String
             val action: StepUpAction
             val digest: String
+            val resourceId: String get() = target
 
             data class Approval(
                 override val target: String,
@@ -56,6 +63,25 @@ class AdminViewModel
                 override val operationId get() = body.operationId
                 override val action = StepUpAction.APPROVE_STAFF
                 override val digest get() = PrivilegedCommandDigests.staffApproval(target, body)
+            }
+
+            data class Affiliation(
+                override val target: String,
+                val body: ApproveStudentAffiliationRequest,
+            ) : Command {
+                override val operationId get() = body.operationId
+                override val action = StepUpAction.MANAGE_ACADEMICS
+                override val digest get() = PrivilegedCommandDigests.studentAffiliation(target, body)
+            }
+
+            data class IdentityLink(
+                override val target: String,
+                val body: InstitutionalIdentityLinkRequest,
+            ) : Command {
+                override val operationId get() = body.operationId
+                override val action = StepUpAction.MANAGE_ACADEMICS
+                override val resourceId get() = body.institutionId
+                override val digest get() = InstitutionalIdentityLinkDigest.command(body)
             }
 
             data class Lifecycle(
@@ -242,6 +268,67 @@ class AdminViewModel
             )
         }
 
+        fun prepareStudentAffiliation(
+            userId: String,
+            institutionId: String,
+        ) {
+            if (!ready() || command != null) return
+            val target =
+                mutable.value.overview
+                    ?.users
+                    ?.find { it.user.id == userId } ?: return invalid()
+            if (target.requestedInstitutionId != institutionId ||
+                target.user.institutionId != null ||
+                !target.user.emailVerified ||
+                target.user.accountStatus != AccountStatus.ACTIVE ||
+                target.user.roles != setOf(UserRole.STUDENT) ||
+                target.user.registrationAccountType != RegistrationAccountType.STUDENT
+            ) {
+                return invalid()
+            }
+            prepare(
+                Command.Affiliation(
+                    userId,
+                    ApproveStudentAffiliationRequest(UUID.randomUUID().toString(), target.user.authRevision, institutionId, ""),
+                ),
+                target.user.displayName,
+            )
+        }
+
+        fun prepareInstitutionalLink(
+            userId: String,
+            externalId: String,
+        ) {
+            if (!ready() || command != null) return
+            val target =
+                mutable.value.overview
+                    ?.users
+                    ?.find { it.user.id == userId }
+                    ?.user ?: return invalid()
+            val institution = target.institutionId ?: return invalid()
+            val reference = externalId.trim().uppercase(java.util.Locale.ROOT)
+            if (!reference.matches(Regex("[A-Z0-9][A-Z0-9_-]{1,31}")) ||
+                !target.emailVerified ||
+                target.accountStatus != AccountStatus.ACTIVE ||
+                target.roles.any { it == UserRole.ADMIN || it == UserRole.SUPER_ADMIN }
+            ) {
+                return invalid()
+            }
+            val kind =
+                when {
+                    UserRole.TEACHER in target.roles -> InstitutionalIdentityKind.TEACHER
+                    UserRole.STUDENT in target.roles -> InstitutionalIdentityKind.STUDENT
+                    else -> return invalid()
+                }
+            prepare(
+                Command.IdentityLink(
+                    userId,
+                    InstitutionalIdentityLinkRequest(institution, kind, reference, userId, UUID.randomUUID().toString(), ""),
+                ),
+                target.displayName + " · " + reference,
+            )
+        }
+
         fun prepareRevocation(id: String) {
             if (!ready() || command != null) return
             val assignment = mutable.value.assignments.find { it.id == id && it.active } ?: return invalid()
@@ -275,7 +362,9 @@ class AdminViewModel
                         ) {
                             Outcome.Success(cached)
                         } else {
-                            mfa.stepUp(MfaStepUpRequest(password, otp, pending.action, pending.target, pending.operationId, pending.digest))
+                            mfa.stepUp(
+                                MfaStepUpRequest(password, otp, pending.action, pending.resourceId, pending.operationId, pending.digest),
+                            )
                         }
                     if (!current(captured, capturedOwner) || command !== pending) return@launch
                     if (evidence is Outcome.Failure) {
@@ -292,6 +381,8 @@ class AdminViewModel
                     proof = actual
                     val result =
                         when (pending) {
+                            is Command.Affiliation -> repository.affiliateStudent(pending.target, pending.body.copy(proof = actual.proof))
+                            is Command.IdentityLink -> repository.linkInstitutionalIdentity(pending.body.copy(proof = actual.proof))
                             is Command.Approval -> repository.approve(pending.target, pending.body.copy(proof = actual.proof))
                             is Command.Lifecycle -> repository.lifecycle(pending.target, pending.body.copy(proof = actual.proof))
                             is Command.Revocation -> repository.revokeAssignment(pending.target, pending.body.copy(proof = actual.proof))

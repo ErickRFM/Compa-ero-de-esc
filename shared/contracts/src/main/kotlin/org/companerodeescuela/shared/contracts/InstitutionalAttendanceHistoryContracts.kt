@@ -20,9 +20,12 @@ object InstitutionalAttendanceHistoryContract {
 @OptIn(ExperimentalSerializationApi::class)
 data class InstitutionalAttendanceHistoryRequest(
     val contract: String,
-    val studentExternalId: String,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val studentExternalId: String = "",
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val page: Int? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val teacherExternalId: String? = null,
 )
 
 /** Institution-scoped attendance only. No native identity, reviewer, note or device evidence leaves the API. */
@@ -55,4 +58,22 @@ data class InstitutionalAttendanceHistoryResponse(
     val page: Int? = null,
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val nextPage: Int? = null,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val classSessions: List<InstitutionalClassSessionRecord>? = null,
+)
+
+/** Operational closure only; no private native actor or device evidence leaves Compañero. */
+@Serializable
+data class InstitutionalClassSessionRecord(
+    val sessionId: String,
+    val sectionId: String,
+    val occurrenceId: String,
+    val sourceVersion: Long,
+    val occurrenceDate: String,
+    val teacherExternalId: String,
+    val sessionRevision: Int,
+    val status: AttendanceSessionStatus,
+    val openedAtEpochSeconds: Long,
+    val closedAtEpochSeconds: Long?,
+    val closedByTeacher: Boolean,
 )

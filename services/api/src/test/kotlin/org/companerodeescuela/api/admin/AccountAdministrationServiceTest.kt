@@ -158,6 +158,52 @@ class AccountAdministrationServiceTest {
             }
     }
 
+    @Test fun `student affiliation requires current scoped MFA and never invents an enrollment`() =
+        runBlocking<Unit> {
+            val f = Fixture()
+            f.initialize()
+            val student =
+                PlatformAccount(
+                    "student-affiliation",
+                    "QA Student",
+                    "student@example.test",
+                    "unused",
+                    setOf(UserRole.STUDENT),
+                    emailVerifiedAt = f.clock.now,
+                    registrationIntent = RegistrationIntent(RegistrationAccountType.STUDENT, "campus", "MAT-QA-2026"),
+                )
+            f.accounts.create(student)
+            val request =
+                org.companerodeescuela.shared.contracts
+                    .ApproveStudentAffiliationRequest("affiliate", 0, "campus", "")
+            assertFailsWith<ApiException.Forbidden> { f.service.approveStudentAffiliation(f.actor, student.id, request) }
+            f.clock.now = f.clock.now.plusSeconds(30)
+            val proof =
+                f.mfa.issueStepUp(
+                    f.actor,
+                    password,
+                    Totp.code(f.seed, f.clock.now.epochSecond),
+                    StepUpAction.MANAGE_ACADEMICS,
+                    student.id,
+                    request.operationId,
+                    PrivilegedCommandDigests.studentAffiliation(student.id, request),
+                )
+            val approved = f.service.approveStudentAffiliation(f.actor, student.id, request.copy(proof = proof.proof))
+            assertEquals("campus", approved.user.institutionId)
+            assertEquals(setOf(UserRole.STUDENT), approved.user.roles)
+            assertEquals(approved, f.service.approveStudentAffiliation(f.actor, student.id, request.copy(proof = proof.proof)))
+            assertEquals(
+                1,
+                f.accounts
+                    .findById(student.id)!!
+                    .identityAudit.size,
+            )
+            assertFailsWith<ApiException.Forbidden> {
+                f.service.approveStudentAffiliation(f.actor, student.id, request.copy(institutionId = "other", proof = proof.proof))
+            }
+            assertTrue(f.assignments.listAll().isEmpty())
+        }
+
     @Test fun `verified pending teacher receives only persisted teacher intent after actual scoped MFA`() =
         runBlocking<Unit> {
             val f = Fixture()

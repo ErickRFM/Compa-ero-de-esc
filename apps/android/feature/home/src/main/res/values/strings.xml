@@ -62,4 +62,8 @@
 <string name="admin_directory_no_results">No hay usuarios que coincidan con la búsqueda y el filtro.</string>
 <string name="admin_directory_previous">Anterior</string>
 <string name="admin_directory_next">Siguiente</string>
+<string name="admin_student_affiliation">Autorizar afiliación escolar</string>
+<string name="admin_link_siii">Vincular con SIII</string>
+<string name="admin_link_reference">Matrícula o clave docente</string>
+<string name="admin_link_reference_help">Escribe la matrícula o clave docente que figura en SIII.</string>
 </resources>

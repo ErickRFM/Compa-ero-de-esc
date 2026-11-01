@@ -138,7 +138,7 @@ object QaAdminBootstrap {
         claims: QaAdminBootstrapClaims,
         clock: Clock = Clock.systemUTC(),
     ) {
-        require(environment in setOf("local", "development") && databaseName.matches(Regex("[A-Za-z0-9_]+_qa"))) {
+        require(environment in setOf("local", "staging") && databaseName.matches(Regex("[A-Za-z0-9_]+_qa"))) {
             "QA bootstrap requires an isolated QA database and nonproduction runtime"
         }
         val now = clock.instant()

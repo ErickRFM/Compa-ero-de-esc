@@ -34,7 +34,7 @@ class InstitutionalAttendanceHistoryService(
             throw ApiException.Validation("A bounded page is available only for the versioned history contract")
         }
         if ((request.contract != InstitutionalAttendanceHistoryContract.REQUEST && !versioned) ||
-            request.studentExternalId.isBlank() ||
+            (!archival && (request.studentExternalId.isBlank() || request.teacherExternalId != null)) ||
             request.studentExternalId != request.studentExternalId.trim() ||
             request.studentExternalId.length > 256 ||
             request.studentExternalId.any(Char::isISOControl)
@@ -121,24 +121,42 @@ class InstitutionalAttendanceHistoryService(
         request: InstitutionalAttendanceHistoryRequest,
     ): InstitutionalAttendanceHistoryResponse {
         val repository = archivalRecords ?: throw ApiException.DependencyUnavailable("Institutional archive export is unavailable")
-        val studentId =
-            identities.historicalStudentId(institution.tenantId, request.studentExternalId)
-                ?: throw ApiException.NotFound("An approved historical institutional linkage is required")
+        val teacher = request.teacherExternalId
+        if ((teacher == null) ==
+            request.studentExternalId.isBlank()
+        ) {
+            throw ApiException.Validation("Exactly one archival subject is required")
+        }
+        if (teacher != null &&
+            (teacher.isBlank() || teacher != teacher.trim() || teacher.length > 256 || teacher.any(Char::isISOControl))
+        ) {
+            throw ApiException.Validation("Invalid archival teacher reference")
+        }
+
+        suspend fun subjectId(): String? =
+            if (teacher ==
+                null
+            ) {
+                identities.historicalStudentId(institution.tenantId, request.studentExternalId)
+            } else {
+                identities.historicalTeacherId(institution.tenantId, teacher)
+            }
+        val nativeId = subjectId() ?: throw ApiException.NotFound("An approved historical institutional linkage is required")
         val page = request.page ?: 1
-        val candidates = repository.studentHistoryPage(studentId, page)
+        val candidates = if (teacher == null) repository.studentHistoryPage(nativeId, page) else emptyList()
+        val sessions = linkedMapOf<String, org.companerodeescuela.shared.contracts.AttendanceSessionResponse>()
+        val teacherSessions = if (teacher != null) repository.teacherHistoryPage(nativeId, page) else emptyList()
+        for (session in teacherSessions.take(100)) if (session.openedBy == nativeId) sessions[session.id] = session
         val exported =
             candidates.take(100).mapNotNull { raw ->
                 val session = repository.findSession(raw.sessionId) ?: return@mapNotNull null
-                if (raw.studentId != studentId ||
-                    session.institutionId != institution.tenantId ||
-                    session.identitySource != AttendanceIdentitySource.NATIVE ||
-                    session.academicSource != SiiiAttendanceAuthority.SOURCE ||
-                    session.groupId != session.courseId ||
-                    session.groupScopeRevision < 1 ||
+                if (raw.studentId != nativeId ||
+                    !archivalScope(session, institution.tenantId) ||
                     raw.occurrenceId != session.occurrenceId
                 ) {
                     return@mapNotNull null
                 }
+                sessions[session.id] = session
                 val record = raw.withCurrentPresencePolicy()
                 InstitutionalAttendanceHistoryRecord(
                     auditRecordId =
@@ -163,21 +181,44 @@ class InstitutionalAttendanceHistoryService(
                     recordRevision = record.recordRevision,
                 )
             }
-        if (identities.historicalStudentId(institution.tenantId, request.studentExternalId) !=
-            studentId
-        ) {
-            throw ApiException.Forbidden("Institutional linkage changed during export")
-        }
+        val classSessions =
+            sessions.values.mapNotNull { session ->
+                if (!archivalScope(session, institution.tenantId) || repository.closureWork(session.id) != null) return@mapNotNull null
+                val reference = identities.historicalTeacherExternalId(institution.tenantId, session.openedBy) ?: return@mapNotNull null
+                org.companerodeescuela.shared.contracts.InstitutionalClassSessionRecord(
+                    session.id,
+                    session.courseId,
+                    session.occurrenceId,
+                    session.groupScopeRevision,
+                    session.occurrenceDate,
+                    reference,
+                    if (session.status == org.companerodeescuela.shared.contracts.AttendanceSessionStatus.CLOSED) 2 else 1,
+                    session.status,
+                    session.openedAtEpochSeconds,
+                    session.closedAtEpochSeconds,
+                    session.closedByTeacher && session.closedAtEpochSeconds != null,
+                )
+            }
+        if (subjectId() != nativeId) throw ApiException.Forbidden("Institutional linkage changed during export")
+        val hasMore = if (teacher == null) candidates.size > 100 else teacherSessions.size > 100
         return InstitutionalAttendanceHistoryResponse(
             InstitutionalAttendanceHistoryContract.ARCHIVE_RESPONSE,
             clock.instant().epochSecond,
             100,
             exported,
             page,
-            (
-                page +
-                    1
-            ).takeIf { candidates.size > 100 },
+            (page + 1).takeIf { hasMore },
+            classSessions,
         )
     }
+
+    private fun archivalScope(
+        session: org.companerodeescuela.shared.contracts.AttendanceSessionResponse,
+        institutionId: String,
+    ): Boolean =
+        session.institutionId == institutionId &&
+            session.identitySource == AttendanceIdentitySource.NATIVE &&
+            session.academicSource == SiiiAttendanceAuthority.SOURCE &&
+            session.groupId == session.courseId &&
+            session.groupScopeRevision > 0
 }

@@ -41,22 +41,39 @@ class AdminViewModelTest {
         override fun observeAccessToken(): Flow<String?> = token
     }
 
-    private class Fixture {
+    private class Fixture(
+        student: Boolean = false,
+    ) {
         val store = Store()
         val clock = Clock.fixed(Instant.ofEpochSecond(1900000000), ZoneOffset.UTC)
         val application = StaffApplication("application", StaffRole.TUTOR, "campus", "QA-ID", requestedAtEpochSeconds = 1)
         val target =
-            AdminUserSummary(
-                UserSummary(
-                    "target",
-                    "Actual Teacher",
-                    roles = setOf(UserRole.TEACHER),
-                    institutionId = "campus",
-                    emailVerified = true,
-                    authRevision = 7,
-                ),
-                listOf(application),
-            )
+            if (student) {
+                AdminUserSummary(
+                    UserSummary(
+                        "target",
+                        "QA Student",
+                        roles = setOf(UserRole.STUDENT),
+                        emailVerified = true,
+                        authRevision = 7,
+                        registrationAccountType = RegistrationAccountType.STUDENT,
+                    ),
+                    emptyList(),
+                    requestedInstitutionId = "campus",
+                )
+            } else {
+                AdminUserSummary(
+                    UserSummary(
+                        "target",
+                        "Actual Teacher",
+                        roles = setOf(UserRole.TEACHER),
+                        institutionId = "campus",
+                        emailVerified = true,
+                        authRevision = 7,
+                    ),
+                    listOf(application),
+                )
+            }
         val overview = AdministrationOverview(listOf(target), AdministrationMetrics(1, 1, 1, 0, 0))
         val group =
             AcademicGroupSummary(
@@ -75,6 +92,8 @@ class AdminViewModelTest {
         val proofs = mutableListOf<MfaStepUpRequest>()
         val approvals = mutableListOf<ApproveStaffRequest>()
         val lifecycle = mutableListOf<AccountLifecycleRequest>()
+        val affiliations = mutableListOf<ApproveStudentAffiliationRequest>()
+        val links = mutableListOf<InstitutionalIdentityLinkRequest>()
         val revocations = mutableListOf<RevokeTutorAssignmentRequest>()
         val assignment =
             TutorAssignmentSummary(
@@ -119,6 +138,28 @@ class AdminViewModelTest {
                                     ),
                                 )
                             }
+                            "/admin/accounts/target/student-affiliation" -> {
+                                affiliations += Json.decodeFromString<ApproveStudentAffiliationRequest>((request.body as TextContent).text)
+                                Json.encodeToString(
+                                    ApiResponse(target.copy(user = target.user.copy(institutionId = "campus", authRevision = 8))),
+                                )
+                            }
+                            "/admin/accounts/institutional-identity-links" -> {
+                                val value = Json.decodeFromString<InstitutionalIdentityLinkRequest>((request.body as TextContent).text)
+                                links += value
+                                Json.encodeToString(
+                                    ApiResponse(
+                                        InstitutionalIdentityLinkSummary(
+                                            value.institutionId,
+                                            value.entityType,
+                                            value.externalId,
+                                            value.nativeUserId,
+                                            "admin",
+                                            1900000000,
+                                        ),
+                                    ),
+                                )
+                            }
                             "/admin/accounts/target/lifecycle" -> {
                                 lifecycle +=
                                     Json.decodeFromString<AccountLifecycleRequest>((request.body as TextContent).text)
@@ -152,6 +193,44 @@ class AdminViewModelTest {
             client.close()
         }
     }
+
+    @Test
+    fun `student affiliation and institutional link bind distinct complete MFA commands`() =
+        runTest {
+            Dispatchers.setMain(UnconfinedTestDispatcher())
+            try {
+                val student = Fixture(student = true)
+                try {
+                    student.ready()
+                    student.vm.prepareStudentAffiliation("target", "campus")
+                    student.vm.authorize("secret-password", "123456")
+                    student.awaitState { it.completedOperationId != null }
+                    val body = student.affiliations.single()
+                    assertEquals("target", student.proofs.single().resourceId)
+                    assertEquals(PrivilegedCommandDigests.studentAffiliation("target", body), student.proofs.single().payloadDigest)
+                    assertEquals("campus", body.institutionId)
+                } finally {
+                    student.close()
+                }
+                val teacher = Fixture()
+                try {
+                    teacher.ready()
+                    teacher.vm.prepareInstitutionalLink("target", "emp-qa-2026")
+                    teacher.vm.authorize("secret-password", "123456")
+                    teacher.awaitState { it.completedOperationId != null }
+                    val body = teacher.links.single()
+                    assertEquals("campus", teacher.proofs.single().resourceId)
+                    assertEquals(InstitutionalIdentityLinkDigest.command(body), teacher.proofs.single().payloadDigest)
+                    assertEquals(InstitutionalIdentityKind.TEACHER, body.entityType)
+                    assertEquals("EMP-QA-2026", body.externalId)
+                    assertEquals("target", body.nativeUserId)
+                } finally {
+                    teacher.close()
+                }
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
 
     @Test fun `actual approval binds selected current group revision and digest to MFA and refreshes real overview`() =
         runTest {

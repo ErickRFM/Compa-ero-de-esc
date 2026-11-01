@@ -93,7 +93,7 @@ class QaAdminBootstrapTest {
         runTest {
             val (accounts, mfa, spec) = fixture()
             val claims = Claims()
-            repeat(2) { QaAdminBootstrap.provision(spec, "development", "companero_qa", accounts, institutions, mfa, claims, clock) }
+            repeat(2) { QaAdminBootstrap.provision(spec, "staging", "companero_qa", accounts, institutions, mfa, claims, clock) }
             val account = requireNotNull(accounts.findById(spec.accountId))
             assertEquals(setOf(UserRole.ADMIN), account.roles)
             assertEquals(spec.institutionId, account.institutionId)
@@ -113,7 +113,7 @@ class QaAdminBootstrapTest {
                 ),
             )
             assertFailsWith<IllegalArgumentException> {
-                QaAdminBootstrap.provision(spec, "development", "companero_qa", accounts, institutions, mfa, claims, clock)
+                QaAdminBootstrap.provision(spec, "staging", "companero_qa", accounts, institutions, mfa, claims, clock)
             }
         }
 
@@ -121,7 +121,7 @@ class QaAdminBootstrapTest {
     fun `production shared database and expired authorization never grant authority`() =
         runTest {
             val (accounts, mfa, spec) = fixture()
-            for ((environment, database) in listOf("production" to "companero_qa", "development" to "companero_dev")) {
+            for ((environment, database) in listOf("production" to "companero_qa", "staging" to "companero_dev")) {
                 assertFailsWith<IllegalArgumentException> {
                     QaAdminBootstrap.provision(spec, environment, database, accounts, institutions, mfa, Claims(), clock)
                 }
@@ -129,7 +129,7 @@ class QaAdminBootstrapTest {
             val expired =
                 QaAdminBootstrapSpec(spec.institutionId, spec.accountId, 0, spec.operationId, clock.instant().epochSecond, spec.proof)
             assertFailsWith<IllegalArgumentException> {
-                QaAdminBootstrap.provision(expired, "development", "companero_qa", accounts, institutions, mfa, Claims(), clock)
+                QaAdminBootstrap.provision(expired, "staging", "companero_qa", accounts, institutions, mfa, Claims(), clock)
             }
             assertEquals(setOf(UserRole.WORKSHOP_PARTICIPANT), accounts.findById(spec.accountId)?.roles)
         }
@@ -140,7 +140,7 @@ class QaAdminBootstrapTest {
             val (accounts, mfa, spec) = fixture()
             val altered = QaAdminBootstrapSpec(spec.institutionId, spec.accountId, 0, "another-operation", spec.expiresAt, spec.proof)
             assertFailsWith<org.companerodeescuela.api.errors.ApiException.Forbidden> {
-                QaAdminBootstrap.provision(altered, "development", "companero_qa", accounts, institutions, mfa, Claims(), clock)
+                QaAdminBootstrap.provision(altered, "staging", "companero_qa", accounts, institutions, mfa, Claims(), clock)
             }
             accounts.create(
                 PlatformAccount(
@@ -153,7 +153,7 @@ class QaAdminBootstrapTest {
                 ),
             )
             assertFailsWith<IllegalArgumentException> {
-                QaAdminBootstrap.provision(spec, "development", "companero_qa", accounts, institutions, mfa, Claims(), clock)
+                QaAdminBootstrap.provision(spec, "staging", "companero_qa", accounts, institutions, mfa, Claims(), clock)
             }
         }
 

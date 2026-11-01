@@ -2,6 +2,7 @@ package org.companerodeescuela.api.application
 
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
+import io.ktor.server.application.log
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -341,6 +342,21 @@ fun Application.module(
         context = Dispatchers.IO,
     ) {
         institutionalProjectionWorker?.runForever()
+    }
+
+    launchManagedWorker(enabled = settings.hasAuthentication && settings.mongo.isConfigured, context = Dispatchers.IO) {
+        while (kotlin.coroutines.coroutineContext[kotlinx.coroutines.Job]?.isActive == true) {
+            try {
+                attendanceGraph.sessionService.reconcileClosures()
+            } catch (
+                cancelled: kotlinx.coroutines.CancellationException,
+            ) {
+                throw cancelled
+            } catch (_: Exception) {
+                log.warn("Attendance closure replay unavailable; durable work retained")
+            }
+            kotlinx.coroutines.delay(15_000)
+        }
     }
 
     // Only a fully configured, authenticated Mongo deployment starts the durable worker.

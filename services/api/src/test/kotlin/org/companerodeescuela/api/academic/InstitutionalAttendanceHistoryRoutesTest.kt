@@ -404,6 +404,64 @@ class InstitutionalAttendanceHistoryRoutesTest {
         }
 
     @Test
+    fun `teacher archive paginates classes without student attendance and withholds incomplete closure`() =
+        scenario(101) { f ->
+            val body =
+                ApiJson.encodeToString(
+                    InstitutionalAttendanceHistoryRequest(
+                        InstitutionalAttendanceHistoryContract.ARCHIVE_REQUEST,
+                        teacherExternalId = "TEACHER",
+                    ),
+                )
+            assertEquals(HttpStatusCode.Forbidden, with(f) { read(body = body, keyId = "read-key") }.status)
+            val first = with(f) { read(body = body, keyId = "archive-key") }
+            assertEquals(HttpStatusCode.OK, first.status)
+            val history = ApiJson.decodeFromString<InstitutionalAttendanceHistoryResponse>(first.bodyAsText())
+            assertTrue(history.records.isEmpty())
+            assertEquals(100, history.classSessions!!.size)
+            assertEquals(2, history.nextPage)
+            assertTrue(history.classSessions!!.all { it.teacherExternalId == "TEACHER" && !it.closedByTeacher })
+            val page2 =
+                ApiJson.encodeToString(
+                    InstitutionalAttendanceHistoryRequest(
+                        InstitutionalAttendanceHistoryContract.ARCHIVE_REQUEST,
+                        page = 2,
+                        teacherExternalId = "TEACHER",
+                    ),
+                )
+            assertEquals(
+                1,
+                ApiJson
+                    .decodeFromString<InstitutionalAttendanceHistoryResponse>(
+                        with(f) {
+                            read(body = page2, keyId = "archive-key")
+                        }.bodyAsText(),
+                    ).classSessions!!
+                    .size,
+            )
+            val original = f.repository.findSession("history-session-0")!!
+            f.repository.replaceSession(original.copy(status = AttendanceSessionStatus.OPEN, closedAtEpochSeconds = null))
+            f.repository.closeSessionIfOpen(original.id, "teacher", true, 2, listOf("student"))
+            val pending =
+                ApiJson.decodeFromString<InstitutionalAttendanceHistoryResponse>(
+                    with(f) {
+                        read(body = body, keyId = "archive-key")
+                    }.bodyAsText(),
+                )
+            assertFalse(pending.classSessions!!.any { it.sessionId == original.id })
+            f.repository.completeClosure(original.id)
+            val finished =
+                ApiJson.decodeFromString<InstitutionalAttendanceHistoryResponse>(
+                    with(f) {
+                        read(body = body, keyId = "archive-key")
+                    }.bodyAsText(),
+                )
+            assertTrue(finished.classSessions!!.single { it.sessionId == original.id }.closedByTeacher)
+            assertFalse(first.bodyAsText().contains("studentId"))
+            assertFalse(first.bodyAsText().contains("openedBy"))
+        }
+
+    @Test
     fun `export is capped at one hundred records without adding per-row source reads`() =
         scenario(101) { f ->
             f.source.authorityReads = 0

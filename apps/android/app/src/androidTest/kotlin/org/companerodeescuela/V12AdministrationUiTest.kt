@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -535,6 +536,27 @@ class V12AdministrationUiTest {
             )
             assertEquals(original, f.store.token.value)
             capture("tutor-pending-qa-http-fixture")
+        } finally {
+            compose.runOnIdle { f.close() }
+        }
+    }
+
+    @Test fun managementSchedulePickerOnlyPreparesScopedSlotsWithoutPublishing() {
+        val f = Fixture()
+        try {
+            compose.setContent {
+                AuthTestLocale {
+                    CompaneroTheme { ClassroomAdministrationEditor({}, viewModel = f.academic, startOnSchedule = true) }
+                }
+            }
+            compose.waitUntil(10000) { !f.academic.state.value.loading }
+            compose.onNodeWithTag("academic_day_MONDAY").performScrollTo().performClick()
+            compose.onNodeWithTag("academic_slot_0700").performScrollTo().performClick()
+            compose.onNodeWithTag("academic_schedule_preview").performScrollTo().assertIsDisplayed()
+            // No assigned class in this fixture: painting a proposed slot must never issue an authorized write.
+            compose.onNodeWithTag("academic_schedule_prepare").performScrollTo().assertIsNotEnabled()
+            assertNull(f.academic.state.value.operationId)
+            assertTrue(f.proofs.isEmpty())
         } finally {
             compose.runOnIdle { f.close() }
         }

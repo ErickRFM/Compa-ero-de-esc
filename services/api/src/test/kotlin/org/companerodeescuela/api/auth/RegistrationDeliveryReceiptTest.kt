@@ -1,7 +1,5 @@
 package org.companerodeescuela.api.auth
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlinx.coroutines.test.runTest
 import org.companerodeescuela.api.integrations.mock.MockIdentityProvider
 import org.companerodeescuela.api.mail.VerificationEmailGateway
@@ -9,6 +7,8 @@ import org.companerodeescuela.api.test.TestFixtures
 import org.companerodeescuela.shared.contracts.RegisterRequest
 import org.companerodeescuela.shared.contracts.RegistrationAccountType
 import org.companerodeescuela.shared.contracts.VerificationDeliveryStatus
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class RegistrationDeliveryReceiptTest {
     @Test

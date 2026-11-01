@@ -497,6 +497,12 @@ private fun studentSessionCard(
     schoolPresenceActive: Boolean,
 ) {
     var showContingencyDialog by remember(session.id) { mutableStateOf(false) }
+    val accentColor =
+        if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.primaryContainer
+        }
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
@@ -504,7 +510,7 @@ private fun studentSessionCard(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(26.dp),
-            color = Color(0xFF8A1538),
+            color = accentColor,
             shadowElevation = 8.dp,
         ) {
             Column(
@@ -602,7 +608,7 @@ private fun studentSessionCard(
                                 shape = RoundedCornerShape(16.dp),
                                 colors =
                                     androidx.compose.material3.ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFF8A1538),
+                                        containerColor = accentColor,
                                         contentColor = Color.White,
                                     ),
                                 contentPadding = PaddingValues(vertical = 14.dp),
@@ -671,7 +677,7 @@ private fun studentSessionCard(
                             TextButton(
                                 onClick = { showContingencyDialog = true },
                                 enabled = !busy,
-                            ) { Text("¿Problemas con el pase? · Contingencia", color = Color(0xFF8A1538)) }
+                            ) { Text("¿Problemas con el pase? · Contingencia", color = accentColor) }
                         }
                     }
                 }

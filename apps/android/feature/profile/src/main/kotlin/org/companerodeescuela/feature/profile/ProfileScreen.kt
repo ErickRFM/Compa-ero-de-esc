@@ -62,11 +62,18 @@ fun ProfileScreen(
     notificationsStatus: String? = null,
     onTutorRequest: (() -> Unit)? = null,
     onRepresentatives: (() -> Unit)? = null,
+    /** These are navigation callbacks, not administrative grants. Only pass from Management. */
+    managementExperience: Boolean = false,
+    onAdminDashboard: (() -> Unit)? = null,
+    onAdminSchedule: (() -> Unit)? = null,
+    onAdminClassrooms: (() -> Unit)? = null,
     /** Version string shown in "Acerca de Compañero", e.g. "1.4.2". Pass from app module via BuildConfig.VERSION_NAME. */
     appVersion: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
+    val administrativeExperience =
+        managementExperience && roles.any { it == UserRole.ADMIN || it == UserRole.SUPER_ADMIN }
     Box(modifier = modifier.fillMaxSize()) {
         if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current &&
             MaterialTheme.colorScheme.background.luminance() < 0.5f &&
@@ -84,7 +91,7 @@ fun ProfileScreen(
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
         ) {
             Text(
-                text = "Mi perfil",
+                text = if (administrativeExperience) "Perfil de Gestión" else "Mi perfil",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -140,7 +147,7 @@ fun ProfileScreen(
             ProfileGroup(title = "Cuenta") {
                 ProfileRow(
                     title = "Cuenta",
-                    detail = "Compañero de Clase",
+                    detail = if (managementExperience) "Compañero Gestión" else "Compañero de Clase",
                     trailingLabel = "Activa",
                 )
                 GroupDivider()
@@ -154,6 +161,34 @@ fun ProfileScreen(
                     title = "Privacidad",
                     detail = "Uso y protección de tus datos académicos.",
                 )
+            }
+
+            if (administrativeExperience) {
+                ProfileGroup(title = "Administración") {
+                    onAdminDashboard?.let { action ->
+                        ProfileRow(
+                            title = "Panel administrativo",
+                            detail = "Solicitudes, cuentas y herramientas de gestión.",
+                            onClick = action,
+                        )
+                    }
+                    onAdminSchedule?.let { action ->
+                        if (onAdminDashboard != null) GroupDivider()
+                        ProfileRow(
+                            title = "Horarios y grupos",
+                            detail = "Edición interna con MFA; publicación oficial desde SIII.",
+                            onClick = action,
+                        )
+                    }
+                    onAdminClassrooms?.let { action ->
+                        if (onAdminDashboard != null || onAdminSchedule != null) GroupDivider()
+                        ProfileRow(
+                            title = "Clases y canales",
+                            detail = "Accede a los espacios autorizados de tu institución.",
+                            onClick = action,
+                        )
+                    }
+                }
             }
 
             if (onSecurity != null ||
@@ -220,7 +255,14 @@ fun ProfileScreen(
                 GroupDivider()
                 ProfileRow(
                     title = "Acerca de Compañero",
-                    detail = if (appVersion != null) "v$appVersion · Compañero de Clase" else "Compañero de Clase · interfaz V8",
+                    detail =
+                        if (appVersion != null) {
+                            "v$appVersion · " + if (managementExperience) "Compañero Gestión" else "Compañero de Clase"
+                        } else if (managementExperience) {
+                            "Compañero Gestión"
+                        } else {
+                            "Compañero de Clase · interfaz V8"
+                        },
                 )
             }
 

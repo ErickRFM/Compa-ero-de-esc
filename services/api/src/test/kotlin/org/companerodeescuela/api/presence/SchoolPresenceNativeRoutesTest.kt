@@ -163,7 +163,15 @@ class SchoolPresenceNativeRoutesTest {
             assertEquals("campus", teacherEntry.institutionId)
             assertFalse(teacherEntry.networkVerified)
             assertEquals(HttpStatusCode.Forbidden, post("/presence/school-day/start", Json.encodeToString(start), admin).status)
-            val revoke = AcademicOperationRequest("revoke", current.revision, "")
+            // Both student and teacher scans consume the QR and advance its revision.
+            val afterTeacher =
+                Json
+                    .decodeFromString<ApiResponse<List<SchoolEntryQrResponse>>>(
+                        client.get("/presence/admin/qrs") { bearerAuth(admin) }.bodyAsText(),
+                    ).data
+                    .single()
+            assertEquals(2, afterTeacher.usageCount)
+            val revoke = AcademicOperationRequest("revoke", afterTeacher.revision, "")
             assertEquals(HttpStatusCode.Forbidden, post("/presence/admin/qrs/${qr.id}/revoke", Json.encodeToString(revoke), admin).status)
             val proof =
                 f.qa.proof(

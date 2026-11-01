@@ -23,8 +23,11 @@ import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -35,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -59,7 +63,6 @@ import org.companerodeescuela.core.designsystem.v8.V8SectionTitle
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 import org.companerodeescuela.core.ui.component.AcademicClassCard
 import org.companerodeescuela.core.ui.component.AcademicSyncStatusCard
-import org.companerodeescuela.core.ui.component.CompaneroHeroSurface
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ScheduleEntry
 import java.time.Instant
@@ -76,7 +79,6 @@ fun HomeScreen(
     onOpenSchedule: () -> Unit = {},
     onOpenClassrooms: () -> Unit = {},
     onOpenChannel: () -> Unit = {},
-    onOpenTasks: () -> Unit = { onOpenChannel() },
     onOpenAttendance: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
@@ -117,6 +119,26 @@ fun HomeScreen(
                         ?.replaceFirstChar {
                             if (it.isLowerCase()) it.titlecase(Locale("es", "MX")) else it.toString()
                         }
+                V8ScreenHeader {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text =
+                                buildAnnotatedString {
+                                    append("Hola")
+                                    if (firstName != null) {
+                                        append(", ")
+                                        withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append(firstName) }
+                                    }
+                                },
+                            modifier = Modifier.padding(top = 8.dp),
+                            fontSize = 32.sp,
+                            lineHeight = 38.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -126,7 +148,7 @@ fun HomeScreen(
                         color = MaterialTheme.colorScheme.primary,
                         tonalElevation = 2.dp,
                     ) {
-                        Box(
+                        BoxWithConstraints(
                             modifier = Modifier.size(48.dp),
                             contentAlignment = Alignment.Center,
                         ) {
@@ -172,62 +194,80 @@ fun HomeScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
-                CompaneroHeroSurface(
+                Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    containerColor = MaterialTheme.colorScheme.primary,
+                    shape = RoundedCornerShape(24.dp),
+                    color = Color(0xFF8A1538),
+                    shadowElevation = 6.dp,
                 ) {
                     Column(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(CompaneroSpacing.md),
-                        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+                        modifier = Modifier.fillMaxWidth().padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
+                        val activeOrNext = overview?.current ?: overview?.next
+                        val institutionalReady =
+                            !state.personalOnly &&
+                                !state.institutionalAccessDenied &&
+                                !state.fromCache &&
+                                state.errorMessage == null
+
+                        Text(
+                            text =
+                                when {
+                                    activeOrNext == null -> "TU VIDA ACADÉMICA"
+                                    overview?.current != null && institutionalReady -> "CLASE EN CURSO"
+                                    else -> "PRÓXIMA CLASE"
+                                },
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White.copy(alpha = 0.88f),
+                        )
+                        Text(
+                            text = activeOrNext?.subjectName ?: "Organiza tu próxima clase",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                        )
+                        if (activeOrNext != null) {
+                            activeOrNext.teacherName?.takeIf { it.isNotBlank() }?.let { teacher ->
+                                Text(
+                                    text = "Docente · $teacher",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.White.copy(alpha = 0.92f),
+                                )
+                            }
+                            HorizontalDivider(color = Color.White.copy(alpha = 0.24f))
+                            Text(
+                                text = "${activeOrNext.startsAt} – ${activeOrNext.endsAt}   ·   ${locationLabel(activeOrNext)}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White,
+                            )
+                        } else {
+                            Text(
+                                text = "Cuando haya clases disponibles, aparecerán aquí.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White.copy(alpha = 0.9f),
+                            )
+                        }
+                        TextButton(
+                            onClick =
+                                if (institutionalReady && activeOrNext != null) {
+                                    onOpenAttendance
+                                } else {
+                                    onOpenSchedule
+                                },
+                            modifier = Modifier.align(Alignment.End),
+                            colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
                         ) {
                             Text(
-                                text = todayLabel(),
-                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.78f),
-                                style = MaterialTheme.typography.labelMedium,
-                            )
-                            TextButton(onClick = onOpenClassrooms) {
-                                Text("Mis clases  ›", color = MaterialTheme.colorScheme.onPrimary)
-                            }
-                        }
-
-                        val activeOrNext = overview?.current ?: overview?.next
-                        if (activeOrNext != null) {
-                            Text(
-                                text = activeOrNext.subjectName,
-                                style = MaterialTheme.typography.headlineSmall,
+                                if (institutionalReady && activeOrNext != null) {
+                                    "Ver asistencia  ›"
+                                } else {
+                                    "Abrir horario  ›"
+                                },
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimary,
                             )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    text = "${activeOrNext.startsAt} – ${activeOrNext.endsAt}",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
-                                )
-                                Text(
-                                    text = "•",
-                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
-                                )
-                                Text(
-                                    text = locationLabel(activeOrNext),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
-                                )
-                            }
                         }
-
                         V8RedPrimaryButton(
                             text = if (state.personalOnly || state.institutionalAccessDenied) "Ver mi horario" else "Ver pase de lista",
                             onClick = if (state.personalOnly || state.institutionalAccessDenied) onOpenSchedule else onOpenAttendance,
@@ -594,8 +634,7 @@ private fun V8QuickAccessGrid(
                 modifier = Modifier.weight(1f).clickable(onClick = onClick),
                 shape = RoundedCornerShape(18.dp),
                 color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 0.dp,
-                shadowElevation = 0.dp,
+                shadowElevation = 2.dp,
             ) {
                 Column(
                     modifier = Modifier.padding(vertical = 14.dp, horizontal = 6.dp),

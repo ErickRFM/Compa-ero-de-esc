@@ -5,7 +5,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -37,8 +37,9 @@ class AttendanceTruthUiTest {
         render(state()) { confirmations++ }
         compose.onNodeWithText("Registrada").assertExists()
         compose.onNodeWithText("Verificada").assertDoesNotExist()
+        compose.onNodeWithText("Confirmar asistencia").assertExists()
         compose
-            .onNodeWithContentDescription("Confirmar asistencia")
+            .onNodeWithTag("attendance_confirm_action")
             .performScrollTo()
             .assertIsEnabled()
             .performClick()
@@ -117,7 +118,7 @@ class AttendanceTruthUiTest {
         render(noCampusEntry)
         compose.onAllNodesWithText("Escanear QR institucional").assertCountEquals(1)
         compose.onNodeWithText("Esperando pase del docente").assertExists()
-        compose.onNodeWithContentDescription("Confirmar asistencia").assertDoesNotExist()
+        compose.onNodeWithTag("attendance_confirm_action").assertDoesNotExist()
     }
 
     @Test fun teacherContingencyIsHiddenUntilStudentOpensIt() {

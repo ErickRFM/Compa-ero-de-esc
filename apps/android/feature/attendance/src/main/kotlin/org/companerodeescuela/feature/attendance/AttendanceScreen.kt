@@ -68,6 +68,11 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.companerodeescuela.core.database.LocalAttendanceRecord
@@ -79,7 +84,6 @@ import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
-import org.companerodeescuela.core.ui.component.CompaneroHeroSurface
 import org.companerodeescuela.core.ui.component.CompaneroSurface
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
@@ -91,11 +95,6 @@ import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.AttendanceStatus
 import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
 import org.companerodeescuela.shared.contracts.TeacherClassContext
-import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 @Composable
 fun attendanceScreen(
@@ -248,26 +247,9 @@ fun studentAttendanceContent(
                     .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
         ) {
-            CompaneroHeroSurface(
-                modifier = Modifier.fillMaxWidth(),
-                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(CompaneroSpacing.md),
-                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
-                ) {
-                    Text(
-                        "Pase de",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        "lista",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
+            V8ScreenHeader {
+                org.companerodeescuela.core.designsystem.v8
+                    .V8HeroTitle("Pase de", "lista")
             }
             TextButton(onClick = onRefresh, enabled = !state.loading, modifier = Modifier.align(Alignment.End)) {
                 Text(if (state.loading) "Actualizando…" else "Actualizar")
@@ -494,17 +476,25 @@ private fun studentSessionCard(
             color = Color(0xFF8A1538),
             shadowElevation = 8.dp,
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Column(
                     modifier = Modifier.padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Text(
-                        text = occurrence?.subjectName ?: "Grupo ${session.groupName}",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = occurrence?.subjectName ?: "Grupo " + session.groupName,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                        )
+                    }
                     occurrence?.teacherName?.takeIf { it.isNotBlank() }?.let { teacherName ->
                         Text(
                             text = teacherName,
@@ -522,7 +512,9 @@ private fun studentSessionCard(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            Box(modifier = Modifier.size(8.dp).background(Color(0xFF35D98C), CircleShape))
+                            Box(
+                                modifier = Modifier.size(8.dp).background(Color(0xFF35D98C), CircleShape),
+                            )
                             Text(
                                 text = "Clase iniciada",
                                 style = MaterialTheme.typography.labelMedium,
@@ -566,6 +558,7 @@ private fun studentSessionCard(
                                 color = Color(0xFF666666),
                             )
                         }
+
                         if (confirmed == null && local == null) {
                             Button(
                                 onClick = onConfirm,
@@ -573,7 +566,7 @@ private fun studentSessionCard(
                                 modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .testTag("confirm_attendance_button")
+                                        .testTag("attendance_confirm_action")
                                         .semantics { contentDescription = "Confirmar asistencia" },
                                 shape = RoundedCornerShape(16.dp),
                                 colors =
@@ -613,37 +606,41 @@ private fun studentSessionCard(
                                     },
                             )
                         }
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Text(
+                                    text = "Inicio ${session.scheduledStartsAt}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = Color(0xFF666666),
+                                )
+                            }
                             Text(
-                                text = "${session.scheduledStartsAt} – ${session.scheduledEndsAt}",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = Color(0xFF666666),
-                            )
-                            Text(
-                                text = occurrence?.classroomName?.let { "Aula $it" } ?: session.groupName,
+                                text = "Aula ${occurrence?.classroomName ?: session.groupName}",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = Color(0xFF666666),
                             )
                         }
+
                         if (!schoolPresenceActive && confirmed == null) {
                             Text(
-                                text =
-                                    "Para confirmar el pase, primero registra tu jornada con el QR institucional. " +
-                                        "Si hay una incidencia, consulta al docente.",
+                                "Para confirmar el pase, primero registra tu jornada con el QR institucional. Si hay una incidencia, consulta al docente.",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF666666),
+                                color = Color(0xFF888888),
                             )
                         }
                         if (confirmed == null && local == null) {
                             TextButton(
                                 onClick = { showContingencyDialog = true },
                                 enabled = !busy,
-                            ) {
-                                Text("¿Problemas con el pase? · Contingencia", color = Color(0xFF8A1538))
-                            }
+                            ) { Text("¿Problemas con el pase? · Contingencia", color = Color(0xFF8A1538)) }
                         }
                     }
                 }
@@ -993,14 +990,8 @@ private fun teacherAttendanceBody(
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
         ) {
             item {
-                CompaneroHeroSurface(
-                    modifier = Modifier.fillMaxWidth(),
-                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(CompaneroSpacing.md),
-                        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
-                    ) {
+                V8ScreenHeader {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
                             "Asistencia",
                             style = MaterialTheme.typography.headlineLarge,

@@ -61,7 +61,6 @@ fun ProfileScreen(
     onNotifications: (() -> Unit)? = null,
     notificationsStatus: String? = null,
     onTutorRequest: (() -> Unit)? = null,
-    onRepresentatives: (() -> Unit)? = null,
     /** Version string shown in "Acerca de Compañero", e.g. "1.4.2". Pass from app module via BuildConfig.VERSION_NAME. */
     appVersion: String? = null,
     modifier: Modifier = Modifier,
@@ -157,18 +156,9 @@ fun ProfileScreen(
             }
 
             if (onSecurity != null ||
-                (onTutorRequest != null && UserRole.TEACHER in roles && UserRole.TUTOR !in roles) ||
-                (onRepresentatives != null && UserRole.STUDENT in roles)
+                (onTutorRequest != null && UserRole.TEACHER in roles && UserRole.TUTOR !in roles)
             ) {
                 ProfileGroup(title = stringResource(R.string.profile_access)) {
-                    if (onRepresentatives != null && UserRole.STUDENT in roles) {
-                        ProfileRow(
-                            title = "Representantes de grupo",
-                            detail = "Gestiona tus nombramientos.",
-                            onClick = onRepresentatives,
-                        )
-                        if (onSecurity != null || (onTutorRequest != null && UserRole.TEACHER in roles)) GroupDivider()
-                    }
                     onSecurity?.let { action ->
                         ProfileRow(
                             title = stringResource(R.string.profile_security),

@@ -101,8 +101,11 @@ class CompaneroFirebaseMessagingService : FirebaseMessagingService() {
                 academicNotice -> "La institución actualizó tu información académica. Consulta tu horario oficial."
                 channelNotice -> "Nuevo aviso en el Canal Institucional. Toca para revisarlo."
                 else ->
-                    if (managementApp) "Tienes una nueva actualización de gestión."
-                    else "Tienes una nueva actualización académica."
+                    if (managementApp) {
+                        "Tienes una nueva actualización de gestión."
+                    } else {
+                        "Tienes una nueva actualización académica."
+                    }
             }
         val notification =
             NotificationCompat

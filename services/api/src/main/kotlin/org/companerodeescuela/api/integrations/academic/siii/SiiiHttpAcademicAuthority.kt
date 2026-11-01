@@ -129,9 +129,13 @@ class SiiiHttpAcademicAuthority(
             require(!raw.isNullOrBlank() && raw.length <= 8192) { "Missing rollover key ID mapping" }
             val overrides = Json.decodeFromString<Map<String, String>>(raw)
             require(overrides.isNotEmpty() && overrides.size <= originals.size) { "Invalid rollover tenant mapping" }
-            require(overrides.all { (tenant, keyId) ->
-                tenant in originals && Regex("[A-Za-z0-9_-]{1,64}").matches(keyId) && keyId != originals[tenant]?.keyId
-            }) { "Rollover may only select new key IDs of configured tenants" }
+            require(
+                overrides.all { (tenant, keyId) ->
+                    tenant in originals &&
+                        Regex("[A-Za-z0-9_-]{1,64}").matches(keyId) &&
+                        keyId != originals[tenant]?.keyId
+                },
+            ) { "Rollover may only select new key IDs of configured tenants" }
             return overrides
         }
 

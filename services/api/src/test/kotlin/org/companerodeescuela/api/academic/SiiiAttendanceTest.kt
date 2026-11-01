@@ -122,7 +122,6 @@ class SiiiAttendanceTest {
                         owner == "NATIVE:student" && value == token
                     },
                 )
-            val sessions = AttendanceSessionService(repository, resolver, access, clock, nativeProjection = projection, pushService = push)
             val entry = "synthetic-institution-entry-qr"
             val hash =
                 java.security.MessageDigest
@@ -135,6 +134,16 @@ class SiiiAttendanceTest {
                     SchoolPresencePolicy(hash, setOf("QA-CAMPUS"), emptySet(), institutionId = "tenant-a"),
                     clock = clock,
                     accounts = f.accounts,
+                )
+            val sessions =
+                AttendanceSessionService(
+                    repository,
+                    resolver,
+                    access,
+                    clock,
+                    nativeProjection = projection,
+                    pushService = push,
+                    schoolPresenceService = presence,
                 )
             val students =
                 AttendanceStudentService(
@@ -170,6 +179,17 @@ class SiiiAttendanceTest {
             assertEquals(HttpStatusCode.Unauthorized, client.get("/attendance/records/mine").status)
             assertEquals(HttpStatusCode.Forbidden, get("/attendance/records/mine", "teacher").status)
             assertEquals(HttpStatusCode.Forbidden, post("/attendance/sessions", "student", Json.encodeToString(request)).status)
+            assertEquals(HttpStatusCode.Forbidden, post("/attendance/sessions", "teacher", Json.encodeToString(request)).status)
+            presence.start(
+                teacher.id,
+                StartSchoolPresenceRequest("teacher-entry", entry, SchoolNetworkEvidence(ssid = "QA-CAMPUS"), f.now.epochSecond),
+                teacher,
+            )
+            presence.start(
+                student.id,
+                StartSchoolPresenceRequest("entry", entry, SchoolNetworkEvidence(ssid = "QA-CAMPUS"), f.now.epochSecond),
+                student,
+            )
             val response = post("/attendance/sessions", "teacher", Json.encodeToString(request))
             assertEquals(HttpStatusCode.OK, response.status)
             val session = Json.decodeFromString<ApiResponse<AttendanceSessionResponse>>(response.bodyAsText()).data
@@ -182,11 +202,6 @@ class SiiiAttendanceTest {
             assertEquals(null, delivered, "Opening must enqueue without invoking FCM inline")
             assertEquals(true, push.dispatchNext())
             assertEquals(mapOf("type" to "attendance_session_opened", "sessionId" to session.id), assertNotNull(delivered))
-            presence.start(
-                student.id,
-                StartSchoolPresenceRequest("entry", entry, SchoolNetworkEvidence(ssid = "QA-CAMPUS"), f.now.epochSecond),
-                student,
-            )
             val confirmed =
                 post(
                     "/attendance/sessions/${session.id}/confirm",

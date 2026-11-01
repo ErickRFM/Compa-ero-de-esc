@@ -48,6 +48,26 @@ import kotlin.test.assertNull
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AttendanceTeacherPrivacyTest {
+    @Test fun `selecting a live pass from history resumes its QR and roster`() =
+        runTest {
+            Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+            val fixture = Fixture(testScheduler)
+            try {
+                fixture.populate()
+                fixture.model.loadTeacherHistory()
+                val history =
+                    fixture.model.state
+                        .first { it.teacherHistoryLoaded }
+                        .teacherHistory
+                fixture.model.selectTeacherHistory(history.single())
+                fixture.model.state.first { it.qr != null && it.roster != null }
+                assertNotNull(fixture.model.state.value.teacherSession)
+            } finally {
+                fixture.close()
+                Dispatchers.resetMain()
+            }
+        }
+
     @Test fun `roster permission denial clears cached teacher data and QR`() =
         runTest {
             Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
@@ -279,7 +299,13 @@ class AttendanceTeacherPrivacyTest {
                                         Json.encodeToString(
                                             ApiResponse(AcademicWeekResponse("teacher", date, date, listOf(occurrence))),
                                         )
-                                    path == "/attendance/sessions/mine" -> Json.encodeToString(ApiResponse(listOf(session)))
+                                    path in
+                                        setOf(
+                                            "/attendance/sessions/mine",
+                                            "/attendance/sessions/history",
+                                        )
+                                    -> Json.encodeToString(ApiResponse(listOf(session)))
+                                    path == "/presence/school-day" -> "{\"data\":null}"
                                     path.endsWith(
                                         "/qr",
                                     ) -> Json.encodeToString(ApiResponse(AttendanceQrResponse("qa-qr", now, now + 25, 15)))

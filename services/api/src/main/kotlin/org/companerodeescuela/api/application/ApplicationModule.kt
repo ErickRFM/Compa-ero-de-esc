@@ -197,35 +197,6 @@ fun Application.module(
                 institutionalAuthorityTargets.keys,
             )
         }
-    val institutionalProjectionWorker =
-        if (settings.hasAuthentication) {
-            institutionalPushRepository?.let { repository ->
-                val sections = checkNotNull(institutionalSections)
-                InstitutionalEventProjectionWorker(
-                    repository = repository,
-                    identityResolver =
-                        InstitutionalProjectionIdentityResolver { institutionId, reference ->
-                            institutionalIdentityLinkService
-                                .resolve(
-                                    institutionId,
-                                    reference.kind,
-                                    reference.externalId,
-                                )?.id
-                        },
-                    commandHandler = sections.handler,
-                    adapters = listOf(sections.adapter),
-                    leaseDurationSeconds = 120,
-                )
-            }
-        } else {
-            null
-        }
-    launchManagedWorker(
-        enabled = institutionalProjectionWorker != null,
-        context = Dispatchers.IO,
-    ) {
-        institutionalProjectionWorker?.runForever()
-    }
     val classroomGraph =
         buildClassroomFeatureGraph(
             settings = settings,
@@ -270,6 +241,15 @@ fun Application.module(
             mfa = identityGraph.mfa,
             institutions = identityGraph.institutions,
         )
+    val attendanceRepository = buildAttendanceRepository(settings, mongoConnection)
+    val attendancePushEligibility =
+        org.companerodeescuela.api.attendance.AttendancePushEligibility(
+            attendanceRepository,
+            nativeAcademic,
+            identityGraph.accounts,
+            presenceGraph?.service,
+            institutions = identityGraph.institutions,
+        )
     val operationsGraph =
         buildOperationsFeatureGraph(
             settings = settings,
@@ -281,6 +261,7 @@ fun Application.module(
             institutions = identityGraph.institutions,
             mfa = identityGraph.mfa,
             refreshSessions = identityGraph.refreshSessions,
+            authorizePushMessage = attendancePushEligibility::allows,
         )
     val attendanceGraph =
         buildAttendanceFeatureGraph(
@@ -293,7 +274,48 @@ fun Application.module(
             classrooms = classroomGraph.classroomService,
             nativeProjection = nativeAcademic,
             pushService = operationsGraph.pushService,
+            repository = attendanceRepository,
         )
+
+    val academicChangeNotifier =
+        org.companerodeescuela.api.integrations.academic.siii.SiiiAcademicChangeNotifier(
+            institutionalIdentityLinkService,
+            operationsGraph.pushService,
+        )
+    val institutionalProjectionWorker =
+        if (settings.hasAuthentication) {
+            institutionalPushRepository?.let { repository ->
+                val sections = checkNotNull(institutionalSections)
+                InstitutionalEventProjectionWorker(
+                    repository = repository,
+                    identityResolver =
+                        InstitutionalProjectionIdentityResolver { institutionId, reference ->
+                            institutionalIdentityLinkService
+                                .resolve(
+                                    institutionId,
+                                    reference.kind,
+                                    reference.externalId,
+                                )?.id
+                        },
+                    commandHandler =
+                        org.companerodeescuela.api.integrations.academic.siii.SiiiSectionProjectionHandler(
+                            sections.repository,
+                            notificationOwners = academicChangeNotifier::owners,
+                            notifyChange = academicChangeNotifier::enqueue,
+                        ),
+                    adapters = listOf(sections.adapter),
+                    leaseDurationSeconds = 120,
+                )
+            }
+        } else {
+            null
+        }
+    launchManagedWorker(
+        enabled = institutionalProjectionWorker != null,
+        context = Dispatchers.IO,
+    ) {
+        institutionalProjectionWorker?.runForever()
+    }
 
     // Only a fully configured, authenticated Mongo deployment starts the durable worker.
     // A local/test instance never sends live Firebase notifications.

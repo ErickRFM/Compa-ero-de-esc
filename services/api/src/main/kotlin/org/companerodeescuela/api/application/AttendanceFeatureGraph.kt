@@ -37,14 +37,8 @@ fun buildAttendanceFeatureGraph(
     classrooms: org.companerodeescuela.api.classroom.ClassroomService,
     nativeProjection: org.companerodeescuela.api.academic.NativeAcademicProjection,
     pushService: PushOutboxService? = null,
+    repository: org.companerodeescuela.api.attendance.AttendanceRepository = buildAttendanceRepository(settings, mongoConnection),
 ): AttendanceFeatureGraph {
-    val repository =
-        when {
-            !settings.hasAuthentication -> InMemoryAttendanceRepository()
-            settings.mongo.isConfigured -> MongoAttendanceRepository(mongoConnection.database())
-            settings.environment == Environment.LOCAL -> InMemoryAttendanceRepository()
-            else -> error("Attendance requires MONGODB_URI outside local development")
-        }
     val occurrenceResolver = ProviderAttendanceOccurrenceResolver(academicProvider)
     val accessPolicy =
         AttendanceAccessPolicy(
@@ -70,6 +64,7 @@ fun buildAttendanceFeatureGraph(
                 accessPolicy = accessPolicy,
                 nativeProjection = nativeProjection,
                 pushService = pushService,
+                schoolPresenceService = schoolPresenceService,
             ),
         studentService =
             AttendanceStudentService(
@@ -94,3 +89,14 @@ fun buildAttendanceFeatureGraph(
             },
     )
 }
+
+fun buildAttendanceRepository(
+    settings: ApiSettings,
+    mongoConnection: MongoConnection,
+): org.companerodeescuela.api.attendance.AttendanceRepository =
+    when {
+        !settings.hasAuthentication -> InMemoryAttendanceRepository()
+        settings.mongo.isConfigured -> MongoAttendanceRepository(mongoConnection.database())
+        settings.environment == Environment.LOCAL -> InMemoryAttendanceRepository()
+        else -> error("Attendance requires MONGODB_URI outside local development")
+    }

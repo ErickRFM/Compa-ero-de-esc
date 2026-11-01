@@ -23,6 +23,7 @@ class AttendanceSessionService(
     private val newId: () -> String = { UUID.randomUUID().toString() },
     private val nativeProjection: org.companerodeescuela.api.academic.NativeAcademicProjection? = null,
     private val pushService: PushOutboxService? = null,
+    private val schoolPresenceService: org.companerodeescuela.api.presence.SchoolPresenceService? = null,
 ) {
     suspend fun openSession(
         teacherId: String,
@@ -40,7 +41,6 @@ class AttendanceSessionService(
             runCatching { LocalDate.parse(request.occurrenceDate) }
                 .getOrElse { throw ApiException.Validation("occurrenceDate must be YYYY-MM-DD") }
         if (nativeActor != null && nativeActor.id != teacherId) throw ApiException.Forbidden("Actual teacher identity does not match")
-
         val official =
             nativeActor?.let { actor ->
                 nativeProjection
@@ -80,6 +80,12 @@ class AttendanceSessionService(
                 .toInstant()
         if (!now.isBefore(scheduledEnd)) {
             throw ApiException.Conflict("Attendance cannot open after the scheduled class has ended")
+        }
+        if (nativeActor != null) {
+            val presence =
+                schoolPresenceService
+                    ?: throw ApiException.DependencyUnavailable("Institutional entry verification is unavailable")
+            presence.requireActive(teacherId, nativeActor)
         }
         val candidate =
             AttendanceSessionResponse(
@@ -183,7 +189,11 @@ class AttendanceSessionService(
         }
         val projection = nativeProjection ?: return 0
         projection.requireSession(actor, session)
-        val recipients = projection.activeStudentIdsForTeacher(actor, session.courseId).distinct()
+        val institutionId = session.institutionId ?: throw ApiException.Forbidden("Attendance institution is required")
+        val presence =
+            schoolPresenceService
+                ?: throw ApiException.DependencyUnavailable("Institutional entry verification is unavailable")
+        val recipients = presence.activeStudentIds(projection.activeStudentIdsForTeacher(actor, session.courseId), institutionId)
         projection.requireSession(actor, session)
         val data =
             mapOf(
@@ -274,14 +284,61 @@ class AttendanceSessionService(
     ): AttendanceSessionResponse {
         val session = accessPolicy.requireSession(sessionId)
         accessPolicy.requireOwnerOrAdministrative(actorId, session, allowCrossOwner, nativeActor)
-        if (session.status == AttendanceSessionStatus.CLOSED) return session
-
         val closed =
-            session.copy(
-                status = AttendanceSessionStatus.CLOSED,
-                closedAtEpochSeconds = clock.instant().epochSecond,
-            )
+            if (session.status == AttendanceSessionStatus.CLOSED) {
+                session
+            } else {
+                session.copy(
+                    status = AttendanceSessionStatus.CLOSED,
+                    closedAtEpochSeconds = clock.instant().epochSecond,
+                )
+            }
         repository.replaceSession(closed)
+        if (nativeActor != null &&
+            nativeActor.id == closed.openedBy &&
+            org.companerodeescuela.shared.contracts.UserRole.TEACHER in nativeActor.roles &&
+            closed.identitySource == AttendanceIdentitySource.NATIVE
+        ) {
+            val projection = nativeProjection ?: throw ApiException.DependencyUnavailable("Native academic authority is unavailable")
+            val students = projection.activeStudentIdsForTeacher(nativeActor, closed.courseId).distinct()
+            if (students.isNotEmpty()) projection.requireSession(nativeActor, closed)
+            val reviewedAt = closed.closedAtEpochSeconds ?: clock.instant().epochSecond
+            for (studentId in students) {
+                // The unique session/student key preserves a concurrent confirmation or review.
+                // Repeating a partially completed close fills missing records without overwriting any.
+                val status = org.companerodeescuela.shared.contracts.AttendanceStatus.REVIEW_REQUIRED
+                val result =
+                    repository.writeAttempt(
+                        org.companerodeescuela.shared.contracts.AttendanceRecordResponse(
+                            id = AttendanceRecordIds.forStudentSession(closed.id, studentId),
+                            operationId = "close-absence:${AttendanceRecordIds.forStudentSession(closed.id, studentId)}",
+                            sessionId = closed.id,
+                            occurrenceId = closed.occurrenceId,
+                            studentId = studentId,
+                            status = status,
+                            reasonCode = org.companerodeescuela.shared.contracts.AttendanceReasonCode.TEACHER_REVIEW,
+                            attemptedAtEpochSeconds = reviewedAt,
+                            receivedAtEpochSeconds = clock.instant().epochSecond,
+                            reviewedBy = actorId,
+                            reviewedAtEpochSeconds = reviewedAt,
+                            disposition = org.companerodeescuela.shared.contracts.AttendanceDisposition.ABSENT,
+                            reviewHistory =
+                                listOf(
+                                    org.companerodeescuela.shared.contracts.AttendanceReviewEntry(
+                                        actorId,
+                                        reviewedAt,
+                                        "Sin confirmación al cerrar el pase de lista",
+                                        status,
+                                        org.companerodeescuela.shared.contracts.AttendanceDisposition.ABSENT,
+                                    ),
+                                ),
+                        ),
+                    )
+                if (result == AttemptWriteResult.OperationConflict) {
+                    throw ApiException.Conflict("Attendance close operation belongs to another record")
+                }
+            }
+        }
         return closed
     }
 

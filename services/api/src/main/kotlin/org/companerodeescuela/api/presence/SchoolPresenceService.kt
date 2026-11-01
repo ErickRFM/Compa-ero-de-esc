@@ -1,20 +1,20 @@
 package org.companerodeescuela.api.presence
 
-import java.time.Clock
-import java.time.Duration
-import java.util.UUID
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.shared.contracts.SchoolNetworkEvidence
 import org.companerodeescuela.shared.contracts.SchoolPresenceResponse
 import org.companerodeescuela.shared.contracts.SchoolPresenceStatus
 import org.companerodeescuela.shared.contracts.StartSchoolPresenceRequest
+import java.time.Clock
+import java.time.Duration
+import java.util.UUID
 
 data class SchoolPresencePolicy(
     val entryQrSha256: String,
     val allowedSsids: Set<String>,
     val allowedBssids: Set<String>,
     val sessionHours: Long = 14,
-    val institutionId:String?=null,
+    val institutionId: String? = null,
 ) {
     val enabled: Boolean
         get() = allowedSsids.isNotEmpty() || allowedBssids.isNotEmpty()
@@ -23,28 +23,46 @@ data class SchoolPresencePolicy(
 class SchoolPresenceService(
     private val repository: SchoolPresenceRepository,
     private val policy: SchoolPresencePolicy,
-    private val qrVerifier: SchoolEntryQrVerifier = SchoolEntryQrVerifier(
-        legacyQrSha256 = policy.entryQrSha256,
-    ),
-    private val networkVerifier: SchoolNetworkVerifier = SchoolNetworkVerifier(
-        allowedSsids = policy.allowedSsids,
-        allowedBssids = policy.allowedBssids,
-    ),
+    private val qrVerifier: SchoolEntryQrVerifier =
+        SchoolEntryQrVerifier(
+            legacyQrSha256 = policy.entryQrSha256,
+        ),
+    private val networkVerifier: SchoolNetworkVerifier =
+        SchoolNetworkVerifier(
+            allowedSsids = policy.allowedSsids,
+            allowedBssids = policy.allowedBssids,
+        ),
     private val clock: Clock = Clock.systemUTC(),
     private val newId: () -> String = { UUID.randomUUID().toString() },
-    private val accounts:org.companerodeescuela.api.auth.PlatformAccountRepository?=null,
+    private val accounts: org.companerodeescuela.api.auth.PlatformAccountRepository? = null,
 ) {
-    private suspend fun nativeInstitution(studentId:String,actor:org.companerodeescuela.shared.contracts.UserSummary?):String? {
-        if(actor==null) return null
-        if(actor.id!=studentId) throw ApiException.Forbidden("School day belongs to another student")
-        val current=org.companerodeescuela.api.admin.InstitutionScopePolicy(accounts ?: throw ApiException.DependencyUnavailable("Native identity is unavailable"),clock).live(actor)
-        if(org.companerodeescuela.shared.contracts.UserRole.STUDENT !in current.roles || current.institutionId.isNullOrBlank()) throw ApiException.Forbidden("Verified student institution is required")
+    private suspend fun nativeInstitution(
+        studentId: String,
+        actor: org.companerodeescuela.shared.contracts.UserSummary?,
+    ): String? {
+        if (actor == null) return null
+        if (actor.id != studentId) throw ApiException.Forbidden("School day belongs to another student")
+        val current =
+            org.companerodeescuela.api.admin
+                .InstitutionScopePolicy(
+                    accounts ?: throw ApiException.DependencyUnavailable("Native identity is unavailable"),
+                    clock,
+                ).live(actor)
+        if (current.roles.none {
+                it == org.companerodeescuela.shared.contracts.UserRole.STUDENT ||
+                    it == org.companerodeescuela.shared.contracts.UserRole.TEACHER
+            } ||
+            current.institutionId.isNullOrBlank()
+        ) {
+            throw ApiException.Forbidden("Verified student or teacher institution is required")
+        }
         return current.institutionId
     }
+
     suspend fun start(
         studentId: String,
         request: StartSchoolPresenceRequest,
-        nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null,
+        nativeActor: org.companerodeescuela.shared.contracts.UserSummary? = null,
     ): SchoolPresenceResponse {
         if (!policy.enabled) {
             throw ApiException.DependencyUnavailable("School presence verification is not configured")
@@ -58,14 +76,27 @@ class SchoolPresenceService(
             throw ApiException.Validation("device timestamp is invalid")
         }
 
-        val institution=nativeInstitution(studentId,nativeActor)
-        qrVerifier.verify(request.qrToken,institution,policy.institutionId)
+        val institution = nativeInstitution(studentId, nativeActor)
+        qrVerifier.verify(request.qrToken, institution, policy.institutionId)
         val method = networkVerifier.verify(request.network)
         val now = clock.instant()
 
-        activeRecord(studentId,institution,now.epochSecond)?.let { return it.copy(networkVerified=false,serverTimeEpochSeconds=now.epochSecond) }
-        val candidate=SchoolPresenceResponse(
-                id = if(institution==null) newId() else "DAY-"+UUID.nameUUIDFromBytes((studentId+"\u0000"+institution+"\u0000"+operationId).toByteArray(Charsets.UTF_8)),
+        activeRecord(studentId, institution, now.epochSecond)?.let {
+            return it.copy(networkVerified = false, serverTimeEpochSeconds = now.epochSecond)
+        }
+        val candidate =
+            SchoolPresenceResponse(
+                id =
+                    if (institution ==
+                        null
+                    ) {
+                        newId()
+                    } else {
+                        "DAY-" +
+                            UUID.nameUUIDFromBytes(
+                                (studentId + "\u0000" + institution + "\u0000" + operationId).toByteArray(Charsets.UTF_8),
+                            )
+                    },
                 studentId = studentId,
                 startedAtEpochSeconds = now.epochSecond,
                 expiresAtEpochSeconds = now.plus(Duration.ofHours(policy.sessionHours)).epochSecond,
@@ -75,46 +106,106 @@ class SchoolPresenceService(
                 // network witness. No independent verifier is configured.
                 networkVerified = false,
                 networkVerificationMethod = method,
-                institutionId=institution,
-                identitySource=if(institution==null) null else org.companerodeescuela.shared.contracts.SchoolPresenceIdentitySource.NATIVE,
-                operationId=operationId.takeIf { institution!=null },
+                institutionId = institution,
+                identitySource =
+                    if (institution ==
+                        null
+                    ) {
+                        null
+                    } else {
+                        org.companerodeescuela.shared.contracts.SchoolPresenceIdentitySource.NATIVE
+                    },
+                operationId = operationId.takeIf { institution != null },
             )
-        val stored=if(institution==null) repository.save(candidate) else repository.createNative(candidate,now.epochSecond)
-            ?: throw ApiException.Conflict("School day operation has ended or changed")
-        return stored.copy(serverTimeEpochSeconds=now.epochSecond)
+        val stored =
+            if (institution == null) {
+                repository.save(candidate)
+            } else {
+                repository.createNative(candidate, now.epochSecond)
+                    ?: throw ApiException.Conflict("School day operation has ended or changed")
+            }
+        return stored.copy(serverTimeEpochSeconds = now.epochSecond)
     }
 
-    private suspend fun activeRecord(studentId:String,institution:String?,now:Long)=
-        if(institution==null) repository.findActiveForStudent(studentId,now) else repository.findActiveForNativeStudent(studentId,institution,now)
-    suspend fun activeFor(studentId: String,nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null): SchoolPresenceResponse? {
+    private suspend fun activeRecord(
+        studentId: String,
+        institution: String?,
+        now: Long,
+    ) = if (institution ==
+        null
+    ) {
+        repository.findActiveForStudent(studentId, now)
+    } else {
+        repository.findActiveForNativeStudent(studentId, institution, now)
+    }
+
+    suspend fun activeFor(
+        studentId: String,
+        nativeActor: org.companerodeescuela.shared.contracts.UserSummary? = null,
+    ): SchoolPresenceResponse? {
         val now = clock.instant().epochSecond
-        val institution=nativeInstitution(studentId,nativeActor)
-        return activeRecord(studentId,institution,now)?.copy(networkVerified=false,serverTimeEpochSeconds=now)
+        val institution = nativeInstitution(studentId, nativeActor)
+        return activeRecord(studentId, institution, now)?.copy(networkVerified = false, serverTimeEpochSeconds = now)
     }
 
-    suspend fun requireActive(studentId: String,nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null): SchoolPresenceResponse =
-        activeFor(studentId,nativeActor)
+    suspend fun requireActive(
+        studentId: String,
+        nativeActor: org.companerodeescuela.shared.contracts.UserSummary? = null,
+    ): SchoolPresenceResponse =
+        activeFor(studentId, nativeActor)
             ?: throw ApiException.Forbidden(
                 "Start your school day by scanning the institutional QR while connected to the school network",
             )
 
-    suspend fun close(studentId: String,nativeActor:org.companerodeescuela.shared.contracts.UserSummary?=null): SchoolPresenceResponse {
+    /** Current native students only; a QR scan never grants enrollment or attendance. */
+    suspend fun activeStudentIds(
+        studentIds: List<String>,
+        institutionId: String,
+    ): List<String> {
+        val identities = accounts ?: throw ApiException.DependencyUnavailable("Native identity is unavailable")
+        val eligible = mutableListOf<String>()
+        for (id in studentIds.distinct()) {
+            val account = identities.findById(id) ?: continue
+            if (!account.permitsSession ||
+                account.accountStatus != org.companerodeescuela.shared.contracts.AccountStatus.ACTIVE ||
+                account.emailVerifiedAt == null ||
+                account.institutionId != institutionId ||
+                org.companerodeescuela.shared.contracts.UserRole.STUDENT !in account.roles
+            ) {
+                continue
+            }
+            try {
+                if (activeFor(id, account.toUserSummary()) != null) eligible += id
+            } catch (_: ApiException.Unauthorized) {
+                // Identity was revoked while selecting recipients.
+            } catch (_: ApiException.Forbidden) {
+                // No current institutional student authority.
+            }
+        }
+        return eligible
+    }
+
+    suspend fun close(
+        studentId: String,
+        nativeActor: org.companerodeescuela.shared.contracts.UserSummary? = null,
+    ): SchoolPresenceResponse {
         val now = clock.instant().epochSecond
-        val institution=nativeInstitution(studentId,nativeActor)
+        val institution = nativeInstitution(studentId, nativeActor)
         // Write from raw storage; read projections must not overwrite evidence.
-        val current = activeRecord(studentId,institution,now)
-            ?: throw ApiException.Forbidden(
-                "Start your school day by scanning the institutional QR while connected to the school network",
+        val current =
+            activeRecord(studentId, institution, now)
+                ?: throw ApiException.Forbidden(
+                    "Start your school day by scanning the institutional QR while connected to the school network",
+                )
+        val closed =
+            current.copy(
+                status = SchoolPresenceStatus.CLOSED,
+                closedAtEpochSeconds = now,
             )
-        val closed = current.copy(
-            status = SchoolPresenceStatus.CLOSED,
-            closedAtEpochSeconds = now,
-        )
         repository.replace(closed)
         return closed.copy(networkVerified = false, serverTimeEpochSeconds = now)
     }
 
     /** Declaration policy match only; never proof of physical presence. */
-    fun verifyNetworkForAttendance(network: SchoolNetworkEvidence) =
-        networkVerifier.verify(network)
+    fun verifyNetworkForAttendance(network: SchoolNetworkEvidence) = networkVerifier.verify(network)
 }

@@ -299,6 +299,7 @@ class SiiiFullChainLiveContractTest {
                     attendanceClock,
                     nativeProjection = nativeProjection,
                     pushService = push,
+                    schoolPresenceService = presence,
                 )
             val attendanceStudents =
                 AttendanceStudentService(
@@ -415,6 +416,26 @@ class SiiiFullChainLiveContractTest {
                     .single()
                     .occurrences
                     .single()
+            presence.start(
+                teacher.id,
+                StartSchoolPresenceRequest(
+                    "synthetic-teacher-entry",
+                    entry,
+                    SchoolNetworkEvidence(ssid = "CHAIN-QA"),
+                    attendanceClock.instant().epochSecond,
+                ),
+                teacher.toUserSummary(),
+            )
+            presence.start(
+                student.id,
+                StartSchoolPresenceRequest(
+                    "synthetic-entry",
+                    entry,
+                    SchoolNetworkEvidence(ssid = "CHAIN-QA"),
+                    attendanceClock.instant().epochSecond,
+                ),
+                student.toUserSummary(),
+            )
             val opened =
                 attendanceHttp(teacher, "/sessions", Json.encodeToString(CreateAttendanceSessionRequest(meeting.id, meeting.date, 10)))
             assertEquals(200, opened.first)
@@ -427,16 +448,6 @@ class SiiiFullChainLiveContractTest {
             assertEquals(null, notice)
             assertTrue(push.dispatchNext())
             assertEquals(mapOf("type" to "attendance_session_opened", "sessionId" to pass.id), notice)
-            presence.start(
-                student.id,
-                StartSchoolPresenceRequest(
-                    "synthetic-entry",
-                    entry,
-                    SchoolNetworkEvidence(ssid = "CHAIN-QA"),
-                    attendanceClock.instant().epochSecond,
-                ),
-                student.toUserSummary(),
-            )
             val confirmed =
                 attendanceHttp(
                     student,

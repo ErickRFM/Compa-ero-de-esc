@@ -27,6 +27,9 @@ data class StoredSiiiSection(
     val digest: String,
     val snapshot: SiiiSectionSnapshot?,
     val syncedAt: Instant,
+    /** Durable destinations for this source event, including removed members on deletion. */
+    val notificationOwners: List<String> = emptyList(),
+    val notificationsQueued: Boolean = false,
 )
 
 interface SiiiSectionSnapshotRepository {
@@ -36,6 +39,19 @@ interface SiiiSectionSnapshotRepository {
     ): StoredSiiiSection?
 
     suspend fun apply(value: StoredSiiiSection)
+
+    /** Fence recipient derivation against concurrent source revisions. */
+    suspend fun applyExpected(
+        value: StoredSiiiSection,
+        expectedPreviousVersion: Long,
+    ) = apply(value)
+
+    suspend fun markNotificationsQueued(
+        institutionId: String,
+        sectionId: String,
+        sourceVersion: Long,
+        eventId: String,
+    ) = Unit
 }
 
 class SiiiSectionEventAdapter : InstitutionalEventAdapter {
@@ -82,6 +98,8 @@ class SiiiSectionEventAdapter : InstitutionalEventAdapter {
 class SiiiSectionProjectionHandler(
     private val repository: SiiiSectionSnapshotRepository,
     private val clock: Clock = Clock.systemUTC(),
+    private val notificationOwners: (suspend (String, SiiiSectionSnapshot?) -> List<String>)? = null,
+    private val notifyChange: suspend (StoredSiiiSection) -> Unit = {},
 ) : InstitutionalProjectionCommandHandler {
     override suspend fun apply(
         adapterId: String,
@@ -109,7 +127,21 @@ class SiiiSectionProjectionHandler(
             } catch (_: IllegalArgumentException) {
                 throw InstitutionalProjectionPermanentFailure("INVALID_SIII_SNAPSHOT")
             }
-        repository.apply(
+        val previous = if (notificationOwners != null) repository.find(command.institutionId, command.externalId) else null
+        if (previous != null && previous.sourceVersion > command.sourceVersion) return
+        val owners =
+            if (previous?.sourceVersion == command.sourceVersion) {
+                previous.notificationOwners
+            } else if (notificationOwners != null) {
+                (
+                    previous?.takeUnless { it.notificationsQueued }?.notificationOwners.orEmpty() +
+                        notificationOwners.invoke(command.institutionId, previous?.snapshot) +
+                        notificationOwners.invoke(command.institutionId, snapshot)
+                ).distinct()
+            } else {
+                emptyList()
+            }
+        val value =
             StoredSiiiSection(
                 command.institutionId,
                 command.externalId,
@@ -118,8 +150,17 @@ class SiiiSectionProjectionHandler(
                 snapshot?.let(SiiiSectionSnapshotCodec::digest) ?: TOMBSTONE_DIGEST,
                 snapshot,
                 clock.instant(),
-            ),
-        )
+                owners,
+            )
+        if (notificationOwners != null) repository.applyExpected(value, previous?.sourceVersion ?: 0L) else repository.apply(value)
+        if (notificationOwners != null) {
+            val applied = repository.find(command.institutionId, command.externalId)
+            if (applied?.sourceVersion == command.sourceVersion && applied.eventId == command.eventId) {
+                // Queue before acknowledging projection; a retry uses the persisted destinations.
+                notifyChange(applied)
+                repository.markNotificationsQueued(applied.institutionId, applied.sectionId, applied.sourceVersion, applied.eventId)
+            }
+        }
     }
 
     internal companion object {

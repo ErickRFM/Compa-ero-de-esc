@@ -182,6 +182,8 @@ fun attendanceScreen(
                 onReview = viewModel::reviewRecord,
                 onMark = viewModel::markRecord,
                 modifier = modifier,
+                onStartSchoolDay = viewModel::openSchoolDayScanner,
+                onSelectHistory = viewModel::selectTeacherHistory,
             )
         AttendanceMode.UNSUPPORTED ->
             unsupportedAttendance(
@@ -219,18 +221,7 @@ fun studentAttendanceContent(
             selectedSessionFocus.bringIntoView()
         }
     }
-    // A monotonic interval advances the server timestamp even if the device wall clock changes.
-    var monotonicNow by remember { mutableLongStateOf(android.os.SystemClock.elapsedRealtime()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(1_000)
-            monotonicNow = android.os.SystemClock.elapsedRealtime()
-        }
-    }
-    val schoolRecorded =
-        state.schoolPresenceReceivedRealtime?.let {
-            schoolDayRecordedAtServerTime(state.schoolPresence, (monotonicNow - it) / 1_000)
-        } ?: false
+    val schoolRecorded = schoolDayRecordedNow(state)
 
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current) {
@@ -593,12 +584,28 @@ private fun studentSessionCard(
 }
 
 @Composable
+private fun schoolDayRecordedNow(state: AttendanceUiState): Boolean {
+    // Advance server time monotonically, independent of the device wall clock.
+    var monotonicNow by remember { mutableLongStateOf(android.os.SystemClock.elapsedRealtime()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            monotonicNow = android.os.SystemClock.elapsedRealtime()
+            delay(1_000)
+        }
+    }
+    return state.schoolPresenceReceivedRealtime?.let {
+        schoolDayRecordedAtServerTime(state.schoolPresence, (monotonicNow - it) / 1_000)
+    } ?: false
+}
+
+@Composable
 private fun schoolDayPresenceCard(
     recorded: Boolean,
     ssid: String?,
     expiresAtEpochSeconds: Long?,
     busy: Boolean,
     onStart: () -> Unit,
+    teacher: Boolean = false,
 ) {
     V8GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -619,8 +626,12 @@ private fun schoolDayPresenceCard(
             }
             if (recorded) {
                 Text(
-                    "Tu QR institucional fue reconocido. La presencia física queda sujeta a verificación; " +
-                        "cada asistencia a clase requiere confirmación y revisión docente.",
+                    if (teacher) {
+                        "Ingreso registrado. Puedes iniciar una clase asignada; el alumnado debe confirmar su pase y tú revisar el resultado."
+                    } else {
+                        "Tu QR institucional fue reconocido. La presencia física queda sujeta a verificación; " +
+                            "cada asistencia a clase requiere confirmación y revisión docente."
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -809,9 +820,24 @@ fun teacherAttendanceContent(
     onReview: (AttendanceRecordResponse, AttendanceStatus, String) -> Unit,
     onMark: (AttendanceRecordResponse, AttendanceDisposition, String) -> Unit,
     modifier: Modifier,
+    onStartSchoolDay: () -> Unit = {},
+    onSelectHistory: (AttendanceSessionResponse) -> Unit = {},
 ) {
     key(state.teacherScopeGeneration) {
-        teacherAttendanceBody(state, onRefresh, onOpen, onClose, onResendNotice, onLoadHistory, onRefreshRoster, onReview, onMark, modifier)
+        teacherAttendanceBody(
+            state,
+            onRefresh,
+            onOpen,
+            onClose,
+            onResendNotice,
+            onLoadHistory,
+            onRefreshRoster,
+            onReview,
+            onMark,
+            modifier,
+            onStartSchoolDay,
+            onSelectHistory,
+        )
     }
 }
 
@@ -827,6 +853,8 @@ private fun teacherAttendanceBody(
     onReview: (AttendanceRecordResponse, AttendanceStatus, String) -> Unit,
     onMark: (AttendanceRecordResponse, AttendanceDisposition, String) -> Unit,
     modifier: Modifier,
+    onStartSchoolDay: () -> Unit,
+    onSelectHistory: (AttendanceSessionResponse) -> Unit,
 ) {
     var filter by remember(state.teacherSession?.id) { mutableStateOf("Recibidos") }
     var confirmClose by remember { mutableStateOf(false) }
@@ -838,6 +866,7 @@ private fun teacherAttendanceBody(
             ?.records
             .orEmpty()
     val review = records.filter(::attendanceRecordRequiresReview)
+    val schoolRecorded = schoolDayRecordedNow(state)
     Box(modifier = modifier.fillMaxSize()) {
         if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current) {
             V8MatteBackdrop(Modifier.matchParentSize())
@@ -872,6 +901,16 @@ private fun teacherAttendanceBody(
             state.errorMessage?.let { item { StatusNotice("No pudimos completar la operación", it, tone = NoticeTone.ERROR) } }
             state.successMessage?.let { item { StatusNotice("Listo", it, tone = NoticeTone.SUCCESS) } }
             item {
+                schoolDayPresenceCard(
+                    schoolRecorded,
+                    state.schoolNetworkSsid,
+                    state.schoolPresence?.expiresAtEpochSeconds,
+                    state.actionInProgress,
+                    onStartSchoolDay,
+                    teacher = true,
+                )
+            }
+            item {
                 OutlinedButton(onClick = onLoadHistory, enabled = !state.actionInProgress, modifier = Modifier.fillMaxWidth()) {
                     Text(if (state.teacherHistoryLoaded) "Actualizar historial" else "Consultar historial")
                 }
@@ -889,6 +928,9 @@ private fun teacherAttendanceBody(
                                     "${historical.scheduledStartsAt}–${historical.scheduledEndsAt} · ${historical.status.name.lowercase()}",
                                     style = MaterialTheme.typography.bodySmall,
                                 )
+                                OutlinedButton(onClick = { onSelectHistory(historical) }, enabled = !state.actionInProgress) {
+                                    Text("Revisar registros")
+                                }
                             }
                         }
                     }
@@ -911,7 +953,7 @@ private fun teacherAttendanceBody(
                 }
             } else {
                 item {
-                    teacherOccurrenceList(state.occurrences, state.actionInProgress, onOpen)
+                    teacherOccurrenceList(state.occurrences, state.actionInProgress || !schoolRecorded, onOpen)
                 }
             }
             item {
@@ -1055,7 +1097,11 @@ private fun teacherAttendanceBody(
         AlertDialog(
             onDismissRequest = { confirmClose = false },
             title = { Text("¿Cerrar el pase?") },
-            text = { Text("El QR dejará de recibir nuevos intentos.") },
+            text = {
+                Text(
+                    "El pase dejará de recibir confirmaciones. Los alumnos sin registro quedarán ausentes; podrás revisar y corregir el resultado con un motivo.",
+                )
+            },
             confirmButton = {
                 Button(
                     onClick = {
@@ -1091,13 +1137,17 @@ private fun teacherSessionCard(
         }
     }
     val qrValid = qrExpiresAt != null && now < qrExpiresAt && now < session.closesAtEpochSeconds
+    val passOpen =
+        session.closedAtEpochSeconds == null &&
+            session.status == org.companerodeescuela.shared.contracts.AttendanceSessionStatus.OPEN &&
+            now < session.closesAtEpochSeconds
     V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
         Column(
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text = if (now < session.closesAtEpochSeconds) "PASE EN VIVO" else "PASE FINALIZADO",
+                text = if (passOpen) "PASE EN VIVO" else "PASE FINALIZADO",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -1112,6 +1162,7 @@ private fun teacherSessionCard(
             )
 
             when {
+                !passOpen -> Text("Consulta y revisa los registros guardados de esta clase.", style = MaterialTheme.typography.bodyMedium)
                 qrState == QrVisualState.ACTIVE && qrToken != null && qrValid -> {
                     AttendanceQrCode(
                         token = qrToken,
@@ -1162,7 +1213,7 @@ private fun teacherSessionCard(
             ) {
                 OutlinedButton(
                     onClick = onResendNotice,
-                    enabled = !busy && now < session.closesAtEpochSeconds,
+                    enabled = !busy && passOpen,
                     modifier = Modifier.weight(1f),
                 ) {
                     Text("Reenviar aviso")

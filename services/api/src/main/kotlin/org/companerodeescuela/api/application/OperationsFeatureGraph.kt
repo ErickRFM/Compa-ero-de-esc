@@ -42,6 +42,9 @@ fun buildOperationsFeatureGraph(
     institutions: org.companerodeescuela.api.institutions.InstitutionRepository? = null,
     mfa: org.companerodeescuela.api.security.MfaService? = null,
     refreshSessions: RefreshSessionRepository? = null,
+    authorizePushMessage: suspend (org.companerodeescuela.api.devices.PushOutboxItem) -> Boolean = { item ->
+        item.data["type"] != org.companerodeescuela.shared.contracts.AttendancePushContract.TYPE
+    },
 ): OperationsFeatureGraph {
     val eventRepository =
         when {
@@ -81,6 +84,7 @@ fun buildOperationsFeatureGraph(
             devices = devices,
             outbox = outbox,
             sender = pushSender,
+            authorizeMessage = authorizePushMessage,
             authorizeRecipient = { owner ->
                 // Validates that the push recipient is an active, email-verified account.
                 // Event scopes already enforce which roles receive which event types;

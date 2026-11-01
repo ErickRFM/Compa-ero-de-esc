@@ -20,6 +20,7 @@ import org.companerodeescuela.MainActivity
 import org.companerodeescuela.R
 import org.companerodeescuela.core.security.SessionTokenInspector
 import org.companerodeescuela.core.security.SessionTokenStore
+import org.companerodeescuela.shared.contracts.AcademicChangePushContract
 import org.companerodeescuela.shared.contracts.AttendancePushContract
 import java.util.UUID
 import javax.inject.Inject
@@ -48,10 +49,15 @@ class CompaneroFirebaseMessagingService : FirebaseMessagingService() {
                         ?.takeIf { it.equals(raw, ignoreCase = true) }
                 }
         val attendanceNotice = message.data["type"] == AttendancePushContract.TYPE && sessionId != null
+        val academicInstitution =
+            message.data[AcademicChangePushContract.INSTITUTION_ID]?.let { raw ->
+                runCatching { UUID.fromString(raw).toString() }.getOrNull()?.takeIf { it.equals(raw, ignoreCase = true) }
+            }
+        val academicNotice = message.data["type"] == AcademicChangePushContract.TYPE && academicInstitution != null
         val channelNotice =
             message.data["type"] in setOf("channel", "channel_notice", "institutional_notice", "notice") ||
                 message.data["destination"] == "channel"
-        if (message.notification == null && !attendanceNotice && !channelNotice) return
+        if (message.notification == null && !attendanceNotice && !channelNotice && !academicNotice) return
         val hasSession =
             runBlocking(Dispatchers.IO) {
                 withTimeoutOrNull(1500) {
@@ -89,6 +95,7 @@ class CompaneroFirebaseMessagingService : FirebaseMessagingService() {
         val contentText =
             when {
                 attendanceNotice -> "Tu docente abrió el pase de lista. Toca para revisarlo."
+                academicNotice -> "La institución actualizó tu información académica. Consulta tu horario oficial."
                 channelNotice -> "Nuevo aviso en el Canal Institucional. Toca para revisarlo."
                 else -> "Tienes una nueva actualización académica."
             }
@@ -104,6 +111,8 @@ class CompaneroFirebaseMessagingService : FirebaseMessagingService() {
         val notifications = NotificationManagerCompat.from(this)
         if (attendanceNotice && sessionId != null) {
             notifications.notify(AttendancePushContract.notificationTag(sessionId), 0, notification)
+        } else if (academicNotice && academicInstitution != null) {
+            notifications.notify(AcademicChangePushContract.notificationTag(academicInstitution), 0, notification)
         } else {
             notifications.notify(message.messageId?.hashCode() ?: SystemClock.uptimeMillis().toInt(), notification)
         }

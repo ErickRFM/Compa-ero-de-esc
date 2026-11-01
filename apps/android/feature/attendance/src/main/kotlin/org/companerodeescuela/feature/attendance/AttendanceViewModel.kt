@@ -90,6 +90,7 @@ data class AttendanceUiState(
     val schoolPresence: SchoolPresenceResponse? = null,
     val schoolPresenceReceivedRealtime: Long? = null,
     val schoolNetworkSsid: String? = null,
+    val schoolNetworkAvailable: Boolean = false,
     val scannerOpen: Boolean = false,
     val scannerPurpose: ScannerPurpose = ScannerPurpose.ATTENDANCE,
     val scannerSessionHint: String? = null,
@@ -328,6 +329,7 @@ class AttendanceViewModel
                     scannerPurpose = ScannerPurpose.SCHOOL_DAY,
                     scannerSessionHint = null,
                     schoolNetworkSsid = network?.ssid,
+                    schoolNetworkAvailable = network != null,
                     qrInspection = null,
                     successMessage = null,
                     errorMessage = null,
@@ -413,6 +415,7 @@ class AttendanceViewModel
                     it.copy(
                         scannerOpen = false,
                         schoolNetworkSsid = null,
+                        schoolNetworkAvailable = false,
                         errorMessage =
                             "QR leído, pero aún no se registró tu ingreso. " +
                                 "Conéctate al Wi-Fi institucional y vuelve a escanear.",

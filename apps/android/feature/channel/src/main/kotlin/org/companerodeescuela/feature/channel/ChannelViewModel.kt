@@ -319,7 +319,10 @@ class ChannelViewModel
             }
         }
 
-        fun submitTask(taskId: String, comment: String) {
+        fun submitTask(
+            taskId: String,
+            comment: String,
+        ) {
             val channelId = _state.value.selectedChannelId ?: return
             _state.update { it.copy(actionInProgress = true, errorMessage = null, successMessage = null) }
             viewModelScope.launch {

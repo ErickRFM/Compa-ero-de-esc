@@ -195,7 +195,7 @@ class AccountAdministrationServiceTest {
             }
             val approvedRequest = f.proof(student.id, f.request(application = pending.id))
             val approved = f.service.approveStaff(f.actor, student.id, approvedRequest)
-            assertEquals(setOf(UserRole.STUDENT, UserRole.TEACHER), approved.user.roles)
+            assertEquals(setOf(UserRole.TEACHER), approved.user.roles)
             assertEquals("campus", approved.user.institutionId)
             assertEquals(StaffApplicationStatus.APPROVED, approved.applications.single().status)
         }

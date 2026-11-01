@@ -37,7 +37,7 @@ class AttendanceTruthUiTest {
         compose.onNodeWithText("Registrada").assertExists()
         compose.onNodeWithText("Verificada").assertDoesNotExist()
         compose
-            .onNodeWithText("Confirmar pase de lista")
+            .onNodeWithText("Confirmar asistencia")
             .performScrollTo()
             .assertIsEnabled()
             .performClick()
@@ -116,7 +116,7 @@ class AttendanceTruthUiTest {
         render(noCampusEntry)
         compose.onAllNodesWithText("Escanear QR institucional").assertCountEquals(1)
         compose.onNodeWithText("Esperando pase del docente").assertExists()
-        compose.onNodeWithText("Confirmar pase de lista").assertDoesNotExist()
+        compose.onNodeWithText("Confirmar asistencia").assertDoesNotExist()
     }
 
     @Test fun teacherContingencyIsHiddenUntilStudentOpensIt() {

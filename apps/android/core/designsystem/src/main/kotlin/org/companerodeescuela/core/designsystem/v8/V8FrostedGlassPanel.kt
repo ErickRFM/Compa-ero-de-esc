@@ -73,11 +73,13 @@ fun Modifier.v8GlassSurface(
         }
     val highContrast = finish == V8SurfaceFinish.DARK_HIGH_CONTRAST || finish == V8SurfaceFinish.LIGHT_HIGH_CONTRAST
     return shadow(
-        elevation = if (highContrast) 0.dp else elevation.coerceIn(0.dp, 1.dp),
+        elevation = if (highContrast) 0.dp else elevation.coerceIn(0.dp, if (light) 2.dp else 1.dp),
         shape = shape,
         ambientColor = Color.Black,
         spotColor = Color.Black,
-    ).clip(shape).background(fill).border(if (highContrast) 2.dp else 1.dp, edge, shape)
+    ).clip(shape).background(fill).then(
+        if (highContrast) Modifier.border(2.dp, edge, shape) else Modifier,
+    )
 }
 
 @Composable

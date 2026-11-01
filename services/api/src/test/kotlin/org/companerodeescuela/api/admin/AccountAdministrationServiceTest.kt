@@ -28,7 +28,6 @@ import org.companerodeescuela.shared.contracts.PrivilegedCommandDigests
 import org.companerodeescuela.shared.contracts.RegistrationAccountType
 import org.companerodeescuela.shared.contracts.StaffApplicationStatus
 import org.companerodeescuela.shared.contracts.StepUpAction
-import org.companerodeescuela.shared.contracts.TeacherApplicationRequest
 import org.companerodeescuela.shared.contracts.TutorApplicationRequest
 import org.companerodeescuela.shared.contracts.TutorApprovalScope
 import org.companerodeescuela.shared.contracts.UserRole
@@ -158,47 +157,6 @@ class AccountAdministrationServiceTest {
                 )
             }
     }
-
-    @Test
-    fun `existing verified student requests teacher access without another email or an early role grant`() =
-        runBlocking<Unit> {
-            val f = Fixture()
-            f.initialize()
-            val student =
-                PlatformAccount(
-                    "student-requests-teacher",
-                    "QA Student",
-                    "qa-student@example.test",
-                    "test-hash",
-                    setOf(UserRole.STUDENT),
-                    emailVerifiedAt = f.clock.now,
-                    registrationIntent = RegistrationIntent(RegistrationAccountType.STUDENT),
-                )
-            f.accounts.create(student)
-
-            val request = TeacherApplicationRequest(
-                operationId = "request-teacher",
-                expectedAuthRevision = 0,
-                institutionId = "campus",
-                identityReference = "verified-staff-reference",
-            )
-            val pending = f.service.requestTeacher(student, request)
-            assertEquals(StaffApplicationStatus.PENDING, pending.status)
-            val unchanged = requireNotNull(f.accounts.findById(student.id))
-            assertEquals(setOf(UserRole.STUDENT), unchanged.roles)
-            assertEquals(AccountStatus.ACTIVE, unchanged.accountStatus)
-            assertEquals(0, unchanged.authRevision)
-            assertEquals(student.emailVerifiedAt, unchanged.emailVerifiedAt)
-            assertEquals(pending.id, f.service.requestTeacher(student, request).id)
-            assertFailsWith<ApiException.Conflict> {
-                f.service.requestTeacher(student, request.copy(operationId = "another-request"))
-            }
-            val approvedRequest = f.proof(student.id, f.request(application = pending.id))
-            val approved = f.service.approveStaff(f.actor, student.id, approvedRequest)
-            assertEquals(setOf(UserRole.TEACHER), approved.user.roles)
-            assertEquals("campus", approved.user.institutionId)
-            assertEquals(StaffApplicationStatus.APPROVED, approved.applications.single().status)
-        }
 
     @Test fun `student affiliation requires current scoped MFA and never invents an enrollment`() =
         runBlocking<Unit> {

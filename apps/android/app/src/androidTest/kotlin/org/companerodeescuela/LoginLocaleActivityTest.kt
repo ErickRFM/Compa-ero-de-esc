@@ -1,11 +1,11 @@
 package org.companerodeescuela
 
+import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithText
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.uiautomator.By
-import androidx.test.uiautomator.UiDevice
 import org.companerodeescuela.feature.settings.AppLanguage
 import org.companerodeescuela.feature.settings.AppThemeMode
 import org.junit.Rule
@@ -16,24 +16,27 @@ import org.junit.runner.RunWith
 class LoginLocaleActivityTest {
     @get:Rule val compose = createEmptyComposeRule()
 
-    @Test fun languageAndThemePreferencesReachTheRealLoginActivity() {
-        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+    @Test
+    fun languageAndThemePreferencesReachTheRealLoginActivity() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity {
                 it.appearancePreferences.setLanguage(AppLanguage.SPANISH)
                 it.appearancePreferences.setThemeMode(AppThemeMode.DARK)
             }
-            compose.waitForIdle()
-            assertLoginVisible(device, By.textContains("universitaria,"), "locale-spanish")
+            awaitHero("universitaria,")
             scenario.onActivity { it.appearancePreferences.setLanguage(AppLanguage.ENGLISH) }
-            compose.waitForIdle()
-            assertLoginVisible(device, By.textContains("university life,"), "locale-english")
+            awaitHero("university life,")
             scenario.recreate()
-            compose.waitForIdle()
-            assertLoginVisible(device, By.textContains("university life,"), "locale-english")
+            awaitHero("university life,")
             scenario.onActivity { it.appearancePreferences.setLanguage(AppLanguage.SPANISH) }
-            compose.waitForIdle()
-            assertLoginVisible(device, By.textContains("universitaria,"), "locale-restored-spanish")
+            awaitHero("universitaria,")
         }
+    }
+
+    private fun awaitHero(text: String) {
+        compose.waitUntil(timeoutMillis = 15_000) {
+            compose.onAllNodesWithText(text, substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText(text, substring = true).assertExists()
     }
 }

@@ -62,8 +62,10 @@ class SmartRoleLoginUiTest {
         compose.onNodeWithTag("login_submit").assertIsEnabled()
         compose.onNodeWithTag("login_submit").performScrollTo()
         compose.onNodeWithTag("login_submit").performClick()
-        compose.waitUntil(timeoutMillis = 5_000) { submitted != null }
-        assertEquals(Triple("qa.docente", "test-password", AppExperience.TUTOR), submitted)
+        // Read the synchronous UI callback on the Compose thread; avoid a cross-thread polling race.
+        compose.runOnIdle {
+            assertEquals(Triple("qa.docente", "test-password", AppExperience.TUTOR), submitted)
+        }
     }
 
     @Test fun swipeArrowAndIndicatorSelectAllSixAccesses() {

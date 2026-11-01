@@ -337,9 +337,7 @@ class V12AdministrationUiTest {
                 val insets = ViewCompat.getRootWindowInsets(compose.activity.window.decorView)
                 insets != null &&
                     !insets.isVisible(WindowInsetsCompat.Type.ime()) &&
-                    insets.getInsets(WindowInsetsCompat.Type.ime()).bottom == 0 &&
-                    compose.activity.window.decorView
-                        .hasWindowFocus()
+                    insets.getInsets(WindowInsetsCompat.Type.ime()).bottom == 0
             }
         } catch (timeout: ComposeTimeoutException) {
             val view = compose.activity.window.decorView

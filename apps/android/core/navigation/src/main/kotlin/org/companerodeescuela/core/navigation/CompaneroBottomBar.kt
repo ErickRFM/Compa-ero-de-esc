@@ -183,7 +183,8 @@ fun CompaneroBottomBar(
                                         else -> Color(0xFF9E9E9E)
                                     },
                             )
-                            if (isSelected) {
+                            // Keep the capsule usable for profiles with many destinations.
+                            if (isSelected && (destinations.size <= 4 || itemWidth >= 85.dp)) {
                                 Text(
                                     text =
                                         when (topLevel) {

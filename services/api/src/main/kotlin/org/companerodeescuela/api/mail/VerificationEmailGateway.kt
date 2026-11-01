@@ -152,13 +152,17 @@ class ResendVerificationEmailGateway(
                     }
                 val id =
                     runCatching {
-                        Json.parseToJsonElement(body).jsonObject["id"]?.jsonPrimitive?.contentOrNull
+                        val response = Json.parseToJsonElement(body)
+                        val messageId = response.jsonObject["id"]
+                        messageId?.jsonPrimitive?.contentOrNull
                     }.getOrNull()
-                true to if (!id.isNullOrBlank() && id.length <= 128) {
-                    VerificationDeliveryStatus.ACCEPTED
-                } else {
-                    VerificationDeliveryStatus.UNCONFIRMED
-                }
+                val status =
+                    if (!id.isNullOrBlank() && id.length <= 128) {
+                        VerificationDeliveryStatus.ACCEPTED
+                    } else {
+                        VerificationDeliveryStatus.UNCONFIRMED
+                    }
+                true to status
             }
         } catch (cancelled: CancellationException) {
             throw cancelled

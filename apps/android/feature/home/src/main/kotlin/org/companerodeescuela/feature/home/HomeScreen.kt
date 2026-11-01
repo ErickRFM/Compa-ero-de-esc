@@ -186,13 +186,14 @@ fun HomeScreen(
                                 )
                             }
                             HorizontalDivider(color = Color.White.copy(alpha = 0.24f))
+                            val dayPrefix =
+                                if (overview?.current == null && overview?.next == null) {
+                                    upcomingDayLabel(overview?.nextScheduledDaysAway) + " · "
+                                } else {
+                                    ""
+                                }
                             Text(
-                                text =
-                                    (if (overview?.current == null && overview?.next == null) {
-                                        upcomingDayLabel(overview?.nextScheduledDaysAway) + " · "
-                                    } else {
-                                        ""
-                                    }) + "${activeOrNext.startsAt} – ${activeOrNext.endsAt} · ${locationLabel(activeOrNext)}",
+                                text = dayPrefix + "${activeOrNext.startsAt} – ${activeOrNext.endsAt} · ${locationLabel(activeOrNext)}",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = Color.White,
                             )
@@ -418,8 +419,7 @@ private fun HomeDailyStats(
     }
 }
 
-internal fun featuredHomeClass(day: TodayOverview?): ScheduleEntry? =
-    day?.current ?: day?.next ?: day?.nextScheduled
+internal fun featuredHomeClass(day: TodayOverview?): ScheduleEntry? = day?.current ?: day?.next ?: day?.nextScheduled
 
 /** Attendance is an institutional action: a future or personal class never enables it. */
 internal fun canOpenAttendanceFromHome(

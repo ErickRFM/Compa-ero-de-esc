@@ -545,6 +545,7 @@ class V12AdministrationUiTest {
         try {
             compose.setContent { AuthTestLocale { CompaneroTheme { ClassroomAdministrationEditor({}, viewModel = f.academic) } } }
             compose.waitUntil(10000) { !f.academic.state.value.loading }
+            compose.onNodeWithTag("academic_tab_members").performScrollTo().performClick()
             compose.onNodeWithTag("academic_group").performScrollTo().performClick()
             compose.onNodeWithTag("academic_group_QA-GROUP").performClick()
             compose.onNodeWithTag("academic_student").performScrollTo().performClick()

@@ -38,4 +38,14 @@
 <string name="academic_invite_share">Share</string>
 <string name="academic_invite_revoke">Revoke code</string>
 <string name="academic_invite_generate">Generate class invitation code · 30 min</string>
+<string name="academic_tab_schedule">Schedules</string>
+<string name="academic_tab_classes">Classes</string>
+<string name="academic_tab_groups">Groups</string>
+<string name="academic_tab_members">Enrollment</string>
+<string name="academic_schedule_explainer">Select an assigned class and a slot. The server validates conflicts and controls publication.</string>
+<string name="academic_pick_day">1 · Day</string>
+<string name="academic_pick_start">2 · Start</string>
+<string name="academic_pick_duration">3 · Duration</string>
+<string name="academic_pick_preview">Selected slot: %1$s · %2$s–%3$s</string>
+<string name="academic_pick_unselected">Select a day and start time</string>
 </resources>

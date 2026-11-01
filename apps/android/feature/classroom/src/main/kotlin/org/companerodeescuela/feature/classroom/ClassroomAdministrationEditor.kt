@@ -7,8 +7,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -23,10 +23,10 @@ import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.feature.admin.AdminOperation
 import org.companerodeescuela.feature.admin.protectedAdminDialog
 import org.companerodeescuela.shared.contracts.*
-import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneOffset
-import java.time.format.TextStyle
+
+private enum class AcademicWorkspaceTab { SCHEDULE, CLASSES, GROUPS, MEMBERS }
 
 /** Administrative body of ClassroomScreen; existing teacher/student bodies and enrollment cards are reused. */
 @Composable
@@ -34,6 +34,7 @@ fun ClassroomAdministrationEditor(
     onOpenChannel: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ClassroomAdministrationViewModel = hiltViewModel(),
+    startOnSchedule: Boolean = false,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(viewModel) { viewModel.refresh() }
@@ -51,9 +52,11 @@ fun ClassroomAdministrationEditor(
         viewModel::revokeInvite,
         onOpenChannel,
         modifier,
+        startOnSchedule,
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ClassroomAdministrationEditor(
     state: ClassroomAdministrationState,
@@ -68,7 +71,11 @@ fun ClassroomAdministrationEditor(
     onRevokeInvite: () -> Unit,
     onOpenChannel: () -> Unit,
     modifier: Modifier = Modifier,
+    startOnSchedule: Boolean = false,
 ) {
+    var tab by rememberSaveable(state.ownerKey) {
+        mutableStateOf(if (startOnSchedule) AcademicWorkspaceTab.SCHEDULE else AcademicWorkspaceTab.CLASSES)
+    }
     var groupId by remember(state.ownerKey) { mutableStateOf("") }
     var groupName by remember(state.ownerKey) { mutableStateOf("") }
     var institution by remember(state.ownerKey) { mutableStateOf("") }
@@ -108,14 +115,52 @@ fun ClassroomAdministrationEditor(
             .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
-        V8ScreenHeader { Text(stringResource(R.string.academic_admin_title), style = MaterialTheme.typography.headlineSmall) }
-        Text(stringResource(R.string.academic_admin_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        V8ScreenHeader {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(R.string.academic_admin_title), style = MaterialTheme.typography.headlineLarge)
+                Text(
+                    stringResource(R.string.academic_admin_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         if (state.loading) CircularProgressIndicator(Modifier.testTag("academic_admin_loading"))
         state.failure?.let { AcademicFailure(it) }
         if (state.completed) Text(stringResource(R.string.academic_admin_done), modifier = Modifier.testTag("academic_admin_done"))
-        Button(onRefresh, enabled = !state.working) { Text(stringResource(R.string.academic_admin_refresh)) }
+        OutlinedButton(
+            onClick = onRefresh,
+            enabled = !state.working,
+            modifier = Modifier.testTag("academic_admin_refresh"),
+        ) { Text(stringResource(R.string.academic_admin_refresh)) }
         if (state.actor != null) {
-            AcademicCard(R.string.academic_admin_group_create) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                listOf(
+                    AcademicWorkspaceTab.SCHEDULE to R.string.academic_tab_schedule,
+                    AcademicWorkspaceTab.CLASSES to R.string.academic_tab_classes,
+                    AcademicWorkspaceTab.GROUPS to R.string.academic_tab_groups,
+                    AcademicWorkspaceTab.MEMBERS to R.string.academic_tab_members,
+                ).forEach { (section, title) ->
+                    FilterChip(
+                        selected = tab == section,
+                        onClick = { tab = section },
+                        label = { Text(stringResource(title)) },
+                        modifier = Modifier.testTag("academic_tab_" + section.name.lowercase()),
+                        enabled = !state.working && state.operationId == null,
+                    )
+                }
+            }
+            if (tab == AcademicWorkspaceTab.SCHEDULE) {
+                Text(
+                    stringResource(R.string.academic_schedule_explainer),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (tab == AcademicWorkspaceTab.GROUPS) AcademicCard(R.string.academic_admin_group_create) {
                 AcademicField(groupId, { groupId = it.take(128) }, R.string.academic_admin_group_id, "academic_group_id", enabled)
                 AcademicField(groupName, { groupName = it.take(120) }, R.string.academic_admin_group_name, "academic_group_name", enabled)
                 AcademicPicker(
@@ -164,7 +209,7 @@ fun ClassroomAdministrationEditor(
                     modifier = Modifier.testTag("academic_group_prepare"),
                 ) { Text(stringResource(R.string.academic_admin_prepare)) }
             }
-            AcademicCard(R.string.academic_admin_member) {
+            if (tab == AcademicWorkspaceTab.MEMBERS) AcademicCard(R.string.academic_admin_member) {
                 AcademicPicker(R.string.academic_admin_group, knownGroups.map { it.id to (it.name + " · " + it.periodId) }, selectedGroup, {
                     selectedGroup =
                         it
@@ -196,7 +241,7 @@ fun ClassroomAdministrationEditor(
                     Text(stringResource(R.string.academic_admin_prepare))
                 }
             }
-            AcademicCard(R.string.academic_admin_class_create) {
+            if (tab == AcademicWorkspaceTab.CLASSES) AcademicCard(R.string.academic_admin_class_create) {
                 AcademicPicker(R.string.academic_admin_group, knownGroups.map { it.id to it.name }, selectedGroup, {
                     selectedGroup = it
                     teacher =
@@ -224,7 +269,7 @@ fun ClassroomAdministrationEditor(
                     modifier = Modifier.testTag("academic_class_prepare"),
                 ) { Text(stringResource(R.string.academic_admin_prepare)) }
             }
-            AcademicCard(R.string.academic_admin_schedule) {
+            if (tab == AcademicWorkspaceTab.SCHEDULE) AcademicCard(R.string.academic_admin_schedule) {
                 AcademicPicker(
                     R.string.academic_admin_class,
                     state.classrooms.filter { it.status == ClassroomStatus.ACTIVE }.map {
@@ -236,16 +281,13 @@ fun ClassroomAdministrationEditor(
                     "academic_schedule_class",
                     enabled,
                 )
-                AcademicPicker(
-                    R.string.academic_admin_day,
-                    DayOfWeek.entries.map {
-                        it.name to
-                            it.getDisplayName(TextStyle.FULL, LocalConfiguration.current.locales[0])
-                    },
-                    day,
-                    { day = it },
-                    "academic_schedule_day",
-                    enabled,
+                AcademicScheduleQuickPicker(
+                    day = day,
+                    start = fromTime,
+                    end = untilTime,
+                    enabled = enabled,
+                    onDay = { day = it },
+                    onRange = { from, to -> fromTime = from; untilTime = to },
                 )
                 AcademicField(fromTime, { fromTime = it.take(5) }, R.string.academic_admin_time_start, "academic_time_start", enabled)
                 AcademicField(untilTime, { untilTime = it.take(5) }, R.string.academic_admin_time_end, "academic_time_end", enabled)
@@ -256,14 +298,22 @@ fun ClassroomAdministrationEditor(
                     modifier = Modifier.testTag("academic_schedule_prepare"),
                 ) { Text(stringResource(R.string.academic_admin_prepare)) }
             }
-            Text(stringResource(R.string.academic_admin_groups), style = MaterialTheme.typography.titleLarge)
-            state.groups.forEach { Text(it.name + " · " + it.periodId.orEmpty()) }
-            state.activeInvite?.let { invite ->
-                InviteCard(invite, { copyInvite(context, invite) }, { shareInvite(context, invite) }, onRevokeInvite, !state.working)
+            if (tab == AcademicWorkspaceTab.GROUPS) {
+                Text(stringResource(R.string.academic_admin_groups), style = MaterialTheme.typography.titleLarge)
+                state.groups.forEach { group ->
+                    V8GlassCard(Modifier.fillMaxWidth()) {
+                        Text(group.name + " · " + group.periodId.orEmpty(), style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
             }
-            Text(stringResource(R.string.academic_admin_classes), style = MaterialTheme.typography.titleLarge)
-            if (state.classrooms.isEmpty()) Text(stringResource(R.string.academic_admin_empty_classes))
-            state.classrooms.forEach { assigned -> ClassroomCard(assigned, enabled, { onInvite(assigned.id) }) }
+            if (tab == AcademicWorkspaceTab.CLASSES) {
+                state.activeInvite?.let { invite ->
+                    InviteCard(invite, { copyInvite(context, invite) }, { shareInvite(context, invite) }, onRevokeInvite, !state.working)
+                }
+                Text(stringResource(R.string.academic_admin_classes), style = MaterialTheme.typography.titleLarge)
+                if (state.classrooms.isEmpty()) Text(stringResource(R.string.academic_admin_empty_classes))
+                state.classrooms.forEach { assigned -> ClassroomCard(assigned, enabled, { onInvite(assigned.id) }) }
+            }
         }
         TextButton(onOpenChannel) { Text(stringResource(R.string.academic_admin_channel)) }
     }

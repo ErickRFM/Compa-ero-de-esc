@@ -38,4 +38,14 @@
 <string name="academic_invite_share">Compartir</string>
 <string name="academic_invite_revoke">Revocar clave</string>
 <string name="academic_invite_generate">Generar código de incorporación · 30 min</string>
+<string name="academic_tab_schedule">Horarios</string>
+<string name="academic_tab_classes">Clases</string>
+<string name="academic_tab_groups">Grupos</string>
+<string name="academic_tab_members">Inscripciones</string>
+<string name="academic_schedule_explainer">Selecciona una clase y una franja para preparar el horario. Los conflictos y la publicación los decide el servidor.</string>
+<string name="academic_pick_day">1 · Día</string>
+<string name="academic_pick_start">2 · Inicio</string>
+<string name="academic_pick_duration">3 · Duración</string>
+<string name="academic_pick_preview">Franja elegida: %1$s · %2$s–%3$s</string>
+<string name="academic_pick_unselected">Selecciona un día y una hora de inicio</string>
 </resources>

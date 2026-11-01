@@ -204,8 +204,16 @@ class TodayScheduleTest {
 
     @Test
     fun `home attendance requires a current class and authorized institutional data`() {
-        val current = TodaySchedule.calculateEntries(listOf(entry("Bases de Datos", "10:00", "11:00")), now = LocalDateTime.of(2026, 10, 5, 10, 30))
-        val upcoming = TodaySchedule.calculateEntries(listOf(entry("Bases de Datos", "10:00", "11:00")), now = LocalDateTime.of(2026, 10, 5, 9, 30))
+        val current =
+            TodaySchedule.calculateEntries(
+                listOf(entry("Bases de Datos", "10:00", "11:00")),
+                now = LocalDateTime.of(2026, 10, 5, 10, 30),
+            )
+        val upcoming =
+            TodaySchedule.calculateEntries(
+                listOf(entry("Bases de Datos", "10:00", "11:00")),
+                now = LocalDateTime.of(2026, 10, 5, 9, 30),
+            )
         assertEquals("Bases de Datos", featuredHomeClass(current)?.subjectName)
         assertEquals(true, canOpenAttendanceFromHome(current, institutionalReady = true))
         assertEquals(false, canOpenAttendanceFromHome(current, institutionalReady = false))

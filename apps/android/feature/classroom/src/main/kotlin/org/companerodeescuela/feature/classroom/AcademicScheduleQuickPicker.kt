@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.feature.classroom
 
 import androidx.compose.foundation.layout.Arrangement
@@ -37,7 +39,9 @@ internal fun AcademicScheduleQuickPicker(
     val parsedEnd = runCatching { LocalTime.parse(end) }.getOrNull()
     val duration = if (parsedStart != null && parsedEnd != null) {
         java.time.Duration.between(parsedStart, parsedEnd).toMinutes().toInt()
-    } else 60
+    } else {
+        60
+    }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.academic_pick_day), style = MaterialTheme.typography.titleSmall)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -74,7 +78,9 @@ internal fun AcademicScheduleQuickPicker(
                 FilterChip(
                     selected = fits && duration == minutes,
                     onClick = {
-                        if (fits && parsedStart != null) onRange(start, parsedStart.plusMinutes(minutes.toLong()).toString())
+                        if (fits && parsedStart != null) {
+                            onRange(start, parsedStart.plusMinutes(minutes.toLong()).toString())
+                        }
                     },
                     label = { Text("$minutes min") },
                     enabled = enabled && fits,

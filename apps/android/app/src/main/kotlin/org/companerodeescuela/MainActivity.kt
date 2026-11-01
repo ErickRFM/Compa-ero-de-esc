@@ -449,7 +449,11 @@ class MainActivity : AppCompatActivity() {
                                         composable(Destination.Classrooms.route) {
                                             ClassroomScreen(
                                                 roles = session.roles,
-                                                studentExperience = AcademicRoutePolicy.studentActions(roleConfig.experience, session.roles),
+                                                studentExperience =
+                                                    AcademicRoutePolicy.studentActions(
+                                                        roleConfig.experience,
+                                                        session.roles,
+                                                    ),
                                                 teacherExperience = roleConfig.experience == AppExperience.TEACHER,
                                                 administrativeExperience =
                                                     roleConfig.experience == AppExperience.ADMIN ||

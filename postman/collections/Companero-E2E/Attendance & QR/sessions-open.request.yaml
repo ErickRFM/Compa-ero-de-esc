@@ -1,0 +1,6 @@
+$kind: http-request
+name: sessions open
+order: 2000
+method: GET
+url: '{{baseUrl}}/attendance/sessions/open'
+description: 'Auth: bearer (inherits {{jwtToken}}).'

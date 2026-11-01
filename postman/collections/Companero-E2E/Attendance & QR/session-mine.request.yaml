@@ -1,0 +1,6 @@
+$kind: http-request
+name: session mine
+order: 13000
+method: GET
+url: '{{baseUrl}}/attendance/sessions/{{sessionId}}/mine'
+description: 'Auth: bearer (inherits {{jwtToken}}).'

@@ -1,0 +1,26 @@
+$kind: http-request
+name: login
+order: 1000
+method: POST
+url: '{{baseUrl}}/auth/login'
+description: 'Auth: noauth (public login endpoint).'
+auth:
+  type: noauth
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "",
+      "password": ""
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      var j; try{ j=pm.response.json(); }catch(e){ j={}; }
+      pm.test('login status 200', function(){ pm.response.to.have.status(200); });
+      if(j && (j.accessToken||j.token)){ pm.environment.set('jwtToken', j.accessToken||j.token); }
+      pm.test('returns a token', function(){ pm.expect(j.accessToken||j.token).to.be.a('string'); });

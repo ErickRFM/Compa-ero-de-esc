@@ -1,0 +1,17 @@
+$kind: http-request
+name: refresh
+order: 3000
+method: POST
+url: '{{baseUrl}}/auth/refresh'
+description: 'Auth: noauth (token refresh via refreshToken body).'
+auth:
+  type: noauth
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "refreshToken": ""
+    }

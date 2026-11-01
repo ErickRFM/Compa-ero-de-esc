@@ -1,0 +1,6 @@
+$kind: http-request
+name: schedule v2
+order: 3000
+method: GET
+url: '{{baseUrl}}/academic/schedule/v2'
+description: 'Auth: bearer (inherits {{jwtToken}}).'

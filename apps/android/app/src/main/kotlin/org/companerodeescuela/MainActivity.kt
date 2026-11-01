@@ -30,6 +30,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -286,6 +287,7 @@ class MainActivity : AppCompatActivity() {
                                             )
                                         }
                                     val navController = key(userId, roleConfig.experience, session.roles) { rememberNavController() }
+                                    var channelTabRequest by rememberSaveable { mutableIntStateOf(-1) }
                                     LaunchedEffect(pendingAttendanceSessionId, roleConfig.experience, session.roles) {
                                         val requestedSession = pendingAttendanceSessionId ?: return@LaunchedEffect
                                         if (UserRole.STUDENT !in session.roles || appDistribution != AppDistribution.ACADEMIC) {
@@ -332,6 +334,13 @@ class MainActivity : AppCompatActivity() {
                                                     }
                                                 },
                                                 onOpenChannel = {
+                                                    channelTabRequest = 0
+                                                    navController.navigate(Destination.Channel.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                                onOpenTasks = {
+                                                    channelTabRequest = 2
                                                     navController.navigate(Destination.Channel.route) {
                                                         launchSingleTop = true
                                                     }
@@ -487,6 +496,8 @@ class MainActivity : AppCompatActivity() {
                                             ChannelScreen(
                                                 requestedClassroom = selection,
                                                 isAdministrativeSession = isAdministrative,
+                                                requestedTab = channelTabRequest,
+                                                onConsumeRequestedTab = { channelTabRequest = -1 },
                                             )
                                         }
                                         composable(Destination.Attendance.route) { entry ->

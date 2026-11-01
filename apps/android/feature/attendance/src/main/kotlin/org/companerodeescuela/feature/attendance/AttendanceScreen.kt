@@ -60,6 +60,8 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -561,7 +563,11 @@ private fun studentSessionCard(
                             Button(
                                 onClick = onConfirm,
                                 enabled = !busy && schoolPresenceActive,
-                                modifier = Modifier.fillMaxWidth().testTag("attendance_confirm_action"),
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .testTag("attendance_confirm_action")
+                                        .semantics { contentDescription = "Confirmar asistencia" },
                                 shape = RoundedCornerShape(16.dp),
                                 colors =
                                     androidx.compose.material3.ButtonDefaults.buttonColors(

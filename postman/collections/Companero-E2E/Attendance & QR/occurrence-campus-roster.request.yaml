@@ -1,0 +1,9 @@
+$kind: http-request
+name: occurrence campus-roster
+order: 17000
+method: GET
+url: '{{baseUrl}}/attendance/occurrences/{{occurrenceId}}/campus-roster'
+description: 'Auth: bearer (inherits {{jwtToken}}).'
+pathVariables:
+  - key: occurrenceId
+    value: ''

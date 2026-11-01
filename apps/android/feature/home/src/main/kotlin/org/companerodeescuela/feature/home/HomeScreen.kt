@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
@@ -138,7 +139,61 @@ fun HomeScreen(
                     }
                 }
 
-                // V25: prominent solid hero, driven strictly by the authorized overview.
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        tonalElevation = 2.dp,
+                    ) {
+                        BoxWithConstraints(
+                            modifier = Modifier.size(48.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.DateRange,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(26.dp),
+                            )
+                        }
+                    }
+                    Spacer(Modifier.size(12.dp))
+                    Column {
+                        Text(
+                            text = "Compañero de Clase",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = "APP ACADÉMICA",
+                            style = MaterialTheme.typography.labelMedium,
+                            letterSpacing = 0.26.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+
+                Text(
+                    text =
+                        buildAnnotatedString {
+                            append("Tu vida académica, ")
+                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append("más simple") }
+                        },
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    lineHeight = 42.sp,
+                )
+                Text(
+                    text = "Horario, asistencia, tareas y avisos de tu clase en un solo lugar.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(24.dp),
@@ -155,6 +210,7 @@ fun HomeScreen(
                                 !state.institutionalAccessDenied &&
                                 !state.fromCache &&
                                 state.errorMessage == null
+
                         Text(
                             text =
                                 when {
@@ -182,8 +238,7 @@ fun HomeScreen(
                             }
                             HorizontalDivider(color = Color.White.copy(alpha = 0.24f))
                             Text(
-                                text =
-                                    "${activeOrNext.startsAt} – ${activeOrNext.endsAt}   ·   ${locationLabel(activeOrNext)}",
+                                text = "${activeOrNext.startsAt} – ${activeOrNext.endsAt}   ·   ${locationLabel(activeOrNext)}",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = Color.White,
                             )
@@ -213,14 +268,19 @@ fun HomeScreen(
                                 fontWeight = FontWeight.Bold,
                             )
                         }
+                        V8RedPrimaryButton(
+                            text = if (state.personalOnly || state.institutionalAccessDenied) "Ver mi horario" else "Ver pase de lista",
+                            onClick = if (state.personalOnly || state.institutionalAccessDenied) onOpenSchedule else onOpenAttendance,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 }
 
-                V25QuickAccessGrid(
+                V8QuickAccessGrid(
                     onOpenSchedule = onOpenSchedule,
                     onOpenAttendance = onOpenAttendance,
                     onOpenChannel = onOpenChannel,
-                    onOpenClassrooms = onOpenClassrooms,
+                    onOpenTasks = onOpenTasks,
                 )
 
                 if (state.loading && overview == null) CircularProgressIndicator()
@@ -551,45 +611,51 @@ private fun todayLabel(): String {
 }
 
 @Composable
-private fun V25QuickAccessGrid(
+private fun V8QuickAccessGrid(
     onOpenSchedule: () -> Unit,
     onOpenAttendance: () -> Unit,
     onOpenChannel: () -> Unit,
-    onOpenClassrooms: () -> Unit,
+    onOpenTasks: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        val actions =
+        val items =
             listOf(
                 Triple("Horario", Icons.Filled.DateRange, onOpenSchedule),
                 Triple("Asistencia", Icons.Filled.CheckCircle, onOpenAttendance),
                 Triple("Avisos", Icons.Filled.Campaign, onOpenChannel),
-                Triple("Clases", Icons.Filled.School, onOpenClassrooms),
+                Triple("Tareas", Icons.AutoMirrored.Filled.Assignment, onOpenTasks),
             )
-        actions.forEach { (label, icon, action) ->
+        items.forEach { (label, icon, onClick) ->
             Surface(
-                modifier = Modifier.weight(1f).clickable(onClickLabel = "Abrir $label", onClick = action),
+                modifier = Modifier.weight(1f).clickable(onClick = onClick),
                 shape = RoundedCornerShape(18.dp),
                 color = MaterialTheme.colorScheme.surface,
                 shadowElevation = 2.dp,
             ) {
                 Column(
-                    modifier = Modifier.padding(horizontal = 3.dp, vertical = 14.dp),
+                    modifier = Modifier.padding(vertical = 14.dp, horizontal = 6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        modifier = Modifier.size(23.dp),
-                        tint = MaterialTheme.colorScheme.onSurface,
-                    )
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = label,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(10.dp).size(22.dp),
+                        )
+                    }
                     Text(
                         text = label,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Medium,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                     )

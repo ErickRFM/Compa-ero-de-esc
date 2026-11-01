@@ -1,0 +1,15 @@
+$kind: http-request
+name: record review
+order: 15000
+method: PATCH
+url: '{{baseUrl}}/attendance/records/{{recordId}}/review'
+description: 'Auth: bearer. Teacher reviews present/late/absent.'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "status": "present"
+    }

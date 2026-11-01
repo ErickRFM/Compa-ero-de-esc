@@ -1,0 +1,47 @@
+$kind: http-request
+name: events
+order: 1000
+method: POST
+url: '{{integrationBaseUrl}}/integration/v1/events'
+description: 'Auth: noauth (HMAC). Institutional outbox event ingestion; signed with HMAC headers X-Integration-Key-Id, X-Integration-Timestamp, X-Integration-Nonce, X-Integration-Signature (v1=<hex>). Signing added later via pre-request script.'
+auth:
+  type: noauth
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {}
+scripts:
+  - type: beforeRequest
+    language: text/javascript
+    code: |-
+      const secret = pm.environment.get('integrationSecret') || '';
+      const keyId  = pm.environment.get('integrationKeyId') || '';
+      const ts = Math.floor(Date.now()/1000).toString();
+      const alpha='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+      let nonce=''; for(let i=0;i<24;i++){ nonce+=alpha[Math.floor(Math.random()*alpha.length)]; }
+      const forced = pm.collectionVariables.get('forceNonce');
+      if (forced) { nonce = forced; }
+      const method = pm.request.method;
+      let path='/';
+      try {
+        const base = pm.environment.get('integrationBaseUrl') || 'http://localhost:8080';
+        path = new URL(pm.request.url.toString().replace(/\{\{\s*integrationBaseUrl\s*\}\}/, base)).pathname;
+      } catch(e) { path = '/' + pm.request.url.toString().split('/').slice(3).join('/').split('?')[0]; }
+      const body = (pm.request.body && pm.request.body.raw) ? pm.request.body.raw : '';
+      const bodyHash = CryptoJS.SHA256(body).toString(CryptoJS.enc.Hex);
+      const canonical = [method, path, ts, nonce, bodyHash].join('\n');
+      const sig = 'v1=' + CryptoJS.HmacSHA256(canonical, secret).toString(CryptoJS.enc.Hex);
+      pm.request.headers.upsert({key:'X-Integration-Key-Id', value:keyId});
+      pm.request.headers.upsert({key:'X-Integration-Timestamp', value:ts});
+      pm.request.headers.upsert({key:'X-Integration-Nonce', value:nonce});
+      pm.request.headers.upsert({key:'X-Integration-Signature', value:sig});
+      pm.collectionVariables.set('lastNonce', nonce);
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('signed contract reachable (2xx/401/409)', function(){ pm.expect([200,201,202,204,401,409]).to.include(pm.response.code); });
+      pm.test('401 returns a body when signature rejected', function(){ if(pm.response.code===401){ pm.expect(pm.response.text().length).to.be.greaterThan(0);} });
+      pm.test('json content-type when body present', function(){ var t=pm.response.text(); if(t){ var ct=(pm.response.headers.get('Content-Type')||'').toLowerCase(); pm.expect(ct).to.match(/json|text|^$/);} });

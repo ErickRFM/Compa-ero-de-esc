@@ -1,0 +1,6 @@
+$kind: http-request
+name: me
+order: 5000
+method: GET
+url: '{{baseUrl}}/auth/me'
+description: 'Auth: bearer (inherits {{jwtToken}} from collection).'

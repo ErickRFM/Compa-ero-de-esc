@@ -448,7 +448,11 @@ fun Application.module(
         tutorCaseRoutes(settings = settings, service = academicGraph.caseService)
         groupRepresentativeRoutes(settings = settings, service = academicGraph.representativeService)
         classroomRoutes(settings = settings, service = classroomGraph.classroomService)
-        channelRoutes(settings = settings, service = classroomGraph.channelService)
+        channelRoutes(
+            settings = settings,
+            service = classroomGraph.channelService,
+            taskService = classroomGraph.channelTaskService,
+        )
         academicEventRoutes(settings = settings, service = operationsGraph.eventService)
         excuseRoutes(settings = settings, service = operationsGraph.excuseService)
         deviceRoutes(settings = settings, repository = operationsGraph.deviceTokenRepository)

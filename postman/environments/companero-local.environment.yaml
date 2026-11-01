@@ -1,0 +1,42 @@
+name: companero-local
+values:
+  - key: baseUrl
+    value: 'http://localhost:8080'
+    enabled: true
+    type: default
+  - key: integrationBaseUrl
+    value: 'http://localhost:8080'
+    enabled: true
+    type: default
+  - key: jwtToken
+    value: ''
+    enabled: true
+    type: secret
+  - key: jwtTokenTeacher
+    value: ''
+    enabled: true
+    type: secret
+  - key: jwtTokenStudent
+    value: ''
+    enabled: true
+    type: secret
+  - key: integrationKeyId
+    value: ''
+    enabled: true
+    type: default
+  - key: integrationSecret
+    value: ''
+    enabled: true
+    type: secret
+  - key: sessionId
+    value: ''
+    enabled: true
+    type: default
+  - key: groupId
+    value: ''
+    enabled: true
+    type: default
+  - key: recordId
+    value: ''
+    enabled: true
+    type: default

@@ -1,0 +1,6 @@
+$kind: http-request
+name: session reminders
+order: 9000
+method: POST
+url: '{{baseUrl}}/attendance/sessions/{{sessionId}}/reminders'
+description: 'Auth: bearer. FCM "Pasar lista" to eligible scanned students.'

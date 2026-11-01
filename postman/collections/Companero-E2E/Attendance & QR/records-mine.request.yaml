@@ -1,0 +1,12 @@
+$kind: http-request
+name: records mine
+order: 16000
+method: GET
+url: '{{baseUrl}}/attendance/records/mine'
+description: 'Auth: bearer (inherits {{jwtToken}}).'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('records/mine status 200', function(){ pm.response.to.have.status(200); });
+      pm.test('isolation: no cross-user record leak', function(){ var arr=[]; try{ var j=pm.response.json(); arr=Array.isArray(j)?j:(j.records||j.items||[]); }catch(e){} var other=pm.collectionVariables.get('otherUserId'); if(other){ arr.forEach(function(r){ if(r.userId||r.studentId){ pm.expect(r.userId||r.studentId).to.not.eql(other);} }); } pm.expect(arr).to.be.an('array'); });

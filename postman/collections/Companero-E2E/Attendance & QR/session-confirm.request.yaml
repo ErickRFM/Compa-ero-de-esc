@@ -1,0 +1,6 @@
+$kind: http-request
+name: session confirm
+order: 11000
+method: POST
+url: '{{baseUrl}}/attendance/sessions/{{sessionId}}/confirm'
+description: 'Auth: bearer. Student explicit confirmation.'

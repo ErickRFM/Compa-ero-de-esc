@@ -1,0 +1,17 @@
+$kind: http-request
+name: verification resend
+order: 6000
+method: POST
+url: '{{baseUrl}}/auth/verification/resend'
+description: 'Auth: noauth (public verification resend).'
+auth:
+  type: noauth
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": ""
+    }

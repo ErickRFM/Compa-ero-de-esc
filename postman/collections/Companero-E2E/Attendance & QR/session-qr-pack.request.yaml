@@ -1,0 +1,6 @@
+$kind: http-request
+name: session qr-pack
+order: 8000
+method: POST
+url: '{{baseUrl}}/attendance/sessions/{{sessionId}}/qr-pack'
+description: 'Auth: bearer (inherits {{jwtToken}}).'

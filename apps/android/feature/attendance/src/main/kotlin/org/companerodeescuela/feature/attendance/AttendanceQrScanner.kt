@@ -62,6 +62,7 @@ fun AttendanceQrScanner(
     onToken: (String) -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    purpose: ScannerPurpose = ScannerPurpose.ATTENDANCE,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -201,12 +202,17 @@ fun AttendanceQrScanner(
                         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
                     ) {
                         Text(
-                            text = "Escanear QR",
+                            text = if (purpose == ScannerPurpose.SCHOOL_DAY) "Ingreso a la escuela" else "QR de asistencia",
                             style = MaterialTheme.typography.titleLarge,
                             color = Color.White,
                         )
                         Text(
-                            text = "Apunta al pase de tu docente",
+                            text =
+                                if (purpose == ScannerPurpose.SCHOOL_DAY) {
+                                    "Apunta al QR institucional de entrada"
+                                } else {
+                                    "Apunta al QR del pase de tu docente"
+                                },
                             style = MaterialTheme.typography.bodyMedium,
                             color = Color.White.copy(alpha = 0.82f),
                         )
@@ -233,12 +239,17 @@ fun AttendanceQrScanner(
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
             ) {
                 Text(
-                    text = "Lectura segura · sin conexión",
+                    text = if (purpose == ScannerPurpose.SCHOOL_DAY) "Jornada escolar" else "Pase de clase",
                     style = MaterialTheme.typography.labelLarge,
                     color = Color.White,
                 )
                 Text(
-                    text = "El intento se guarda primero en este dispositivo; el servidor confirma el estado.",
+                    text =
+                        if (purpose == ScannerPurpose.SCHOOL_DAY) {
+                            "Conéctate al Wi-Fi escolar. El servidor validará el registro de ingreso."
+                        } else {
+                            "Escanear aporta evidencia; el pase lo confirma el servidor."
+                        },
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.82f),
                 )

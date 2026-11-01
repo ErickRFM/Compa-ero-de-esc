@@ -181,6 +181,12 @@ fun Application.module(
         org.companerodeescuela.api.integrations.academic.siii.SiiiHttpAcademicAuthority.targetsFromJson(
             System.getenv("SIII_ACADEMIC_AUTHORITY_TARGETS_JSON"),
         )
+    val institutionalAuthorityKeyOverrides =
+        org.companerodeescuela.api.integrations.academic.siii.SiiiHttpAcademicAuthority.keyOverridesFromJson(
+            System.getenv("SIII_ACADEMIC_AUTHORITY_ROLLOVER_ENABLED"),
+            System.getenv("SIII_ACADEMIC_AUTHORITY_ROLLOVER_KEY_IDS_JSON"),
+            institutionalAuthorityTargets,
+        )
     require(institutionalAuthorityTargets.isEmpty() || institutionalSections != null) {
         "Institutional academic reads require authenticated MongoDB and encrypted integration credentials"
     }
@@ -193,6 +199,7 @@ fun Application.module(
                 org.companerodeescuela.api.integrations.academic.siii.SiiiHttpAcademicAuthority(
                     institutionalAuthorityTargets,
                     institutionalPushRepository!!,
+                    rolloverKeyIds = institutionalAuthorityKeyOverrides,
                 ),
                 institutionalAuthorityTargets.keys,
             )

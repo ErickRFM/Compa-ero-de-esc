@@ -75,21 +75,38 @@ class SmartRoleLoginUiTest {
         compose.onNodeWithTag("role_pager").performScrollTo()
         compose.onNodeWithTag("role_title_TUTOR", useUnmergedTree = true).assertIsDisplayed()
         captureAccess("tutor")
-        compose.onNodeWithTag("role_GUEST").performScrollTo().performClick()
-        compose.onNodeWithTag("role_title_GUEST", useUnmergedTree = true).assertIsDisplayed()
+        selectAccessAndAwait(AppExperience.GUEST)
         compose.onNodeWithTag("login_registration").assertDoesNotExist()
         captureAccess("guest")
-        compose.onNodeWithTag("role_ADMIN").performScrollTo().performClick()
-        compose.onNodeWithTag("role_title_ADMIN", useUnmergedTree = true).assertIsDisplayed()
+        selectAccessAndAwait(AppExperience.ADMIN)
         captureAccess("admin")
-        compose.onNodeWithTag("role_SUPER_ADMIN").performClick()
-        compose.onNodeWithTag("role_title_SUPER_ADMIN", useUnmergedTree = true).assertIsDisplayed()
+        selectAccessAndAwait(AppExperience.SUPER_ADMIN)
         captureAccess("super_admin")
         compose.onNodeWithTag("access_next").assertIsNotEnabled()
-        compose.onNodeWithTag("role_STUDENT").performClick()
-        compose.onNodeWithTag("role_title_STUDENT", useUnmergedTree = true).assertIsDisplayed()
+        selectAccessAndAwait(AppExperience.STUDENT)
         captureAccess("student")
         compose.onNodeWithTag("access_previous").assertIsNotEnabled()
+    }
+
+    // Chip taps schedule a suspend scroll; Compose can observe the old page for a frame.
+    // Await both selected semantics and visible pager content for every direct access.
+    private fun selectAccessAndAwait(access: AppExperience) {
+        val chipTag = "role_" + access.name
+        val titleTag = "role_title_" + access.name
+        compose.onNodeWithTag(chipTag).performScrollTo().performClick()
+        compose.waitUntil(timeoutMillis = 8_000) {
+            val selected =
+                compose.onAllNodesWithTag(chipTag).fetchSemanticsNodes().firstOrNull()?.config?.let { semantics ->
+                    semantics.contains(SemanticsProperties.Selected) && semantics[SemanticsProperties.Selected]
+                } == true
+            selected &&
+                runCatching {
+                    compose.onNodeWithTag(titleTag, useUnmergedTree = true).assertIsDisplayed()
+                    true
+                }.getOrDefault(false)
+        }
+        compose.onNodeWithTag(chipTag).assertIsSelected()
+        compose.onNodeWithTag(titleTag, useUnmergedTree = true).assertIsDisplayed()
     }
 
     private fun captureAccess(name: String) {

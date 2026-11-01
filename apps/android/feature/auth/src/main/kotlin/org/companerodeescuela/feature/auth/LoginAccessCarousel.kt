@@ -145,10 +145,13 @@ internal fun LoginAccessCarousel(
     val muted = authMuted()
     val accent = authAccent()
 
-    fun select(index: Int) {
+    fun select(
+        index: Int,
+        animate: Boolean = true,
+    ) {
         if (!enabled || index !in 0..accesses.lastIndex) return
         scope.launch {
-            if (!policy.allowSpatialMotion) {
+            if (!animate || !policy.allowSpatialMotion) {
                 pager.scrollToPage(index)
             } else {
                 pager.animateScrollToPage(index, animationSpec = tween(policy.durationMillis))
@@ -182,7 +185,7 @@ internal fun LoginAccessCarousel(
                                 selected = selected,
                                 enabled = enabled,
                                 role = Role.Tab,
-                                onClick = { select(index) },
+                                onClick = { select(index, animate = false) },
                             ).background(
                                 color =
                                     if (selected) {

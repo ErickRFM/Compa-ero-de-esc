@@ -90,7 +90,9 @@ class SmartRoleLoginUiTest {
                 .fetchSemanticsNodes()
                 .firstOrNull()
                 ?.config
-                ?.getOrNull(SemanticsProperties.Selected) == true
+                ?.let { semantics ->
+                    semantics.contains(SemanticsProperties.Selected) && semantics[SemanticsProperties.Selected]
+                } == true
         }
         compose.onNodeWithTag("role_SUPER_ADMIN").assertIsSelected()
         compose.onNodeWithTag("role_title_SUPER_ADMIN", useUnmergedTree = true).assertIsDisplayed()

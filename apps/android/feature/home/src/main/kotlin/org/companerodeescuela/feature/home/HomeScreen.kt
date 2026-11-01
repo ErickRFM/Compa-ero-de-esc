@@ -23,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -57,7 +58,6 @@ import org.companerodeescuela.core.designsystem.v8.V8ClassSummary
 import org.companerodeescuela.core.designsystem.v8.V8DailyClassRow
 import org.companerodeescuela.core.designsystem.v8.V8DashboardStat
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
-import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.designsystem.v8.V8SectionTitle
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
@@ -197,11 +197,21 @@ fun HomeScreen(
                                 color = Color.White,
                             )
                         }
-                        V8RedPrimaryButton(
-                            text = if (canOpenAttendanceFromHome(overview, institutionalReady)) "Pasar lista" else "Ver mi horario",
-                            onClick = if (canOpenAttendanceFromHome(overview, institutionalReady)) onOpenAttendance else onOpenSchedule,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                        TextButton(
+                            onClick =
+                                if (canOpenAttendanceFromHome(overview, institutionalReady)) {
+                                    onOpenAttendance
+                                } else {
+                                    onOpenSchedule
+                                },
+                            modifier = Modifier.align(Alignment.End),
+                            colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
+                        ) {
+                            Text(
+                                if (canOpenAttendanceFromHome(overview, institutionalReady)) "Pasar lista" else "Ver mi horario",
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
                     }
                 }
 

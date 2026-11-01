@@ -63,6 +63,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -584,9 +585,11 @@ private fun DayTimeGrid(
     onMoveRequest: (AgendaMoveProposal) -> Unit,
 ) {
     val placements = remember(entries) { agendaGridLayout(entries) }
-    val startHour = (placements.minOfOrNull { it.startMinute / 60 } ?: 6).coerceAtMost(6)
-    val endHour = (((placements.maxOfOrNull { it.startMinute + it.durationMinutes } ?: 1320) + 59) / 60).coerceAtLeast(22)
-    val hourHeight = 96.dp
+    // The daily timeline should use the same occupied-hour range as the weekly view.
+    val hours = agendaVisibleHours(placements)
+    val startHour = hours.first
+    val endHour = hours.last + 1
+    val hourHeight = (80f * LocalDensity.current.fontScale).coerceIn(80f, 140f).dp
     val totalHours = endHour - startHour
     val railWidth = 58.dp
     val lineColor = MaterialTheme.colorScheme.outlineVariant
@@ -750,7 +753,7 @@ private fun DayTimeGrid(
                 tonalElevation = if (isDragging) 8.dp else 1.dp,
             ) {
                 Column(
-                    modifier = Modifier.padding(CompaneroSpacing.sm),
+                    modifier = Modifier.padding(if (durationMinutes < 45) 4.dp else CompaneroSpacing.sm),
                     verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
                 ) {
                     if (isDragging && shiftedStart != null) {
@@ -759,8 +762,9 @@ private fun DayTimeGrid(
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
                         )
-                    } else {
+                    } else if (durationMinutes >= 45) {
                         Text(
                             entry.startsAt + "–" + entry.endsAt,
                             style = MaterialTheme.typography.labelMedium,
@@ -769,15 +773,24 @@ private fun DayTimeGrid(
                     }
                     Text(
                         entry.subjectName,
-                        style = MaterialTheme.typography.titleSmall,
-                        maxLines = if (durationMinutes < 45) 1 else 2,
+                        style =
+                            if (durationMinutes < 45) {
+                                MaterialTheme.typography.labelSmall
+                            } else {
+                                MaterialTheme.typography.titleSmall
+                            },
+                        maxLines = if (durationMinutes < 90) 1 else 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                    Text(
-                        locationAndTeacher(entry),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                    )
+                    if (durationMinutes >= 90) {
+                        Text(
+                            locationAndTeacher(entry),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }

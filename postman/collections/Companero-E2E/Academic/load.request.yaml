@@ -1,0 +1,6 @@
+$kind: http-request
+name: load
+order: 1000
+method: GET
+url: '{{baseUrl}}/academic/load'
+description: 'Auth: bearer (inherits {{jwtToken}}).'

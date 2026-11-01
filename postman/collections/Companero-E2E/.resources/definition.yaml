@@ -1,0 +1,7 @@
+$kind: collection
+name: 'Compañero de Clase — E2E (SIII ↔ Ktor)'
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{jwtToken}}'

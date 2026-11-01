@@ -1,0 +1,6 @@
+$kind: http-request
+name: session close
+order: 14000
+method: POST
+url: '{{baseUrl}}/attendance/sessions/{{sessionId}}/close'
+description: 'Auth: bearer (inherits {{jwtToken}}).'

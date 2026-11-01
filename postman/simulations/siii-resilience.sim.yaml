@@ -1,0 +1,12 @@
+simulation: siii-resilience
+
+mocks:
+  - file: ../mocks/mock.js
+    scenarios:
+      # siii-timeout: inject latency/timeout on authority + academic-load
+      - type: delay
+        config:
+          delay_ms: 30000
+          paths:
+            - /api/integrations/companion/v1/authority
+            - /api/integrations/companion/v1/students/*/academic-load

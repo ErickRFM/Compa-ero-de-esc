@@ -1,0 +1,15 @@
+$kind: http-request
+name: qr inspect
+order: 5000
+method: POST
+url: '{{baseUrl}}/attendance/qr/inspect'
+description: 'Auth: bearer (inherits {{jwtToken}}).'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "payload": ""
+    }

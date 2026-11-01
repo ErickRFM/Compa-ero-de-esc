@@ -1,0 +1,15 @@
+{
+  "id": "01a194b7-a4ca-73cb-9e12-fcf76241e05c",
+  "version": 1,
+  "name": "SIII Academic Provider Mock",
+  "slug": "siii-companion",
+  "enableSession": true,
+  "protocol": "http",
+  "port": 4500,
+  "mockSrc": "./mock.js",
+  "autoRestartOnChange": true,
+  "logging": {
+    "level": "verbose",
+    "showBody": true
+  }
+}

@@ -1,0 +1,18 @@
+$kind: http-request
+name: verification confirm
+order: 7000
+method: POST
+url: '{{baseUrl}}/auth/verification/confirm'
+description: 'Auth: noauth (public verification confirm).'
+auth:
+  type: noauth
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "",
+      "code": ""
+    }

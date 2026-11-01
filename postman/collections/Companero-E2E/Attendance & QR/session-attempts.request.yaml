@@ -1,0 +1,20 @@
+$kind: http-request
+name: session attempts
+order: 10000
+method: POST
+url: '{{baseUrl}}/attendance/sessions/{{sessionId}}/attempts'
+description: 'Auth: bearer. Student scan/attempt (NOT confirmed attendance).'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "payload": ""
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('scan attempt does NOT confirm attendance', function(){ var j={}; try{ j=pm.response.json(); }catch(e){} if(j.status){ pm.expect(String(j.status).toLowerCase()).to.not.eql('present'); } pm.expect([200,201,202,409]).to.include(pm.response.code); });

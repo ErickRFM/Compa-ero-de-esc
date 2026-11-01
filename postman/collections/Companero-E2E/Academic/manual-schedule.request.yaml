@@ -1,0 +1,9 @@
+$kind: http-request
+name: manual schedule
+order: 6000
+method: GET
+url: '{{baseUrl}}/academic/manual-schedule/{{ownerId}}'
+description: 'Auth: bearer (inherits {{jwtToken}}).'
+pathVariables:
+  - key: ownerId
+    value: ''

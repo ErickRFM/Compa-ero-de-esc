@@ -1,0 +1,23 @@
+$kind: http-request
+name: sessions create
+order: 6000
+method: POST
+url: '{{baseUrl}}/attendance/sessions'
+description: 'Auth: bearer. Teacher starts/reuses a single session per occurrence (idempotent).'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "occurrenceId": "",
+      "groupId": "{{groupId}}"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      var j; try{ j=pm.response.json(); }catch(e){ j={}; }
+      pm.test('create session 200/201/409', function(){ pm.expect([200,201,409]).to.include(pm.response.code); });
+      if(j && j.id){ var prev=pm.collectionVariables.get('firstSessionId'); pm.environment.set('sessionId', j.id); if(prev){ pm.test('idempotent: same occurrence -> same session id', function(){ pm.expect(j.id).to.eql(prev); }); } else { pm.collectionVariables.set('firstSessionId', j.id); } }

@@ -1,0 +1,6 @@
+$kind: http-request
+name: institutional sections
+order: 4000
+method: GET
+url: '{{baseUrl}}/academic/institutional/sections'
+description: 'Auth: bearer (inherits {{jwtToken}}).'

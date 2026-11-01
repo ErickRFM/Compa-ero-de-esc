@@ -563,11 +563,11 @@ private fun V25QuickAccessGrid(
     ) {
         val actions =
             listOf(
-            Triple("Horario", Icons.Filled.DateRange, onOpenSchedule),
-            Triple("Asistencia", Icons.Filled.CheckCircle, onOpenAttendance),
-            Triple("Avisos", Icons.Filled.Campaign, onOpenChannel),
-            Triple("Clases", Icons.Filled.School, onOpenClassrooms),
-        )
+                Triple("Horario", Icons.Filled.DateRange, onOpenSchedule),
+                Triple("Asistencia", Icons.Filled.CheckCircle, onOpenAttendance),
+                Triple("Avisos", Icons.Filled.Campaign, onOpenChannel),
+                Triple("Clases", Icons.Filled.School, onOpenClassrooms),
+            )
         actions.forEach { (label, icon, action) ->
             Surface(
                 modifier = Modifier.weight(1f).clickable(onClickLabel = "Abrir $label", onClick = action),

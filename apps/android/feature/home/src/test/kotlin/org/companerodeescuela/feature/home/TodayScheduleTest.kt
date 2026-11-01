@@ -74,7 +74,7 @@ class TodayScheduleTest {
 
     @Test
     fun `merged personal-only response is not labeled institutional`() {
-        val imported = entry("Agenda importada", "08:00", "09:00").copy(source = ScheduleSource.PERSONAL)
+        val imported = entry("Agenda importada", "08:00", "09:00").copy(source = ScheduleSource.MANUAL)
         val response =
             AcademicLoadResponse(
                 student = AcademicProfile("student-1", "Ana"),
@@ -88,7 +88,7 @@ class TodayScheduleTest {
     @Test
     fun `official courses take precedence over merged imports`() {
         val official = entry("Clase oficial", "09:00", "10:00").copy(source = ScheduleSource.INSTITUTIONAL)
-        val imported = entry("Importada", "08:00", "09:00").copy(source = ScheduleSource.PERSONAL)
+        val imported = entry("Importada", "08:00", "09:00").copy(source = ScheduleSource.MANUAL)
         val response =
             AcademicLoadResponse(
                 student = AcademicProfile("student-1", "Ana"),

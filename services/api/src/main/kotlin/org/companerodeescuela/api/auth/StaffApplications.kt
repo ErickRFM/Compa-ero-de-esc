@@ -13,8 +13,14 @@ internal fun PlatformAccount.staffApplications():List<StaffApplication> {
     return listOf(StaffApplication("registration-$id",role,institution,reference,intent.preferredGroup,emailVerifiedAt.epochSecond))
 }
 internal fun PlatformAccount.withStaffApplication(expectedRevision:Long,application:StaffApplication):PlatformAccount? {
+    val permittedRoleRequest = when(application.role) {
+        StaffRole.TEACHER ->
+            UserRole.STUDENT in roles && UserRole.TEACHER !in roles &&
+                roles.none { it == UserRole.ADMIN || it == UserRole.SUPER_ADMIN || it == UserRole.PRINCIPAL || it == UserRole.COORDINATOR }
+        StaffRole.TUTOR -> UserRole.TEACHER in roles && UserRole.TUTOR !in roles
+    }
     if(!permitsSession || accountStatus!=AccountStatus.ACTIVE || emailVerifiedAt==null || authRevision!=expectedRevision ||
-        UserRole.TEACHER !in roles || UserRole.TUTOR in roles || application.role!=StaffRole.TUTOR ||
+        !permittedRoleRequest || (institutionId != null && institutionId != application.requestedInstitutionId) ||
         application.status!=StaffApplicationStatus.PENDING || application.decidedBy!=null || application.decidedAtEpochSeconds!=null ||
         application.decisionOperationId!=null || application.decisionDigest!=null || application.grantedRoleGeneration!=null ||
         application.requestedAtEpochSeconds<0 || applicationRevision==Long.MAX_VALUE || roleApplications.size>=20 ||

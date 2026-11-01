@@ -11,7 +11,7 @@ import androidx.compose.ui.graphics.Color
  * used in dim classrooms and outdoors, so light-only is not an option.
  */
 object CompanionColors {
-    val crimson = Color(0xFF9B1C31)
+    val crimson = Color(0xFF8A1538)
     val crimsonContainer = Color(0xFFF5DADF)
     val crimsonSubtle = Color(0xFFFCEFF1)
 
@@ -66,11 +66,11 @@ enum class CompaneroAccentPalette(
 ) {
     CRIMSON(
         displayName = "Carmesí UPTlax",
-        lightPrimary = Color(0xFF9B1C31),
+        lightPrimary = Color(0xFF8A1538),
         lightContainer = Color(0xFFF5DADF),
         darkPrimary = Color(0xFFFF303F),
-        darkContainer = Color(0xFFB31328),
-        previewColor = Color(0xFFD91E36),
+        darkContainer = Color(0xFF8A1538),
+        previewColor = Color(0xFF8A1538),
     ),
     COBALT(
         displayName = "Azul Cobalto",

@@ -159,6 +159,7 @@ fun attendanceScreen(
                 onClose = viewModel::dismissScanner,
                 modifier = Modifier.fillMaxSize(),
                 purpose = state.scannerPurpose,
+                schoolNetworkReady = state.schoolNetworkSsid != null,
             )
         }
     }

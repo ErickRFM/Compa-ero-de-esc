@@ -549,10 +549,47 @@ class MainActivity : AppCompatActivity() {
                                             RoleUnavailableScreen(roleConfig.experience, onLogout = sessionViewModel::logout)
                                         }
                                         composable(Destination.Profile.route) {
+                                            val adminProfile =
+                                                appDistribution == AppDistribution.MANAGEMENT &&
+                                                    roleConfig.experience in setOf(
+                                                        AppExperience.ADMIN,
+                                                        AppExperience.SUPER_ADMIN,
+                                                    )
                                             ProfileScreen(
                                                 displayName = session.displayName,
                                                 roles = session.roles,
                                                 canSwitchExperience = availableExperiences.size > 1,
+                                                managementExperience = appDistribution == AppDistribution.MANAGEMENT,
+                                                onAdminDashboard =
+                                                    if (adminProfile) {
+                                                        {
+                                                            navController.navigate(Destination.AdminHome.route) {
+                                                                launchSingleTop = true
+                                                            }
+                                                        }
+                                                    } else {
+                                                        null
+                                                    },
+                                                onAdminSchedule =
+                                                    if (adminProfile) {
+                                                        {
+                                                            navController.navigate(Destination.Schedule.route) {
+                                                                launchSingleTop = true
+                                                            }
+                                                        }
+                                                    } else {
+                                                        null
+                                                    },
+                                                onAdminClassrooms =
+                                                    if (adminProfile) {
+                                                        {
+                                                            navController.navigate(Destination.Classrooms.route) {
+                                                                launchSingleTop = true
+                                                            }
+                                                        }
+                                                    } else {
+                                                        null
+                                                    },
                                                 onSwitchExperience = {
                                                     userId?.let(activeExperiencePreferences::clear)
                                                     loginExperienceName = null

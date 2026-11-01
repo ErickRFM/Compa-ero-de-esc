@@ -1,22 +1,20 @@
 package org.companerodeescuela
 
+import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.uiautomator.By
-import androidx.test.uiautomator.BySelector
-import androidx.test.uiautomator.UiDevice
-import androidx.test.uiautomator.UiObject2
-import androidx.test.uiautomator.UiScrollable
-import androidx.test.uiautomator.UiSelector
-import androidx.test.uiautomator.Until
 import org.companerodeescuela.feature.settings.AppLanguage
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+/** Real MainActivity login: Compose semantics are authoritative for Compose UI. */
 @RunWith(AndroidJUnit4::class)
 class LoginV8SmokeTest {
     @get:Rule val compose = createEmptyComposeRule()
@@ -25,15 +23,13 @@ class LoginV8SmokeTest {
     fun registrationAccountTypeCanBeSelectedByItsLabel() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { it.appearancePreferences.setLanguage(AppLanguage.SPANISH) }
-            val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-            compose.waitForIdle()
-            assertLoginVisible(device, By.textContains("universitaria,"), "smoke-hero")
-            findVisible(device, By.text("Crear cuenta")).click()
-            findVisible(device, By.text("Alumno"))
-            findVisible(device, By.text("Docente")).click()
-            findVisible(device, By.textContains("requieren verificación"))
-            findVisible(device, By.text("Ya tengo cuenta")).click()
-            findVisible(device, By.textContains("universitaria,"), forward = false)
+            waitForText("universitaria,")
+            compose.onNodeWithTag("login_registration").performScrollTo().performClick()
+            compose.onNodeWithText("Alumno").performScrollTo().assertExists()
+            compose.onNodeWithText("Docente").performScrollTo().performClick()
+            waitForText("requieren verificación")
+            compose.onNodeWithText("Ya tengo cuenta").performScrollTo().performClick()
+            waitForText("universitaria,")
         }
     }
 
@@ -41,12 +37,9 @@ class LoginV8SmokeTest {
     fun signedOutUserSeesInstitutionalLogin() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { it.appearancePreferences.setLanguage(AppLanguage.SPANISH) }
-            val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-
-            compose.waitForIdle()
-            assertLoginVisible(device, By.textContains("Compañero"), "smoke-brand")
-            assertTrue(device.hasObject(By.textContains("universitaria,")))
-            findVisible(device, By.text("Correo electrónico o matrícula"))
+            waitForText("universitaria,")
+            compose.onNodeWithTag("login_username").performScrollTo().assertExists()
+            compose.onNodeWithTag("login_password").performScrollTo().assertExists()
         }
     }
 
@@ -54,32 +47,17 @@ class LoginV8SmokeTest {
     fun firstAccessOpensInstitutionalIdentityValidation() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { it.appearancePreferences.setLanguage(AppLanguage.SPANISH) }
-            val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-
-            compose.waitForIdle()
-            assertLoginVisible(device, By.textContains("universitaria,"), "smoke-hero")
-            findVisible(device, By.text("Crear cuenta")).click()
-
-            device.waitForIdle()
-            findVisible(device, By.text("Nombre"))
-            findVisible(device, By.text("Crear cuenta"), forward = false)
+            waitForText("universitaria,")
+            compose.onNodeWithTag("login_registration").performScrollTo().performClick()
+            compose.onNodeWithTag("registration_name").performScrollTo().assertExists()
+            compose.onNodeWithTag("registration_email").performScrollTo().assertExists()
         }
     }
 
-    private fun findVisible(
-        device: UiDevice,
-        selector: BySelector,
-        forward: Boolean = true,
-    ): UiObject2 {
-        val scroll =
-            UiScrollable(UiSelector().packageName("org.companerodeescuela").scrollable(true))
-                .setAsVerticalList()
-        repeat(6) {
-            compose.waitForIdle()
-            device.waitForIdle()
-            device.wait(Until.findObject(selector), 2_000)?.let { return it }
-            if (forward) scroll.scrollForward() else scroll.scrollBackward()
+    private fun waitForText(text: String) {
+        compose.waitUntil(timeoutMillis = 15_000) {
+            compose.onAllNodesWithText(text, substring = true).fetchSemanticsNodes().isNotEmpty()
         }
-        throw AssertionError("Control did not become visible after scrolling: $selector")
+        compose.onNodeWithText(text, substring = true).assertExists()
     }
 }

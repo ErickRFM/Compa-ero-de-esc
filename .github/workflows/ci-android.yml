@@ -34,6 +34,10 @@ jobs:
       COMPANERO_FIREBASE_PROJECT_ID: ${{ vars.COMPANERO_FIREBASE_PROJECT_ID }}
       COMPANERO_FIREBASE_SENDER_ID: ${{ vars.COMPANERO_FIREBASE_SENDER_ID }}
       COMPANERO_FIREBASE_API_KEY: ${{ vars.COMPANERO_FIREBASE_API_KEY }}
+      COMPANERO_MANAGEMENT_FIREBASE_APP_ID: ${{ vars.COMPANERO_MANAGEMENT_FIREBASE_APP_ID }}
+      COMPANERO_MANAGEMENT_FIREBASE_PROJECT_ID: ${{ vars.COMPANERO_MANAGEMENT_FIREBASE_PROJECT_ID }}
+      COMPANERO_MANAGEMENT_FIREBASE_SENDER_ID: ${{ vars.COMPANERO_MANAGEMENT_FIREBASE_SENDER_ID }}
+      COMPANERO_MANAGEMENT_FIREBASE_API_KEY: ${{ vars.COMPANERO_MANAGEMENT_FIREBASE_API_KEY }}
 
     steps:
       - name: Checkout
@@ -190,7 +194,8 @@ jobs:
             echo "run_attempt=$GITHUB_RUN_ATTEMPT"
             echo "release_signing=debug_key_internal_testing_only"
             echo "production_distribution_ready=false"
-            if [ -n "$COMPANERO_FIREBASE_APP_ID" ]; then echo "firebase_configured=true"; else echo "firebase_configured=false_diagnostic_only"; fi
+            if [ -n "$COMPANERO_FIREBASE_APP_ID" ]; then echo "academic_firebase_configured=true"; else echo "academic_firebase_configured=false_diagnostic_only"; fi
+            if [ -n "$COMPANERO_MANAGEMENT_FIREBASE_APP_ID" ]; then echo "management_firebase_configured=true"; else echo "management_firebase_configured=false_diagnostic_only"; fi
           } > "$out/BUILD_PROVENANCE.txt"
           ls -lh "$out"
 

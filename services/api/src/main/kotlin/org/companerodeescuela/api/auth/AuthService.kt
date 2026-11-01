@@ -90,8 +90,8 @@ class AuthService(
         if (!authenticationDependency { accounts.create(account) }) {
             throw ApiException.Conflict("An account with that email already exists")
         }
-        verification.issue(account.id)
-        return createSession(account.toUserSummary(), SessionIdentitySource.NATIVE)
+        val delivery = verification.issue(account.id)
+        return createSession(account.toUserSummary().copy(verificationDelivery = delivery.status), SessionIdentitySource.NATIVE)
     }
 
     suspend fun verifyEmail(userId: String, token: String): LoginResponse =

@@ -29,13 +29,14 @@ fun main() {
     val mongoConnection = DriverMongoConnectionFactory().create(settings.mongo)
 
     log.info(
-        "Starting {} v{} in {} on {}:{} (mongo configured: {})",
+        "Starting {} v{} in {} on {}:{} (mongo configured: {}, verification email configured: {})",
         settings.serviceName,
         settings.version,
         settings.environment,
         settings.host,
         settings.port,
         settings.mongo.isConfigured,
+        settings.hasVerificationEmail,
     )
 
     embeddedServer(

@@ -33,6 +33,7 @@ private data class SiiiAuthorityRequest(
 class SiiiHttpAcademicAuthority(
     private val targets: Map<String, SiiiAuthorityTarget>,
     private val credentials: IntegrationCredentialRepository,
+    private val rolloverKeyIds: Map<String, String> = emptyMap(),
     private val clock: Clock = Clock.systemUTC(),
     private val endpoint: (SiiiAuthorityTarget) -> URI = { URI(it.origin + PATH) },
 ) : SiiiAcademicAuthority {
@@ -42,11 +43,12 @@ class SiiiHttpAcademicAuthority(
         externalId: String,
     ): SiiiAuthorityManifest {
         val target = targets[institutionId] ?: throw ApiException.DependencyUnavailable("Institutional authority is not configured")
+        val selectedKeyId = rolloverKeyIds[institutionId] ?: target.keyId
         val credential =
-            credentials.findCredential(target.keyId)
+            credentials.findCredential(selectedKeyId)
                 ?: throw ApiException.DependencyUnavailable("Institutional authority credential is unavailable")
         if (!credential.enabled ||
-            credential.keyId != target.keyId ||
+            credential.keyId != selectedKeyId ||
             credential.tenantId != institutionId ||
             credential.secret.size < 32 ||
             ("group:write" !in credential.scopes && "academic:*:write" !in credential.scopes) ||
@@ -80,7 +82,7 @@ class SiiiHttpAcademicAuthority(
                 connection.requestMethod = "POST"
                 connection.doOutput = true
                 connection.setRequestProperty("Content-Type", "application/json")
-                connection.setRequestProperty("X-Integration-Key-Id", target.keyId)
+                connection.setRequestProperty("X-Integration-Key-Id", selectedKeyId)
                 connection.setRequestProperty("X-Integration-Timestamp", timestamp)
                 connection.setRequestProperty("X-Integration-Nonce", nonce)
                 connection.setRequestProperty("X-Integration-Signature", signature)
@@ -114,6 +116,28 @@ class SiiiHttpAcademicAuthority(
     companion object {
         const val PATH = "/api/integrations/companion/v1/authority"
         private const val MAX_BYTES = 131072
+
+        /** Overrides only key IDs of already pinned tenant/origin mappings, never destination or scope. */
+        fun keyOverridesFromJson(
+            enabled: String?,
+            raw: String?,
+            originals: Map<String, SiiiAuthorityTarget>,
+        ): Map<String, String> {
+            val mode = enabled ?: "false"
+            require(mode == "true" || mode == "false") { "Invalid SIII authority HMAC rollover flag" }
+            if (mode == "false") return emptyMap()
+            require(!raw.isNullOrBlank() && raw.length <= 8192) { "Missing rollover key ID mapping" }
+            val overrides = Json.decodeFromString<Map<String, String>>(raw)
+            require(overrides.isNotEmpty() && overrides.size <= originals.size) { "Invalid rollover tenant mapping" }
+            require(
+                overrides.all { (tenant, keyId) ->
+                    tenant in originals &&
+                        Regex("[A-Za-z0-9_-]{1,64}").matches(keyId) &&
+                        keyId != originals[tenant]?.keyId
+                },
+            ) { "Rollover may only select new key IDs of configured tenants" }
+            return overrides
+        }
 
         fun targetsFromJson(raw: String?): Map<String, SiiiAuthorityTarget> {
             if (raw.isNullOrBlank()) return emptyMap()

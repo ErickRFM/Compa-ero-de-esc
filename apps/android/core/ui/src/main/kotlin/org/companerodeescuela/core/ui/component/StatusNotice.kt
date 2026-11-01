@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
+import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled
@@ -62,11 +63,8 @@ fun StatusNotice(
             NoticeTone.ERROR -> MaterialTheme.colorScheme.onErrorContainer
         }
     val border =
-        if (tone == NoticeTone.NEUTRAL) {
-            BorderStroke(
-                width = CompaneroElevation.subtle,
-                color = MaterialTheme.colorScheme.outlineVariant,
-            )
+        if (LocalCompaneroHighContrast.current && !glass) {
+            BorderStroke(2.dp, MaterialTheme.colorScheme.onSurface)
         } else {
             null
         }
@@ -75,27 +73,20 @@ fun StatusNotice(
         modifier = modifier.fillMaxWidth().then(if (glass) Modifier.v8GlassSurface() else Modifier),
         color = if (glass) Color.Transparent else container,
         shape = MaterialTheme.shapes.large,
-        tonalElevation = if (glass) 0.dp else CompaneroElevation.subtle,
-        shadowElevation =
-            if (glass) {
-                0.dp
-            } else if (tone == NoticeTone.NEUTRAL) {
-                CompaneroElevation.subtle
-            } else {
-                CompaneroElevation.card
-            },
+        tonalElevation = 0.dp,
+        shadowElevation = if (glass || LocalCompaneroHighContrast.current) 0.dp else 1.dp,
         border = if (glass) null else border,
     ) {
         Column(modifier = Modifier.padding(CompaneroSpacing.sm)) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleSmall,
                 color = content,
             )
             Text(
                 text = message,
                 modifier = Modifier.padding(top = CompaneroSpacing.xxs),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = content,
             )
         }

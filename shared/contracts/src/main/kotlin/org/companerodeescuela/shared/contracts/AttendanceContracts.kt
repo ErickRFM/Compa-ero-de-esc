@@ -194,6 +194,7 @@ data class AttendanceRecordResponse(
     val originalStatus: AttendanceStatus? = null,
     val originalReasonCode: AttendanceReasonCode? = null,
     val reviewHistory: List<AttendanceReviewEntry> = emptyList(),
+    val recordRevision: Long = 1,
 )
 
 @Serializable

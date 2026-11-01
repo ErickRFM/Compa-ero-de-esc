@@ -71,6 +71,26 @@ class MongoAttendanceRecordIdentityIntegrationTest {
             assertEquals(1, repository.recordsForSession(sessionId).size)
         }
 
+    @Test
+    fun `independent servers cannot overwrite another reviewed revision`() =
+        withDatabase { database ->
+            val original = record("revision-record", "revision-operation")
+            MongoAttendanceRepository(database).writeAttempt(original)
+            val winners =
+                coroutineScope {
+                    (1..16)
+                        .map { index ->
+                            async {
+                                MongoAttendanceRepository(
+                                    database,
+                                ).compareAndSetRecord(original.copy(recordRevision = 2, reviewedBy = "teacher-$index"), 1)
+                            }
+                        }.awaitAll()
+                }
+            assertEquals(1, winners.count { it })
+            assertEquals(2, MongoAttendanceRepository(database).findRecord(original.id)?.recordRevision)
+        }
+
     private fun record(
         id: String,
         operationId: String,

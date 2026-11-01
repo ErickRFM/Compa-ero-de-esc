@@ -87,6 +87,18 @@ interface AttendanceRepository {
 
     suspend fun replaceRecord(record: AttendanceRecordResponse)
 
+    /** Stable identity order allows complete repeated scans, including old corrected records. */
+    suspend fun studentHistoryPage(
+        studentId: String,
+        page: Int,
+    ): List<AttendanceRecordResponse>
+
+    /** Atomic across server instances. A stale reviewer must reload before deciding again. */
+    suspend fun compareAndSetRecord(
+        record: AttendanceRecordResponse,
+        expectedRevision: Long,
+    ): Boolean
+
     suspend fun findRecord(id: String): AttendanceRecordResponse?
 
     suspend fun findStudentSessionRecord(
@@ -260,9 +272,10 @@ class InMemoryAttendanceRepository : AttendanceRepository {
         mutex.withLock {
             val current = records[record.id] ?: return@withLock record
             if (current.status == org.companerodeescuela.shared.contracts.AttendanceStatus.REJECTED && current.reviewedBy == null) {
-                records[record.id] = record
+                val next = record.copy(recordRevision = current.recordRevision + 1)
+                records[record.id] = next
                 operationToRecord[record.operationId] = record.id
-                record
+                next
             } else {
                 current
             }
@@ -292,6 +305,32 @@ class InMemoryAttendanceRepository : AttendanceRepository {
             operationToRecord[record.operationId] = record.id
         }
     }
+
+    override suspend fun studentHistoryPage(
+        studentId: String,
+        page: Int,
+    ): List<AttendanceRecordResponse> =
+        mutex.withLock {
+            require(page in 1..10_000)
+            records.values
+                .filter { it.studentId == studentId }
+                .sortedBy { it.id }
+                .drop((page - 1) * 100)
+                .take(101)
+        }
+
+    override suspend fun compareAndSetRecord(
+        record: AttendanceRecordResponse,
+        expectedRevision: Long,
+    ): Boolean =
+        mutex.withLock {
+            if (record.recordRevision != expectedRevision + 1 || records[record.id]?.recordRevision != expectedRevision) {
+                return@withLock false
+            }
+            records[record.id] = record
+            operationToRecord[record.operationId] = record.id
+            true
+        }
 
     override suspend fun findRecord(id: String): AttendanceRecordResponse? = mutex.withLock { records[id] }
 

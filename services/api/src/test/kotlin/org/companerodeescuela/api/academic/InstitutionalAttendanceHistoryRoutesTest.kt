@@ -109,7 +109,8 @@ class InstitutionalAttendanceHistoryRoutesTest {
                 links,
                 MfaService(source.accounts, InMemoryMfaRepository(), null),
             )
-        val service = InstitutionalAttendanceHistoryService(identities, students, authority, Clock.fixed(source.now, ZoneOffset.UTC))
+        val service =
+            InstitutionalAttendanceHistoryService(identities, students, authority, Clock.fixed(source.now, ZoneOffset.UTC), repository)
         var acceptedWrites = 0
         val writes =
             InstitutionalPushService(
@@ -125,6 +126,7 @@ class InstitutionalAttendanceHistoryRoutesTest {
         private val credentials =
             mapOf(
                 "read-key" to IntegrationCredential("read-key", "tenant-a", secret, setOf("attendance:read"), true, null),
+                "archive-key" to IntegrationCredential("archive-key", "tenant-a", secret, setOf("attendance:archive"), true, null),
                 "write-key" to IntegrationCredential("write-key", "tenant-a", secret, setOf("group:write"), true, null),
                 "other-key" to IntegrationCredential("other-key", "tenant-b", secret, setOf("attendance:read"), true, null),
                 "revoked-key" to IntegrationCredential("revoked-key", "tenant-a", secret, setOf("attendance:read"), false, null),
@@ -282,6 +284,23 @@ class InstitutionalAttendanceHistoryRoutesTest {
                     .matches(Regex("[0-9a-f]{64}")),
             )
             assertEquals(AttendanceStatus.REVIEW_REQUIRED, history.records.single().status)
+            assertFalse(text.contains("recordRevision"), "The strict v1 response must remain unchanged")
+            val versioned =
+                with(
+                    f,
+                ) {
+                    read(
+                        body =
+                            body().replace(
+                                InstitutionalAttendanceHistoryContract.REQUEST,
+                                InstitutionalAttendanceHistoryContract.REQUEST_V2,
+                            ),
+                    )
+                }
+            assertEquals(HttpStatusCode.OK, versioned.status)
+            val versionedHistory = ApiJson.decodeFromString<InstitutionalAttendanceHistoryResponse>(versioned.bodyAsText())
+            assertEquals(InstitutionalAttendanceHistoryContract.RESPONSE_V2, versionedHistory.contract)
+            assertEquals(1, versionedHistory.records.single().recordRevision)
             for (sensitive in listOf(
                 "studentId",
                 "student:history-audit",
@@ -364,10 +383,22 @@ class InstitutionalAttendanceHistoryRoutesTest {
     @Test
     fun `source withdrawal returns no stale rows and authority outages remain errors`() =
         scenario { f ->
+            val archiveBody =
+                f.body().replace(
+                    InstitutionalAttendanceHistoryContract.REQUEST,
+                    InstitutionalAttendanceHistoryContract.ARCHIVE_REQUEST,
+                )
+            assertEquals(HttpStatusCode.Forbidden, with(f) { read(body = archiveBody) }.status)
+            assertEquals(HttpStatusCode.Forbidden, with(f) { read(keyId = "archive-key") }.status)
             f.source.sections = emptyList()
             val withdrawn = with(f) { read() }
             assertEquals(HttpStatusCode.OK, withdrawn.status)
             assertTrue(ApiJson.decodeFromString<InstitutionalAttendanceHistoryResponse>(withdrawn.bodyAsText()).records.isEmpty())
+            val archive = with(f) { read(keyId = "archive-key", body = archiveBody) }
+            assertEquals(HttpStatusCode.OK, archive.status)
+            val retained = ApiJson.decodeFromString<InstitutionalAttendanceHistoryResponse>(archive.bodyAsText())
+            assertEquals(InstitutionalAttendanceHistoryContract.ARCHIVE_RESPONSE, retained.contract)
+            assertEquals(1, retained.records.size)
             f.source.onAuthorityRead = { throw ApiException.DependencyUnavailable("Synthetic source outage") }
             assertEquals(HttpStatusCode.ServiceUnavailable, with(f) { read() }.status)
         }

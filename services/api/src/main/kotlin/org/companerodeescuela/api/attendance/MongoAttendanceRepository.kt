@@ -401,15 +401,17 @@ class MongoAttendanceRepository(
 
     override suspend fun replaceRejectedRecord(record: AttendanceRecordResponse): AttendanceRecordResponse {
         ensureIndexes()
+        val current = records.find(eq("_id", record.id)).firstOrNull()?.toRecord() ?: return record
         val replaced =
             records
                 .findOneAndReplace(
                     and(
                         eq("_id", record.id),
+                        revisionFilter(current.recordRevision),
                         eq("status", AttendanceStatus.REJECTED.name),
                         or(exists("reviewedBy", false), eq("reviewedBy", null)),
                     ),
-                    record.toDocument(),
+                    record.copy(recordRevision = current.recordRevision + 1).toDocument(),
                     FindOneAndReplaceOptions().returnDocument(ReturnDocument.AFTER),
                 )?.toRecord()
         return replaced ?: records.find(eq("_id", record.id)).firstOrNull()?.toRecord() ?: record
@@ -441,6 +443,29 @@ class MongoAttendanceRepository(
             ReplaceOptions().upsert(false),
         )
     }
+
+    override suspend fun studentHistoryPage(
+        studentId: String,
+        page: Int,
+    ): List<AttendanceRecordResponse> {
+        require(page in 1..10_000)
+        ensureIndexes()
+        return records.find(eq("studentId", studentId)).sort(Sorts.ascending("_id")).skip((page - 1) * 100).limit(101).toList().map {
+            it.toRecord()
+        }
+    }
+
+    override suspend fun compareAndSetRecord(
+        record: AttendanceRecordResponse,
+        expectedRevision: Long,
+    ): Boolean {
+        ensureIndexes()
+        if (record.recordRevision != expectedRevision + 1) return false
+        return records.replaceOne(and(eq("_id", record.id), revisionFilter(expectedRevision)), record.toDocument()).modifiedCount == 1L
+    }
+
+    private fun revisionFilter(revision: Long) =
+        if (revision == 1L) or(eq("recordRevision", revision), exists("recordRevision", false)) else eq("recordRevision", revision)
 
     override suspend fun findRecord(id: String): AttendanceRecordResponse? {
         ensureIndexes()
@@ -538,6 +563,7 @@ class MongoAttendanceRepository(
                 ),
                 IndexOptions().name("ix_attendance_student_history"),
             )
+            records.createIndex(Indexes.ascending("studentId", "_id"), IndexOptions().name("ix_attendance_reconciliation_scan"))
             qrNonceUses.createIndex(
                 Indexes.ascending("sessionId", "nonce", "studentId"),
                 IndexOptions().unique(true).name("uq_attendance_qr_nonce_student"),
@@ -626,6 +652,7 @@ class MongoAttendanceRepository(
             .append("originalStatus", originalStatus?.name)
             .append("originalReasonCode", originalReasonCode?.name)
             .append("reviewHistory", Json.encodeToString(reviewHistory))
+            .append("recordRevision", recordRevision)
 
     private fun Document.toRecord(): AttendanceRecordResponse =
         AttendanceRecordResponse(
@@ -644,6 +671,7 @@ class MongoAttendanceRepository(
             originalStatus = getString("originalStatus")?.let(AttendanceStatus::valueOf),
             originalReasonCode = getString("originalReasonCode")?.let(AttendanceReasonCode::valueOf),
             reviewHistory = getString("reviewHistory")?.let { Json.decodeFromString<List<AttendanceReviewEntry>>(it) }.orEmpty(),
+            recordRevision = numberAsLong("recordRevision") ?: 1,
         )
 
     private fun Document.requireLong(name: String): Long = numberAsLong(name) ?: error("Missing numeric field: $name")

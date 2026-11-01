@@ -145,7 +145,10 @@ internal fun LoginAccessCarousel(
     val muted = authMuted()
     val accent = authAccent()
 
-    fun select(index: Int, animate: Boolean = true) {
+    fun select(
+        index: Int,
+        animate: Boolean = true,
+    ) {
         if (!enabled || index !in 0..accesses.lastIndex) return
         scope.launch {
             if (!animate || !policy.allowSpatialMotion) {

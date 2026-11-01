@@ -71,7 +71,6 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
 import org.companerodeescuela.core.designsystem.v8.V8DaySelector
-import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8GlassFilterChip
 import org.companerodeescuela.core.designsystem.v8.V8HeroTitle
 import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
@@ -79,6 +78,7 @@ import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.motion.CompaneroMotionDuration
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
+import org.companerodeescuela.core.ui.component.AcademicSyncStatusCard
 import org.companerodeescuela.core.ui.component.AcademicTimelineItem
 import org.companerodeescuela.core.ui.component.CompaneroSurface
 import org.companerodeescuela.core.ui.component.CompaneroSurfaceRole
@@ -110,6 +110,7 @@ fun ScheduleScreen(
     val scope = rememberCoroutineScope()
     val importProcessor = remember(context) { ScheduleImportProcessor(context) }
     var mode by rememberSaveable { mutableStateOf(AgendaMode.WEEK) }
+    var weekFocusDay by rememberSaveable { mutableStateOf("MONDAY") }
     var subjectFilter by rememberSaveable { mutableStateOf<String?>(null) }
     var showEditor by remember { mutableStateOf(false) }
     var editingEntry by remember { mutableStateOf<ScheduleEntry?>(null) }
@@ -117,6 +118,7 @@ fun ScheduleScreen(
     var importBusy by remember { mutableStateOf(false) }
     var moveProposal by remember { mutableStateOf<AgendaMoveProposal?>(null) }
     var deleteTarget by remember { mutableStateOf<ScheduleEntry?>(null) }
+    var showEditingHelp by rememberSaveable { mutableStateOf(false) }
 
     val documentLauncher =
         rememberLauncherForActivityResult(
@@ -166,12 +168,6 @@ fun ScheduleScreen(
             V8ScreenHeader {
                 V8HeroTitle(leading = "Mi", accent = "horario")
             }
-            Text(
-                text = "Organiza tu semana, consulta tus clases incluso sin conexión.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
             ExpressiveSegmentedControl(
                 options = listOf("Semana", "Día"),
                 selectedIndex = if (mode == AgendaMode.WEEK) 0 else 1,
@@ -201,19 +197,9 @@ fun ScheduleScreen(
                 onSelect = { index ->
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     selectedDay = displayedDays[index]
-                    mode = AgendaMode.DAY
+                    weekFocusDay = displayedDays[index]
                 },
             )
-            if (state.fromCache) {
-                StatusNotice(
-                    title = "Agenda guardada",
-                    message =
-                        state.syncMessage
-                            ?: "Estás viendo la última versión disponible en este dispositivo.",
-                    tone = NoticeTone.WARNING,
-                )
-            }
-
             state.successMessage?.let {
                 StatusNotice(
                     title = "Listo",
@@ -237,6 +223,10 @@ fun ScheduleScreen(
                     message = it,
                     tone = NoticeTone.ERROR,
                 )
+            }
+
+            if (state.entries.isNotEmpty() || state.institutionalAccessDenied) {
+                InstitutionSyncCard(state, viewModel::load)
             }
 
             if (state.entries.isEmpty()) {
@@ -325,6 +315,7 @@ fun ScheduleScreen(
                         AgendaMode.WEEK ->
                             WeekAgenda(
                                 entries = visibleEntries,
+                                focusDay = resolveScheduleDay(weekFocusDay, displayedDays),
                                 onEdit = {
                                     editingEntry = it
                                     editingImportIndex = null
@@ -343,12 +334,6 @@ fun ScheduleScreen(
                             )
                     }
                 }
-
-                Text(
-                    text = "Tip: mantén presionada una clase personal y arrástrala para moverla. Se ajusta en intervalos de 15 minutos.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -378,12 +363,18 @@ fun ScheduleScreen(
                     }
                 }
 
-                InstitutionSyncCard(
-                    fromCache = state.fromCache,
-                    lastUpdatedAtEpochSeconds = state.lastUpdatedAtEpochSeconds,
-                    loading = state.loading,
-                    onSync = viewModel::load,
-                )
+                if (state.entries.any { it.source != ScheduleSource.INSTITUTIONAL }) {
+                    TextButton(onClick = { showEditingHelp = !showEditingHelp }) {
+                        Text(if (showEditingHelp) "Ocultar ayuda" else "Cómo editar mi agenda")
+                    }
+                    if (showEditingHelp) {
+                        Text(
+                            "Toca una clase para editarla. Mantén presionado y arrastra para moverla en pasos de 15 minutos.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
         }
     }
@@ -466,52 +457,29 @@ fun ScheduleScreen(
 
 @Composable
 private fun InstitutionSyncCard(
-    fromCache: Boolean,
-    lastUpdatedAtEpochSeconds: Long?,
-    loading: Boolean,
+    state: ScheduleUiState,
     onSync: () -> Unit,
 ) {
-    V8GlassCard(
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier.padding(CompaneroSpacing.sm),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
-            ) {
-                Text(
-                    "Fuente institucional · UPTlax",
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                Text(
-                    if (fromCache) {
-                        "Sin conexión institucional · usando copia guardada"
-                    } else {
-                        "Sincronización disponible"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                lastUpdatedAtEpochSeconds?.let { epoch ->
-                    Text(
-                        "Última actualización: " + formatSyncTime(epoch),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            TextButton(
-                onClick = onSync,
-                enabled = !loading,
-            ) {
-                Text(if (loading) "…" else "Sincronizar")
-            }
-        }
-    }
+    val official = state.entries.any { it.source == ScheduleSource.INSTITUTIONAL }
+    AcademicSyncStatusCard(
+        title =
+            when {
+                state.institutionalAccessDenied -> "Vinculación escolar pendiente"
+                state.fromCache -> "Horario guardado"
+                official -> "Horario oficial · SIII"
+                else -> "Agenda personal"
+            },
+        message =
+            state.syncMessage ?: when {
+                state.institutionalAccessDenied -> "Vincula tu cuenta con SIII para consultar las clases oficiales."
+                state.fromCache -> "Disponible en este dispositivo mientras recuperas la conexión."
+                official && state.lastUpdatedAtEpochSeconds != null -> "Actualizado · " + formatSyncTime(state.lastUpdatedAtEpochSeconds)
+                official -> "Clases asignadas por tu institución."
+                else -> "Tus clases guardadas no sustituyen una inscripción escolar."
+            },
+        refreshing = state.loading,
+        onRefresh = onSync,
+    )
 }
 
 @Composable
@@ -524,10 +492,10 @@ private fun EmptyScheduleActions(
     StatusNotice(
         title = "Aún no tienes un horario",
         message =
-            "No encontramos clases asociadas a tu cuenta. UPTlax sigue siendo la fuente oficial; también puedes agregar una copia personal.",
+            "Sin clases oficiales asignadas. Puedes importar tu horario o crear una agenda personal.",
     )
     V8RedPrimaryButton(
-        text = "Sincronizar con UPTlax",
+        text = "Actualizar horario oficial",
         onClick = onSync,
         enabled = !loading,
         modifier = Modifier.fillMaxWidth(),
@@ -868,11 +836,12 @@ private fun DayTimeGrid(
 @Composable
 private fun WeekAgenda(
     entries: List<ScheduleEntry>,
+    focusDay: String,
     onEdit: (ScheduleEntry) -> Unit,
     onDelete: (ScheduleEntry) -> Unit,
     onMoveRequest: (AgendaMoveProposal) -> Unit,
 ) {
-    WeeklyAgendaGrid(entries, onEdit, onDelete, onMoveRequest)
+    WeeklyAgendaGrid(entries, onEdit, onDelete, onMoveRequest, focusDay)
 }
 
 @Composable

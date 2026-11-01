@@ -77,8 +77,9 @@ fun CompaneroBottomBar(
         }
     val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
     val glass = LocalV8GlassEnabled.current
-    val largeText = LocalDensity.current.fontScale >= 1.5f
-    val itemHeight = if (largeText) 88.dp else 74.dp
+    val fontScale = LocalDensity.current.fontScale
+    val largeText = fontScale >= 1.5f
+    val itemHeight = if (largeText) (44f + 28f * fontScale).dp else 64.dp
 
     Surface(
         modifier =

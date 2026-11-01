@@ -6,6 +6,17 @@ import kotlin.test.assertEquals
 
 class AgendaGridLayoutTest {
     @Test
+    fun `afternoon schedule starts at the first class without blank morning hours`() {
+        val layout = agendaGridLayout(listOf(entry("afternoon", "13:00", "15:00"), entry("evening", "17:00", "20:00")))
+        assertEquals(13 until 20, agendaVisibleHours(layout))
+    }
+
+    @Test
+    fun `visible hours preserve early and partial hour classes`() {
+        assertEquals(7 until 11, agendaVisibleHours(agendaGridLayout(listOf(entry("early", "07:30", "10:15")))))
+    }
+
+    @Test
     fun `weekend entries do not duplicate columns`() {
         val days = weeklyAgendaDays(listOf(entry("weekend", "08:00", "09:00").copy(dayOfWeek = "SATURDAY")))
         assertEquals(1, days.count { it == "SATURDAY" })

@@ -16,19 +16,16 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import org.companerodeescuela.core.designsystem.theme.CompaneroAccentPalette
-import org.companerodeescuela.core.designsystem.theme.LocalCompaneroAccentPalette
 import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 
 /**
  * One shared V9 surface with three deliberately different visual treatments:
- * normal dark is deep matte (no reflected light), dark high contrast has
- * visible top reflections with an opaque black foundation, and light is clean
+ * normal dark is opaque matte, dark high contrast uses an opaque black
+ * foundation and a solid outline, and light is clean
  * white with ink text. High-contrast light remains opaque and sharply outlined.
  */
 internal enum class V8SurfaceFinish {
@@ -60,72 +57,27 @@ fun Modifier.v8GlassSurface(
     val light = themeAware && MaterialTheme.colorScheme.background.luminance() > 0.5f
     val finish = v8SurfaceFinish(light, LocalCompaneroHighContrast.current)
     val scheme = MaterialTheme.colorScheme
-    val palette = LocalCompaneroAccentPalette.current
-
-    val tint =
+    val fill =
         when (finish) {
-            V8SurfaceFinish.LIGHT_CLEAN ->
-                if (emphasized && palette != CompaneroAccentPalette.CRIMSON) {
-                    listOf(Color.White, palette.lightContainer.copy(alpha = 0.35f))
-                } else {
-                    listOf(Color.White, Color(0xFFFCFCFE))
-                }
-            V8SurfaceFinish.LIGHT_HIGH_CONTRAST ->
-                listOf(Color.White, Color.White)
-            V8SurfaceFinish.DARK_MATTE ->
-                listOf(
-                    when {
-                        !emphasized -> Color(0xF816171D)
-                        palette == CompaneroAccentPalette.CRIMSON -> Color(0xF8241B24)
-                        else -> palette.darkContainer.copy(alpha = 0.28f)
-                    },
-                    Color(0xFA101116),
-                )
-            V8SurfaceFinish.DARK_HIGH_CONTRAST ->
-                listOf(
-                    Color(0xFF393D48),
-                    Color(0xFF22242E),
-                    Color(0xFF101116),
-                )
+            V8SurfaceFinish.LIGHT_CLEAN -> if (emphasized) Color(0xFFF2F4F8) else Color.White
+            V8SurfaceFinish.LIGHT_HIGH_CONTRAST -> Color.White
+            V8SurfaceFinish.DARK_MATTE -> if (emphasized) Color(0xFF20232B) else Color(0xFF17191F)
+            V8SurfaceFinish.DARK_HIGH_CONTRAST -> Color(0xFF090A0D)
         }
-
     val edge =
         when (finish) {
-            V8SurfaceFinish.LIGHT_CLEAN ->
-                if (emphasized) {
-                    listOf(scheme.primary.copy(alpha = 0.45f), Color(0xFFE0E3E9))
-                } else {
-                    listOf(Color(0xFFD1D5DD), Color(0xFFE0E3E9))
-                }
-            V8SurfaceFinish.LIGHT_HIGH_CONTRAST ->
-                listOf(scheme.onSurface, scheme.onSurface)
-            V8SurfaceFinish.DARK_MATTE ->
-                listOf(
-                    when {
-                        !emphasized -> Color(0x4D555966)
-                        palette == CompaneroAccentPalette.CRIMSON -> Color(0x665E3943)
-                        else -> scheme.primary.copy(alpha = 0.45f)
-                    },
-                    Color(0x33373A44),
-                )
-            V8SurfaceFinish.DARK_HIGH_CONTRAST ->
-                listOf(Color(0xE6FFFFFF), Color(0x73FFFFFF), Color(0xB3FFFFFF))
+            V8SurfaceFinish.LIGHT_CLEAN -> if (emphasized) Color(0xFFBFC5CF) else Color(0xFFDEE2E9)
+            V8SurfaceFinish.LIGHT_HIGH_CONTRAST -> scheme.onSurface
+            V8SurfaceFinish.DARK_MATTE -> if (emphasized) Color(0xFF414650) else Color(0xFF30343D)
+            V8SurfaceFinish.DARK_HIGH_CONTRAST -> scheme.onSurface
         }
-
-    val shadowElevation = if (finish == V8SurfaceFinish.DARK_MATTE) elevation.coerceAtMost(4.dp) else 0.dp
-    val borderWidth =
-        if (finish == V8SurfaceFinish.DARK_HIGH_CONTRAST || finish == V8SurfaceFinish.LIGHT_HIGH_CONTRAST) 2.dp else 1.dp
-
-    val shaded =
-        this.shadow(
-            elevation = shadowElevation,
-            shape = shape,
-            ambientColor = Color.Black.copy(alpha = 0.25f),
-            spotColor = Color.Black,
-        )
-    val clipped = shaded.clip(shape)
-    val painted = clipped.background(Brush.verticalGradient(tint))
-    return painted.border(borderWidth, Brush.verticalGradient(edge), shape)
+    val highContrast = finish == V8SurfaceFinish.DARK_HIGH_CONTRAST || finish == V8SurfaceFinish.LIGHT_HIGH_CONTRAST
+    return shadow(
+        elevation = if (highContrast) 0.dp else elevation.coerceIn(0.dp, 1.dp),
+        shape = shape,
+        ambientColor = Color.Black,
+        spotColor = Color.Black,
+    ).clip(shape).background(fill).border(if (highContrast) 2.dp else 1.dp, edge, shape)
 }
 
 @Composable

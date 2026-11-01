@@ -95,7 +95,7 @@ if (managementFirebaseConfigured) {
             managementFirebaseProjectId.matches(Regex("[a-z][a-z0-9-]{3,99}")) &&
             managementFirebaseSenderId.matches(Regex("[0-9]{4,25}")) &&
             managementFirebaseApiKey.matches(Regex("[A-Za-z0-9_-]{20,100}")) &&
-            managementFirebaseAppId != firebaseAppId
+            managementFirebaseAppId != firebaseAppId,
     ) {
         "Invalid or reused academic Firebase application for management distribution"
     }

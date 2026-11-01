@@ -29,7 +29,9 @@ fun main() {
     val mongoConnection = DriverMongoConnectionFactory().create(settings.mongo)
 
     log.info(
-        "Starting {} v{} in {} on {}:{} (mongo configured: {}, verification email configured: {})",
+        "Starting {} v{} in {} on {}:{} " +
+            "(mongo configured: {}, verification email configured: {}, Firebase push configured: {}, " +
+            "school Wi-Fi configured: {}, attendance QR signing configured: {})",
         settings.serviceName,
         settings.version,
         settings.environment,
@@ -37,6 +39,9 @@ fun main() {
         settings.port,
         settings.mongo.isConfigured,
         settings.hasVerificationEmail,
+        settings.hasFirebasePush,
+        settings.hasSchoolPresenceVerification,
+        settings.hasAttendanceQrSigning,
     )
 
     embeddedServer(

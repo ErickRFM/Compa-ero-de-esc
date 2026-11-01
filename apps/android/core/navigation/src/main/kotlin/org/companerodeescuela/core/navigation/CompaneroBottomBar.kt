@@ -6,9 +6,9 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,7 +27,6 @@ import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,17 +49,12 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavHostController
-import org.companerodeescuela.core.designsystem.theme.CompaneroElevation
-import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
-import org.companerodeescuela.core.designsystem.theme.LocalCompaneroAccentPalette
-import org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled
-import org.companerodeescuela.core.designsystem.v8.v8GlassSurface
 import org.companerodeescuela.core.motion.CompaneroMotion
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 
 /**
- * Compact V9 bottom navigation bar featuring icons-only tabs, central highlighted QR
- * action, TalkBack semantic accessibility, and dark matte glass surface.
+ * Compact V25 floating bottom navigation bar in dark charcoal featuring
+ * an active white pill container with dark icon and text.
  */
 @Composable
 fun CompaneroBottomBar(
@@ -76,30 +70,29 @@ fun CompaneroBottomBar(
                 ?.any { it.route == topLevel.destination.route } == true
         }
     val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
-    val glass = LocalV8GlassEnabled.current
     val fontScale = LocalDensity.current.fontScale
     val largeText = fontScale >= 1.5f
-    val itemHeight = if (largeText) (44f + 28f * fontScale).dp else 64.dp
+    val itemHeight = if (largeText) (44f + 28f * fontScale).dp else 60.dp
 
     Surface(
         modifier =
             modifier
                 .navigationBarsPadding()
                 .padding(
-                    horizontal = CompaneroSpacing.sm,
-                    vertical = CompaneroSpacing.xxs,
-                ).then(if (glass) Modifier.v8GlassSurface(cornerRadius = 28.dp) else Modifier),
-        shape = MaterialTheme.shapes.extraLarge,
-        color = if (glass) Color.Transparent else MaterialTheme.colorScheme.surface,
-        tonalElevation = if (glass) 0.dp else CompaneroElevation.raised,
-        shadowElevation = if (glass) 0.dp else CompaneroElevation.immersive,
+                    horizontal = 20.dp,
+                    vertical = 8.dp,
+                ),
+        shape = CircleShape,
+        color = Color(0xFF191A1C),
+        tonalElevation = 6.dp,
+        shadowElevation = 4.dp,
     ) {
         BoxWithConstraints(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(itemHeight + 12.dp)
-                    .padding(horizontal = CompaneroSpacing.xxs, vertical = 6.dp),
+                    .height(itemHeight)
+                    .padding(horizontal = 6.dp, vertical = 6.dp),
         ) {
             val itemWidth = maxWidth / destinations.size.coerceAtLeast(1)
 
@@ -121,27 +114,18 @@ fun CompaneroBottomBar(
                         Modifier
                             .offset(x = pillOffset)
                             .width(itemWidth)
-                            .height(itemHeight)
-                            .then(
-                                if (glass) {
-                                    Modifier.v8GlassSurface(
-                                        cornerRadius = 20.dp,
-                                        emphasized = true,
-                                        elevation = 0.dp,
-                                    )
-                                } else {
-                                    Modifier
-                                        .clip(MaterialTheme.shapes.extraLarge)
-                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
-                                },
-                            ),
+                            .height(itemHeight - 12.dp)
+                            .clip(CircleShape)
+                            .background(Color.White),
                 )
             }
 
-            Row(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 destinations.forEachIndexed { index, topLevel ->
                     val isSelected = index == selectedIndex
-                    val isQr = topLevel == TopLevelDestination.Attendance
                     val scale by animateFloatAsState(
                         targetValue = if (isSelected && !reducedMotion) 1.05f else 1f,
                         animationSpec = CompaneroMotion.fast(),
@@ -152,8 +136,8 @@ fun CompaneroBottomBar(
                         modifier =
                             Modifier
                                 .width(itemWidth)
-                                .height(itemHeight)
-                                .clip(MaterialTheme.shapes.extraLarge)
+                                .height(itemHeight - 12.dp)
+                                .clip(CircleShape)
                                 .semantics(mergeDescendants = true) {
                                     role = Role.Tab
                                     selected = isSelected
@@ -163,65 +147,60 @@ fun CompaneroBottomBar(
                                 },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            val qrContainerColor = LocalCompaneroAccentPalette.current.darkContainer
-                            Box(
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Icon(
+                                imageVector =
+                                    when (topLevel) {
+                                        TopLevelDestination.Home,
+                                        TopLevelDestination.TeacherHome,
+                                        TopLevelDestination.TutorHome,
+                                        TopLevelDestination.CoordinatorHome,
+                                        TopLevelDestination.AdminHome,
+                                        -> Icons.Filled.Home
+                                        TopLevelDestination.Schedule -> Icons.Filled.DateRange
+                                        TopLevelDestination.Classrooms,
+                                        TopLevelDestination.TutorGroups,
+                                        -> Icons.Filled.School
+                                        TopLevelDestination.Grading -> Icons.Filled.Assessment
+                                        TopLevelDestination.Channel,
+                                        TopLevelDestination.TutorRequests,
+                                        -> Icons.Filled.Forum
+                                        TopLevelDestination.Attendance -> Icons.Filled.QrCodeScanner
+                                        TopLevelDestination.Profile -> Icons.Filled.PersonOutline
+                                    },
+                                contentDescription = null,
                                 modifier =
-                                    Modifier
-                                        .size(if (isQr) 38.dp else 34.dp)
-                                        .clip(CircleShape)
-                                        .background(if (isQr) qrContainerColor else Color.Transparent)
-                                        .graphicsLayer {
-                                            scaleX = scale
-                                            scaleY = scale
-                                        },
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(
-                                    imageVector =
+                                    Modifier.size(20.dp).graphicsLayer {
+                                        scaleX = scale
+                                        scaleY = scale
+                                    },
+                                tint =
+                                    when {
+                                        isSelected -> Color(0xFF191A1C)
+                                        else -> Color(0xFF9E9E9E)
+                                    },
+                            )
+                            // Keep the capsule usable for profiles with many destinations.
+                            if (isSelected && (destinations.size <= 4 || itemWidth >= 85.dp)) {
+                                Text(
+                                    text =
                                         when (topLevel) {
-                                            TopLevelDestination.Home,
-                                            TopLevelDestination.TeacherHome,
-                                            TopLevelDestination.TutorHome,
-                                            TopLevelDestination.CoordinatorHome,
-                                            TopLevelDestination.AdminHome,
-                                            -> Icons.Filled.Home
-                                            TopLevelDestination.Schedule -> Icons.Filled.DateRange
-                                            TopLevelDestination.Classrooms,
-                                            TopLevelDestination.TutorGroups,
-                                            -> Icons.Filled.School
-                                            TopLevelDestination.Grading -> Icons.Filled.Assessment
-                                            TopLevelDestination.Channel,
-                                            TopLevelDestination.TutorRequests,
-                                            -> Icons.Filled.Forum
-                                            TopLevelDestination.Attendance -> Icons.Filled.QrCodeScanner
-                                            TopLevelDestination.Profile -> Icons.Filled.PersonOutline
+                                            TopLevelDestination.AdminHome -> "Admin"
+                                            TopLevelDestination.CoordinatorHome -> "Gestión"
+                                            TopLevelDestination.Grading -> "Notas"
+                                            else -> topLevel.label
                                         },
-                                    contentDescription = null,
-                                    modifier = Modifier.size(if (isQr) 24.dp else 22.dp),
-                                    tint =
-                                        when {
-                                            isQr -> Color.White
-                                            isSelected -> MaterialTheme.colorScheme.primary
-                                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                        },
+                                    fontSize = 12.sp,
+                                    lineHeight = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = Color(0xFF191A1C),
                                 )
                             }
-                            Text(
-                                text =
-                                    when (topLevel) {
-                                        TopLevelDestination.AdminHome -> "Admin"
-                                        TopLevelDestination.CoordinatorHome -> "Gestión"
-                                        TopLevelDestination.Grading -> "Notas"
-                                        else -> topLevel.label
-                                    },
-                                fontSize = if (largeText) 12.sp else 11.sp,
-                                lineHeight = if (largeText) 14.sp else 13.sp,
-                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
                         }
                     }
                 }

@@ -10,8 +10,8 @@ class ColorContrastTest {
     @Test
     fun `critical V5 3 pairs meet normal text contrast`() {
         val pairs = listOf(
-            "#9B1C31" to "#FFFFFF", // crimson / white
-            "#F5DADF" to "#9B1C31", // primary container / crimson
+            "#8A1538" to "#FFFFFF", // crimson / white
+            "#F5DADF" to "#8A1538", // primary container / crimson
             "#F6F4F1" to "#211F1E", // light background / text
             "#222326" to "#E9E6E3", // dark surface / text
             "#313338" to "#C9C4C0", // dark raised / secondary text

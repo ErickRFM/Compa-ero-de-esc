@@ -2,6 +2,7 @@
 
 package org.companerodeescuela.feature.home
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -12,12 +13,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Assignment
+import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -49,6 +59,7 @@ import org.companerodeescuela.core.designsystem.v8.V8SectionTitle
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 import org.companerodeescuela.core.ui.component.AcademicClassCard
 import org.companerodeescuela.core.ui.component.AcademicSyncStatusCard
+import org.companerodeescuela.core.ui.component.CompaneroHeroSurface
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ScheduleEntry
 import java.time.Instant
@@ -65,6 +76,7 @@ fun HomeScreen(
     onOpenSchedule: () -> Unit = {},
     onOpenClassrooms: () -> Unit = {},
     onOpenChannel: () -> Unit = {},
+    onOpenTasks: () -> Unit = { onOpenChannel() },
     onOpenAttendance: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
@@ -124,9 +136,15 @@ fun HomeScreen(
                         )
                     }
                 }
-                V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
+                CompaneroHeroSurface(
+                    modifier = Modifier.fillMaxWidth(),
+                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                ) {
                     Column(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(CompaneroSpacing.md),
                         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
                     ) {
                         Row(
@@ -147,9 +165,7 @@ fun HomeScreen(
                         if (activeOrNext != null) {
                             Text(
                                 text =
-                                    if (overview?.current !=
-                                        null
-                                    ) {
+                                    if (overview?.current != null) {
                                         "EN CURSO · ${activeOrNext.subjectName}"
                                     } else {
                                         "PRÓXIMA · ${activeOrNext.subjectName}"
@@ -171,6 +187,13 @@ fun HomeScreen(
                         )
                     }
                 }
+
+                V8QuickAccessGrid(
+                    onOpenSchedule = onOpenSchedule,
+                    onOpenAttendance = onOpenAttendance,
+                    onOpenChannel = onOpenChannel,
+                    onOpenTasks = onOpenTasks,
+                )
 
                 if (state.loading && overview == null) CircularProgressIndicator()
                 if (state.fromCache || state.personalOnly || state.errorMessage != null) {
@@ -496,5 +519,55 @@ private fun todayLabel(): String {
     val date = LocalDate.now().format(formatter)
     return date.replaceFirstChar {
         if (it.isLowerCase()) it.titlecase(Locale("es", "MX")) else it.toString()
+    }
+}
+
+@Composable
+private fun V8QuickAccessGrid(
+    onOpenSchedule: () -> Unit,
+    onOpenAttendance: () -> Unit,
+    onOpenChannel: () -> Unit,
+    onOpenTasks: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        val items =
+            listOf(
+                Triple("Horario", Icons.Filled.DateRange, onOpenSchedule),
+                Triple("Asistencia", Icons.Filled.CheckCircle, onOpenAttendance),
+                Triple("Avisos", Icons.Filled.Campaign, onOpenChannel),
+                Triple("Tareas", Icons.AutoMirrored.Filled.Assignment, onOpenTasks),
+            )
+        items.forEach { (label, icon, onClick) ->
+            Surface(
+                modifier = Modifier.weight(1f).clickable(onClick = onClick),
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                tonalElevation = 2.dp,
+            ) {
+                Column(
+                    modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = label,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp),
+                    )
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
     }
 }

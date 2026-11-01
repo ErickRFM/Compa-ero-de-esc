@@ -14,22 +14,52 @@ import org.companerodeescuela.shared.contracts.ChannelAttachment
 import org.companerodeescuela.shared.contracts.ChannelAttachmentType
 import org.companerodeescuela.shared.contracts.ChannelPost
 import org.companerodeescuela.shared.contracts.ChannelPresetResponse
+import org.companerodeescuela.shared.contracts.ChannelPrivateFileMetadata
+import org.companerodeescuela.shared.contracts.ChannelTask
 import org.companerodeescuela.shared.contracts.ClassChannelSummary
+import org.companerodeescuela.shared.contracts.CreateChannelFileRequest
 import org.companerodeescuela.shared.contracts.CreateChannelPostRequest
+import org.companerodeescuela.shared.contracts.CreateChannelTaskRequest
+import org.companerodeescuela.shared.contracts.ReviewSubmissionRequest
+import org.companerodeescuela.shared.contracts.SubmitTaskRequest
+import org.companerodeescuela.shared.contracts.TaskStatus
+import org.companerodeescuela.shared.contracts.TaskSubmission
 import org.companerodeescuela.shared.contracts.TeacherClassContext
+import org.companerodeescuela.shared.contracts.UpdateChannelTaskRequest
+import java.util.UUID
 import javax.inject.Inject
+
+data class ChannelTaskUpload(
+    val fileName: String,
+    val contentType: String,
+    val bytes: ByteArray,
+)
+
+data class ChannelTaskDownload(
+    val requestId: String,
+    val fileName: String,
+    val contentType: String,
+    val bytes: ByteArray,
+)
 
 data class ChannelUiState(
     val loading: Boolean = true,
+    val tasksLoading: Boolean = false,
     val actionInProgress: Boolean = false,
     val channels: List<ClassChannelSummary> = emptyList(),
     val selectedChannelId: String? = null,
     val posts: List<ChannelPost> = emptyList(),
+    val tasks: List<ChannelTask> = emptyList(),
+    val submissions: Map<String, List<TaskSubmission>> = emptyMap(),
+    val submissionsLoading: Set<String> = emptySet(),
     val draftBody: String = "",
     val draftResourceLabel: String = "",
     val draftResourceUrl: String = "",
+    val draftTaskTitle: String = "",
+    val draftTaskInstructions: String = "",
     val successMessage: String? = null,
     val errorMessage: String? = null,
+    val downloadReady: ChannelTaskDownload? = null,
 )
 
 @HiltViewModel
@@ -124,7 +154,11 @@ class ChannelViewModel
             _state.update {
                 it.copy(
                     selectedChannelId = channelId,
+                    tasksLoading = false,
                     posts = emptyList(),
+                    tasks = emptyList(),
+                    submissions = emptyMap(),
+                    submissionsLoading = emptySet(),
                     draftBody = "",
                     draftResourceLabel = "",
                     draftResourceUrl = "",
@@ -263,6 +297,363 @@ class ChannelViewModel
             }
         }
 
+        fun updateDraftTaskTitle(value: String) {
+            _state.update { it.copy(draftTaskTitle = value.take(200)) }
+        }
+
+        fun updateDraftTaskInstructions(value: String) {
+            _state.update { it.copy(draftTaskInstructions = value.take(MAX_DRAFT_BODY)) }
+        }
+
+        fun createTask(dueDateSeconds: Long) {
+            val snapshot = _state.value
+            val channelId = snapshot.selectedChannelId ?: return
+            val selected = snapshot.channels.firstOrNull { it.id == channelId }
+            if (selected?.canPublish != true) {
+                _state.update { it.copy(errorMessage = "Solo el docente asignado puede publicar tareas.") }
+                return
+            }
+            if (snapshot.actionInProgress || snapshot.loading) return
+            val title = snapshot.draftTaskTitle.trim()
+            val instructions = snapshot.draftTaskInstructions.trim()
+            if (title.isBlank()) {
+                _state.update { it.copy(errorMessage = "Ingresa el título de la tarea.") }
+                return
+            }
+            _state.update { it.copy(actionInProgress = true, errorMessage = null, successMessage = null) }
+            viewModelScope.launch {
+                when (
+                    val result =
+                        repository.createTask(
+                            channelId = channelId,
+                            request = CreateChannelTaskRequest(title, instructions, dueDateSeconds),
+                        )
+                ) {
+                    is Outcome.Success ->
+                        if (_state.value.selectedChannelId == channelId) {
+                            _state.update {
+                                it.copy(
+                                    actionInProgress = false,
+                                    tasks = listOf(result.value) + it.tasks,
+                                    draftTaskTitle = "",
+                                    draftTaskInstructions = "",
+                                    successMessage = "Tarea publicada para la clase.",
+                                )
+                            }
+                        }
+                    is Outcome.Failure ->
+                        _state.update {
+                            it.copy(
+                                actionInProgress = false,
+                                errorMessage = result.error.userMessage,
+                            )
+                        }
+                }
+            }
+        }
+
+        fun loadTaskSubmissions(taskId: String) {
+            val snapshot = _state.value
+            val channelId = snapshot.selectedChannelId ?: return
+            if (taskId in snapshot.submissionsLoading || taskId in snapshot.submissions) return
+            if (snapshot.tasks.none { it.id == taskId && it.channelId == channelId }) return
+            _state.update {
+                it.copy(submissionsLoading = it.submissionsLoading + taskId, errorMessage = null)
+            }
+            viewModelScope.launch {
+                when (val result = repository.submissions(channelId, taskId)) {
+                    is Outcome.Success ->
+                        if (_state.value.selectedChannelId == channelId) {
+                            _state.update {
+                                it.copy(
+                                    submissions = it.submissions + (taskId to result.value),
+                                    submissionsLoading = it.submissionsLoading - taskId,
+                                )
+                            }
+                        }
+                    is Outcome.Failure ->
+                        if (_state.value.selectedChannelId == channelId) {
+                            _state.update {
+                                it.copy(
+                                    submissionsLoading = it.submissionsLoading - taskId,
+                                    errorMessage = result.error.userMessage,
+                                )
+                            }
+                        }
+                }
+            }
+        }
+
+        fun submitTask(
+            taskId: String,
+            comment: String,
+            uploads: List<ChannelTaskUpload>,
+        ) {
+            val snapshot = _state.value
+            val channelId = snapshot.selectedChannelId ?: return
+            val selected = snapshot.channels.firstOrNull { it.id == channelId }
+            val task = snapshot.tasks.firstOrNull { it.id == taskId && it.channelId == channelId } ?: return
+            if (selected?.canPublish != false || task.closed || snapshot.actionInProgress || snapshot.loading) return
+            val existing = snapshot.submissions[taskId]?.singleOrNull()
+            if (existing != null && existing.status != TaskStatus.RETURNED) {
+                _state.update { it.copy(errorMessage = "La entrega ya fue registrada y está en revisión.") }
+                return
+            }
+            val submissionId = existing?.id ?: UUID.randomUUID().toString()
+            val requestKey = UUID.randomUUID().toString()
+            _state.update { it.copy(actionInProgress = true, errorMessage = null, successMessage = null) }
+            viewModelScope.launch {
+                val fileIds = mutableListOf<String>()
+                uploads.forEach { upload ->
+                    val reservation =
+                        repository.reserveSubmissionFile(
+                            channelId,
+                            taskId,
+                            submissionId,
+                            CreateChannelFileRequest(upload.fileName, upload.contentType, upload.bytes.size.toLong()),
+                        )
+                    when (reservation) {
+                        is Outcome.Success -> {
+                            when (
+                                val uploaded =
+                                    repository.uploadSubmissionFile(
+                                        channelId,
+                                        taskId,
+                                        submissionId,
+                                        reservation.value.fileId,
+                                        upload.contentType,
+                                        upload.bytes,
+                                    )
+                            ) {
+                                is Outcome.Success -> fileIds += reservation.value.fileId
+                                is Outcome.Failure -> {
+                                    finishTaskAction(uploaded.error.userMessage)
+                                    return@launch
+                                }
+                            }
+                        }
+                        is Outcome.Failure -> {
+                            finishTaskAction(reservation.error.userMessage)
+                            return@launch
+                        }
+                    }
+                }
+                when (
+                    val result =
+                        repository.submitTask(
+                            channelId = channelId,
+                            taskId = taskId,
+                            request =
+                                SubmitTaskRequest(
+                                    comment = comment.trim().ifBlank { null },
+                                    fileIds = (existing?.fileIds.orEmpty() + fileIds).distinct(),
+                                    idempotencyKey = requestKey,
+                                    expectedVersion = existing?.version,
+                                    submissionId = submissionId,
+                                ),
+                        )
+                ) {
+                    is Outcome.Success ->
+                        if (_state.value.selectedChannelId == channelId) {
+                            _state.update {
+                                it.copy(
+                                    actionInProgress = false,
+                                    submissions = it.submissions + (taskId to listOf(result.value)),
+                                    successMessage = "Entrega registrada correctamente.",
+                                )
+                            }
+                        }
+                    is Outcome.Failure ->
+                        finishTaskAction(result.error.userMessage)
+                }
+            }
+        }
+
+        fun uploadTaskFiles(
+            taskId: String,
+            uploads: List<ChannelTaskUpload>,
+        ) {
+            val snapshot = _state.value
+            val channelId = snapshot.selectedChannelId ?: return
+            val selected = snapshot.channels.firstOrNull { it.id == channelId }
+            val task = snapshot.tasks.firstOrNull { it.id == taskId && it.channelId == channelId } ?: return
+            if (selected?.canPublish != true || task.closed || snapshot.actionInProgress || uploads.isEmpty()) return
+            _state.update { it.copy(actionInProgress = true, errorMessage = null, successMessage = null) }
+            viewModelScope.launch {
+                uploads.forEach { upload ->
+                    val reservation =
+                        repository.reserveTaskFile(
+                            channelId,
+                            taskId,
+                            CreateChannelFileRequest(upload.fileName, upload.contentType, upload.bytes.size.toLong()),
+                        )
+                    when (reservation) {
+                        is Outcome.Success ->
+                            when (
+                                val uploaded =
+                                    repository.uploadTaskFile(
+                                        channelId,
+                                        taskId,
+                                        reservation.value.fileId,
+                                        upload.contentType,
+                                        upload.bytes,
+                                    )
+                            ) {
+                                is Outcome.Success -> Unit
+                                is Outcome.Failure -> {
+                                    finishTaskAction(uploaded.error.userMessage)
+                                    return@launch
+                                }
+                            }
+                        is Outcome.Failure -> {
+                            finishTaskAction(reservation.error.userMessage)
+                            return@launch
+                        }
+                    }
+                }
+                if (_state.value.selectedChannelId == channelId) {
+                    val pluralSuffix = if (uploads.size == 1) "" else "s"
+                    _state.update {
+                        it.copy(
+                            actionInProgress = false,
+                            successMessage =
+                                "Archivo$pluralSuffix agregado$pluralSuffix a la tarea.",
+                        )
+                    }
+                    loadTasks(channelId)
+                }
+            }
+        }
+
+        fun reviewSubmission(
+            taskId: String,
+            submissionId: String,
+            status: TaskStatus,
+            feedback: String?,
+        ) {
+            val snapshot = _state.value
+            val channelId = snapshot.selectedChannelId ?: return
+            val selected = snapshot.channels.firstOrNull { it.id == channelId }
+            val submission = snapshot.submissions[taskId]?.singleOrNull { it.id == submissionId } ?: return
+            if (selected?.canPublish != true || submission.status != TaskStatus.SUBMITTED || snapshot.actionInProgress) return
+            _state.update { it.copy(actionInProgress = true, errorMessage = null, successMessage = null) }
+            viewModelScope.launch {
+                when (
+                    val result =
+                        repository.reviewSubmission(
+                            channelId,
+                            taskId,
+                            submissionId,
+                            ReviewSubmissionRequest(status, feedback, submission.version),
+                        )
+                ) {
+                    is Outcome.Success ->
+                        if (_state.value.selectedChannelId == channelId) {
+                            _state.update {
+                                it.copy(
+                                    actionInProgress = false,
+                                    submissions =
+                                        it.submissions +
+                                            (
+                                                taskId to
+                                                    it.submissions[taskId].orEmpty().map { current ->
+                                                        if (current.id == result.value.id) result.value else current
+                                                    }
+                                            ),
+                                    successMessage = "La entrega fue revisada.",
+                                )
+                            }
+                        }
+                    is Outcome.Failure -> finishTaskAction(result.error.userMessage)
+                }
+            }
+        }
+
+        fun setTaskClosed(
+            taskId: String,
+            closed: Boolean,
+        ) {
+            val snapshot = _state.value
+            val channelId = snapshot.selectedChannelId ?: return
+            val selected = snapshot.channels.firstOrNull { it.id == channelId }
+            val task = snapshot.tasks.firstOrNull { it.id == taskId && it.channelId == channelId } ?: return
+            if (selected?.canPublish != true || snapshot.actionInProgress) return
+            _state.update { it.copy(actionInProgress = true, errorMessage = null, successMessage = null) }
+            viewModelScope.launch {
+                when (
+                    val result =
+                        repository.updateTask(
+                            channelId,
+                            taskId,
+                            UpdateChannelTaskRequest(closed = closed, expectedVersion = task.version),
+                        )
+                ) {
+                    is Outcome.Success ->
+                        if (_state.value.selectedChannelId == channelId) {
+                            _state.update {
+                                it.copy(
+                                    actionInProgress = false,
+                                    tasks = it.tasks.map { current -> if (current.id == taskId) result.value else current },
+                                    successMessage = if (closed) "Tarea cerrada." else "Tarea reabierta.",
+                                )
+                            }
+                        }
+                    is Outcome.Failure -> finishTaskAction(result.error.userMessage)
+                }
+            }
+        }
+
+        fun downloadTaskFile(
+            taskId: String,
+            file: ChannelPrivateFileMetadata,
+        ) {
+            val channelId = _state.value.selectedChannelId ?: return
+            if (_state.value.actionInProgress) return
+            _state.update { it.copy(actionInProgress = true, errorMessage = null, successMessage = null) }
+            viewModelScope.launch {
+                when (val result = repository.downloadFile(channelId, taskId, file)) {
+                    is Outcome.Success ->
+                        if (_state.value.selectedChannelId == channelId) {
+                            _state.update {
+                                it.copy(
+                                    actionInProgress = false,
+                                    downloadReady =
+                                        ChannelTaskDownload(
+                                            requestId = UUID.randomUUID().toString(),
+                                            fileName = file.fileName,
+                                            contentType = file.contentType,
+                                            bytes = result.value,
+                                        ),
+                                )
+                            }
+                        }
+                    is Outcome.Failure -> finishTaskAction(result.error.userMessage)
+                }
+            }
+        }
+
+        fun finishFileDownload(success: Boolean) {
+            _state.update {
+                it.copy(
+                    downloadReady = null,
+                    successMessage = if (success) "Archivo guardado." else it.successMessage,
+                    errorMessage = if (success) null else "No se pudo guardar el archivo seleccionado.",
+                )
+            }
+        }
+
+        fun cancelFileDownload() {
+            _state.update { it.copy(downloadReady = null) }
+        }
+
+        fun reportLocalFileError(message: String) {
+            _state.update { it.copy(errorMessage = message, successMessage = null) }
+        }
+
+        private fun finishTaskAction(error: String) {
+            _state.update { it.copy(actionInProgress = false, errorMessage = error) }
+        }
+
         private fun loadPosts(channelId: String) {
             viewModelScope.launch {
                 _state.update { it.copy(loading = true, errorMessage = null) }
@@ -276,6 +667,7 @@ class ChannelViewModel
                                     errorMessage = null,
                                 )
                             }
+                            loadTasks(channelId)
                         }
                     is Outcome.Failure ->
                         if (_state.value.selectedChannelId == channelId) {
@@ -283,6 +675,34 @@ class ChannelViewModel
                                 it.copy(
                                     loading = false,
                                     posts = emptyList(),
+                                    errorMessage = result.error.userMessage,
+                                )
+                            }
+                        }
+                }
+            }
+        }
+
+        private fun loadTasks(channelId: String) {
+            viewModelScope.launch {
+                _state.update { it.copy(tasksLoading = true) }
+                when (val result = repository.tasks(channelId)) {
+                    is Outcome.Success ->
+                        if (_state.value.selectedChannelId == channelId) {
+                            _state.update {
+                                it.copy(
+                                    tasksLoading = false,
+                                    tasks = result.value,
+                                    errorMessage = null,
+                                )
+                            }
+                        }
+                    is Outcome.Failure ->
+                        if (_state.value.selectedChannelId == channelId) {
+                            _state.update {
+                                it.copy(
+                                    tasksLoading = false,
+                                    tasks = emptyList(),
                                     errorMessage = result.error.userMessage,
                                 )
                             }

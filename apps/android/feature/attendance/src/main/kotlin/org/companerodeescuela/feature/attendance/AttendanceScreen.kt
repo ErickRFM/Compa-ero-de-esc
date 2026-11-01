@@ -3,13 +3,18 @@ package org.companerodeescuela.feature.attendance
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -17,6 +22,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
@@ -47,10 +54,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -237,9 +248,26 @@ fun studentAttendanceContent(
                     .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
         ) {
-            V8ScreenHeader {
-                org.companerodeescuela.core.designsystem.v8
-                    .V8HeroTitle("Pase de", "lista")
+            CompaneroHeroSurface(
+                modifier = Modifier.fillMaxWidth(),
+                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(CompaneroSpacing.md),
+                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                ) {
+                    Text(
+                        "Pase de",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        "lista",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
             }
             TextButton(onClick = onRefresh, enabled = !state.loading, modifier = Modifier.align(Alignment.End)) {
                 Text(if (state.loading) "Actualizando…" else "Actualizar")
@@ -460,123 +488,205 @@ private fun studentSessionCard(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
     ) {
-        CompaneroHeroSurface(
+        Surface(
             modifier = Modifier.fillMaxWidth(),
-            containerColor = CompanionColors.graphite,
+            shape = RoundedCornerShape(26.dp),
+            color = Color(0xFF8A1538),
+            shadowElevation = 8.dp,
         ) {
-            Column(
-                modifier = Modifier.padding(CompaneroSpacing.md),
-                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
-            ) {
-                Text(
-                    text = "EN VIVO  ●",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = CompanionColors.crimsonContainer,
-                )
-                Text(
-                    text = occurrence?.subjectName ?: "Grupo " + session.groupName,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text =
-                        session.scheduledStartsAt + " – " +
-                            session.scheduledEndsAt + " · " + session.groupName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = CompanionColors.onDarkSurfaceVariant,
-                )
-                occurrence?.let {
-                    val location =
-                        listOfNotNull(it.classroomName, it.buildingName)
-                            .joinToString(" · ")
-                            .ifBlank { "Aula por confirmar" }
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     Text(
-                        text = location,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = CompanionColors.onDarkSurfaceVariant,
+                        text = occurrence?.subjectName ?: "Grupo ${session.groupName}",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
                     )
+                    occurrence?.teacherName?.takeIf { it.isNotBlank() }?.let { teacherName ->
+                        Text(
+                            text = teacherName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.85f),
+                        )
+                    }
+                    Surface(
+                        shape = CircleShape,
+                        color = Color.White.copy(alpha = 0.2f),
+                        modifier = Modifier.padding(top = 4.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Box(modifier = Modifier.size(8.dp).background(Color(0xFF35D98C), CircleShape))
+                            Text(
+                                text = "Clase iniciada",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White,
+                            )
+                        }
+                    }
                 }
 
-                if (confirmed == null && local == null) {
-                    Button(
-                        onClick = onConfirm,
-                        enabled = !busy && schoolPresenceActive,
-                        modifier = Modifier.fillMaxWidth(),
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                    color = Color.White,
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Text("Confirmar pase de lista")
-                    }
-                } else if (confirmed != null) {
-                    val needsReview = attendanceRecordRequiresReview(confirmed)
-                    val isRejected = confirmed.status == AttendanceStatus.REJECTED
-                    StatusNotice(
-                        title =
-                            when {
-                                isRejected -> "Pase rechazado"
-                                needsReview -> "Pase recibido · en revisión"
-                                else -> "Resultado de asistencia"
-                            },
-                        message = classCallRecordMessage(confirmed),
-                        tone =
-                            when {
-                                isRejected -> NoticeTone.ERROR
-                                needsReview || confirmed.disposition == AttendanceDisposition.ABSENT -> NoticeTone.WARNING
-                                else -> NoticeTone.SUCCESS
-                            },
-                    )
-                }
-                if (!schoolPresenceActive && confirmed == null) {
-                    Text(
-                        "Para confirmar el pase, primero registra tu jornada con el QR institucional. " +
-                            "Si hay una incidencia, consulta al docente.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = CompanionColors.onDarkSurfaceVariant,
-                    )
-                }
-                if (confirmed == null && local == null) {
-                    TextButton(
-                        onClick = { showContingencyDialog = true },
-                        enabled = !busy,
-                    ) { Text("¿Problemas con el pase? · Contingencia") }
-                }
-                if (showContingencyDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showContingencyDialog = false },
-                        title = { Text("Contingencia de clase") },
-                        text = {
-                            Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
-                                Text("Solo si tu docente te proporcionó un QR o código alternativo. No sustituye su revisión.")
-                                TextButton(
-                                    onClick = {
-                                        showContingencyDialog = false
-                                        onScan()
-                                    },
-                                ) {
-                                    Text("Escanear QR del docente")
-                                }
-                                TextButton(
-                                    onClick = {
-                                        showContingencyDialog = false
-                                        onImage()
-                                    },
-                                ) {
-                                    Text("Elegir imagen del código")
-                                }
-                                TextButton(
-                                    onClick = {
-                                        showContingencyDialog = false
-                                        onPaste()
-                                    },
-                                ) {
-                                    Text("Pegar código")
-                                }
+                        Box(
+                            modifier =
+                                Modifier
+                                    .width(36.dp)
+                                    .height(4.dp)
+                                    .background(Color(0xFFE0E0E0), CircleShape),
+                        )
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(
+                                text = "Control de asistencia",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF191A1C),
+                            )
+                            Text(
+                                text = "Registra tu presencia en esta clase.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF666666),
+                            )
+                        }
+                        if (confirmed == null && local == null) {
+                            Button(
+                                onClick = onConfirm,
+                                enabled = !busy && schoolPresenceActive,
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .testTag("confirm_attendance_button")
+                                        .semantics { contentDescription = "Confirmar asistencia" },
+                                shape = RoundedCornerShape(16.dp),
+                                colors =
+                                    androidx.compose.material3.ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFF8A1538),
+                                        contentColor = Color.White,
+                                    ),
+                                contentPadding = PaddingValues(vertical = 14.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.CheckCircle,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                                Text(
+                                    text = "Confirmar asistencia",
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(start = 8.dp),
+                                )
                             }
-                        },
-                        confirmButton = {
-                            TextButton(onClick = { showContingencyDialog = false }) { Text("Cerrar") }
-                        },
-                    )
+                        } else if (confirmed != null) {
+                            val needsReview = attendanceRecordRequiresReview(confirmed)
+                            val isRejected = confirmed.status == AttendanceStatus.REJECTED
+                            StatusNotice(
+                                title =
+                                    when {
+                                        isRejected -> "Pase rechazado"
+                                        needsReview -> "Pase recibido · en revisión"
+                                        else -> "Resultado de asistencia"
+                                    },
+                                message = classCallRecordMessage(confirmed),
+                                tone =
+                                    when {
+                                        isRejected -> NoticeTone.ERROR
+                                        needsReview || confirmed.disposition == AttendanceDisposition.ABSENT -> NoticeTone.WARNING
+                                        else -> NoticeTone.SUCCESS
+                                    },
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                text = "${session.scheduledStartsAt} – ${session.scheduledEndsAt}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color(0xFF666666),
+                            )
+                            Text(
+                                text = occurrence?.classroomName?.let { "Aula $it" } ?: session.groupName,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color(0xFF666666),
+                            )
+                        }
+                        if (!schoolPresenceActive && confirmed == null) {
+                            Text(
+                                text =
+                                    "Para confirmar el pase, primero registra tu jornada con el QR institucional. " +
+                                        "Si hay una incidencia, consulta al docente.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF666666),
+                            )
+                        }
+                        if (confirmed == null && local == null) {
+                            TextButton(
+                                onClick = { showContingencyDialog = true },
+                                enabled = !busy,
+                            ) {
+                                Text("¿Problemas con el pase? · Contingencia", color = Color(0xFF8A1538))
+                            }
+                        }
+                    }
                 }
             }
+        }
+
+        if (showContingencyDialog) {
+            AlertDialog(
+                onDismissRequest = { showContingencyDialog = false },
+                title = { Text("Contingencia de clase") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
+                        Text("Solo si tu docente te proporcionó un QR o código alternativo. No sustituye su revisión.")
+                        TextButton(
+                            onClick = {
+                                showContingencyDialog = false
+                                onScan()
+                            },
+                        ) {
+                            Text("Escanear QR del docente")
+                        }
+                        TextButton(
+                            onClick = {
+                                showContingencyDialog = false
+                                onImage()
+                            },
+                        ) {
+                            Text("Elegir imagen del código")
+                        }
+                        TextButton(
+                            onClick = {
+                                showContingencyDialog = false
+                                onPaste()
+                            },
+                        ) {
+                            Text("Pegar código")
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showContingencyDialog = false }) { Text("Cerrar") }
+                },
+            )
         }
 
         local?.let { localAttendanceStatus(it) }
@@ -883,8 +993,14 @@ private fun teacherAttendanceBody(
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
         ) {
             item {
-                V8ScreenHeader {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                CompaneroHeroSurface(
+                    modifier = Modifier.fillMaxWidth(),
+                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(CompaneroSpacing.md),
+                        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                    ) {
                         Text(
                             "Asistencia",
                             style = MaterialTheme.typography.headlineLarge,

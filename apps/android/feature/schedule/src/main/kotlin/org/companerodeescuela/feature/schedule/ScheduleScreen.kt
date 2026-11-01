@@ -32,6 +32,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -58,6 +59,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -109,7 +111,8 @@ fun ScheduleScreen(
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val importProcessor = remember(context) { ScheduleImportProcessor(context) }
-    var mode by rememberSaveable { mutableStateOf(AgendaMode.WEEK) }
+    val compactScreen = LocalConfiguration.current.screenWidthDp < 600
+    var mode by rememberSaveable { mutableStateOf(if (compactScreen) AgendaMode.DAY else AgendaMode.WEEK) }
     var weekFocusDay by rememberSaveable { mutableStateOf("MONDAY") }
     var subjectFilter by rememberSaveable { mutableStateOf<String?>(null) }
     var showEditor by remember { mutableStateOf(false) }
@@ -200,12 +203,19 @@ fun ScheduleScreen(
                     weekFocusDay = displayedDays[index]
                 },
             )
-            state.successMessage?.let {
-                StatusNotice(
-                    title = "Listo",
-                    message = it,
-                    tone = NoticeTone.SUCCESS,
-                )
+            state.successMessage?.let { message ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(message, style = MaterialTheme.typography.bodyMedium)
+                }
             }
 
             if (state.undoDrafts.isNotEmpty()) {
@@ -295,7 +305,6 @@ fun ScheduleScreen(
                             DayAgenda(
                                 entries = visibleEntries,
                                 selectedDay = visibleSelectedDay,
-                                onSelectedDay = { selectedDay = it },
                                 onEdit = {
                                     editingEntry = it
                                     editingImportIndex = null
@@ -520,78 +529,21 @@ private fun EmptyScheduleActions(
 private fun DayAgenda(
     entries: List<ScheduleEntry>,
     selectedDay: String,
-    onSelectedDay: (String) -> Unit,
     onEdit: (ScheduleEntry) -> Unit,
     onDelete: (ScheduleEntry) -> Unit,
     onMoveRequest: (AgendaMoveProposal) -> Unit,
 ) {
-    val days = weeklyAgendaDays(entries)
-    val dayEntries = entries.filter { it.dayOfWeek == selectedDay }
-
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        if (maxWidth >= CompaneroWindowBreakpoints.medium) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
-                verticalAlignment = Alignment.Top,
-            ) {
-                Column(
-                    modifier = Modifier.width(CompaneroSize.agendaRailWidth),
-                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
-                ) {
-                    days.forEach { day ->
-                        V8GlassFilterChip(
-                            selected = selectedDay == day,
-                            onClick = { onSelectedDay(day) },
-                            label = { Text(dayLabel(day)) },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
-                DayAgendaDetails(
-                    day = selectedDay,
-                    entries = dayEntries,
-                    onEdit = onEdit,
-                    onDelete = onDelete,
-                    onMoveRequest = onMoveRequest,
-                    allEntries = entries,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md)) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
-                ) {
-                    days.chunked(3).forEach { rowDays ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
-                        ) {
-                            rowDays.forEach { day ->
-                                V8GlassFilterChip(
-                                    selected = selectedDay == day,
-                                    onClick = { onSelectedDay(day) },
-                                    label = { Text(dayShortLabel(day)) },
-                                    modifier = Modifier.weight(1f),
-                                )
-                            }
-                        }
-                    }
-                }
-                DayAgendaDetails(
-                    day = selectedDay,
-                    entries = dayEntries,
-                    onEdit = onEdit,
-                    onDelete = onDelete,
-                    onMoveRequest = onMoveRequest,
-                    allEntries = entries,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
-    }
+    // The screen-level date strip is the single source of day selection.
+    // Avoid rendering a second 2x3 chip grid above every day timeline on phones.
+    DayAgendaDetails(
+        day = selectedDay,
+        entries = entries.filter { it.dayOfWeek == selectedDay },
+        onEdit = onEdit,
+        onDelete = onDelete,
+        onMoveRequest = onMoveRequest,
+        allEntries = entries,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable

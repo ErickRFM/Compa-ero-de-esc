@@ -61,9 +61,7 @@ import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.designsystem.v8.V8SectionTitle
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
-import org.companerodeescuela.core.ui.component.AcademicClassCard
 import org.companerodeescuela.core.ui.component.AcademicSyncStatusCard
-import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ScheduleEntry
 import java.time.Instant
 import java.time.LocalDate
@@ -155,7 +153,7 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxWidth().padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        val activeOrNext = overview?.current ?: overview?.next
+                        val activeOrNext = featuredHomeClass(overview)
                         val institutionalReady =
                             !state.personalOnly &&
                                 !state.institutionalAccessDenied &&
@@ -166,7 +164,7 @@ fun HomeScreen(
                             text =
                                 when {
                                     activeOrNext == null -> "MI AGENDA"
-                                    overview?.current != null && institutionalReady -> "CLASE EN CURSO"
+                                    overview?.current != null -> "CLASE EN CURSO"
                                     else -> "PRÓXIMA CLASE"
                                 },
                             style = MaterialTheme.typography.labelLarge,
@@ -189,14 +187,19 @@ fun HomeScreen(
                             }
                             HorizontalDivider(color = Color.White.copy(alpha = 0.24f))
                             Text(
-                                text = "${activeOrNext.startsAt} – ${activeOrNext.endsAt}   ·   ${locationLabel(activeOrNext)}",
+                                text =
+                                    (if (overview?.current == null && overview?.next == null) {
+                                        upcomingDayLabel(overview?.nextScheduledDaysAway) + " · "
+                                    } else {
+                                        ""
+                                    }) + "${activeOrNext.startsAt} – ${activeOrNext.endsAt} · ${locationLabel(activeOrNext)}",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = Color.White,
                             )
                         }
                         V8RedPrimaryButton(
-                            text = if (institutionalReady && activeOrNext != null) "Pasar lista" else "Ver mi horario",
-                            onClick = if (institutionalReady && activeOrNext != null) onOpenAttendance else onOpenSchedule,
+                            text = if (canOpenAttendanceFromHome(overview, institutionalReady)) "Pasar lista" else "Ver mi horario",
+                            onClick = if (canOpenAttendanceFromHome(overview, institutionalReady)) onOpenAttendance else onOpenSchedule,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -253,42 +256,18 @@ fun HomeScreen(
                                 HomeDailyStats(day, distinctSubjectCount, onOpenSchedule, onOpenClassrooms)
                                 when {
                                     !day.hasSchedule -> {
-                                        StatusNotice(
-                                            title = "Aún no hay clases en tu horario",
-                                            message =
-                                                "Importa una imagen o PDF o crea tu agenda personal; " +
-                                                    "las clases asignadas desde SIII aparecerán al sincronizar.",
-                                        )
-                                        V8RedPrimaryButton(
-                                            text = "Preparar mi agenda",
-                                            onClick = onOpenSchedule,
-                                            modifier = Modifier.fillMaxWidth(),
+                                        Text(
+                                            "Añade tu primera clase desde Horario.",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
                                     day.classes.isEmpty() -> {
-                                        StatusNotice(
-                                            title = "Día libre",
-                                            message = "Hoy no tienes clases. Tu próxima actividad académica sigue visible abajo.",
+                                        Text(
+                                            "Hoy no tienes clases.",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
-                                        day.nextScheduled?.let { upcoming ->
-                                            Column(
-                                                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
-                                            ) {
-                                                Text(
-                                                    text = "Próxima clase",
-                                                    style = MaterialTheme.typography.titleMedium,
-                                                )
-                                                AcademicClassCard(
-                                                    subject = upcoming.subjectName,
-                                                    time =
-                                                        upcomingDayLabel(day.nextScheduledDaysAway) +
-                                                            " · " + upcoming.startsAt + " – " + upcoming.endsAt,
-                                                    location = locationLabel(upcoming),
-                                                    teacher = upcoming.teacherName,
-                                                    subjectKey = scheduleSubjectKey(upcoming),
-                                                )
-                                            }
-                                        }
                                     }
                                     else -> {
                                         DayTimeline(day, onOpenSchedule)
@@ -334,49 +313,18 @@ fun HomeScreen(
                         HomeDailyStats(day, distinctSubjectCount, onOpenSchedule, onOpenClassrooms)
                         when {
                             !day.hasSchedule -> {
-                                StatusNotice(
-                                    title = "Aún no hay clases en tu horario",
-                                    message =
-                                        "Importa una imagen o PDF o crea tu agenda personal; " +
-                                            "las clases asignadas desde SIII aparecerán al sincronizar.",
-                                )
-                                V8RedPrimaryButton(
-                                    text = "Preparar mi agenda",
-                                    onClick = onOpenSchedule,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
                                 Text(
-                                    text =
-                                        "La agenda local funciona sin integración escolar y conserva " +
-                                            "tus bloques personales, importaciones y recordatorios.",
+                                    "Añade tu primera clase desde Horario.",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                             day.classes.isEmpty() -> {
-                                StatusNotice(
-                                    title = "Día libre",
-                                    message = "Hoy no tienes clases. Tu próxima actividad académica sigue visible abajo.",
+                                Text(
+                                    "Hoy no tienes clases.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                                day.nextScheduled?.let { upcoming ->
-                                    Column(
-                                        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
-                                    ) {
-                                        Text(
-                                            text = "Próxima clase",
-                                            style = MaterialTheme.typography.titleMedium,
-                                        )
-                                        AcademicClassCard(
-                                            subject = upcoming.subjectName,
-                                            time =
-                                                upcomingDayLabel(day.nextScheduledDaysAway) +
-                                                    " · " + upcoming.startsAt + " – " + upcoming.endsAt,
-                                            location = locationLabel(upcoming),
-                                            teacher = upcoming.teacherName,
-                                            subjectKey = scheduleSubjectKey(upcoming),
-                                        )
-                                    }
-                                }
                             }
                             else -> {
                                 DayTimeline(day, onOpenSchedule)
@@ -459,6 +407,15 @@ private fun HomeDailyStats(
         if (largeText) V8DashboardStat("Próxima clase", nextClassStatLabel(day), onSchedule, Modifier.fillMaxWidth(), compact = true)
     }
 }
+
+internal fun featuredHomeClass(day: TodayOverview?): ScheduleEntry? =
+    day?.current ?: day?.next ?: day?.nextScheduled
+
+/** Attendance is an institutional action: a future or personal class never enables it. */
+internal fun canOpenAttendanceFromHome(
+    day: TodayOverview?,
+    institutionalReady: Boolean,
+): Boolean = institutionalReady && day?.current != null
 
 internal data class ClassStatus(
     val label: String?,

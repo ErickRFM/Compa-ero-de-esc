@@ -62,4 +62,8 @@
 <string name="admin_directory_no_results">No accounts match the search and filter.</string>
 <string name="admin_directory_previous">Previous</string>
 <string name="admin_directory_next">Next</string>
+<string name="admin_shortcut_schedule">Paint time slots</string>
+<string name="admin_shortcut_classrooms">Classes and groups</string>
+<string name="admin_shortcut_channel">Classroom notices</string>
+<string name="admin_shortcut_security">Secure access</string>
 </resources>

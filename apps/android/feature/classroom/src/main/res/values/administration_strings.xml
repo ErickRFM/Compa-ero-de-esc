@@ -16,7 +16,7 @@
 <string name="academic_admin_class_create">Asignar materia al grupo</string>
 <string name="academic_admin_subject">Materia</string>
 <string name="academic_admin_room">Aula (opcional)</string>
-<string name="academic_admin_schedule">Publicar horario escolar</string>
+<string name="academic_admin_schedule">Planificar horario del grupo</string>
 <string name="academic_admin_class">Clase asignada</string>
 <string name="academic_admin_day">Día de la semana</string>
 <string name="academic_admin_time_start">Hora inicial (HH:MM)</string>
@@ -38,4 +38,14 @@
 <string name="academic_invite_share">Compartir</string>
 <string name="academic_invite_revoke">Revocar clave</string>
 <string name="academic_invite_generate">Generar código de incorporación · 30 min</string>
+<string name="academic_tab_schedule">Horarios</string>
+<string name="academic_tab_classes">Clases</string>
+<string name="academic_tab_groups">Grupos</string>
+<string name="academic_tab_members">Inscripciones</string>
+<string name="academic_schedule_explainer">Selecciona una clase y una franja. El servidor comprueba permisos y conflictos. Este editor guarda horarios administrativos en Compañero; todavía no publica cambios oficiales en SIII.</string>
+<string name="academic_pick_day">1 · Día</string>
+<string name="academic_pick_start">2 · Inicio</string>
+<string name="academic_pick_duration">3 · Duración</string>
+<string name="academic_pick_preview">Franja elegida: %1$s · %2$s–%3$s</string>
+<string name="academic_pick_unselected">Selecciona un día y una hora de inicio</string>
 </resources>

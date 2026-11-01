@@ -66,4 +66,8 @@
 <string name="admin_link_siii">Link with SIII</string>
 <string name="admin_link_reference">Student or teacher identifier</string>
 <string name="admin_link_reference_help">Enter the student or teacher identifier recorded in SIII.</string>
+<string name="admin_shortcut_schedule">Paint time slots</string>
+<string name="admin_shortcut_classrooms">Classes and groups</string>
+<string name="admin_shortcut_channel">Classroom notices</string>
+<string name="admin_shortcut_security">Secure access</string>
 </resources>

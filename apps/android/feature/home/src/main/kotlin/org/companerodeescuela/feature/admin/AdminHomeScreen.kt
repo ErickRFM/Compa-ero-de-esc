@@ -153,6 +153,39 @@ fun adminHomeScreenContent(
         if (state.loading) CircularProgressIndicator(Modifier.testTag("admin_loading"))
         state.failure?.let { adminFailure(it) }
         if (state.completedOperationId != null) Text(stringResource(R.string.admin_done), modifier = Modifier.testTag("admin_done"))
+        Text(stringResource(R.string.admin_tools), style = MaterialTheme.typography.titleLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            adminShortcutTile(
+                title = stringResource(R.string.admin_schedule),
+                tag = "admin_schedule",
+                description = stringResource(R.string.admin_shortcut_schedule),
+                onClick = onOpenSchedule,
+                modifier = Modifier.weight(1f),
+            )
+            adminShortcutTile(
+                title = stringResource(R.string.admin_classrooms),
+                tag = "admin_classrooms",
+                description = stringResource(R.string.admin_shortcut_classrooms),
+                onClick = onOpenClassrooms,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            adminShortcutTile(
+                title = stringResource(R.string.admin_channel),
+                tag = "admin_channel",
+                description = stringResource(R.string.admin_shortcut_channel),
+                onClick = onOpenChannel,
+                modifier = Modifier.weight(1f),
+            )
+            adminShortcutTile(
+                title = stringResource(R.string.admin_security),
+                tag = "admin_security",
+                description = stringResource(R.string.admin_shortcut_security),
+                onClick = onOpenSecurity,
+                modifier = Modifier.weight(1f),
+            )
+        }
         state.overview?.let { overview ->
             V8GlassCard(Modifier.fillMaxWidth(), emphasized = true) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("admin_metrics")) {
@@ -237,63 +270,6 @@ fun adminHomeScreenContent(
                 }
             }
         }
-        Text(stringResource(R.string.admin_tools), style = MaterialTheme.typography.titleLarge)
-        V8GlassCard(Modifier.fillMaxWidth()) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(
-                    onClick = onOpenClassrooms,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(stringResource(R.string.admin_classrooms))
-                        Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                TextButton(
-                    onClick = onOpenChannel,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(stringResource(R.string.admin_channel))
-                        Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                TextButton(
-                    onClick = onOpenSchedule,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(stringResource(R.string.admin_schedule))
-                        Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                TextButton(
-                    onClick = onOpenSecurity,
-                    modifier = Modifier.fillMaxWidth().testTag("admin_security"),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(stringResource(R.string.admin_security))
-                        Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-        }
     }
     linkTarget?.let { target ->
         AlertDialog(
@@ -333,6 +309,36 @@ fun adminHomeScreenContent(
     }
     state.operation?.let { operation ->
         protectedAdminDialog(operation, state.working, state.failure, onCancel, onAuthorize)
+    }
+}
+
+/** Compact responsive management shortcuts; no duplicate account or schedule authority. */
+@Composable
+private fun adminShortcutTile(
+    title: String,
+    description: String,
+    tag: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    V8GlassCard(modifier = modifier) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                description,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(
+                onClick = onClick,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag(tag),
+            ) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
     }
 }
 

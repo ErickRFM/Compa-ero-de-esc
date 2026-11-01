@@ -66,6 +66,7 @@ import org.companerodeescuela.feature.auth.RegistrationScreen
 import org.companerodeescuela.feature.auth.SessionViewModel
 import org.companerodeescuela.feature.auth.StaffApplicationScreen
 import org.companerodeescuela.feature.channel.ChannelScreen
+import org.companerodeescuela.feature.classroom.ClassroomAdministrationEditor
 import org.companerodeescuela.feature.classroom.ClassroomScreen
 import org.companerodeescuela.feature.coordinator.coordinatorHomeScreen
 import org.companerodeescuela.feature.designsystem.DesignSystemCatalogScreen
@@ -430,7 +431,21 @@ class MainActivity : AppCompatActivity() {
                                                 },
                                             )
                                         }
-                                        composable(Destination.Schedule.route) { ScheduleScreen() }
+                                        composable(Destination.Schedule.route) {
+                                            if (
+                                                roleConfig.experience == AppExperience.ADMIN ||
+                                                roleConfig.experience == AppExperience.SUPER_ADMIN
+                                            ) {
+                                                ClassroomAdministrationEditor(
+                                                    onOpenChannel = {
+                                                        navController.navigate(Destination.Channel.route) { launchSingleTop = true }
+                                                    },
+                                                    startOnSchedule = true,
+                                                )
+                                            } else {
+                                                ScheduleScreen()
+                                            }
+                                        }
                                         composable(Destination.Classrooms.route) {
                                             ClassroomScreen(
                                                 roles = session.roles,

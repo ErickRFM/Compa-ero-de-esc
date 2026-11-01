@@ -66,4 +66,8 @@
 <string name="admin_link_siii">Vincular con SIII</string>
 <string name="admin_link_reference">Matrícula o clave docente</string>
 <string name="admin_link_reference_help">Escribe la matrícula o clave docente que figura en SIII.</string>
+<string name="admin_shortcut_schedule">Pintar franjas</string>
+<string name="admin_shortcut_classrooms">Clases y grupos</string>
+<string name="admin_shortcut_channel">Avisos del grupo</string>
+<string name="admin_shortcut_security">Acceso seguro</string>
 </resources>

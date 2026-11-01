@@ -49,12 +49,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
@@ -70,6 +64,12 @@ import org.companerodeescuela.core.ui.component.AcademicClassCard
 import org.companerodeescuela.core.ui.component.AcademicSyncStatusCard
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ScheduleEntry
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -151,8 +151,10 @@ fun HomeScreen(
                     ) {
                         val activeOrNext = overview?.current ?: overview?.next
                         val institutionalReady =
-                            !state.personalOnly && !state.institutionalAccessDenied &&
-                                !state.fromCache && state.errorMessage == null
+                            !state.personalOnly &&
+                                !state.institutionalAccessDenied &&
+                                !state.fromCache &&
+                                state.errorMessage == null
                         Text(
                             text =
                                 when {
@@ -548,7 +550,6 @@ private fun todayLabel(): String {
     }
 }
 
-
 @Composable
 private fun V25QuickAccessGrid(
     onOpenSchedule: () -> Unit,
@@ -560,7 +561,8 @@ private fun V25QuickAccessGrid(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        val actions = listOf(
+        val actions =
+            listOf(
             Triple("Horario", Icons.Filled.DateRange, onOpenSchedule),
             Triple("Asistencia", Icons.Filled.CheckCircle, onOpenAttendance),
             Triple("Avisos", Icons.Filled.Campaign, onOpenChannel),

@@ -8,6 +8,8 @@ El usuario cambió el alcance a **«Solo trabaja en codigo, las pruebas las hago
 
 Bases verificadas: Compañero `5eba569084cf2742ae130ec15e457c7759d28254`, con PR #241 ya fusionado; SIII `f19d8a0eacf37960aba95e9d09000ce6d4992f7f`. Sus CI anteriores estaban verdes; esos resultados no certifican V24.
 
+Durante el cierre se reconciliaron también Compañero `main@9081df0ce9a8958f831724f52fbba1d28222fef1` (PR #242) y SIII `main@7150280` (PR #158), conservando la rotación HMAC incorporada en paralelo. El contrato SIII fija el receptor integrado `a08244d001d8a65cac9b09ec166e4fbb1e1c6175`; los commits posteriores de documentación no cambian ese código.
+
 ## Matriz de cambios
 
 | Función | Archivos principales | Regresiones preparadas para el usuario | Resultado de código |
@@ -30,6 +32,7 @@ Las rutas Kotlin se encuentran bajo `services/api/src/main/kotlin/org/companerod
 - SIII: `npm run typecheck`, `npm run lint`, `npm run build` aprobados.
 - Formato Kotlin sobre archivos cambiados y `git diff --check`: aprobados.
 - Revisión independiente estática: corregida la selección de pase activo desde historial y una adaptación de fixture; no se ejecutaron pruebas durante la revisión.
+- Revisión de avisos oficiales: corregida pérdida de destinatarios al adelantar versiones y concurrir proyectores; el marcador durable de cola y el CAS por versión previa obligan a recalcular antes de confirmar. Cuatro regresiones sintéticas preparadas; no ejecutadas localmente.
 - Compilación final y hashes de APK: ver archivos de entrega y manifiesto local `build/v24-apk-sha256.txt`.
 
 ## Comandos para la validación del usuario

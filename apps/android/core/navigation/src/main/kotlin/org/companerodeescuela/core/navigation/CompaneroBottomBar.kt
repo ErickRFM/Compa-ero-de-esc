@@ -72,7 +72,7 @@ fun CompaneroBottomBar(
     val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
     val fontScale = LocalDensity.current.fontScale
     val largeText = fontScale >= 1.5f
-    val itemHeight = if (largeText) (44f + 28f * fontScale).dp else 60.dp
+    val itemHeight = if (largeText) (44f + 28f * fontScale).dp else 56.dp
 
     Surface(
         modifier =
@@ -80,19 +80,19 @@ fun CompaneroBottomBar(
                 .navigationBarsPadding()
                 .padding(
                     horizontal = 20.dp,
-                    vertical = 8.dp,
+                    vertical = 6.dp,
                 ),
         shape = CircleShape,
         color = Color(0xFF191A1C),
-        tonalElevation = 6.dp,
-        shadowElevation = 4.dp,
+        tonalElevation = 2.dp,
+        shadowElevation = 2.dp,
     ) {
         BoxWithConstraints(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .height(itemHeight)
-                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
         ) {
             val itemWidth = maxWidth / destinations.size.coerceAtLeast(1)
 
@@ -114,7 +114,7 @@ fun CompaneroBottomBar(
                         Modifier
                             .offset(x = pillOffset)
                             .width(itemWidth)
-                            .height(itemHeight - 12.dp)
+                            .height(itemHeight - 8.dp)
                             .clip(CircleShape)
                             .background(Color.White),
                 )
@@ -136,7 +136,7 @@ fun CompaneroBottomBar(
                         modifier =
                             Modifier
                                 .width(itemWidth)
-                                .height(itemHeight - 12.dp)
+                                .height(itemHeight - 8.dp)
                                 .clip(CircleShape)
                                 .semantics(mergeDescendants = true) {
                                     role = Role.Tab

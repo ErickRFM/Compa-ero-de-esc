@@ -167,7 +167,7 @@ fun ProfileScreen(
                         )
                     }
                     if (onTutorRequest != null && UserRole.TEACHER in roles && UserRole.TUTOR !in roles) {
-                        GroupDivider()
+                        if (onSecurity != null) GroupDivider()
                         ProfileRow(
                             title = stringResource(R.string.profile_tutor_request),
                             detail = stringResource(R.string.profile_tutor_description),

@@ -4,6 +4,7 @@ import org.companerodeescuela.shared.contracts.AcademicLoadResponse
 import org.companerodeescuela.shared.contracts.AcademicProfile
 import org.companerodeescuela.shared.contracts.AcademicScheduleResponse
 import org.companerodeescuela.shared.contracts.ScheduleEntry
+import org.companerodeescuela.shared.contracts.ScheduleSource
 import org.companerodeescuela.shared.contracts.ScheduleRecurrence
 import java.time.Instant
 import java.time.LocalDate
@@ -69,6 +70,33 @@ class TodayScheduleTest {
             )
         assertEquals(false, selected.usesPersonalSchedule)
         assertEquals(listOf("Sistemas oficiales"), selected.overview.classes.map { it.subjectName })
+    }
+
+    @Test
+    fun `merged personal-only response is not labeled institutional`() {
+        val imported = entry("Agenda importada", "08:00", "09:00").copy(source = ScheduleSource.MANUAL)
+        val response =
+            AcademicLoadResponse(
+                student = AcademicProfile("student-1", "Ana"),
+                schedule = AcademicScheduleResponse(ownerId = "student-1", entries = listOf(imported)),
+            )
+        val selected = TodaySchedule.select(response, emptyList(), LocalDateTime.of(2026, 10, 5, 8, 20))
+        assertEquals(true, selected.usesPersonalSchedule)
+        assertEquals("Agenda importada", selected.overview.current?.subjectName)
+    }
+
+    @Test
+    fun `official courses take precedence over merged imports`() {
+        val official = entry("Clase oficial", "09:00", "10:00").copy(source = ScheduleSource.INSTITUTIONAL)
+        val imported = entry("Importada", "08:00", "09:00").copy(source = ScheduleSource.MANUAL)
+        val response =
+            AcademicLoadResponse(
+                student = AcademicProfile("student-1", "Ana"),
+                schedule = AcademicScheduleResponse(ownerId = "student-1", entries = listOf(imported, official)),
+            )
+        val selected = TodaySchedule.select(response, emptyList(), LocalDateTime.of(2026, 10, 5, 8, 20))
+        assertEquals(false, selected.usesPersonalSchedule)
+        assertEquals(listOf("Clase oficial"), selected.overview.classes.map { it.subjectName })
     }
 
     @Test

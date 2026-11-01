@@ -53,13 +53,17 @@ object TodaySchedule {
         personal: List<ScheduleEntry>,
         now: LocalDateTime = LocalDateTime.now(),
     ): HomeScheduleChoice {
-        val usePersonal = academic.schedule.entries.isEmpty() && personal.isNotEmpty()
+        // The repository may already have merged imported personal lessons into
+        // the response. A non-empty timetable is not proof of official enrollment.
+        val institutional = academic.schedule.entries.filter { it.source.name == "INSTITUTIONAL" }
+        val embeddedPersonal = academic.schedule.entries.filterNot { it.source.name == "INSTITUTIONAL" }
+        val usePersonal = institutional.isEmpty() && (embeddedPersonal.isNotEmpty() || personal.isNotEmpty())
         return HomeScheduleChoice(
             overview =
                 if (usePersonal) {
-                    calculateEntries(personal, academic.student.displayName, now)
+                    calculateEntries((embeddedPersonal + personal).distinct(), academic.student.displayName, now)
                 } else {
-                    calculate(academic, now)
+                    calculateEntries(institutional, academic.student.displayName, now)
                 },
             usesPersonalSchedule = usePersonal,
         )

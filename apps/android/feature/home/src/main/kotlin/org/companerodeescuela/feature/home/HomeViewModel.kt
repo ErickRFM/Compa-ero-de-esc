@@ -80,7 +80,7 @@ class HomeViewModel
                         is Outcome.Success -> {
                             val academic = result.value.academic
                             val personal =
-                                if (academic.schedule.entries.isEmpty()) {
+                                if (academic.schedule.entries.none { it.source.name == "INSTITUTIONAL" }) {
                                     when (val saved = personalRepository.list()) {
                                         is Outcome.Success -> saved.value
                                         is Outcome.Failure -> emptyList()
@@ -90,7 +90,7 @@ class HomeViewModel
                                 }
                             val selected = TodaySchedule.select(academic, personal, LocalDateTime.now())
                             latestAcademic = academic.takeUnless { selected.usesPersonalSchedule }
-                            latestPersonal = personal.takeIf { selected.usesPersonalSchedule }
+                            latestPersonal = (academic.schedule.entries + personal).distinct().takeIf { selected.usesPersonalSchedule }
                             _state.value =
                                 HomeUiState(
                                     loading = false,

@@ -48,6 +48,8 @@ dependencies {
     implementation(libs.ktor.serialization.kotlinx.json)
 
     implementation(libs.mongodb.driver.kotlin.coroutine)
+    implementation(platform(libs.netty.bom))
+    implementation(libs.netty.handler)
     implementation(libs.logback.classic)
 
     testImplementation(libs.kotlin.test)

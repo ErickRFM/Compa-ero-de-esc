@@ -95,6 +95,14 @@ class MongoConnectionHealthTest {
         assertFalse(options.retryWrites)
     }
 
+    @Test
+    fun `TLS recovery keeps certificate and hostname validation enabled`() {
+        val options = mongoClientSettings(MongoSettings("mongodb://localhost:27017/?tls=true&retryWrites=false", "readiness_test"))
+        assertTrue(options.sslSettings.isEnabled)
+        assertFalse(options.sslSettings.isInvalidHostNameAllowed)
+        assertFalse(options.retryWrites)
+    }
+
     private suspend fun unavailableMongo(block: suspend (String) -> Unit) {
         // Reserve a local TCP listener that never speaks MongoDB. No remote host or
         // independently running service is needed to exercise driver selection.

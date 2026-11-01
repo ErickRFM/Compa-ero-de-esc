@@ -17,6 +17,10 @@ services:
         value: staging
       - key: API_HOST
         value: 0.0.0.0
+      - key: MONGODB_CONNECT_TIMEOUT_MS
+        value: '30000'
+      - key: MONGODB_SERVER_SELECTION_TIMEOUT_MS
+        value: '30000'
       - key: MONGODB_DATABASE
         value: companero_qa
       - key: MONGODB_URI

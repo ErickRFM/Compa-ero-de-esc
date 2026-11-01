@@ -298,8 +298,7 @@ fun studentAttendanceContent(
                 StatusNotice(
                     title = "Esperando pase del docente",
                     message =
-                        "Recibirás una notificación cuando tu docente abra el pase de lista. " +
-                            "También aparecerá aquí, incluso si no recibiste el aviso.",
+                        "Cuando el docente abra el pase, aparecerá aquí y recibirás un aviso si tienes las notificaciones activas.",
                 )
             }
 
@@ -372,8 +371,20 @@ fun studentAttendanceContent(
                     Text("${historicalRecords.size} registros", style = MaterialTheme.typography.labelMedium)
                 }
             }
-            state.studentHistoryError?.let {
-                StatusNotice(title = "Historial sin actualizar", message = it, tone = NoticeTone.ERROR)
+            state.studentHistoryError?.let { historyError ->
+                // One denied authorization may affect both the active pass and history.
+                // Keep the cause visible above without duplicating the same red alert.
+                val alreadyReported =
+                    state.errorMessage?.let { historyError.contains(it, ignoreCase = true) } == true
+                if (alreadyReported) {
+                    Text(
+                        "Historial no disponible hasta recuperar el acceso.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    StatusNotice(title = "Historial sin actualizar", message = historyError, tone = NoticeTone.ERROR)
+                }
             }
             if (!state.studentHistoryLoaded && state.studentHistoryError == null) {
                 Text("Cargando historial…", style = MaterialTheme.typography.bodySmall)

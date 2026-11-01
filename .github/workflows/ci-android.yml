@@ -289,7 +289,7 @@ jobs:
               assert len(matching) == count and len({case.get('name') for case in matching}) == count, (
                   f'{flavor} expected {count} distinct tests in {cls}'
               )
-          require_distinct('org.companerodeescuela.V12AdministrationUiTest', 5)
+          require_distinct('org.companerodeescuela.V12AdministrationUiTest', 6)
           require_distinct('org.companerodeescuela.AppDistributionSmokeTest', 2)
           require_distinct('org.companerodeescuela.InstitutionalClassesUiTest', 4)
           require_distinct('org.companerodeescuela.CoordinationAttendanceIndicatorsUiTest', 3)

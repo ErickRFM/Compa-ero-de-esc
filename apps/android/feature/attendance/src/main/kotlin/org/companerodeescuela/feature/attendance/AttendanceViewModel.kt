@@ -319,24 +319,15 @@ class AttendanceViewModel
 
         fun openSchoolDayScanner() {
             if (_state.value.mode !in setOf(AttendanceMode.STUDENT, AttendanceMode.TEACHER) || _state.value.actionInProgress) return
+            // Scanning is allowed to open for diagnosis; registration still requires
+            // fresh network evidence and an authorized server decision.
             val network = repository.currentSchoolNetwork()
-            if (network == null) {
-                _state.update {
-                    it.copy(
-                        schoolNetworkSsid = null,
-                        errorMessage =
-                            "Sin Wi-Fi escolar no se verifica la jornada. " +
-                                "Conéctate a la red institucional para registrar tu ingreso.",
-                    )
-                }
-                return
-            }
             _state.update {
                 it.copy(
                     scannerOpen = true,
                     scannerPurpose = ScannerPurpose.SCHOOL_DAY,
                     scannerSessionHint = null,
-                    schoolNetworkSsid = network.ssid,
+                    schoolNetworkSsid = network?.ssid,
                     qrInspection = null,
                     successMessage = null,
                     errorMessage = null,
@@ -417,6 +408,18 @@ class AttendanceViewModel
             val generation = modeGeneration
             val ownerId = _state.value.userId ?: return
             val token = rawToken.trim()
+            if (repository.currentSchoolNetwork() == null) {
+                _state.update {
+                    it.copy(
+                        scannerOpen = false,
+                        schoolNetworkSsid = null,
+                        errorMessage =
+                            "QR leído, pero aún no se registró tu ingreso. " +
+                                "Conéctate al Wi-Fi institucional y vuelve a escanear.",
+                    )
+                }
+                return
+            }
             if (token.isBlank()) {
                 _state.update {
                     it.copy(

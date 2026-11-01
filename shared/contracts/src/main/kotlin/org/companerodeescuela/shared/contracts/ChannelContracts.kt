@@ -125,13 +125,26 @@ data class ChannelPostStats(
 
 @Serializable
 enum class TaskStatus {
-    @SerialName("pending") PENDING,
-    @SerialName("submitting") SUBMITTING,
-    @SerialName("submitted") SUBMITTED,
-    @SerialName("overdue") OVERDUE,
-    @SerialName("returned") RETURNED,
-    @SerialName("reviewed") REVIEWED,
-    @SerialName("error") ERROR,
+    @SerialName("pending")
+    PENDING,
+
+    @SerialName("submitting")
+    SUBMITTING,
+
+    @SerialName("submitted")
+    SUBMITTED,
+
+    @SerialName("overdue")
+    OVERDUE,
+
+    @SerialName("returned")
+    RETURNED,
+
+    @SerialName("reviewed")
+    REVIEWED,
+
+    @SerialName("error")
+    ERROR,
 }
 
 @Serializable

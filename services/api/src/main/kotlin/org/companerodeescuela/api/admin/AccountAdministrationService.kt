@@ -149,7 +149,8 @@ class AccountAdministrationService(
         request: TeacherApplicationRequest,
     ): StaffApplication {
         val current = policy.live(actor.toUserSummary())
-        if (current.roles != setOf(UserRole.STUDENT) || current.emailVerifiedAt == null ||
+        if (current.roles != setOf(UserRole.STUDENT) ||
+            current.emailVerifiedAt == null ||
             current.accountStatus != AccountStatus.ACTIVE
         ) {
             throw ApiException.Forbidden("A verified student account is required to request teacher access")
@@ -166,7 +167,8 @@ class AccountAdministrationService(
         }
         val reference = request.identityReference.trim()
         val preference = request.preferredGroup?.trim()
-        if (reference.length !in 1..160 || reference.any(Char::isISOControl) ||
+        if (reference.length !in 1..160 ||
+            reference.any(Char::isISOControl) ||
             (preference != null && (preference.length !in 1..120 || preference.any(Char::isISOControl)))
         ) {
             throw ApiException.Validation("Teacher identity reference or preferred group is invalid")
@@ -491,12 +493,15 @@ class AccountAdministrationService(
             effectiveInstitution(account).takeIf { account.institutionId == null },
         )
 
-    private fun effectiveInstitution(account: PlatformAccount) =
-        account.institutionId
-            ?: account.registrationIntent?.requestedInstitutionId
-            ?: account.staffApplications().firstOrNull {
+    private fun effectiveInstitution(account: PlatformAccount): String? {
+        val pendingTeacher =
+            account.staffApplications().firstOrNull {
                 it.role == StaffRole.TEACHER && it.status == StaffApplicationStatus.PENDING
-            }?.requestedInstitutionId
+            }
+        return account.institutionId
+            ?: account.registrationIntent?.requestedInstitutionId
+            ?: pendingTeacher?.requestedInstitutionId
+    }
 
     private fun identifier(value: String) {
         if (value.isBlank() ||

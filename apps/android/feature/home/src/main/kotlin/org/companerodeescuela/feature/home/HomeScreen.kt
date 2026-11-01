@@ -117,28 +117,64 @@ fun HomeScreen(
                         ?.replaceFirstChar {
                             if (it.isLowerCase()) it.titlecase(Locale("es", "MX")) else it.toString()
                         }
-                V8ScreenHeader {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        tonalElevation = 2.dp,
+                    ) {
+                        Box(
+                            modifier = Modifier.size(48.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.DateRange,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(26.dp),
+                            )
+                        }
+                    }
+                    Spacer(Modifier.size(12.dp))
+                    Column {
                         Text(
-                            text =
-                                buildAnnotatedString {
-                                    append("Hola")
-                                    if (firstName != null) {
-                                        append(", ")
-                                        withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append(firstName) }
-                                    }
-                                },
-                            modifier = Modifier.padding(top = 8.dp),
-                            fontSize = 32.sp,
-                            lineHeight = 38.sp,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            text = "Compañero de Clase",
+                            style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = "APP ACADÉMICA",
+                            style = MaterialTheme.typography.labelMedium,
+                            letterSpacing = 0.26.sp,
+                            color = MaterialTheme.colorScheme.primary,
                         )
                     }
                 }
+
+                Text(
+                    text =
+                        buildAnnotatedString {
+                            append("Tu vida académica, ")
+                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append("más simple") }
+                        },
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    lineHeight = 42.sp,
+                )
+                Text(
+                    text = "Horario, asistencia, tareas y avisos de tu clase en un solo lugar.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
                 CompaneroHeroSurface(
                     modifier = Modifier.fillMaxWidth(),
-                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                    containerColor = MaterialTheme.colorScheme.primary,
                 ) {
                     Column(
                         modifier =
@@ -153,33 +189,45 @@ fun HomeScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                todayLabel(),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                text = todayLabel(),
+                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.78f),
                                 style = MaterialTheme.typography.labelMedium,
                             )
                             TextButton(onClick = onOpenClassrooms) {
-                                Text("Mis clases  ›", color = MaterialTheme.colorScheme.primary)
+                                Text("Mis clases  ›", color = MaterialTheme.colorScheme.onPrimary)
                             }
                         }
+
                         val activeOrNext = overview?.current ?: overview?.next
                         if (activeOrNext != null) {
                             Text(
-                                text =
-                                    if (overview?.current != null) {
-                                        "EN CURSO · ${activeOrNext.subjectName}"
-                                    } else {
-                                        "PRÓXIMA · ${activeOrNext.subjectName}"
-                                    },
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
+                                text = activeOrNext.subjectName,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimary,
                             )
-                            Text(
-                                text = "${activeOrNext.startsAt} – ${activeOrNext.endsAt} · ${locationLabel(activeOrNext)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = "${activeOrNext.startsAt} – ${activeOrNext.endsAt}",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
+                                )
+                                Text(
+                                    text = "•",
+                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
+                                )
+                                Text(
+                                    text = locationLabel(activeOrNext),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
+                                )
+                            }
                         }
+
                         V8RedPrimaryButton(
                             text = if (state.personalOnly || state.institutionalAccessDenied) "Ver mi horario" else "Ver pase de lista",
                             onClick = if (state.personalOnly || state.institutionalAccessDenied) onOpenSchedule else onOpenAttendance,
@@ -544,21 +592,27 @@ private fun V8QuickAccessGrid(
         items.forEach { (label, icon, onClick) ->
             Surface(
                 modifier = Modifier.weight(1f).clickable(onClick = onClick),
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                tonalElevation = 2.dp,
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp,
             ) {
                 Column(
-                    modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp),
+                    modifier = Modifier.padding(vertical = 14.dp, horizontal = 6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = label,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp),
-                    )
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = label,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(10.dp).size(22.dp),
+                        )
+                    }
                     Text(
                         text = label,
                         style = MaterialTheme.typography.labelMedium,

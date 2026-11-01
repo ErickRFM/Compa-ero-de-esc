@@ -17,6 +17,18 @@ class AgendaGridLayoutTest {
     }
 
     @Test
+    fun `daily late classes show only occupied afternoon and evening hours`() {
+        val layout = agendaGridLayout(listOf(entry("late", "18:30", "20:45")))
+        assertEquals(18 until 21, agendaVisibleHours(layout))
+    }
+
+    @Test
+    fun `short 15 minute classes retain a single visible hour`() {
+        val layout = agendaGridLayout(listOf(entry("brief", "13:45", "14:00")))
+        assertEquals(13 until 14, agendaVisibleHours(layout))
+    }
+
+    @Test
     fun `weekend entries do not duplicate columns`() {
         val days = weeklyAgendaDays(listOf(entry("weekend", "08:00", "09:00").copy(dayOfWeek = "SATURDAY")))
         assertEquals(1, days.count { it == "SATURDAY" })

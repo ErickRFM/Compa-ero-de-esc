@@ -23,7 +23,6 @@ import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -53,17 +53,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
+import org.companerodeescuela.core.designsystem.theme.LocalCompaneroAccentPalette
 import org.companerodeescuela.core.designsystem.v8.V8ClassSummary
 import org.companerodeescuela.core.designsystem.v8.V8DailyClassRow
 import org.companerodeescuela.core.designsystem.v8.V8DashboardStat
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
-import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.designsystem.v8.V8SectionTitle
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
-import org.companerodeescuela.core.ui.component.AcademicClassCard
 import org.companerodeescuela.core.ui.component.AcademicSyncStatusCard
-import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ScheduleEntry
 import java.time.Instant
 import java.time.LocalDate
@@ -79,6 +77,7 @@ fun HomeScreen(
     onOpenSchedule: () -> Unit = {},
     onOpenClassrooms: () -> Unit = {},
     onOpenChannel: () -> Unit = {},
+    onOpenTasks: () -> Unit = onOpenChannel,
     onOpenAttendance: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
@@ -131,80 +130,30 @@ fun HomeScreen(
                                     }
                                 },
                             modifier = Modifier.padding(top = 8.dp),
-                            fontSize = 32.sp,
-                            lineHeight = 38.sp,
+                            fontSize = 28.sp,
+                            lineHeight = 34.sp,
                             color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Bold,
                         )
                     }
                 }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        tonalElevation = 2.dp,
-                    ) {
-                        BoxWithConstraints(
-                            modifier = Modifier.size(48.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.DateRange,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(26.dp),
-                            )
-                        }
-                    }
-                    Spacer(Modifier.size(12.dp))
-                    Column {
-                        Text(
-                            text = "Compañero de Clase",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Text(
-                            text = "APP ACADÉMICA",
-                            style = MaterialTheme.typography.labelMedium,
-                            letterSpacing = 0.26.sp,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                }
-
-                Text(
-                    text =
-                        buildAnnotatedString {
-                            append("Tu vida académica, ")
-                            withStyle(SpanStyle(color = MaterialTheme.colorScheme.primary)) { append("más simple") }
-                        },
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    lineHeight = 42.sp,
-                )
-                Text(
-                    text = "Horario, asistencia, tareas y avisos de tu clase en un solo lugar.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
 
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(24.dp),
-                    color = Color(0xFF8A1538),
-                    shadowElevation = 6.dp,
+                    color =
+                        if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            LocalCompaneroAccentPalette.current.darkContainer
+                        },
+                    shadowElevation = 2.dp,
                 ) {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        val activeOrNext = overview?.current ?: overview?.next
+                        val activeOrNext = featuredHomeClass(overview)
                         val institutionalReady =
                             !state.personalOnly &&
                                 !state.institutionalAccessDenied &&
@@ -214,8 +163,8 @@ fun HomeScreen(
                         Text(
                             text =
                                 when {
-                                    activeOrNext == null -> "TU VIDA ACADÉMICA"
-                                    overview?.current != null && institutionalReady -> "CLASE EN CURSO"
+                                    activeOrNext == null -> "MI AGENDA"
+                                    overview?.current != null -> "CLASE EN CURSO"
                                     else -> "PRÓXIMA CLASE"
                                 },
                             style = MaterialTheme.typography.labelLarge,
@@ -223,7 +172,7 @@ fun HomeScreen(
                             color = Color.White.copy(alpha = 0.88f),
                         )
                         Text(
-                            text = activeOrNext?.subjectName ?: "Organiza tu próxima clase",
+                            text = activeOrNext?.subjectName ?: "Sin clases próximas",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
@@ -237,21 +186,21 @@ fun HomeScreen(
                                 )
                             }
                             HorizontalDivider(color = Color.White.copy(alpha = 0.24f))
+                            val dayPrefix =
+                                if (overview?.current == null && overview?.next == null) {
+                                    upcomingDayLabel(overview?.nextScheduledDaysAway) + " · "
+                                } else {
+                                    ""
+                                }
                             Text(
-                                text = "${activeOrNext.startsAt} – ${activeOrNext.endsAt}   ·   ${locationLabel(activeOrNext)}",
+                                text = dayPrefix + "${activeOrNext.startsAt} – ${activeOrNext.endsAt} · ${locationLabel(activeOrNext)}",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = Color.White,
-                            )
-                        } else {
-                            Text(
-                                text = "Cuando haya clases disponibles, aparecerán aquí.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White.copy(alpha = 0.9f),
                             )
                         }
                         TextButton(
                             onClick =
-                                if (institutionalReady && activeOrNext != null) {
+                                if (canOpenAttendanceFromHome(overview, institutionalReady)) {
                                     onOpenAttendance
                                 } else {
                                     onOpenSchedule
@@ -260,19 +209,10 @@ fun HomeScreen(
                             colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
                         ) {
                             Text(
-                                if (institutionalReady && activeOrNext != null) {
-                                    "Ver asistencia  ›"
-                                } else {
-                                    "Abrir horario  ›"
-                                },
-                                fontWeight = FontWeight.Bold,
+                                if (canOpenAttendanceFromHome(overview, institutionalReady)) "Pasar lista" else "Ver mi horario",
+                                fontWeight = FontWeight.SemiBold,
                             )
                         }
-                        V8RedPrimaryButton(
-                            text = if (state.personalOnly || state.institutionalAccessDenied) "Ver mi horario" else "Ver pase de lista",
-                            onClick = if (state.personalOnly || state.institutionalAccessDenied) onOpenSchedule else onOpenAttendance,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
                     }
                 }
 
@@ -327,42 +267,18 @@ fun HomeScreen(
                                 HomeDailyStats(day, distinctSubjectCount, onOpenSchedule, onOpenClassrooms)
                                 when {
                                     !day.hasSchedule -> {
-                                        StatusNotice(
-                                            title = "Aún no hay clases en tu horario",
-                                            message =
-                                                "Importa una imagen o PDF o crea tu agenda personal; " +
-                                                    "las clases asignadas desde SIII aparecerán al sincronizar.",
-                                        )
-                                        V8RedPrimaryButton(
-                                            text = "Preparar mi agenda",
-                                            onClick = onOpenSchedule,
-                                            modifier = Modifier.fillMaxWidth(),
+                                        Text(
+                                            "Añade tu primera clase desde Horario.",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
                                     day.classes.isEmpty() -> {
-                                        StatusNotice(
-                                            title = "Día libre",
-                                            message = "Hoy no tienes clases. Tu próxima actividad académica sigue visible abajo.",
+                                        Text(
+                                            "Hoy no tienes clases.",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
-                                        day.nextScheduled?.let { upcoming ->
-                                            Column(
-                                                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
-                                            ) {
-                                                Text(
-                                                    text = "Próxima clase",
-                                                    style = MaterialTheme.typography.titleMedium,
-                                                )
-                                                AcademicClassCard(
-                                                    subject = upcoming.subjectName,
-                                                    time =
-                                                        upcomingDayLabel(day.nextScheduledDaysAway) +
-                                                            " · " + upcoming.startsAt + " – " + upcoming.endsAt,
-                                                    location = locationLabel(upcoming),
-                                                    teacher = upcoming.teacherName,
-                                                    subjectKey = scheduleSubjectKey(upcoming),
-                                                )
-                                            }
-                                        }
                                     }
                                     else -> {
                                         DayTimeline(day, onOpenSchedule)
@@ -383,17 +299,12 @@ fun HomeScreen(
                                 V8GlassCard(modifier = Modifier.fillMaxWidth()) {
                                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Text(
-                                            text = "Canal de tus clases",
+                                            text = "Avisos de clase",
                                             style = MaterialTheme.typography.titleMedium,
                                             color = MaterialTheme.colorScheme.onSurface,
                                         )
-                                        Text(
-                                            text = "Consulta avisos y materiales publicados por tus docentes.",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
                                         TextButton(onClick = onOpenChannel) {
-                                            Text("Ver canales y avisos  ›", color = MaterialTheme.colorScheme.primary)
+                                            Text("Abrir canales  ›", color = MaterialTheme.colorScheme.primary)
                                         }
                                     }
                                 }
@@ -413,49 +324,18 @@ fun HomeScreen(
                         HomeDailyStats(day, distinctSubjectCount, onOpenSchedule, onOpenClassrooms)
                         when {
                             !day.hasSchedule -> {
-                                StatusNotice(
-                                    title = "Aún no hay clases en tu horario",
-                                    message =
-                                        "Importa una imagen o PDF o crea tu agenda personal; " +
-                                            "las clases asignadas desde SIII aparecerán al sincronizar.",
-                                )
-                                V8RedPrimaryButton(
-                                    text = "Preparar mi agenda",
-                                    onClick = onOpenSchedule,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
                                 Text(
-                                    text =
-                                        "La agenda local funciona sin integración escolar y conserva " +
-                                            "tus bloques personales, importaciones y recordatorios.",
+                                    "Añade tu primera clase desde Horario.",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                             day.classes.isEmpty() -> {
-                                StatusNotice(
-                                    title = "Día libre",
-                                    message = "Hoy no tienes clases. Tu próxima actividad académica sigue visible abajo.",
+                                Text(
+                                    "Hoy no tienes clases.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                                day.nextScheduled?.let { upcoming ->
-                                    Column(
-                                        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
-                                    ) {
-                                        Text(
-                                            text = "Próxima clase",
-                                            style = MaterialTheme.typography.titleMedium,
-                                        )
-                                        AcademicClassCard(
-                                            subject = upcoming.subjectName,
-                                            time =
-                                                upcomingDayLabel(day.nextScheduledDaysAway) +
-                                                    " · " + upcoming.startsAt + " – " + upcoming.endsAt,
-                                            location = locationLabel(upcoming),
-                                            teacher = upcoming.teacherName,
-                                            subjectKey = scheduleSubjectKey(upcoming),
-                                        )
-                                    }
-                                }
                             }
                             else -> {
                                 DayTimeline(day, onOpenSchedule)
@@ -471,17 +351,12 @@ fun HomeScreen(
                         V8GlassCard(modifier = Modifier.fillMaxWidth()) {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(
-                                    text = "Canal de tus clases",
+                                    text = "Avisos de clase",
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.onSurface,
                                 )
-                                Text(
-                                    text = "Consulta avisos y materiales publicados por tus docentes.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
                                 TextButton(onClick = onOpenChannel) {
-                                    Text("Ver canales y avisos  ›", color = MaterialTheme.colorScheme.primary)
+                                    Text("Abrir canales  ›", color = MaterialTheme.colorScheme.primary)
                                 }
                             }
                         }
@@ -543,6 +418,14 @@ private fun HomeDailyStats(
         if (largeText) V8DashboardStat("Próxima clase", nextClassStatLabel(day), onSchedule, Modifier.fillMaxWidth(), compact = true)
     }
 }
+
+internal fun featuredHomeClass(day: TodayOverview?): ScheduleEntry? = day?.current ?: day?.next ?: day?.nextScheduled
+
+/** Attendance is an institutional action: a future or personal class never enables it. */
+internal fun canOpenAttendanceFromHome(
+    day: TodayOverview?,
+    institutionalReady: Boolean,
+): Boolean = institutionalReady && day?.current != null
 
 internal data class ClassStatus(
     val label: String?,
@@ -618,47 +501,56 @@ private fun V8QuickAccessGrid(
     onOpenTasks: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        val items =
-            listOf(
-                Triple("Horario", Icons.Filled.DateRange, onOpenSchedule),
-                Triple("Asistencia", Icons.Filled.CheckCircle, onOpenAttendance),
-                Triple("Avisos", Icons.Filled.Campaign, onOpenChannel),
-                Triple("Tareas", Icons.AutoMirrored.Filled.Assignment, onOpenTasks),
-            )
-        items.forEach { (label, icon, onClick) ->
-            Surface(
-                modifier = Modifier.weight(1f).clickable(onClick = onClick),
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 2.dp,
-            ) {
-                Column(
-                    modifier = Modifier.padding(vertical = 14.dp, horizontal = 6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+    val items =
+        listOf(
+            Triple("Horario", Icons.Filled.DateRange, onOpenSchedule),
+            Triple("Asistencia", Icons.Filled.CheckCircle, onOpenAttendance),
+            Triple("Avisos", Icons.Filled.Campaign, onOpenChannel),
+            Triple("Tareas", Icons.AutoMirrored.Filled.Assignment, onOpenTasks),
+        )
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        // Four compact shortcuts on normal phones, two columns for large text
+        // or small screens so labels remain fully readable without clipping.
+        val columns = if (maxWidth < 328.dp || LocalDensity.current.fontScale >= 1.3f) 2 else 4
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            items.chunked(columns).forEach { group ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                    ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = label,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(10.dp).size(22.dp),
-                        )
+                    group.forEach { (label, icon, onClick) ->
+                        Surface(
+                            modifier = Modifier.weight(1f).clickable(onClickLabel = "Abrir $label", onClick = onClick),
+                            shape = RoundedCornerShape(18.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            shadowElevation = 1.dp,
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(vertical = 14.dp, horizontal = 6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                                ) {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(10.dp).size(22.dp),
+                                    )
+                                }
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
                     }
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                    )
                 }
             }
         }

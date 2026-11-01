@@ -191,6 +191,36 @@ class TodayScheduleTest {
     }
 
     @Test
+    fun `free day home feature shows tomorrow without opening attendance`() {
+        val overview =
+            TodaySchedule.calculateEntries(
+                listOf(entry("Programación móvil", "13:00", "14:00")),
+                now = LocalDateTime.of(2026, 10, 4, 12, 0),
+            )
+        assertEquals("Programación móvil", featuredHomeClass(overview)?.subjectName)
+        assertEquals(1, overview.nextScheduledDaysAway)
+        assertEquals(false, canOpenAttendanceFromHome(overview, institutionalReady = true))
+    }
+
+    @Test
+    fun `home attendance requires a current class and authorized institutional data`() {
+        val current =
+            TodaySchedule.calculateEntries(
+                listOf(entry("Bases de Datos", "10:00", "11:00")),
+                now = LocalDateTime.of(2026, 10, 5, 10, 30),
+            )
+        val upcoming =
+            TodaySchedule.calculateEntries(
+                listOf(entry("Bases de Datos", "10:00", "11:00")),
+                now = LocalDateTime.of(2026, 10, 5, 9, 30),
+            )
+        assertEquals("Bases de Datos", featuredHomeClass(current)?.subjectName)
+        assertEquals(true, canOpenAttendanceFromHome(current, institutionalReady = true))
+        assertEquals(false, canOpenAttendanceFromHome(current, institutionalReady = false))
+        assertEquals(false, canOpenAttendanceFromHome(upcoming, institutionalReady = true))
+    }
+
+    @Test
     fun `empty institutional schedule is identified separately from a free day`() {
         val result =
             TodaySchedule.calculate(

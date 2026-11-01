@@ -501,47 +501,56 @@ private fun V8QuickAccessGrid(
     onOpenTasks: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        val items =
-            listOf(
-                Triple("Horario", Icons.Filled.DateRange, onOpenSchedule),
-                Triple("Asistencia", Icons.Filled.CheckCircle, onOpenAttendance),
-                Triple("Avisos", Icons.Filled.Campaign, onOpenChannel),
-                Triple("Tareas", Icons.AutoMirrored.Filled.Assignment, onOpenTasks),
-            )
-        items.forEach { (label, icon, onClick) ->
-            Surface(
-                modifier = Modifier.weight(1f).clickable(onClick = onClick),
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 2.dp,
-            ) {
-                Column(
-                    modifier = Modifier.padding(vertical = 14.dp, horizontal = 6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+    val items =
+        listOf(
+            Triple("Horario", Icons.Filled.DateRange, onOpenSchedule),
+            Triple("Asistencia", Icons.Filled.CheckCircle, onOpenAttendance),
+            Triple("Avisos", Icons.Filled.Campaign, onOpenChannel),
+            Triple("Tareas", Icons.AutoMirrored.Filled.Assignment, onOpenTasks),
+        )
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        // Four compact shortcuts on normal phones, two columns for large text
+        // or small screens so labels remain fully readable without clipping.
+        val columns = if (maxWidth < 328.dp || LocalDensity.current.fontScale >= 1.3f) 2 else 4
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            items.chunked(columns).forEach { group ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                    ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = label,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(10.dp).size(22.dp),
-                        )
+                    group.forEach { (label, icon, onClick) ->
+                        Surface(
+                            modifier = Modifier.weight(1f).clickable(onClickLabel = "Abrir $label", onClick = onClick),
+                            shape = RoundedCornerShape(18.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            shadowElevation = 1.dp,
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(vertical = 14.dp, horizontal = 6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                                ) {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(10.dp).size(22.dp),
+                                    )
+                                }
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
                     }
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                    )
                 }
             }
         }

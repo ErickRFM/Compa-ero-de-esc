@@ -83,19 +83,12 @@ fun ProfileScreen(
                     .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "Mi perfil",
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = "Tus datos, preferencias y acceso escolar en un solo lugar.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            Text(
+                text = "Mi perfil",
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
 
             V8GlassCard(modifier = Modifier.fillMaxWidth()) {
                 Row(
@@ -153,13 +146,13 @@ fun ProfileScreen(
                 GroupDivider()
                 ProfileRow(
                     title = "Sistema escolar",
-                    detail = "Estado, sincronización y fuentes académicas.",
+                    detail = "Vinculación y sincronización con SIII.",
                     onClick = onIntegrations,
                 )
                 GroupDivider()
                 ProfileRow(
                     title = "Privacidad",
-                    detail = "Tus datos académicos solo se comparten con tu institución. Compañero no vende información personal.",
+                    detail = "Uso y protección de tus datos académicos.",
                 )
             }
 
@@ -171,7 +164,7 @@ fun ProfileScreen(
                     if (onRepresentatives != null && UserRole.STUDENT in roles) {
                         ProfileRow(
                             title = "Representantes de grupo",
-                            detail = "Acepta o rechaza tus nombramientos de grupo.",
+                            detail = "Gestiona tus nombramientos.",
                             onClick = onRepresentatives,
                         )
                         if (onSecurity != null || (onTutorRequest != null && UserRole.TEACHER in roles)) GroupDivider()

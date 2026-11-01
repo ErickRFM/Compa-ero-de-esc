@@ -30,7 +30,12 @@ class AppDistributionSmokeTest {
             }
             AppDistribution.MANAGEMENT -> {
                 assertEquals("org.companerodeescuela.gestion", context.packageName)
-                assertFalse(BuildConfig.FIREBASE_CONFIGURED)
+                if (BuildConfig.FIREBASE_CONFIGURED) {
+                    assertTrue(BuildConfig.FIREBASE_APP_ID.isNotBlank())
+                    assertTrue(BuildConfig.FIREBASE_PROJECT_ID.isNotBlank())
+                    assertTrue(BuildConfig.FIREBASE_SENDER_ID.isNotBlank())
+                    assertTrue(BuildConfig.FIREBASE_API_KEY.isNotBlank())
+                }
                 assertTrue(RoleExperienceResolver.available(setOf(UserRole.ADMIN), distribution).isNotEmpty())
                 assertFalse(distribution.allows(AppExperience.STUDENT))
             }

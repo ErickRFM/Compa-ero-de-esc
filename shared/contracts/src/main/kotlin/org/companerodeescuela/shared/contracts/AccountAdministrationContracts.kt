@@ -55,6 +55,15 @@ import kotlinx.serialization.Serializable
     val preferredGroup: String? = null,
 )
 
+/** Verified native accounts may request an additional teacher grant; this does not grant authority. */
+@Serializable data class TeacherApplicationRequest(
+    val operationId: String,
+    val expectedAuthRevision: Long,
+    val institutionId: String,
+    val identityReference: String,
+    val preferredGroup: String? = null,
+)
+
 @Serializable data class TutorApprovalScope(
     val academicGroupId: String,
     val periodId: String,

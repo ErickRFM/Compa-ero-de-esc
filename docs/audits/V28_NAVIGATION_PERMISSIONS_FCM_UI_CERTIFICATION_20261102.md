@@ -44,7 +44,7 @@ El sistema implementa **transporte potencialmente real**, pero `PushDeliveryResu
 - Confirmar `FIREBASE_CONFIGURED`, coincidencia de proyecto Firebase, package/flavor Academic y Management, canales Android, permisos POST_NOTIFICATIONS y token registration de un dispositivo identificado de pruebas.
 - Verificar flujo Ktor -> Mongo outbox -> FCM v1 -> token de dispositivo -> `FirebaseMessagingService` o recepción de notificación del SO -> click -> destino autorizado -> consulta API -> estado del recurso.
 - Probar app abierta, segundo plano, terminada, sesión caducada, permiso denegado, token rotado, dispositivo desinstalado, sin Wi-Fi, doble push y usuario que cambia de rol o institución.
-- Las notificaciones específicas de **tarea publicada, devolución, entrega evaluada y plazo** no están aún conectadas a `ChannelTaskService`. Abrir incidencia propia con idempotencia, privacidad, destinatarios por aula y revalidación al entregar.
+- Las notificaciones de **tarea publicada, entrega realizada y revisión** ya están conectadas en V28 mediante outbox; siguen pendientes el aviso de plazo/vencimiento, la observabilidad durable y la prueba física de entrega. El outbox no confirma lectura en Android.
 - Incorporar un diagnóstico administrativo seguro de eventos en cola/aceptados/reintento/rechazados, sin exponer tokens en logs ni prometer “entregada” cuando FCM solo aceptó el mensaje.
 - La pantalla de notificaciones y contador de no leídos requiere fuente durable del servidor, no el número de FCM recibidos.
 
@@ -63,10 +63,23 @@ Revisar **Hoy, Horario, Clase, Canal, Tareas, Pase, Perfil y Administración** c
 1. **P0:** CI verde backend, unit, ktlint, instrumentación Académica y Gestión API 31/35, release APK; solucionar causas reales en logs, no silenciar suites. No fusionar PR #266 mientras haya fallos.
 2. **P0:** E2E en QA real MongoDB de membresía, pase manual, historial, notas Mongo, aislamiento multiinstitución y doble request.
 3. **P0:** prueba física FCM real en ambas APK, revalidación por actor y recurso; cobertura de tareas, canal y avisos.
-4. **P1:** entrada de lista provisional solo por nombre, Excel XLSX, PDF escaneado/OCR y reconciliación segura con identidad verificada sin crear matrícula oficial.
+4. **P1:** entrada de lista provisional solo por nombre, PDF escaneado/OCR y reconciliación segura con identidad verificada sin crear matrícula oficial. Excel XLSX tiene lector nativo en V28, sujeto a CI y pruebas en dispositivo.
 5. **P1:** publicación de horarios compartidos y sincronización limitada con SIII; propuestas y autorización explícita, sin duplicar ERP.
 6. **P1:** consolidar notas privadas de tareas en gradebook nativo, criterios/rúbricas, permisos y optar por exportar a SIII solo tras reconciliación.
 7. **P1:** coherencia UI: capturas por rol, recortar tarjetas largas, tipografía/responsividad, jerarquía, estados, scroll/IME, dark, animaciones y TalkBack.
 8. **P2:** trazas de entrega/métricas, navegación deep link de tarea y badge real no leído, QA de desempeño/cold start y permisos denegados.
 
 **Criterio para merge:** todas las suites requeridas en verde en el último SHA; revisión de PR y regresión de privacidad; evidencia QA de los flujos con capturas y HTTP; sin simulación de datos oficiales; rollback preparado. **Criterio para producción:** merge con versión, build reproducible de ambas APK, deploy/health y pruebas FCM/identidad/autorización sobre el despliegue real.
+
+## 7. Bloque adicional de implementación — 2 noviembre, cierre de revisión
+
+**Código publicado en la misma rama V28, no fusionado ni desplegado:**
+
+- Aviso FCM de revisión: tipo separado `channel_task_review`, identificador y versión de entrega. Antes de despachar se comprueba autorización vigente del alumno, pertenencia actual al Canal y versión de **su propia** revisión. Permite notificar una revisión incluso si la tarea se cerró después de entregarse; descarta eventos de entrega antigua o cambiada. El payload no incluye nota ni feedback privado.
+- Android: reconocimiento centralizado de eventos `channel_task`, `channel_task_submission`, `channel_task_review`; lanzamiento de pestaña Tareas tanto con la actividad viva como en arranque frío, texto de aviso genérico sin información académica privada y pruebas del reconocimiento.
+- XLSX: lector de `xl/worksheets/sheetN.xml` y `sharedStrings.xml` en formato OOXML; misma deduplicación de correo/ID que CSV, sin interpretación de fórmulas ni matrícula SIII. Límites de 2 MB comprimidos, 8 MB descomprimidos, 150 entradas ZIP, 10 hojas, 2500 filas y 100 candidatos por lote; se prohíben DTD/entidades externas. Pruebas de celdas compartidas, inline, IDs numéricos, entidades externas y expansión de ZIP.
+- UI: selector incluye XLSX, botón abreviado «Seleccionar archivo», ayuda explícita de formato/límites y confirmación abreviada para evitar etiquetas largas en 360dp.
+
+**Pruebas y aceptación:** el último SHA anteriormente aprobado antes de este bloque fue `b3400faa`, con backend y cinco trabajos de Android satisfactorios; su CI iOS constaba como `failure` con el job cancelado. Las nuevas modificaciones disparan CI independiente y **no son aprobadas hasta que ese CI termine**. Permanece obligatorio medir entrega FCM real en equipo físico con Android en foreground/background/cerrada, y comparar capturas Android 360/390/430 dp, texto al 200%, TalkBack y tema oscuro.
+
+**Alcance fuera de PR #266:** OCR de PDF escaneado, registros provisionales sin cuenta, propuestas oficiales SIII con revisión/aprobación y recibos de sincronización, motor de horarios compartidos y libro de calificaciones nativo completo. No representar esas funciones como operativas.

@@ -113,7 +113,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         pendingAttendanceSessionId = attendanceSessionId(intent)
         pendingChannelNavigation = isChannelNotificationIntent(intent?.action, intent?.getStringExtra("destination"))
-        pendingChannelTasksTab = intent?.getStringExtra("type") in setOf("channel_task", "channel_task_submission")
+        pendingChannelTasksTab = intent?.getStringExtra("type") in setOf("channel_task", "channel_task_review", "channel_task_submission")
         appearancePreferences.applySavedLanguage()
         val appDistribution = AppDistribution.valueOf(BuildConfig.APP_DISTRIBUTION)
 
@@ -741,7 +741,7 @@ class MainActivity : AppCompatActivity() {
         if (isChannelNotificationIntent(intent.action, intent.getStringExtra("destination"))) {
             pendingChannelNavigation = true
             pendingChannelTasksTab =
-                intent.getStringExtra("type") in setOf("channel_task", "channel_task_submission")
+                intent.getStringExtra("type") in setOf("channel_task", "channel_task_review", "channel_task_submission")
         }
     }
 

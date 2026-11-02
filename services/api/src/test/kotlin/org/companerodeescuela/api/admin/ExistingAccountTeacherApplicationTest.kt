@@ -77,12 +77,12 @@ class ExistingAccountTeacherApplicationTest {
 
             val approval =
                 ApproveStaffRequest(
-                operationId = "approve-teacher",
-                expectedAuthRevision = 0,
-                applicationId = application.id,
-                institutionId = "campus",
-                proof = "",
-            )
+                    operationId = "approve-teacher",
+                    expectedAuthRevision = 0,
+                    applicationId = application.id,
+                    institutionId = "campus",
+                    proof = "",
+                )
             val proof =
                 operator.proof(
                 StepUpAction.APPROVE_STAFF,

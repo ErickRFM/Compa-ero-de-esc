@@ -35,19 +35,29 @@ internal class NativeRosterImportReader(
             val isPdfMime = mime.equals("application/pdf", ignoreCase = true)
             val isPdfName = uri.lastPathSegment?.endsWith(".pdf", ignoreCase = true) == true
             val pdf = isPdfMime || isPdfName
-            val text =
-                if (pdf) {
-                    PDFBoxResourceLoader.init(context.applicationContext)
-                    PDDocument.load(bytes).use { document ->
-                        if (document.numberOfPages !in 1..MAX_PAGES) {
-                            throw IOException("El PDF debe tener entre 1 y 10 páginas")
-                        }
-                        PDFTextStripper().getText(document)
-                    }
+            val xlsx =
+                mime.equals(
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    ignoreCase = true,
+                ) || uri.lastPathSegment?.endsWith(".xlsx", ignoreCase = true) == true
+            val identifiers =
+                if (xlsx) {
+                    parseNativeRosterXlsxIdentifiers(bytes)
                 } else {
-                    bytes.toString(Charsets.UTF_8)
+                    val text =
+                        if (pdf) {
+                            PDFBoxResourceLoader.init(context.applicationContext)
+                            PDDocument.load(bytes).use { document ->
+                                if (document.numberOfPages !in 1..MAX_PAGES) {
+                                    throw IOException("El PDF debe tener entre 1 y 10 páginas")
+                                }
+                                PDFTextStripper().getText(document)
+                            }
+                        } else {
+                            bytes.toString(Charsets.UTF_8)
+                        }
+                    parseNativeRosterIdentifiers(text)
                 }
-            val identifiers = parseNativeRosterIdentifiers(text)
             if (identifiers.isEmpty()) {
                 throw IOException("No se reconocieron correos o identificadores; revisa la lista")
             }

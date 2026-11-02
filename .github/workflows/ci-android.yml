@@ -296,7 +296,7 @@ jobs:
               )
           require_distinct('org.companerodeescuela.V12AdministrationUiTest', 6)
           require_distinct('org.companerodeescuela.AppDistributionSmokeTest', 2)
-          require_distinct('org.companerodeescuela.InstitutionalClassesUiTest', 4)
+          require_distinct('org.companerodeescuela.InstitutionalClassesUiTest', 5)
           require_distinct('org.companerodeescuela.CoordinationAttendanceIndicatorsUiTest', 3)
           require_distinct('org.companerodeescuela.NotificationConsentUiTest', 3)
           require_distinct('org.companerodeescuela.AttendanceTruthUiTest', 8)

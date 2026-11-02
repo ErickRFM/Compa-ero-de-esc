@@ -1022,7 +1022,8 @@ private fun teacherAttendanceBody(
     val eligibleStudents =
         state.roster
             ?.takeIf { it.session.id == active?.id }
-            ?.eligibleStudents.orEmpty()
+            ?.eligibleStudents
+            .orEmpty()
     val schoolRecorded = schoolDayRecordedNow(state)
     Box(modifier = modifier.fillMaxSize()) {
         if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current) {

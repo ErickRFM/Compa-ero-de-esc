@@ -613,7 +613,12 @@ private fun TeacherAssignedClassrooms(
                                         },
                                         enabled = !state.submitting && !importLoading && documentPicker != null,
                                         modifier = Modifier.fillMaxWidth(),
-                                    ) { Text("Elegir lista PDF / CSV / TXT / XLSX") }
+                                    ) { Text("Seleccionar archivo") }
+                                    Text(
+                                        "PDF con texto, CSV, TXT o Excel XLSX · máximo 2 MB y 100 alumnos.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
                                     if (importLoading) {
                                         CircularProgressIndicator()
                                         Text("Leyendo lista de alumnos…", style = MaterialTheme.typography.bodySmall)
@@ -635,7 +640,7 @@ private fun TeacherAssignedClassrooms(
                                             style = MaterialTheme.typography.bodySmall,
                                         )
                                         V8RedPrimaryButton(
-                                            text = "Confirmar incorporación a Compañero",
+                                            text = "Añadir a la clase",
                                             onClick = { onAddMembers(classroom.id, importCandidates) },
                                             enabled = !state.submitting && !importLoading,
                                             modifier = Modifier.fillMaxWidth(),

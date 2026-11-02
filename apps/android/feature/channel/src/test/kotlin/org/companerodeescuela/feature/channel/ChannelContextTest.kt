@@ -19,9 +19,20 @@ import org.companerodeescuela.shared.contracts.TeacherClassContext
 import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChannelContextTest {
+    @Test
+    fun `task deep link is consumed only after a channel is selected`() {
+        assertFalse(shouldConsumeChannelTabRequest(2, channelReady = false))
+        assertTrue(shouldConsumeChannelTabRequest(2, channelReady = true))
+        assertTrue(shouldConsumeChannelTabRequest(0, channelReady = true))
+        assertFalse(shouldConsumeChannelTabRequest(-1, channelReady = true))
+        assertFalse(shouldConsumeChannelTabRequest(3, channelReady = true))
+    }
+
     @Test
     fun `native class resolves by authorized identity despite room group label`() =
         runTest {

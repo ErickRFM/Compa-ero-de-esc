@@ -16,6 +16,7 @@ import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.api.runCatchingCancellable
 import org.companerodeescuela.shared.contracts.ApiResponse
+import org.companerodeescuela.shared.contracts.AddClassMembersRequest
 import org.companerodeescuela.shared.contracts.CreateClassInviteRequest
 import org.companerodeescuela.shared.contracts.CreateClassroomRequest
 import org.companerodeescuela.shared.contracts.JoinClassInviteRequest
@@ -73,6 +74,23 @@ fun Route.classroomRoutes(
                 call.respond(
                     ApiResponse(
                         data = service.join(actor, request.code),
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
+
+            post("/{classroomId}/members") {
+                val actor = call.requireNativeActor(tokenService)
+                val classroomId = call.requireClassroomId()
+                val request = runCatchingCancellable {
+                    call.boundedAuthRequest(AddClassMembersRequest.serializer())
+                }.getOrElse {
+                    if (it is kotlinx.coroutines.CancellationException) throw it
+                    throw ApiException.Validation("Invalid native member import")
+                }
+                call.respond(
+                    ApiResponse(
+                        data = service.addMembers(actor, classroomId, request.identifiers),
                         requestId = call.requestId(),
                     ),
                 )

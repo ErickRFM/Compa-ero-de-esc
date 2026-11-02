@@ -256,6 +256,29 @@ class ClassroomViewModel
             }
         }
 
+        fun addMembers(
+            classroomId: String,
+            identifiers: List<String>,
+        ) {
+            if (_state.value.submitting || identifiers.isEmpty()) return
+            viewModelScope.launch {
+                _state.update { it.copy(submitting = true, errorMessage = null, successMessage = null) }
+                when (val outcome = repository.addMembers(classroomId, identifiers)) {
+                    is Outcome.Success ->
+                        _state.update {
+                            it.copy(
+                                submitting = false,
+                                successMessage = "${outcome.value.size} cuentas vinculadas al Canal de Compañero.",
+                            )
+                        }
+                    is Outcome.Failure ->
+                        _state.update {
+                            it.copy(submitting = false, errorMessage = outcome.error.userMessage)
+                        }
+                }
+            }
+        }
+
         fun generateInvite(classroomId: String) {
             if (_state.value.submitting) return
             viewModelScope.launch {

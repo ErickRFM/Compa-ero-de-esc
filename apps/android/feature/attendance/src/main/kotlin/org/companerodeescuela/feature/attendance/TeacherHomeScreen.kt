@@ -289,7 +289,7 @@ fun TeacherHomeScreen(
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TeacherToolCard("Canal", "Avisos y archivos", Icons.Filled.Campaign, onOpenChannel, Modifier.weight(1f))
-                    TeacherToolCard("Tareas", "Entregas y revisión", Assignment, onOpenTasks, Modifier.weight(1f))
+                    TeacherToolCard("Tareas", "Entregas y revisión", Icons.AutoMirrored.Filled.Assignment, onOpenTasks, Modifier.weight(1f))
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TeacherToolCard("Evaluación", "Excel y calificaciones", Icons.Filled.BarChart, onOpenGrading, Modifier.weight(1f))

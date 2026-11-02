@@ -3,21 +3,25 @@ package org.companerodeescuela.feature.attendance
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.LocalDate
+import java.time.LocalDateTime
+import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.SupervisorJob
 import org.companerodeescuela.core.attendance.AttendanceRepository
 import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.database.LocalAttendanceRecord
 import org.companerodeescuela.shared.contracts.AttendanceDisposition
+import org.companerodeescuela.shared.contracts.AttendanceIdentitySource
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse
 import org.companerodeescuela.shared.contracts.AttendanceQrResponse
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
@@ -26,17 +30,12 @@ import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.AttendanceStatus
 import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
-import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
 import org.companerodeescuela.shared.contracts.ManualAttendanceMarkRequest
-import org.companerodeescuela.shared.contracts.AttendanceDisposition
-import org.companerodeescuela.shared.contracts.AttendanceIdentitySource
+import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
 import org.companerodeescuela.shared.contracts.SchoolPresenceResponse
 import org.companerodeescuela.shared.contracts.TeacherCampusRosterResponse
 import org.companerodeescuela.shared.contracts.TeacherClassContext
 import org.companerodeescuela.shared.contracts.UserRole
-import java.time.LocalDate
-import java.time.LocalDateTime
-import javax.inject.Inject
 
 enum class AttendanceMode {
     LOADING,

@@ -281,12 +281,16 @@ class ClassroomService(
         }
         val group = scopedGroupFor(actor, classroomId)
         val directory = accounts ?: throw ApiException.DependencyUnavailable("Current student identities are unavailable")
-        return repository.listMembershipsForClass(classroomId)
+        val memberships = repository.listMembershipsForClass(classroomId)
+        return memberships
             .filter { it.role == ClassroomMemberRole.STUDENT }
             .mapNotNull { member ->
                 val account = directory.findById(member.userId) ?: return@mapNotNull null
-                if (!account.permitsSession || UserRole.STUDENT !in account.roles ||
-                    account.institutionId != group.institutionId || account.emailVerifiedAt == null
+                if (
+                    !account.permitsSession ||
+                    UserRole.STUDENT !in account.roles ||
+                    account.institutionId != group.institutionId ||
+                    account.emailVerifiedAt == null
                 ) {
                     return@mapNotNull null
                 }
@@ -307,25 +311,30 @@ class ClassroomService(
         }
         val group = scopedGroupFor(actor, classroomId)
         val directory = accounts ?: throw ApiException.DependencyUnavailable("Current student identities are unavailable")
-        if (identifiers.isEmpty() || identifiers.size > 100 || identifiers.any {
-                it.isBlank() || it != it.trim() || it.length > 128 || it.any(Char::isISOControl)
-            }
-        ) {
+        val invalid = identifiers.any {
+            it.isBlank() || it != it.trim() || it.length > 128 || it.any(Char::isISOControl)
+        }
+        if (identifiers.isEmpty() || identifiers.size > 100 || invalid) {
             throw ApiException.Validation("Provide 1 to 100 account emails or ids")
         }
         val unique = identifiers.distinctBy { it.lowercase() }
         // Resolve the whole batch before modifying any membership: never persist partial imports.
-        val students = unique.map { identifier ->
-            val student = directory.findByIdentifier(identifier)
-                ?: throw ApiException.Validation("One or more students need registered accounts")
-            if (!student.permitsSession || student.emailVerifiedAt == null ||
-                student.emailVerifiedAt > clock.instant() ||
-                UserRole.STUDENT !in student.roles || student.institutionId != group.institutionId
-            ) {
-                throw ApiException.Forbidden("Students require verified accounts in the same institution")
-            }
-            student
-        }.distinctBy { it.id }
+        val students =
+            unique.map { identifier ->
+                val student =
+                    directory.findByIdentifier(identifier)
+                        ?: throw ApiException.Validation("One or more students need registered accounts")
+                if (
+                    !student.permitsSession ||
+                    student.emailVerifiedAt == null ||
+                    student.emailVerifiedAt > clock.instant() ||
+                    UserRole.STUDENT !in student.roles ||
+                    student.institutionId != group.institutionId
+                ) {
+                    throw ApiException.Forbidden("Students require verified accounts in the same institution")
+                }
+                student
+            }.distinctBy { it.id }
         val now = clock.instant()
         return students.map { student ->
             repository.addMembershipIfAbsent(

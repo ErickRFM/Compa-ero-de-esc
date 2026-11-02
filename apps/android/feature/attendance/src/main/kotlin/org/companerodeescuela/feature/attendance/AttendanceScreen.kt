@@ -96,6 +96,7 @@ import org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionStatus
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
+import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
 import org.companerodeescuela.shared.contracts.AttendanceStatus
 import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
 import org.companerodeescuela.shared.contracts.TeacherClassContext
@@ -1018,6 +1019,10 @@ private fun teacherAttendanceBody(
             ?.records
             .orEmpty()
     val review = records.filter(::attendanceRecordRequiresReview)
+    val eligibleStudents =
+        state.roster
+            ?.takeIf { it.session.id == active?.id }
+            ?.eligibleStudents.orEmpty()
     val schoolRecorded = schoolDayRecordedNow(state)
     Box(modifier = modifier.fillMaxSize()) {
         if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current) {
@@ -1231,7 +1236,7 @@ private fun teacherAttendanceBody(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
-                if (shown.isEmpty()) {
+                if (shown.isEmpty() && (filter != "Recibidos" || eligibleStudents.isEmpty())) {
                     item {
                         StatusNotice(
                             "Sin registros en este filtro",
@@ -1242,7 +1247,49 @@ private fun teacherAttendanceBody(
                 items(shown, key = AttendanceRecordResponse::id) { record ->
                     rosterRecord(record, state.actionInProgress, state.teacherReviewCompletion, state.errorMessage, onReview, onMark)
                 }
-                if (filter == "Recibidos" && campus?.sessionId == active.id) {
+                if (filter == "Recibidos" && eligibleStudents.isNotEmpty()) {
+                    val missing = eligibleStudents.filter { student -> records.none { it.studentId == student.studentId } }
+                    if (missing.isNotEmpty()) {
+                        item {
+                            Text(
+                                "Alumnos pendientes de pase · ${missing.size}",
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
+                    }
+                    items(missing, key = { "missing:${it.studentId}" }) { student ->
+                        V8GlassCard(Modifier.fillMaxWidth()) {
+                            Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
+                                Text(student.displayName, style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    "Sin pase de clase registrado",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
+                                    items(
+                                        listOf(
+                                            AttendanceDisposition.PRESENT to "Presente",
+                                            AttendanceDisposition.LATE to "Retardo",
+                                            AttendanceDisposition.ABSENT to "Ausente",
+                                        ),
+                                    ) { option ->
+                                        OutlinedButton(
+                                            onClick = {
+                                                onManualMark(
+                                                    student.studentId,
+                                                    option.first,
+                                                    "Decisión de pase manual: ${option.second}",
+                                                )
+                                            },
+                                            enabled = !state.actionInProgress && active.status == AttendanceSessionStatus.OPEN,
+                                        ) { Text(option.second) }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else if (filter == "Recibidos" && campus?.sessionId == active.id) {
                     items(campus.students.filter { student -> records.none { it.studentId == student.studentId } }, key = {
                         "missing:" +
                             it.studentId

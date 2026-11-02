@@ -91,6 +91,7 @@ import org.companerodeescuela.core.ui.component.CompaneroSurface
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.AttendanceDisposition
+import org.companerodeescuela.shared.contracts.AttendanceIdentitySource
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionStatus
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
@@ -211,6 +212,7 @@ fun attendanceScreen(
                 onRefreshRoster = viewModel::refreshRoster,
                 onReview = viewModel::reviewRecord,
                 onMark = viewModel::markRecord,
+                onManualMark = viewModel::markNativeAttendance,
                 modifier = modifier,
                 onStartSchoolDay = openSchoolDay,
                 onSelectHistory = viewModel::selectTeacherHistory,
@@ -966,6 +968,7 @@ fun teacherAttendanceContent(
     modifier: Modifier,
     onStartSchoolDay: () -> Unit = {},
     onSelectHistory: (AttendanceSessionResponse) -> Unit = {},
+    onManualMark: (String, AttendanceDisposition, String) -> Unit = { _, _, _ -> },
 ) {
     key(state.teacherScopeGeneration) {
         teacherAttendanceBody(
@@ -981,6 +984,7 @@ fun teacherAttendanceContent(
             modifier,
             onStartSchoolDay,
             onSelectHistory,
+            onManualMark,
         )
     }
 }
@@ -999,7 +1003,11 @@ private fun teacherAttendanceBody(
     modifier: Modifier,
     onStartSchoolDay: () -> Unit,
     onSelectHistory: (AttendanceSessionResponse) -> Unit,
+    onManualMark: (String, AttendanceDisposition, String) -> Unit,
 ) {
+    var manualStudentId by remember(state.teacherSession?.id) { mutableStateOf("") }
+    var manualNote by remember(state.teacherSession?.id) { mutableStateOf("Pase manual confirmado por el docente") }
+    var manualDisposition by remember(state.teacherSession?.id) { mutableStateOf(AttendanceDisposition.PRESENT) }
     var filter by remember(state.teacherSession?.id) { mutableStateOf("Recibidos") }
     var confirmClose by remember { mutableStateOf(false) }
     val active = state.teacherSession
@@ -1098,6 +1106,53 @@ private fun teacherAttendanceBody(
             } else {
                 item {
                     teacherOccurrenceList(state.occurrences, state.actionInProgress || !schoolRecorded, onOpen)
+                }
+            }
+            if (active?.identitySource == AttendanceIdentitySource.NATIVE && active.academicSource == null) {
+                item {
+                    V8GlassCard(Modifier.fillMaxWidth()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
+                            Text("Pase de lista manual", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                "Escribe el ID de una cuenta de alumno vinculada a la clase. No acredita entrada QR ni matrícula oficial.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            OutlinedTextField(
+                                value = manualStudentId,
+                                onValueChange = { manualStudentId = it.take(128) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                label = { Text("ID del alumno registrado") },
+                            )
+                            OutlinedTextField(
+                                value = manualNote,
+                                onValueChange = { manualNote = it.take(500) },
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text("Motivo de la decisión") },
+                            )
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
+                                items(
+                                    listOf(
+                                        AttendanceDisposition.PRESENT to "Presente",
+                                        AttendanceDisposition.LATE to "Retardo",
+                                        AttendanceDisposition.ABSENT to "Ausente",
+                                    ),
+                                ) { option ->
+                                    FilterChip(
+                                        selected = manualDisposition == option.first,
+                                        onClick = { manualDisposition = option.first },
+                                        label = { Text(option.second) },
+                                    )
+                                }
+                            }
+                            Button(
+                                onClick = { onManualMark(manualStudentId.trim(), manualDisposition, manualNote.trim()) },
+                                enabled = !state.actionInProgress && manualStudentId.isNotBlank() && manualNote.trim().length in 3..500,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text("Registrar pase manual") }
+                        }
+                    }
                 }
             }
             item {

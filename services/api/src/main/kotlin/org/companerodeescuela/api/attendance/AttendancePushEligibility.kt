@@ -2,6 +2,7 @@ package org.companerodeescuela.api.attendance
 
 import org.companerodeescuela.api.academic.NativeAcademicProjection
 import org.companerodeescuela.api.auth.PlatformAccountRepository
+import org.companerodeescuela.api.channel.ChannelTaskService
 import org.companerodeescuela.api.devices.PushOutboxItem
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.presence.SchoolPresenceService
@@ -19,8 +20,14 @@ class AttendancePushEligibility(
     private val presence: SchoolPresenceService?,
     private val clock: Clock = Clock.systemUTC(),
     private val institutions: org.companerodeescuela.api.institutions.InstitutionRepository? = null,
+    private val tasks: ChannelTaskService? = null,
 ) {
     suspend fun allows(item: PushOutboxItem): Boolean {
+        if (item.data["type"] == "channel_task") {
+            val channelId = item.data["channelId"] ?: return false
+            val taskId = item.data["taskId"] ?: return false
+            return tasks?.eligibleTaskNotice(item.owner, channelId, taskId) ?: false
+        }
         if (item.data["type"] == org.companerodeescuela.api.integrations.academic.siii.SiiiAcademicChangeNotifier.TYPE) {
             val id = item.owner.takeIf { it.startsWith("NATIVE:") }?.removePrefix("NATIVE:") ?: return false
             val current = accounts.findById(id) ?: return false

@@ -91,6 +91,11 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
+internal fun shouldConsumeChannelTabRequest(
+    requestedTab: Int,
+    channelReady: Boolean,
+): Boolean = requestedTab in 0..2 && channelReady
+
 private data class PendingChannelTaskUpload(
     val taskId: String,
     val comment: String? = null,
@@ -176,8 +181,8 @@ fun ChannelScreen(
     LaunchedEffect(state.downloadReady?.requestId) {
         state.downloadReady?.let { downloadPicker.launch(it.fileName) }
     }
-    LaunchedEffect(requestedTab) {
-        if (requestedTab in 0..2) {
+    LaunchedEffect(requestedTab, selected?.id) {
+        if (shouldConsumeChannelTabRequest(requestedTab, selected != null)) {
             selectedTab = requestedTab
             onConsumeRequestedTab()
         }
@@ -392,8 +397,8 @@ fun ChannelScreen(
                             pendingUpload = PendingChannelTaskUpload(task.id)
                             taskFilePicker.launch(acceptedTaskFileTypes)
                         },
-                        onReview = { submissionId, status, feedback ->
-                            viewModel.reviewSubmission(task.id, submissionId, status, feedback)
+                        onReview = { submissionId, status, feedback, score ->
+                            viewModel.reviewSubmission(task.id, submissionId, status, feedback, score)
                         },
                         onSetClosed = { closed -> viewModel.setTaskClosed(task.id, closed) },
                         onDownload = { file -> viewModel.downloadTaskFile(task.id, file) },
@@ -666,7 +671,7 @@ private fun ChannelTaskDetails(
     onSubmit: (String) -> Unit,
     onPickSubmissionFiles: (String) -> Unit,
     onPickTaskFiles: () -> Unit,
-    onReview: (String, TaskStatus, String?) -> Unit,
+    onReview: (String, TaskStatus, String?, Double?) -> Unit,
     onSetClosed: (Boolean) -> Unit,
     onDownload: (ChannelPrivateFileMetadata) -> Unit,
 ) {
@@ -731,7 +736,7 @@ private fun ChannelTaskDetails(
                         TaskSubmissionReviewCard(
                             submission = item,
                             busy = busy,
-                            onReview = { status, feedback -> onReview(item.id, status, feedback) },
+                            onReview = { status, feedback, score -> onReview(item.id, status, feedback, score) },
                             onDownload = onDownload,
                         )
                     }
@@ -750,6 +755,13 @@ private fun ChannelTaskDetails(
                         message = it.feedback ?: it.comment ?: "El docente revisará tu entrega.",
                         tone = if (it.feedback == null) NoticeTone.INFO else NoticeTone.WARNING,
                     )
+                    if (it.status == TaskStatus.REVIEWED && it.score != null) {
+                        Text(
+                            "Calificación de tarea: ${it.score} / 10",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                     if (it.files.isNotEmpty()) {
                         Text("Archivos enviados", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                         TaskFileRows(it.files, busy, onDownload)
@@ -815,10 +827,11 @@ private fun TaskFileRows(
 private fun TaskSubmissionReviewCard(
     submission: TaskSubmission,
     busy: Boolean,
-    onReview: (TaskStatus, String?) -> Unit,
+    onReview: (TaskStatus, String?, Double?) -> Unit,
     onDownload: (ChannelPrivateFileMetadata) -> Unit,
 ) {
     var feedback by remember(submission.id, submission.version) { mutableStateOf(submission.feedback.orEmpty()) }
+    var score by remember(submission.id, submission.version) { mutableStateOf(submission.score?.toString().orEmpty()) }
     V8GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
             Text(submission.studentDisplayName, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
@@ -841,16 +854,25 @@ private fun TaskSubmissionReviewCard(
                     enabled = !busy,
                     label = { Text("Comentarios de revisión") },
                 )
+                OutlinedTextField(
+                    value = score,
+                    onValueChange = { score = it.take(6) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !busy,
+                    label = { Text("Calificación de tarea (0 a 10, opcional)") },
+                    isError = score.isNotBlank() && score.toDoubleOrNull()?.let { it.isFinite() && it in 0.0..10.0 } != true,
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
                     TextButton(
-                        onClick = { onReview(TaskStatus.RETURNED, feedback) },
+                        onClick = { onReview(TaskStatus.RETURNED, feedback, null) },
                         enabled = !busy && feedback.isNotBlank(),
                     ) {
                         Text("Devolver")
                     }
                     TextButton(
-                        onClick = { onReview(TaskStatus.REVIEWED, feedback.ifBlank { null }) },
-                        enabled = !busy,
+                        onClick = { onReview(TaskStatus.REVIEWED, feedback.ifBlank { null }, score.toDoubleOrNull()) },
+                        enabled = !busy && (score.isBlank() || score.toDoubleOrNull()?.let { it.isFinite() && it in 0.0..10.0 } == true),
                     ) {
                         Text("Marcar revisada")
                     }

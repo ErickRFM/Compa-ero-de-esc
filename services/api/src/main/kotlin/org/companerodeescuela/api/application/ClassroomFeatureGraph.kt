@@ -75,6 +75,12 @@ fun buildClassroomFeatureGraph(
                 repository = channelRepository,
                 accessPolicy = accessPolicy,
             ),
-        channelTaskService = ChannelTaskService(taskRepository, accessPolicy),
+        channelTaskService =
+            ChannelTaskService(
+                taskRepository,
+                accessPolicy,
+                classrooms = classroomService,
+                accounts = accounts,
+            ),
     )
 }

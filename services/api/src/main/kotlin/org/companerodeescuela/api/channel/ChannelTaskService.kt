@@ -1,6 +1,8 @@
 package org.companerodeescuela.api.channel
 
 import org.companerodeescuela.api.auth.SessionIdentitySource
+import org.companerodeescuela.api.classroom.ClassroomService
+import org.companerodeescuela.api.devices.PushOutboxService
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.shared.contracts.ChannelAttachment
 import org.companerodeescuela.shared.contracts.ChannelFileScope
@@ -21,11 +23,173 @@ import java.security.MessageDigest
 import java.time.Clock
 import java.util.UUID
 
+/** Only the current student's own review may trigger a delayed review push. */
+internal fun isCurrentTaskNotice(
+    task: ChannelTask?,
+    submission: TaskSubmission?,
+    channelId: String,
+    reviewSubmissionId: String?,
+    reviewVersion: Int?,
+): Boolean {
+    if (task == null || task.channelId != channelId) return false
+    if (reviewSubmissionId == null) return !task.closed
+    return submission != null &&
+        submission.channelId == channelId &&
+        submission.taskId == task.id &&
+        submission.id == reviewSubmissionId &&
+        submission.version == reviewVersion &&
+        submission.status in setOf(TaskStatus.RETURNED, TaskStatus.REVIEWED)
+}
+
 class ChannelTaskService(
     private val repository: ChannelTaskRepository,
     private val accessPolicy: ChannelAccessPolicy,
     private val clock: Clock = Clock.systemUTC(),
+    private val classrooms: ClassroomService? = null,
+    private val accounts: org.companerodeescuela.api.auth.PlatformAccountRepository? = null,
 ) {
+    @Volatile
+    private var notifications: PushOutboxService? = null
+
+    fun attachNotifications(service: PushOutboxService) {
+        notifications = service
+    }
+
+    /** Revalidated when retrying delivery, including changed class membership. */
+    suspend fun eligibleTaskNotice(
+        owner: String,
+        channelId: String,
+        taskId: String,
+        reviewSubmissionId: String? = null,
+        reviewVersion: Int? = null,
+    ): Boolean {
+        val id = owner.takeIf { it.startsWith("NATIVE:") }?.removePrefix("NATIVE:") ?: return false
+        val account = accounts?.findById(id) ?: return false
+        if (
+            !account.permitsSession ||
+            account.emailVerifiedAt == null ||
+            UserRole.STUDENT !in account.roles
+        ) {
+            return false
+        }
+        return try {
+            accessPolicy.requireCanRead(
+                id,
+                account.roles,
+                channelId,
+                account.toUserSummary(),
+                SessionIdentitySource.NATIVE,
+            )
+            val task = repository.findTask(channelId, taskId)
+            val submission = if (reviewSubmissionId != null) repository.findSubmissionByStudent(taskId, id) else null
+            isCurrentTaskNotice(task, submission, channelId, reviewSubmissionId, reviewVersion)
+        } catch (_: ApiException.Forbidden) {
+            false
+        } catch (_: ApiException.NotFound) {
+            false
+        } catch (_: ApiException.Unauthorized) {
+            false
+        }
+    }
+
+    /** A teacher receives delivery notices only while the assignment remains valid. */
+    suspend fun eligibleSubmissionNotice(
+        owner: String,
+        channelId: String,
+        taskId: String,
+    ): Boolean {
+        val id = owner.takeIf { it.startsWith("NATIVE:") }?.removePrefix("NATIVE:") ?: return false
+        val teacher = accounts?.findById(id) ?: return false
+        if (!teacher.permitsSession || teacher.emailVerifiedAt == null || UserRole.TEACHER !in teacher.roles) {
+            return false
+        }
+        return try {
+            accessPolicy.requireCanPublish(
+                id,
+                teacher.roles,
+                channelId,
+                teacher.toUserSummary(),
+                SessionIdentitySource.NATIVE,
+            )
+            repository.findTask(channelId, taskId)?.teacherId == id
+        } catch (_: ApiException.Forbidden) {
+            false
+        } catch (_: ApiException.NotFound) {
+            false
+        } catch (_: ApiException.Unauthorized) {
+            false
+        }
+    }
+
+    private suspend fun queueSubmittedNotice(
+        task: ChannelTask,
+        submission: TaskSubmission,
+        identitySource: SessionIdentitySource,
+    ) {
+        if (identitySource != SessionIdentitySource.NATIVE) return
+        val service = notifications ?: return
+        try {
+            service.enqueueForOwner(
+                eventId = "task:${task.id}:submission:${submission.id}:${submission.version}",
+                owner = "NATIVE:${task.teacherId}",
+                title = "Nueva entrega",
+                body = "Hay una entrega para revisar en Compañero.",
+                data =
+                    mapOf(
+                        "type" to "channel_task_submission",
+                        "destination" to "channel",
+                        "channelId" to task.channelId,
+                        "taskId" to task.id,
+                    ),
+                appDistribution = "ACADEMIC",
+            )
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // A notification failure must not turn a persisted submission into an HTTP error.
+        }
+    }
+
+    private suspend fun queueNotice(
+        eventId: String,
+        studentIds: List<String>,
+        channelId: String,
+        taskId: String,
+        review: TaskSubmission? = null,
+    ) {
+        val service = notifications ?: return
+        studentIds.distinct().forEach { id ->
+            try {
+                service.enqueueForOwner(
+                    eventId = eventId,
+                    owner = "NATIVE:$id",
+                    title = "Actualización de clase",
+                    body = "Tienes una tarea o revisión en Compañero.",
+                    data =
+                        mapOf(
+                            "type" to if (review == null) "channel_task" else "channel_task_review",
+                            "destination" to "channel",
+                            "channelId" to channelId,
+                            "taskId" to taskId,
+                        ) +
+                            if (review == null) {
+                                emptyMap()
+                            } else {
+                                mapOf(
+                                    "submissionId" to review.id,
+                                    "submissionVersion" to review.version.toString(),
+                                )
+                            },
+                    appDistribution = "ACADEMIC",
+                )
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // The business write is committed; notification transport is best-effort.
+            }
+        }
+    }
+
     suspend fun listTasks(
         userId: String,
         roles: Set<UserRole>,
@@ -84,6 +248,21 @@ class ChannelTaskService(
             )
         if (!channel.canPublish) throw ApiException.Forbidden()
         if (!repository.createTask(task)) throw ApiException.Conflict("Task could not be created")
+        if (
+            identitySource == SessionIdentitySource.NATIVE &&
+            actor != null &&
+            UserRole.TEACHER in roles &&
+            task.teacherId == actor.id
+        ) {
+            try {
+                val students = classrooms?.activeStudentIdsForTeacher(actor, channelId).orEmpty()
+                queueNotice("task:${task.id}:published", students, channelId, task.id)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Task creation already committed; delivery errors must not cause retries to duplicate it.
+            }
+        }
         return task
     }
 
@@ -220,6 +399,7 @@ class ChannelTaskService(
                     fileIds = request.fileIds.distinct(),
                     submittedAtEpochSeconds = now,
                     feedback = null,
+                    score = null,
                     reviewedAtEpochSeconds = null,
                     version = existing.version + 1,
                     history =
@@ -240,6 +420,7 @@ class ChannelTaskService(
                 if (winner != null && isSameSubmission(winner, request)) return winner.withFiles()
                 throw ApiException.Conflict("Submission was updated by another request")
             }
+            queueSubmittedNotice(task, updated, identitySource)
             return updated.withFiles()
         }
 
@@ -278,6 +459,7 @@ class ChannelTaskService(
             if (winner != null && isSameSubmission(winner, request)) return winner.withFiles()
             throw ApiException.Conflict("A submission already exists for this task")
         }
+        queueSubmittedNotice(task, created, identitySource)
         return created.withFiles()
     }
 
@@ -305,6 +487,13 @@ class ChannelTaskService(
         }
         if (request.expectedVersion != current.version) throw ApiException.Conflict("Submission version is stale")
         val feedback = request.feedback?.trim()?.takeIf(String::isNotEmpty)
+        val score = request.score
+        if (score != null && (!score.isFinite() || score !in 0.0..10.0)) {
+            throw ApiException.Validation("Task grade must be between 0 and 10")
+        }
+        if (request.status == TaskStatus.RETURNED && request.score != null) {
+            throw ApiException.Validation("Returned work cannot receive a published score")
+        }
         if (request.status == TaskStatus.RETURNED && feedback == null) {
             throw ApiException.Validation("Feedback is required when returning work")
         }
@@ -313,6 +502,7 @@ class ChannelTaskService(
             current.copy(
                 status = request.status,
                 feedback = feedback,
+                score = request.score,
                 reviewedAtEpochSeconds = now,
                 version = current.version + 1,
                 history =
@@ -325,10 +515,20 @@ class ChannelTaskService(
                             feedback,
                             userId,
                             now,
+                            request.score,
                         ),
             )
         if (!repository.replaceSubmission(updated, current.version)) {
             throw ApiException.Conflict("Submission was updated by another request")
+        }
+        if (identitySource == SessionIdentitySource.NATIVE) {
+            queueNotice(
+                "task:${task.id}:review:${updated.id}:${updated.version}",
+                listOf(updated.studentId),
+                channelId,
+                task.id,
+                review = updated,
+            )
         }
         return updated.withFiles()
     }
@@ -680,7 +880,8 @@ class ChannelTaskService(
         feedback: String?,
         changedBy: String,
         changedAt: Long,
-    ) = TaskSubmissionVersion(version, status, comment, fileIds, feedback, changedBy, changedAt)
+        score: Double? = null,
+    ) = TaskSubmissionVersion(version, status, comment, fileIds, feedback, changedBy, changedAt, score)
 
     private fun isSameSubmission(
         current: TaskSubmission,

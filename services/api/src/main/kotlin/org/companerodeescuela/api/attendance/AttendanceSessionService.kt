@@ -2,12 +2,14 @@ package org.companerodeescuela.api.attendance
 
 import org.companerodeescuela.api.devices.PushOutboxService
 import org.companerodeescuela.api.errors.ApiException
+import org.companerodeescuela.shared.contracts.AttendanceEligibleStudent
 import org.companerodeescuela.shared.contracts.AttendanceIdentitySource
 import org.companerodeescuela.shared.contracts.AttendancePushContract
 import org.companerodeescuela.shared.contracts.AttendanceRosterResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
+import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.model.ClassOccurrenceStatus
 import java.time.Clock
 import java.time.Duration
@@ -24,6 +26,8 @@ class AttendanceSessionService(
     private val nativeProjection: org.companerodeescuela.api.academic.NativeAcademicProjection? = null,
     private val pushService: PushOutboxService? = null,
     private val schoolPresenceService: org.companerodeescuela.api.presence.SchoolPresenceService? = null,
+    private val accounts: org.companerodeescuela.api.auth.PlatformAccountRepository? = null,
+    private val classrooms: org.companerodeescuela.api.classroom.ClassroomService? = null,
 ) {
     suspend fun openSession(
         teacherId: String,
@@ -381,9 +385,30 @@ class AttendanceSessionService(
     ): AttendanceRosterResponse {
         val session = accessPolicy.requireSession(sessionId)
         accessPolicy.requireOwnerOrAdministrative(actorId, session, allowCrossOwner, nativeActor)
+        val students =
+            if (
+                nativeActor != null &&
+                session.openedBy == nativeActor.id &&
+                UserRole.TEACHER in nativeActor.roles &&
+                session.identitySource == AttendanceIdentitySource.NATIVE &&
+                session.academicSource == null
+            ) {
+                val directory = accounts ?: throw ApiException.DependencyUnavailable("Native student directory is unavailable")
+                val classes = classrooms ?: throw ApiException.DependencyUnavailable("Native classroom roster is unavailable")
+                val ids = classes.activeStudentIdsForTeacher(nativeActor, session.courseId)
+                ids
+                    .mapNotNull { studentId ->
+                        directory.findById(studentId)?.let { student ->
+                            AttendanceEligibleStudent(student.id, student.displayName)
+                        }
+                    }.sortedWith(compareBy({ it.displayName.lowercase() }, { it.studentId }))
+            } else {
+                emptyList()
+            }
         return AttendanceRosterResponse(
             session = session,
             records = repository.recordsForSession(sessionId).map { it.withCurrentPresencePolicy() }.sortedBy { it.studentId },
+            eligibleStudents = students,
         )
     }
 

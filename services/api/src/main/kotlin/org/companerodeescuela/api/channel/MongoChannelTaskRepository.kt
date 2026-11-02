@@ -278,6 +278,7 @@ class MongoChannelTaskRepository(
             .append("fileIds", fileIds)
             .append("submittedAtEpochSeconds", submittedAtEpochSeconds)
             .append("feedback", feedback)
+            .append("score", score)
             .append("reviewedAtEpochSeconds", reviewedAtEpochSeconds)
             .append("version", version)
             .append(
@@ -289,6 +290,7 @@ class MongoChannelTaskRepository(
                         .append("comment", it.comment)
                         .append("fileIds", it.fileIds)
                         .append("feedback", it.feedback)
+                        .append("score", it.score)
                         .append("changedBy", it.changedBy)
                         .append("changedAtEpochSeconds", it.changedAtEpochSeconds)
                 },
@@ -306,6 +308,7 @@ class MongoChannelTaskRepository(
             attachments = getList("attachments", Document::class.java).orEmpty().map { it.toAttachment() },
             submittedAtEpochSeconds = requireLong("submittedAtEpochSeconds"),
             feedback = getString("feedback"),
+            score = (get("score") as? Number)?.toDouble(),
             reviewedAtEpochSeconds = numberAsLong("reviewedAtEpochSeconds"),
             version = getInteger("version", 1),
             fileIds = getList("fileIds", String::class.java).orEmpty(),
@@ -317,6 +320,7 @@ class MongoChannelTaskRepository(
                         comment = it.getString("comment"),
                         fileIds = it.getList("fileIds", String::class.java).orEmpty(),
                         feedback = it.getString("feedback"),
+                        score = (it.get("score") as? Number)?.toDouble(),
                         changedBy = it.getString("changedBy"),
                         changedAtEpochSeconds = it.requireLong("changedAtEpochSeconds"),
                     )

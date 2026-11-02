@@ -208,9 +208,17 @@ data class AttendanceReviewEntry(
 )
 
 @Serializable
+data class AttendanceEligibleStudent(
+    val studentId: String,
+    val displayName: String,
+)
+
+@Serializable
 data class AttendanceRosterResponse(
     val session: AttendanceSessionResponse,
     val records: List<AttendanceRecordResponse>,
+    /** Current authorized roster; does not imply QR, school entry or confirmed presence. */
+    val eligibleStudents: List<AttendanceEligibleStudent> = emptyList(),
 )
 
 @Serializable
@@ -224,6 +232,15 @@ data class ReviewAttendanceRequest(
     val reasonCode: AttendanceReasonCode = AttendanceReasonCode.TEACHER_REVIEW,
     val disposition: AttendanceDisposition? = null,
     val note: String? = null,
+)
+
+/** A teacher decision for a verified native class member; not campus/QR proof. */
+@Serializable
+data class ManualAttendanceMarkRequest(
+    val studentId: String,
+    val disposition: AttendanceDisposition,
+    val note: String,
+    val expectedRevision: Long = 0,
 )
 
 /** A class check-in must be verified server-side; receiving a notification does not count. */

@@ -3,21 +3,25 @@ package org.companerodeescuela.feature.attendance
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.LocalDate
+import java.time.LocalDateTime
+import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.SupervisorJob
 import org.companerodeescuela.core.attendance.AttendanceRepository
 import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.database.LocalAttendanceRecord
 import org.companerodeescuela.shared.contracts.AttendanceDisposition
+import org.companerodeescuela.shared.contracts.AttendanceIdentitySource
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionResponse
 import org.companerodeescuela.shared.contracts.AttendanceQrResponse
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
@@ -26,14 +30,12 @@ import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.AttendanceStatus
 import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
+import org.companerodeescuela.shared.contracts.ManualAttendanceMarkRequest
 import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
 import org.companerodeescuela.shared.contracts.SchoolPresenceResponse
 import org.companerodeescuela.shared.contracts.TeacherCampusRosterResponse
 import org.companerodeescuela.shared.contracts.TeacherClassContext
 import org.companerodeescuela.shared.contracts.UserRole
-import java.time.LocalDate
-import java.time.LocalDateTime
-import javax.inject.Inject
 
 enum class AttendanceMode {
     LOADING,
@@ -808,6 +810,60 @@ class AttendanceViewModel
                                         AttendanceDisposition.ABSENT -> "Alumno marcado como ausente."
                                     },
                             )
+                        }
+                    }
+                    is Outcome.Failure -> teacherActionFailed(result.error)
+                }
+            }
+        }
+
+        fun markNativeAttendance(
+            studentId: String,
+            disposition: AttendanceDisposition,
+            note: String,
+        ) {
+            val snapshot = _state.value
+            val session = snapshot.teacherSession ?: return
+            if (
+                snapshot.mode != AttendanceMode.TEACHER ||
+                snapshot.actionInProgress ||
+                session.identitySource != AttendanceIdentitySource.NATIVE ||
+                session.academicSource != null ||
+                studentId.isBlank() ||
+                note.trim().length !in 3..500
+            ) {
+                return
+            }
+            val expectedRevision =
+                snapshot.roster
+                    ?.records
+                    ?.firstOrNull { it.studentId == studentId }
+                    ?.recordRevision ?: 0L
+            launchTeacherRequest {
+                _state.update { it.copy(actionInProgress = true, errorMessage = null) }
+                val result =
+                    repository.markNative(
+                        session.id,
+                        ManualAttendanceMarkRequest(studentId.trim(), disposition, note.trim(), expectedRevision),
+                    )
+                ensureActive()
+                when (result) {
+                    is Outcome.Success -> {
+                        _state.update { current ->
+                            if (current.teacherSession?.id != session.id) {
+                                current.copy(actionInProgress = false)
+                            } else {
+                                val roster = current.roster
+                                current.copy(
+                                    actionInProgress = false,
+                                    roster =
+                                        roster?.copy(
+                                            records =
+                                                roster.records.filterNot { it.studentId == result.value.studentId } + result.value,
+                                        ),
+                                    successMessage = "Decisión manual registrada por el servidor.",
+                                )
+                            }
                         }
                     }
                     is Outcome.Failure -> teacherActionFailed(result.error)

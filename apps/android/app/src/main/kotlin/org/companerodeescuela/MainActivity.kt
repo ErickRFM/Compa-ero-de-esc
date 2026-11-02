@@ -87,6 +87,7 @@ import org.companerodeescuela.feature.tutoring.TutorRequestsScreen
 import org.companerodeescuela.notifications.PushRegistrationDiagnostics
 import org.companerodeescuela.notifications.PushRegistrationSchedule
 import org.companerodeescuela.notifications.isChannelNotificationIntent
+import org.companerodeescuela.notifications.isTaskNotificationType
 import org.companerodeescuela.notifications.parseAttendanceSessionId
 import org.companerodeescuela.shared.contracts.AttendancePushContract
 import org.companerodeescuela.shared.contracts.TeacherClassContext
@@ -97,6 +98,7 @@ import javax.inject.Inject
 class MainActivity : AppCompatActivity() {
     private var pendingAttendanceSessionId by mutableStateOf<String?>(null)
     private var pendingChannelNavigation by mutableStateOf(false)
+    private var pendingChannelTasksTab by mutableStateOf(false)
 
     @Inject
     lateinit var attendanceSyncScheduler: AttendanceSyncScheduler
@@ -112,6 +114,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         pendingAttendanceSessionId = attendanceSessionId(intent)
         pendingChannelNavigation = isChannelNotificationIntent(intent?.action, intent?.getStringExtra("destination"))
+        pendingChannelTasksTab = isTaskNotificationType(intent?.getStringExtra("type"))
         appearancePreferences.applySavedLanguage()
         val appDistribution = AppDistribution.valueOf(BuildConfig.APP_DISTRIBUTION)
 
@@ -306,9 +309,25 @@ class MainActivity : AppCompatActivity() {
                                     }
                                     LaunchedEffect(pendingChannelNavigation, roleConfig.experience, session.roles) {
                                         if (pendingChannelNavigation && userId != null) {
-                                            pendingChannelNavigation = false
-                                            navController.navigate(Destination.Channel.route) {
-                                                launchSingleTop = true
+                                            val destinationExperience =
+                                                AcademicRoutePolicy.channelExperience(
+                                                    current = roleConfig.experience,
+                                                    roles = session.roles,
+                                                    distribution = appDistribution,
+                                                )
+                                            when {
+                                                destinationExperience == null -> pendingChannelNavigation = false
+                                                destinationExperience != roleConfig.experience -> {
+                                                    preferredExperience = destinationExperience
+                                                }
+                                                else -> {
+                                                    pendingChannelNavigation = false
+                                                    channelTabRequest = if (pendingChannelTasksTab) 2 else 0
+                                                    pendingChannelTasksTab = false
+                                                    navController.navigate(Destination.Channel.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -722,6 +741,8 @@ class MainActivity : AppCompatActivity() {
         pendingAttendanceSessionId = attendanceSessionId(intent)
         if (isChannelNotificationIntent(intent.action, intent.getStringExtra("destination"))) {
             pendingChannelNavigation = true
+            pendingChannelTasksTab =
+                isTaskNotificationType(intent.getStringExtra("type"))
         }
     }
 

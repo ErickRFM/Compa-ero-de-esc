@@ -70,6 +70,19 @@ data class ClassInvite(
 )
 
 @Serializable
+data class ClassroomMemberSummary(
+    val userId: String,
+    val displayName: String,
+    val joinedAtEpochSeconds: Long,
+)
+
+/** Native classroom membership only. Never creates an official SIII enrollment. */
+@Serializable
+data class AddClassMembersRequest(
+    val identifiers: List<String>,
+)
+
+@Serializable
 data class JoinClassInviteRequest(
     val code: String,
 )

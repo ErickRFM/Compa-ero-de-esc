@@ -35,7 +35,6 @@ class RoleExperienceResolverTest {
                 TopLevelDestination.Schedule,
                 TopLevelDestination.Attendance,
                 TopLevelDestination.Classrooms,
-                TopLevelDestination.Profile,
             ),
             config.topLevelDestinations,
         )
@@ -52,7 +51,6 @@ class RoleExperienceResolverTest {
                 TopLevelDestination.TeacherHome,
                 TopLevelDestination.Schedule,
                 TopLevelDestination.Attendance,
-                TopLevelDestination.Classrooms,
                 TopLevelDestination.Channel,
             ),
             config.topLevelDestinations,

@@ -5,6 +5,7 @@ import org.companerodeescuela.api.academic.groups.AcademicGroupRepository
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.shared.contracts.ClassInvite
 import org.companerodeescuela.shared.contracts.ClassroomMemberRole
+import org.companerodeescuela.shared.contracts.ClassroomMemberSummary
 import org.companerodeescuela.shared.contracts.ClassroomMembership
 import org.companerodeescuela.shared.contracts.ClassroomStatus
 import org.companerodeescuela.shared.contracts.ClassroomSummary
@@ -267,6 +268,84 @@ class ClassroomService(
                 ),
             membership = membership.toContract(),
         )
+    }
+
+    suspend fun listMembers(
+        actor: UserSummary,
+        classroomId: String,
+    ): List<ClassroomMemberSummary> {
+        val current = policy().live(actor)
+        val classroom = requireCanPublish(actor, classroomId)
+        if (UserRole.TEACHER !in current.roles || classroom.teacherId != current.id) {
+            throw ApiException.Forbidden("Only the assigned teacher can inspect the class roster")
+        }
+        val group = scopedGroupFor(actor, classroomId)
+        val directory = accounts ?: throw ApiException.DependencyUnavailable("Current student identities are unavailable")
+        val memberships = repository.listMembershipsForClass(classroomId)
+        return memberships
+            .filter { it.role == ClassroomMemberRole.STUDENT }
+            .mapNotNull { member ->
+                val account = directory.findById(member.userId) ?: return@mapNotNull null
+                if (
+                    !account.permitsSession ||
+                    UserRole.STUDENT !in account.roles ||
+                    account.institutionId != group.institutionId ||
+                    account.emailVerifiedAt == null
+                ) {
+                    return@mapNotNull null
+                }
+                ClassroomMemberSummary(member.userId, account.displayName, member.joinedAt.epochSecond)
+            }.sortedWith(compareBy({ it.displayName.lowercase() }, { it.userId }))
+    }
+
+    /** Teacher-managed native memberships; does not assert institutional enrollment. */
+    suspend fun addMembers(
+        actor: UserSummary,
+        classroomId: String,
+        identifiers: List<String>,
+    ): List<ClassroomMembership> {
+        val current = policy().live(actor)
+        val classroom = requireCanPublish(actor, classroomId)
+        if (UserRole.TEACHER !in current.roles || classroom.teacherId != current.id) {
+            throw ApiException.Forbidden("Only the assigned teacher can import native class members")
+        }
+        val group = scopedGroupFor(actor, classroomId)
+        val directory = accounts ?: throw ApiException.DependencyUnavailable("Current student identities are unavailable")
+        val invalid =
+            identifiers.any {
+                it.isBlank() || it != it.trim() || it.length > 128 || it.any(Char::isISOControl)
+            }
+        if (identifiers.isEmpty() || identifiers.size > 100 || invalid) {
+            throw ApiException.Validation("Provide 1 to 100 account emails or ids")
+        }
+        val unique =
+            identifiers.distinctBy { it.lowercase() }
+        // Resolve the whole batch before modifying any membership: never persist partial imports.
+        val resolved =
+            unique.map { identifier ->
+                val student =
+                    directory.findByIdentifier(identifier)
+                        ?: throw ApiException.Validation("One or more students need registered accounts")
+                if (
+                    !student.permitsSession ||
+                    student.emailVerifiedAt == null ||
+                    student.emailVerifiedAt > clock.instant() ||
+                    UserRole.STUDENT !in student.roles ||
+                    student.institutionId != group.institutionId
+                ) {
+                    throw ApiException.Forbidden("Students require verified accounts in the same institution")
+                }
+                student
+            }
+        val students = resolved.distinctBy { it.id }
+        val now = clock.instant()
+        return students.map { student ->
+            val membership =
+                repository.addMembershipIfAbsent(
+                    NativeClassroomMembership(classroomId, student.id, ClassroomMemberRole.STUDENT, now),
+                )
+            membership.toContract()
+        }
     }
 
     suspend fun revokeInvite(

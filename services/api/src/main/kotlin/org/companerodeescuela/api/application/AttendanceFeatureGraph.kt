@@ -65,6 +65,8 @@ fun buildAttendanceFeatureGraph(
                 nativeProjection = nativeProjection,
                 pushService = pushService,
                 schoolPresenceService = schoolPresenceService,
+                accounts = accounts,
+                classrooms = classrooms,
             ),
         studentService =
             AttendanceStudentService(
@@ -81,6 +83,8 @@ fun buildAttendanceFeatureGraph(
             AttendanceReviewService(
                 repository = repository,
                 accessPolicy = accessPolicy,
+                accounts = accounts,
+                classrooms = classrooms,
             ),
         qrService = qrService,
         campusRoster =

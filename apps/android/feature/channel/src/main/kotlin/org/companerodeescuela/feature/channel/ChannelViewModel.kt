@@ -530,6 +530,7 @@ class ChannelViewModel
             submissionId: String,
             status: TaskStatus,
             feedback: String?,
+            score: Double? = null,
         ) {
             val snapshot = _state.value
             val channelId = snapshot.selectedChannelId ?: return
@@ -544,7 +545,7 @@ class ChannelViewModel
                             channelId,
                             taskId,
                             submissionId,
-                            ReviewSubmissionRequest(status, feedback, submission.version),
+                            ReviewSubmissionRequest(status, feedback, submission.version, score),
                         )
                 ) {
                     is Outcome.Success ->

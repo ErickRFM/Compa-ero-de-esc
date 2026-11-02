@@ -77,6 +77,11 @@ jobs:
       - name: Kotlin style check
         run: ./gradlew ktlintCheck --console=plain
 
+      - name: Show Kotlin style diagnostics on failure
+        if: failure()
+        run: |
+          find services/api apps/android shared -path '*/build/reports/ktlint/*' -name '*.txt' -type f -print -exec cat {} \; || true
+
       - name: Compile backend and shared
         run: ./gradlew :services:api:compileKotlin :shared:contracts:compileKotlin :shared:models:compileKotlin :shared:validation:compileKotlin --console=plain
 

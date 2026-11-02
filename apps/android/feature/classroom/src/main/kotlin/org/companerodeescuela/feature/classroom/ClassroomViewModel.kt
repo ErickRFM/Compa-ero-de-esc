@@ -15,6 +15,7 @@ import org.companerodeescuela.core.academic.AcademicRepository
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.shared.contracts.AcademicGroupSummary
 import org.companerodeescuela.shared.contracts.ClassInvite
+import org.companerodeescuela.shared.contracts.ClassroomMemberSummary
 import org.companerodeescuela.shared.contracts.ClassroomSummary
 import org.companerodeescuela.shared.contracts.InstitutionalAcademicSection
 import javax.inject.Inject
@@ -25,6 +26,7 @@ data class ClassroomUiState(
     val classrooms: List<ClassroomSummary> = emptyList(),
     val groups: List<AcademicGroupSummary> = emptyList(),
     val activeInvite: ClassInvite? = null,
+    val members: Map<String, List<ClassroomMemberSummary>> = emptyMap(),
     val errorMessage: String? = null,
     val successMessage: String? = null,
     val institutionalLoading: Boolean = true,
@@ -251,6 +253,41 @@ class ClassroomViewModel
                                 submitting = false,
                                 errorMessage = outcome.error.userMessage,
                             )
+                        }
+                }
+            }
+        }
+
+        fun loadMembers(classroomId: String) {
+            if (_state.value.submitting) return
+            viewModelScope.launch {
+                when (val result = repository.members(classroomId)) {
+                    is Outcome.Success ->
+                        _state.update { it.copy(members = it.members + (classroomId to result.value), errorMessage = null) }
+                    is Outcome.Failure ->
+                        _state.update { it.copy(errorMessage = result.error.userMessage) }
+                }
+            }
+        }
+
+        fun addMembers(
+            classroomId: String,
+            identifiers: List<String>,
+        ) {
+            if (_state.value.submitting || identifiers.isEmpty()) return
+            viewModelScope.launch {
+                _state.update { it.copy(submitting = true, errorMessage = null, successMessage = null) }
+                when (val outcome = repository.addMembers(classroomId, identifiers)) {
+                    is Outcome.Success ->
+                        _state.update {
+                            it.copy(
+                                submitting = false,
+                                successMessage = "${outcome.value.size} cuentas vinculadas al Canal de Compañero.",
+                            )
+                        }
+                    is Outcome.Failure ->
+                        _state.update {
+                            it.copy(submitting = false, errorMessage = outcome.error.userMessage)
                         }
                 }
             }

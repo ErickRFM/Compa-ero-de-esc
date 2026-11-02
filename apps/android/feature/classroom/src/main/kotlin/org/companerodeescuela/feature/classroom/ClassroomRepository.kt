@@ -6,16 +6,19 @@ import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
-import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import io.ktor.http.ContentType
 import org.companerodeescuela.core.common.result.Outcome
-import org.companerodeescuela.core.network.SessionRefreshCoordinator
 import org.companerodeescuela.core.network.apiCall
 import org.companerodeescuela.core.network.requireBody
 import org.companerodeescuela.core.network.requireUnit
+import org.companerodeescuela.core.network.SessionRefreshCoordinator
 import org.companerodeescuela.core.security.SessionTokenStore
+import org.companerodeescuela.shared.contracts.AddClassMembersRequest
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.ClassInvite
+import org.companerodeescuela.shared.contracts.ClassroomMembership
+import org.companerodeescuela.shared.contracts.ClassroomMemberSummary
 import org.companerodeescuela.shared.contracts.ClassroomSummary
 import org.companerodeescuela.shared.contracts.CreateClassInviteRequest
 import org.companerodeescuela.shared.contracts.CreateClassroomRequest
@@ -84,6 +87,30 @@ class ClassroomRepository(
                         contentType(ContentType.Application.Json)
                         setBody(CreateClassInviteRequest(ttlMinutes = ttlMinutes))
                     }.requireBody<ApiResponse<ClassInvite>>()
+            }.map { it.data }
+        }
+
+    suspend fun members(classroomId: String): Outcome<List<ClassroomMemberSummary>> =
+        authorized { token ->
+            apiCall {
+                client
+                    .get("classrooms/$classroomId/members") { bearerAuth(token) }
+                    .requireBody<ApiResponse<List<ClassroomMemberSummary>>>()
+            }.map { it.data }
+        }
+
+    suspend fun addMembers(
+        classroomId: String,
+        identifiers: List<String>,
+    ): Outcome<List<ClassroomMembership>> =
+        authorized { token ->
+            apiCall {
+                client
+                    .post("classrooms/$classroomId/members") {
+                        bearerAuth(token)
+                        contentType(ContentType.Application.Json)
+                        setBody(AddClassMembersRequest(identifiers))
+                    }.requireBody<ApiResponse<List<ClassroomMembership>>>()
             }.map { it.data }
         }
 

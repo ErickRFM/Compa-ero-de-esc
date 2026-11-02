@@ -3,11 +3,21 @@ package org.companerodeescuela.api.attendance
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.contentType
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.Test
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.companerodeescuela.api.academic.groups.InMemoryAcademicGroupRepository
@@ -21,6 +31,7 @@ import org.companerodeescuela.api.auth.SessionIdentitySource
 import org.companerodeescuela.api.classroom.ClassroomService
 import org.companerodeescuela.api.classroom.InMemoryClassroomRepository
 import org.companerodeescuela.api.classroom.NativeClassroom
+import org.companerodeescuela.api.classroom.NativeClassroomMembership
 import org.companerodeescuela.api.integrations.mock.MockAcademicProvider
 import org.companerodeescuela.api.integrations.mock.MockFixtures
 import org.companerodeescuela.api.integrations.mock.MockIdentityProvider
@@ -31,18 +42,13 @@ import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.AttendanceIdentitySource
 import org.companerodeescuela.shared.contracts.AttendanceNotificationEnqueueResponse
+import org.companerodeescuela.shared.contracts.AttendanceRosterResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
+import org.companerodeescuela.shared.contracts.ClassroomMemberRole
 import org.companerodeescuela.shared.contracts.ClassroomStatus
 import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
-import java.time.Clock
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneOffset
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 
 class AttendanceNativeRoutesTest {
     private class Fixture {
@@ -75,7 +81,16 @@ class AttendanceNativeRoutesTest {
                     .InMemoryAcademicScheduleOverrideRepository(),
                 clock,
             )
-        val service = AttendanceSessionService(repository, resolver, policy, clock, nativeProjection = projection)
+        val service =
+            AttendanceSessionService(
+                repository,
+                resolver,
+                policy,
+                clock,
+                nativeProjection = projection,
+                accounts = accounts,
+                classrooms = ClassroomService(classes, groups, clock, accounts = accounts),
+            )
 
         suspend fun initialize() {
             accounts.create(ScopedAcademicFixtures.account(admin))
@@ -83,6 +98,9 @@ class AttendanceNativeRoutesTest {
             accounts.create(ScopedAcademicFixtures.account(student))
             groups.create(ScopedAcademicFixtures.group("6A").copy(institutionId = "campus"))
             groups.create(ScopedAcademicFixtures.group("6B").copy(institutionId = "other"))
+            classes.addMembershipIfAbsent(
+                NativeClassroomMembership("own-class", student.id, ClassroomMemberRole.STUDENT, now),
+            )
             classes.createClassroom(
                 NativeClassroom("own-class", "Own", null, null, "6A", "6A", teacher.id, "Teacher", ClassroomStatus.ACTIVE, now, 0, 0),
             )
@@ -156,7 +174,13 @@ class AttendanceNativeRoutesTest {
                         f.settings,
                         f.service,
                         AttendanceStudentService(f.repository, AttendanceEnrollmentResolver(MockAcademicProvider())),
-                        AttendanceReviewService(f.repository, f.policy, f.clock),
+                        AttendanceReviewService(
+                            f.repository,
+                            f.policy,
+                            f.clock,
+                            f.accounts,
+                            ClassroomService(f.classes, f.groups, f.clock, accounts = f.accounts),
+                        ),
                         AttendanceQrService(
                             CharArray(32) { 's' },
                             f.repository,
@@ -167,6 +191,44 @@ class AttendanceNativeRoutesTest {
                 }
             }
             block(f)
+        }
+
+    @Test fun `native teacher roster lists real eligible students without claiming their presence`() =
+        scenario { f ->
+            val token = f.token(f.teacher)
+            val response = client.get("/attendance/sessions/own/roster") { bearerAuth(token) }
+            assertEquals(HttpStatusCode.OK, response.status)
+            val roster = Json.decodeFromString<ApiResponse<AttendanceRosterResponse>>(response.bodyAsText()).data
+            assertEquals(listOf("student-test"), roster.eligibleStudents.map { it.studentId })
+            assertEquals(emptyList(), roster.records)
+        }
+
+    @Test fun `teacher marks a linked native student manually with revision control`() =
+        scenario { f ->
+            val token = f.token(f.teacher)
+            val request =
+                """{"studentId":"student-test","disposition":"present","note":"Pase manual revisado por docente","expectedRevision":0}"""
+            val first =
+                client.post("/attendance/sessions/own/manual-record") {
+                    bearerAuth(token)
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+            assertEquals(HttpStatusCode.OK, first.status)
+            val retry =
+                client.post("/attendance/sessions/own/manual-record") {
+                    bearerAuth(token)
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+            assertEquals(HttpStatusCode.Conflict, retry.status)
+            val anotherClass =
+                client.post("/attendance/sessions/foreign/manual-record") {
+                    bearerAuth(token)
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
+            assertEquals(HttpStatusCode.Forbidden, anotherClass.status)
         }
 
     @Test fun `actual native admin lists and operates only its persisted classroom sessions`() =

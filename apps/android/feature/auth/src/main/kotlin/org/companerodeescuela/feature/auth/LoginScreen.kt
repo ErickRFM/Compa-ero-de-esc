@@ -43,11 +43,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.companerodeescuela.core.common.result.AppError
@@ -91,24 +94,21 @@ fun LoginScreen(
     }
 
     AuthV8Layout(modifier, themeAware = true) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(bottom = 10.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.auth_hero_title),
-                color = ink,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = stringResource(R.string.auth_hero_accent),
-                color = accent,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-            )
-        }
+        val heroLead = stringResource(R.string.auth_hero_title)
+        val heroAccent = stringResource(R.string.auth_hero_accent)
+        Text(
+            text =
+                buildAnnotatedString {
+                    append(heroLead)
+                    append(" ")
+                    withStyle(SpanStyle(color = accent)) { append(heroAccent) }
+                },
+            color = ink,
+            fontSize = 22.sp,
+            lineHeight = 27.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+        )
 
         LoginAccessCarousel(
             pager = pager,
@@ -195,7 +195,7 @@ fun LoginScreen(
                     enabled = !state.submitting,
                     singleLine = true,
                     shape = RoundedCornerShape(16.dp),
-                    label = { Text(stringResource(R.string.auth_identifier)) },
+                    label = { Text(stringResource(R.string.auth_identifier), fontSize = 14.sp, maxLines = 1) },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Filled.Badge,
@@ -236,7 +236,7 @@ fun LoginScreen(
                     enabled = !state.submitting,
                     singleLine = true,
                     shape = RoundedCornerShape(16.dp),
-                    label = { Text(stringResource(R.string.auth_password)) },
+                    label = { Text(stringResource(R.string.auth_password), fontSize = 14.sp, maxLines = 1) },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Filled.Lock,

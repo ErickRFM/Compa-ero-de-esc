@@ -6,18 +6,23 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import androidx.activity.compose.LocalActivityResultRegistryOwner
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
@@ -96,6 +103,8 @@ fun ClassroomScreen(
                 onOpenGrading = onOpenGrading,
                 onGenerateInvite = model::generateInvite,
                 onRevokeInvite = model::revokeInvite,
+                onAddMembers = model::addMembers,
+                onLoadMembers = model::loadMembers,
                 modifier = modifier,
             )
         } else {
@@ -177,13 +186,13 @@ fun ClassroomScreen(
                         ) {
                             if (isStudent) {
                                 V8RedPrimaryButton(
-                                    text = "Calificaciones",
+                                    text = "Notas",
                                     onClick = onOpenStudentGrades,
                                     modifier = Modifier.weight(1f),
                                 )
                             }
                             OutlinedButton(onClick = { onOpenChannel(null) }, modifier = Modifier.weight(1f)) {
-                                Text("Canal de clase")
+                                Text("Canal")
                             }
                         }
                     }
@@ -354,9 +363,40 @@ private fun TeacherAssignedClassrooms(
     onOpenGrading: (ClassroomSummary) -> Unit,
     onGenerateInvite: (String) -> Unit,
     onRevokeInvite: () -> Unit,
+    onAddMembers: (String, List<String>) -> Unit = { _, _ -> },
+    onLoadMembers: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val importReader = remember(context) { NativeRosterImportReader(context) }
+    var selectedImportClass by remember { mutableStateOf<String?>(null) }
+    var selectedRosterClass by remember { mutableStateOf<String?>(null) }
+    var importCandidates by remember { mutableStateOf<List<String>>(emptyList()) }
+    var manualIdentifier by remember { mutableStateOf("") }
+    var importError by remember { mutableStateOf<String?>(null) }
+    var importLoading by remember { mutableStateOf(false) }
+    var pickerClassId by remember { mutableStateOf<String?>(null) }
+    val documentPicker =
+        if (LocalActivityResultRegistryOwner.current != null) {
+            rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+                val expectedClassId = pickerClassId
+                if (uri != null && expectedClassId != null && selectedImportClass == expectedClassId) {
+                    importLoading = true
+                    importCandidates = emptyList()
+                    importError = null
+                    scope.launch {
+                        val result = runCatching { importReader.read(uri) }
+                        if (selectedImportClass != expectedClassId) return@launch
+                        importLoading = false
+                        result.onSuccess { importCandidates = it }
+                        result.onFailure { importError = it.message ?: "No se pudo importar la lista" }
+                    }
+                }
+            }
+        } else {
+            null
+        }
     val assigned =
         state.classrooms.filter {
             it.canManage && it.status == ClassroomStatus.ACTIVE && it.teacherId == teacherUserId
@@ -497,6 +537,116 @@ private fun TeacherAssignedClassrooms(
                                 ) {
                                     Text("Generar código para compartir")
                                 }
+                                OutlinedButton(
+                                    onClick = {
+                                        selectedRosterClass = classroom.id
+                                        onLoadMembers(classroom.id)
+                                    },
+                                    enabled = !state.submitting,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) { Text("Ver integrantes de la clase") }
+                                state.members[classroom.id]?.let { members ->
+                                    Text("${members.size} alumnos con cuenta vinculada", style = MaterialTheme.typography.titleSmall)
+                                    if (members.isEmpty()) {
+                                        Text("Aún no hay alumnos vinculados a este Canal.")
+                                    }
+                                    members.take(6).forEach { student ->
+                                        val timestamp = Instant.ofEpochSecond(student.joinedAtEpochSeconds)
+                                        val date = timestamp.atZone(ZoneId.systemDefault())
+                                        val joinedAt = DateTimeFormatter.ofPattern("d MMM yyyy").format(date)
+                                        Text(
+                                            student.displayName + " · " + joinedAt,
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
+                                    }
+                                    if (members.size > 6) {
+                                        Text(
+                                            "+${members.size - 6} integrantes más en la lista de la clase",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                                OutlinedButton(
+                                    onClick = {
+                                        selectedImportClass = classroom.id
+                                        importCandidates = emptyList()
+                                        manualIdentifier = ""
+                                        importError = null
+                                        importLoading = false
+                                        pickerClassId = null
+                                    },
+                                    enabled = !state.submitting,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) { Text("Añadir alumnos · lista o manual") }
+                                if (selectedImportClass == classroom.id) {
+                                    Text(
+                                        "Se vinculan cuentas registradas en Compañero, no matrículas oficiales de SIII.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    OutlinedTextField(
+                                        value = manualIdentifier,
+                                        onValueChange = { manualIdentifier = it.take(128) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        label = { Text("Correo o ID de alumno") },
+                                        singleLine = true,
+                                    )
+                                    OutlinedButton(
+                                        onClick = {
+                                            onAddMembers(classroom.id, listOf(manualIdentifier.trim()))
+                                        },
+                                        enabled = !state.submitting && manualIdentifier.trim().isNotEmpty(),
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) { Text("Vincular alumno registrado") }
+                                    OutlinedButton(
+                                        onClick = {
+                                            pickerClassId = classroom.id
+                                            documentPicker?.launch(
+                                                arrayOf(
+                                                    "application/pdf",
+                                                    "text/csv",
+                                                    "text/plain",
+                                                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                                ),
+                                            )
+                                        },
+                                        enabled = !state.submitting && !importLoading && documentPicker != null,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) { Text("Seleccionar archivo") }
+                                    Text(
+                                        "PDF con texto, CSV, TXT o Excel XLSX · máximo 2 MB y 100 alumnos.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    if (importLoading) {
+                                        CircularProgressIndicator()
+                                        Text("Leyendo lista de alumnos…", style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    importError?.let {
+                                        StatusNotice(
+                                            title = "No se pudo leer la lista",
+                                            message = it,
+                                        )
+                                    }
+                                    if (importCandidates.isNotEmpty()) {
+                                        Text(
+                                            "${importCandidates.size} identificadores detectados. Revisa antes de confirmar:",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                        )
+                                        Text(
+                                            importCandidates.take(10).joinToString("\n") +
+                                                if (importCandidates.size > 10) "\n…" else "",
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
+                                        V8RedPrimaryButton(
+                                            text = "Añadir a la clase",
+                                            onClick = { onAddMembers(classroom.id, importCandidates) },
+                                            enabled = !state.submitting && !importLoading,
+                                            modifier = Modifier.fillMaxWidth(),
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -513,6 +663,38 @@ private fun TeacherAssignedClassrooms(
                 }
             }
         }
+    }
+    selectedRosterClass?.let { classroomId ->
+        val selected = assigned.firstOrNull { it.id == classroomId }
+        val members = state.members[classroomId]
+        AlertDialog(
+            onDismissRequest = { selectedRosterClass = null },
+            title = { Text("Lista de ${selected?.name ?: "alumnos"}") },
+            text = {
+                Column(
+                    modifier = Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+                ) {
+                    when {
+                        members == null -> CircularProgressIndicator()
+                        members.isEmpty() -> Text("No hay cuentas vinculadas a esta clase.")
+                        else -> {
+                            Text(
+                                "${members.size} cuentas verificadas · lista interna de Compañero",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            members.forEach { student ->
+                                Text(student.displayName, style = MaterialTheme.typography.bodyLarge)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { selectedRosterClass = null }) { Text("Cerrar") }
+            },
+        )
     }
 }
 

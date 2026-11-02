@@ -79,7 +79,6 @@ object RoleExperienceResolver {
                             TopLevelDestination.Schedule,
                             TopLevelDestination.Attendance,
                             TopLevelDestination.Classrooms,
-                            TopLevelDestination.Profile,
                         ),
                 )
             AppExperience.TEACHER ->
@@ -92,7 +91,6 @@ object RoleExperienceResolver {
                                 TopLevelDestination.TeacherHome,
                                 TopLevelDestination.Schedule,
                                 TopLevelDestination.Attendance,
-                                TopLevelDestination.Classrooms,
                                 TopLevelDestination.Channel,
                             )
                         } else {

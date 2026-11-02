@@ -27,6 +27,7 @@ import org.companerodeescuela.shared.contracts.AttendanceNotificationEnqueueResp
 import org.companerodeescuela.shared.contracts.AttendanceQrInspectionRequest
 import org.companerodeescuela.shared.contracts.ClassCallConfirmationRequest
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
+import org.companerodeescuela.shared.contracts.ManualAttendanceMarkRequest
 import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
 import org.companerodeescuela.shared.contracts.UserRole
 
@@ -330,6 +331,26 @@ fun Route.attendanceRoutes(
                                 sessionId = sessionId,
                                 allowCrossOwner = principal.platformRoles().any { it == UserRole.ADMIN || it == UserRole.SUPER_ADMIN },
                                 nativeActor = nativeActor(call),
+                            ),
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
+
+            post("/sessions/{sessionId}/manual-record") {
+                val principal = call.requirePlatformPrincipal()
+                principal.requireRole(UserRole.TEACHER)
+                val actor = call.requireNativeActor(tokens!!)
+                val sessionId =
+                    call.parameters["sessionId"]
+                        ?: throw ApiException.Validation("sessionId is required")
+                call.respond(
+                    ApiResponse(
+                        data =
+                            reviewService.markNative(
+                                reviewer = actor,
+                                sessionId = sessionId,
+                                request = call.boundedBody(ManualAttendanceMarkRequest.serializer()),
                             ),
                         requestId = call.requestId(),
                     ),

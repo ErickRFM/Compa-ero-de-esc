@@ -125,6 +125,77 @@ class ChannelTaskServiceTest {
         }
 
     @Test
+    fun `teacher scores submitted work and only the student reads the own published score`() =
+        runTest {
+            val task = createTask()
+            val submitted = service.submit(STUDENT, "Ana", setOf(UserRole.STUDENT), CHANNEL, task.id, SubmitTaskRequest())
+            assertFailsWith<ApiException.Validation> {
+                service.review(
+                    TEACHER,
+                    setOf(UserRole.TEACHER),
+                    CHANNEL,
+                    task.id,
+                    submitted.id,
+                    ReviewSubmissionRequest(TaskStatus.REVIEWED, "Revisado", 1, 11.0),
+                )
+            }
+            assertFailsWith<ApiException.Validation> {
+                service.review(
+                    TEACHER,
+                    setOf(UserRole.TEACHER),
+                    CHANNEL,
+                    task.id,
+                    submitted.id,
+                    ReviewSubmissionRequest(TaskStatus.RETURNED, "Corrige", 1, 7.0),
+                )
+            }
+            val reviewed =
+                service.review(
+                    TEACHER,
+                    setOf(UserRole.TEACHER),
+                    CHANNEL,
+                    task.id,
+                    submitted.id,
+                    ReviewSubmissionRequest(TaskStatus.REVIEWED, "Muy bien", 1, 9.5),
+                )
+            assertEquals(9.5, reviewed.score)
+            assertEquals(9.5, reviewed.history.last().score)
+            val own = service.submissionsFor(STUDENT, setOf(UserRole.STUDENT), CHANNEL, task.id)
+            assertEquals(listOf(9.5), own.map { it.score })
+        }
+
+    @Test
+    fun `closed task can notify a current review but never a stale or foreign submission`() =
+        runTest {
+            val task = createTask()
+            val submitted = service.submit(STUDENT, "Ana", setOf(UserRole.STUDENT), CHANNEL, task.id, SubmitTaskRequest())
+            val closed =
+                service.updateTask(
+                    TEACHER,
+                    setOf(UserRole.TEACHER),
+                    CHANNEL,
+                    task.id,
+                    UpdateChannelTaskRequest(closed = true, expectedVersion = 1),
+                )
+            val reviewed =
+                service.review(
+                    TEACHER,
+                    setOf(UserRole.TEACHER),
+                    CHANNEL,
+                    task.id,
+                    submitted.id,
+                    ReviewSubmissionRequest(TaskStatus.REVIEWED, "Revisado", 1, 8.5),
+                )
+            assertFalse(isCurrentTaskNotice(closed, null, CHANNEL, null, null))
+            assertTrue(isCurrentTaskNotice(closed, reviewed, CHANNEL, reviewed.id, reviewed.version))
+            assertFalse(isCurrentTaskNotice(closed, reviewed, CHANNEL, reviewed.id, reviewed.version - 1))
+            assertFalse(isCurrentTaskNotice(closed, reviewed, CHANNEL, UUID.randomUUID().toString(), reviewed.version))
+            assertFalse(isCurrentTaskNotice(closed, reviewed, "C-OTHER", reviewed.id, reviewed.version))
+            assertFalse(isCurrentTaskNotice(closed, null, CHANNEL, reviewed.id, reviewed.version))
+            assertFalse(isCurrentTaskNotice(null, reviewed, CHANNEL, reviewed.id, reviewed.version))
+        }
+
+    @Test
     fun `concurrent reviews with the same version allow exactly one write`() =
         runTest {
             val task = createTask()

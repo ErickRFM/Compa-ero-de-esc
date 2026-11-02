@@ -1,5 +1,7 @@
 package org.companerodeescuela.feature.attendance
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -67,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.Instant
 import java.time.LocalDate
@@ -124,6 +127,21 @@ fun attendanceScreen(
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val imageReader = remember(context) { AttendanceQrImageReader(context) }
+    // Request only when the student or teacher explicitly tries school entry.
+    // Reading the connected Wi-Fi SSID can require fine location on Android.
+    val locationPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+            viewModel.openSchoolDayScanner()
+        }
+    val openSchoolDay: () -> Unit = {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            viewModel.openSchoolDayScanner()
+        } else {
+            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
     val imageLauncher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.OpenDocument(),
@@ -158,6 +176,8 @@ fun attendanceScreen(
                 },
                 onClose = viewModel::dismissScanner,
                 modifier = Modifier.fillMaxSize(),
+                purpose = state.scannerPurpose,
+                schoolNetworkReady = state.schoolNetworkAvailable,
             )
         }
     }
@@ -170,7 +190,7 @@ fun attendanceScreen(
                 onRefresh = viewModel::refresh,
                 onScan = viewModel::openScanner,
                 onPrepareClassContingency = viewModel::prepareClassContingency,
-                onStartSchoolDay = viewModel::openSchoolDayScanner,
+                onStartSchoolDay = openSchoolDay,
                 onConfirmClassCall = { id ->
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     viewModel.confirmClassCall(id)
@@ -192,7 +212,7 @@ fun attendanceScreen(
                 onReview = viewModel::reviewRecord,
                 onMark = viewModel::markRecord,
                 modifier = modifier,
-                onStartSchoolDay = viewModel::openSchoolDayScanner,
+                onStartSchoolDay = openSchoolDay,
                 onSelectHistory = viewModel::selectTeacherHistory,
             )
         AttendanceMode.UNSUPPORTED ->
@@ -477,6 +497,12 @@ private fun studentSessionCard(
     schoolPresenceActive: Boolean,
 ) {
     var showContingencyDialog by remember(session.id) { mutableStateOf(false) }
+    val accentColor =
+        if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.primaryContainer
+        }
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
@@ -484,7 +510,7 @@ private fun studentSessionCard(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(26.dp),
-            color = Color(0xFF8A1538),
+            color = accentColor,
             shadowElevation = 8.dp,
         ) {
             Column(
@@ -582,7 +608,7 @@ private fun studentSessionCard(
                                 shape = RoundedCornerShape(16.dp),
                                 colors =
                                     androidx.compose.material3.ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFF8A1538),
+                                        containerColor = accentColor,
                                         contentColor = Color.White,
                                     ),
                                 contentPadding = PaddingValues(vertical = 14.dp),
@@ -651,7 +677,7 @@ private fun studentSessionCard(
                             TextButton(
                                 onClick = { showContingencyDialog = true },
                                 enabled = !busy,
-                            ) { Text("¿Problemas con el pase? · Contingencia", color = Color(0xFF8A1538)) }
+                            ) { Text("¿Problemas con el pase? · Contingencia", color = accentColor) }
                         }
                     }
                 }

@@ -61,8 +61,7 @@ fun ProfileScreen(
     onNotifications: (() -> Unit)? = null,
     notificationsStatus: String? = null,
     onTutorRequest: (() -> Unit)? = null,
-    onRepresentatives: (() -> Unit)? = null,
-    /** These are navigation callbacks, not administrative grants. Only pass from Management. */
+    /** Callbacks navigate only; backend permissions still control protected operations. */
     managementExperience: Boolean = false,
     onAdminDashboard: (() -> Unit)? = null,
     onAdminSchedule: (() -> Unit)? = null,
@@ -192,18 +191,9 @@ fun ProfileScreen(
             }
 
             if (onSecurity != null ||
-                (onTutorRequest != null && UserRole.TEACHER in roles && UserRole.TUTOR !in roles) ||
-                (onRepresentatives != null && UserRole.STUDENT in roles)
+                (onTutorRequest != null && UserRole.TEACHER in roles && UserRole.TUTOR !in roles)
             ) {
                 ProfileGroup(title = stringResource(R.string.profile_access)) {
-                    if (onRepresentatives != null && UserRole.STUDENT in roles) {
-                        ProfileRow(
-                            title = "Representantes de grupo",
-                            detail = "Gestiona tus nombramientos.",
-                            onClick = onRepresentatives,
-                        )
-                        if (onSecurity != null || (onTutorRequest != null && UserRole.TEACHER in roles)) GroupDivider()
-                    }
                     onSecurity?.let { action ->
                         ProfileRow(
                             title = stringResource(R.string.profile_security),
@@ -212,7 +202,7 @@ fun ProfileScreen(
                         )
                     }
                     if (onTutorRequest != null && UserRole.TEACHER in roles && UserRole.TUTOR !in roles) {
-                        GroupDivider()
+                        if (onSecurity != null) GroupDivider()
                         ProfileRow(
                             title = stringResource(R.string.profile_tutor_request),
                             detail = stringResource(R.string.profile_tutor_description),

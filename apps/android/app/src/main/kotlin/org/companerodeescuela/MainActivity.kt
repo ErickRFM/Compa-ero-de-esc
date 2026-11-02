@@ -321,6 +321,7 @@ class MainActivity : AppCompatActivity() {
                                     ) {
                                         composable(Destination.Home.route) {
                                             HomeScreen(
+                                                displayName = session.displayName,
                                                 onOpenAttendance = {
                                                     navController.navigate(Destination.Attendance.route) { launchSingleTop = true }
                                                 },
@@ -449,7 +450,15 @@ class MainActivity : AppCompatActivity() {
                                         composable(Destination.Classrooms.route) {
                                             ClassroomScreen(
                                                 roles = session.roles,
+                                                studentExperience =
+                                                    AcademicRoutePolicy.studentActions(
+                                                        roleConfig.experience,
+                                                        session.roles,
+                                                    ),
                                                 teacherExperience = roleConfig.experience == AppExperience.TEACHER,
+                                                administrativeExperience =
+                                                    roleConfig.experience == AppExperience.ADMIN ||
+                                                        roleConfig.experience == AppExperience.SUPER_ADMIN,
                                                 teacherUserId = session.userId,
                                                 onOpenAttendance = { classroom ->
                                                     navController.navigate(Destination.Attendance.route) { launchSingleTop = true }
@@ -641,20 +650,6 @@ class MainActivity : AppCompatActivity() {
                                                     } else {
                                                         null
                                                     },
-                                                onRepresentatives =
-                                                    if (appDistribution == AppDistribution.ACADEMIC &&
-                                                        AcademicRoutePolicy.studentActions(roleConfig.experience, session.roles)
-                                                    ) {
-                                                        {
-                                                            navController.navigate(Destination.RepresentativeInvitations.route) {
-                                                                launchSingleTop =
-                                                                    true
-                                                            }
-                                                        }
-                                                    } else {
-                                                        null
-                                                    },
-                                                appVersion = BuildConfig.VERSION_NAME,
                                                 onLogout = {
                                                     loginExperienceName = null
                                                     sessionViewModel.logout()

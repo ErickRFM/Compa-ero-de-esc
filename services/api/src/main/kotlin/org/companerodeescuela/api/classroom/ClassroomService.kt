@@ -171,11 +171,10 @@ class ClassroomService(
         classroomId: String,
         request: CreateClassInviteRequest,
     ): ClassInvite {
-        requireAcademicAdmin(actor)
+        requireCanPublish(actor, classroomId)
         val classroom =
             repository.findClassroom(classroomId)
                 ?: throw ApiException.NotFound("Classroom was not found")
-        requireScopedAdmin(actor, classroom)
         if (classroom.status != ClassroomStatus.ACTIVE) {
             throw ApiException.Conflict("Archived classrooms cannot create invitations")
         }
@@ -275,9 +274,12 @@ class ClassroomService(
         classroomId: String,
         inviteId: String,
     ) {
-        requireAcademicAdmin(actor)
         val classroom = repository.findClassroom(classroomId) ?: throw ApiException.NotFound("Classroom was not found")
-        requireScopedAdmin(actor, classroom, allowStale = true)
+        if (isAcademicAdmin(actor)) {
+            requireScopedAdmin(actor, classroom, allowStale = true)
+        } else {
+            requireCanPublish(actor, classroomId)
+        }
         if (!repository.revokeInvite(inviteId, classroomId, clock.instant())) {
             throw ApiException.NotFound("Active invitation was not found")
         }

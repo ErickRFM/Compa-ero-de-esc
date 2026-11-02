@@ -65,7 +65,9 @@ import java.time.format.DateTimeFormatter
 fun ClassroomScreen(
     roles: Set<UserRole>,
     modifier: Modifier = Modifier,
+    studentExperience: Boolean = false,
     teacherExperience: Boolean = false,
+    administrativeExperience: Boolean = false,
     teacherUserId: String? = null,
     onOpenAttendance: (ClassroomSummary) -> Unit = {},
     onOpenChannel: (ClassroomSummary?) -> Unit = {},
@@ -73,28 +75,42 @@ fun ClassroomScreen(
     onOpenStudentGrades: () -> Unit = {},
     viewModel: ClassroomViewModel? = null,
 ) {
-    if (!teacherExperience && roles.any { it == UserRole.ADMIN || it == UserRole.SUPER_ADMIN }) {
-        ClassroomAdministrationEditor(onOpenChannel = { onOpenChannel(null) }, modifier = modifier)
+    if (administrativeExperience) {
+        if (roles.any { it == UserRole.ADMIN || it == UserRole.SUPER_ADMIN }) {
+            ClassroomAdministrationEditor(onOpenChannel = { onOpenChannel(null) }, modifier = modifier)
+        } else {
+            Text("Acceso administrativo no autorizado")
+        }
         return
     }
     val model = viewModel ?: hiltViewModel<ClassroomViewModel>()
     val state by model.state.collectAsStateWithLifecycle()
-    if (teacherExperience && UserRole.TEACHER in roles) {
-        TeacherAssignedClassrooms(
-            state = state,
-            teacherUserId = teacherUserId,
-            onRefresh = model::refresh,
-            onOpenAttendance = onOpenAttendance,
-            onOpenChannel = onOpenChannel,
-            onOpenGrading = onOpenGrading,
-            modifier = modifier,
-        )
+    if (teacherExperience) {
+        if (UserRole.TEACHER in roles) {
+            TeacherAssignedClassrooms(
+                state = state,
+                teacherUserId = teacherUserId,
+                onRefresh = model::refresh,
+                onOpenAttendance = onOpenAttendance,
+                onOpenChannel = onOpenChannel,
+                onOpenGrading = onOpenGrading,
+                onGenerateInvite = model::generateInvite,
+                onRevokeInvite = model::revokeInvite,
+                modifier = modifier,
+            )
+        } else {
+            Text("Tu acceso docente está pendiente de aprobación institucional.")
+        }
+        return
+    }
+    if (!studentExperience || UserRole.STUDENT !in roles) {
+        Text("Esta vista requiere la experiencia de estudiante.")
         return
     }
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
-    val isStudent = UserRole.STUDENT in roles
-    val pendingTeacher = UserRole.TEACHER_PENDING in roles
+    val isStudent = true
+    val pendingTeacher = false
 
     var joinCode by remember { mutableStateOf("") }
 
@@ -174,7 +190,7 @@ fun ClassroomScreen(
                 }
                 InstitutionalSections(state)
                 Text(
-                    text = "Espacios colaborativos de Compañero. No sustituyen tus inscripciones oficiales de SIII.",
+                    text = "Los espacios de Compañero no sustituyen tu inscripción oficial.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -204,12 +220,12 @@ fun ClassroomScreen(
                             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
                         ) {
                             Text(
-                                text = "Unirme a una clase",
+                                text = "Unirme con código",
                                 style = MaterialTheme.typography.titleMedium,
                             )
                             Text(
                                 text =
-                                    "Usa un código de incorporación emitido por control escolar cuando tu grupo todavía no se haya sincronizado automáticamente.",
+                                    "¿Control escolar te dio un código? Escríbelo para solicitar acceso a tu espacio de clase.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -222,18 +238,17 @@ fun ClassroomScreen(
                                             .filter { it.isLetterOrDigit() || it == '-' }
                                             .take(9)
                                 },
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier.fillMaxWidth().testTag("classroom_join_code"),
                                 singleLine = true,
-                                label = { Text("Código de incorporación") },
+                                label = { Text("Código de clase") },
                                 placeholder = { Text("ABCD-2345") },
                             )
-                            Button(
+                            V8RedPrimaryButton(
+                                text = if (state.submitting) "Vinculando…" else "Unirme a la clase",
                                 onClick = { model.join(joinCode) },
                                 enabled = !state.submitting && joinCode.isNotBlank(),
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text("Vincular clase")
-                            }
+                                modifier = Modifier.fillMaxWidth().testTag("classroom_join_action"),
+                            )
                         }
                     }
                 }
@@ -313,6 +328,7 @@ fun ClassroomScreen(
                         classroom = classroom,
                         enabled = !state.submitting,
                         onGenerateInvite = { model.generateInvite(classroom.id) },
+                        showInviteActions = false,
                     )
                     if (index != state.classrooms.lastIndex) {
                         HorizontalDivider()
@@ -336,8 +352,11 @@ private fun TeacherAssignedClassrooms(
     onOpenAttendance: (ClassroomSummary) -> Unit,
     onOpenChannel: (ClassroomSummary?) -> Unit,
     onOpenGrading: (ClassroomSummary) -> Unit,
+    onGenerateInvite: (String) -> Unit,
+    onRevokeInvite: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val assigned =
         state.classrooms.filter {
             it.canManage && it.status == ClassroomStatus.ACTIVE && it.teacherId == teacherUserId
@@ -383,6 +402,18 @@ private fun TeacherAssignedClassrooms(
                 )
                 if (state.loading) CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 state.errorMessage?.let { StatusNotice(title = "Datos sin actualizar", message = it) }
+                state.successMessage?.let { StatusNotice(title = "Listo", message = it) }
+                state.activeInvite?.let { invite ->
+                    if (assigned.any { it.id == invite.classroomId }) {
+                        InviteCard(
+                            invite = invite,
+                            onCopy = { copyInvite(context, invite) },
+                            onShare = { shareInvite(context, invite) },
+                            onRevoke = onRevokeInvite,
+                            enabled = !state.submitting,
+                        )
+                    }
+                }
                 if (!state.loading && state.errorMessage == null && assigned.isEmpty()) {
                     StatusNotice(
                         title = "No tienes espacios colaborativos asignados",
@@ -459,6 +490,13 @@ private fun TeacherAssignedClassrooms(
                                         Text("Evaluar")
                                     }
                                 }
+                                OutlinedButton(
+                                    onClick = { onGenerateInvite(classroom.id) },
+                                    enabled = !state.submitting && classroom.canManage,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Text("Generar código para compartir")
+                                }
                             }
                         }
                     }
@@ -531,6 +569,7 @@ internal fun ClassroomCard(
     classroom: ClassroomSummary,
     enabled: Boolean,
     onGenerateInvite: () -> Unit,
+    showInviteActions: Boolean = true,
 ) {
     V8GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -565,7 +604,7 @@ internal fun ClassroomCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            if (classroom.canManageEnrollment) {
+            if (showInviteActions && classroom.canManageEnrollment) {
                 V8RedPrimaryButton(
                     text = stringResource(R.string.academic_invite_generate),
                     onClick = onGenerateInvite,

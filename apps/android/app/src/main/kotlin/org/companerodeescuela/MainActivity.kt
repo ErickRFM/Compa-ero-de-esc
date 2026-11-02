@@ -321,6 +321,7 @@ class MainActivity : AppCompatActivity() {
                                     ) {
                                         composable(Destination.Home.route) {
                                             HomeScreen(
+                                                displayName = session.displayName,
                                                 onOpenAttendance = {
                                                     navController.navigate(Destination.Attendance.route) { launchSingleTop = true }
                                                 },

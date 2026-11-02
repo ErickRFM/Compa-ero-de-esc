@@ -190,7 +190,7 @@ fun ClassroomScreen(
                 }
                 InstitutionalSections(state)
                 Text(
-                    text = "Espacios colaborativos de Compañero. No sustituyen tus inscripciones oficiales de SIII.",
+                    text = "Los espacios de Compañero no sustituyen tu inscripción oficial.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -220,12 +220,12 @@ fun ClassroomScreen(
                             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
                         ) {
                             Text(
-                                text = "Unirme a una clase",
+                                text = "Unirme con código",
                                 style = MaterialTheme.typography.titleMedium,
                             )
                             Text(
                                 text =
-                                    "Usa un código de incorporación emitido por control escolar cuando tu grupo todavía no se haya sincronizado automáticamente.",
+                                    "¿Control escolar te dio un código? Escríbelo para solicitar acceso a tu espacio de clase.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -238,18 +238,17 @@ fun ClassroomScreen(
                                             .filter { it.isLetterOrDigit() || it == '-' }
                                             .take(9)
                                 },
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier.fillMaxWidth().testTag("classroom_join_code"),
                                 singleLine = true,
-                                label = { Text("Código de incorporación") },
+                                label = { Text("Código de clase") },
                                 placeholder = { Text("ABCD-2345") },
                             )
-                            Button(
+                            V8RedPrimaryButton(
+                                text = if (state.submitting) "Vinculando…" else "Unirme a la clase",
                                 onClick = { model.join(joinCode) },
                                 enabled = !state.submitting && joinCode.isNotBlank(),
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Text("Vincular clase")
-                            }
+                                modifier = Modifier.fillMaxWidth().testTag("classroom_join_action"),
+                            )
                         }
                     }
                 }

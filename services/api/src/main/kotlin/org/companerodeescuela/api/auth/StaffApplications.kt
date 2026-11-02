@@ -74,9 +74,9 @@ internal fun PlatformAccount.withStaffApplication(
         application.identityReference.isBlank() ||
         application.identityReference.length > 160 ||
         application.identityReference.any(Char::isISOControl) ||
-        (application.preferredGroup?.let {
+        application.preferredGroup?.let {
             it.isBlank() || it.length > 120 || it.any(Char::isISOControl)
-        } == true)
+        } == true
     ) {
         return null
     }

@@ -38,8 +38,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -86,7 +86,11 @@ internal fun authMuted(): Color =
 
 @Composable
 internal fun authAccent(): Color =
-    if (authDark()) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.primary
+    if (authDark()) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
 
 /** Same campus, geometry and tokens; colors come from the existing CompaneroTheme. */
 @Composable

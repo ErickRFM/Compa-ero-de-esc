@@ -7,13 +7,14 @@ import kotlin.test.assertFailsWith
 class NativeRosterImportReaderTest {
     @Test
     fun `parses emails and ids from reviewed CSV without treating names as identities`() {
-        val input = """
-            Nombre,Correo,Matrícula
-            Ana María Pérez,ANA@example.edu,0001234567
-            Ana María Pérez,ana@example.edu,0001234567
-            Alumno sin cuenta,,
-            Roberto Ruiz,roberto@example.edu,
-        """.trimIndent()
+        val input =
+            listOf(
+                "Nombre,Correo,Matrícula",
+                "Ana María Pérez,ANA@example.edu,0001234567",
+                "Ana María Pérez,ana@example.edu,0001234567",
+                "Alumno sin cuenta,,",
+                "Roberto Ruiz,roberto@example.edu,",
+            ).joinToString("\n")
         assertEquals(
             listOf("ana@example.edu", "roberto@example.edu"),
             parseNativeRosterIdentifiers(input),

@@ -208,9 +208,17 @@ data class AttendanceReviewEntry(
 )
 
 @Serializable
+data class AttendanceEligibleStudent(
+    val studentId: String,
+    val displayName: String,
+)
+
+@Serializable
 data class AttendanceRosterResponse(
     val session: AttendanceSessionResponse,
     val records: List<AttendanceRecordResponse>,
+    /** Current authorized roster; does not imply QR, school entry or confirmed presence. */
+    val eligibleStudents: List<AttendanceEligibleStudent> = emptyList(),
 )
 
 @Serializable

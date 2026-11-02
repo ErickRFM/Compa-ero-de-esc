@@ -269,6 +269,46 @@ class ClassroomService(
         )
     }
 
+    /** Teacher-managed native memberships; does not assert institutional enrollment. */
+    suspend fun addMembers(
+        actor: UserSummary,
+        classroomId: String,
+        identifiers: List<String>,
+    ): List<ClassroomMembership> {
+        val current = policy().live(actor)
+        val classroom = requireCanPublish(actor, classroomId)
+        if (UserRole.TEACHER !in current.roles || classroom.teacherId != current.id) {
+            throw ApiException.Forbidden("Only the assigned teacher can import native class members")
+        }
+        val group = scopedGroupFor(actor, classroomId)
+        val directory = accounts ?: throw ApiException.DependencyUnavailable("Current student identities are unavailable")
+        if (identifiers.isEmpty() || identifiers.size > 100 || identifiers.any {
+                it.isBlank() || it != it.trim() || it.length > 128 || it.any(Char::isISOControl)
+            }
+        ) {
+            throw ApiException.Validation("Provide 1 to 100 account emails or ids")
+        }
+        val unique = identifiers.distinctBy { it.lowercase() }
+        // Resolve the whole batch before modifying any membership: never persist partial imports.
+        val students = unique.map { identifier ->
+            val student = directory.findByIdentifier(identifier)
+                ?: throw ApiException.Validation("One or more students need registered accounts")
+            if (!student.permitsSession || student.emailVerifiedAt == null ||
+                student.emailVerifiedAt > clock.instant() ||
+                UserRole.STUDENT !in student.roles || student.institutionId != group.institutionId
+            ) {
+                throw ApiException.Forbidden("Students require verified accounts in the same institution")
+            }
+            student
+        }.distinctBy { it.id }
+        val now = clock.instant()
+        return students.map { student ->
+            repository.addMembershipIfAbsent(
+                NativeClassroomMembership(classroomId, student.id, ClassroomMemberRole.STUDENT, now),
+            ).toContract()
+        }
+    }
+
     suspend fun revokeInvite(
         actor: UserSummary,
         classroomId: String,

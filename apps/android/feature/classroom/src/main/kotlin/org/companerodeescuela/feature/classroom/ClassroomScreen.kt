@@ -373,16 +373,18 @@ private fun TeacherAssignedClassrooms(
     var importError by remember { mutableStateOf<String?>(null) }
     val documentPicker =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            scope.launch {
-                runCatching { importReader.read(uri) }
-                    .onSuccess {
-                        importCandidates = it
-                        importError = null
-                    }.onFailure { importError = it.message ?: "No se pudo importar la lista" }
+            if (uri != null) {
+                scope.launch {
+                    runCatching { importReader.read(uri) }
+                        .onSuccess {
+                            importCandidates = it
+                            importError = null
+                        }.onFailure {
+                            importError = it.message ?: "No se pudo importar la lista"
+                        }
+                }
             }
         }
-    }
     val assigned =
         state.classrooms.filter {
             it.canManage && it.status == ClassroomStatus.ACTIVE && it.teacherId == teacherUserId

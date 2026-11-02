@@ -15,7 +15,9 @@ import org.companerodeescuela.core.network.requireBody
 import org.companerodeescuela.core.network.requireUnit
 import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.shared.contracts.ApiResponse
+import org.companerodeescuela.shared.contracts.AddClassMembersRequest
 import org.companerodeescuela.shared.contracts.ClassInvite
+import org.companerodeescuela.shared.contracts.ClassroomMembership
 import org.companerodeescuela.shared.contracts.ClassroomSummary
 import org.companerodeescuela.shared.contracts.CreateClassInviteRequest
 import org.companerodeescuela.shared.contracts.CreateClassroomRequest
@@ -84,6 +86,21 @@ class ClassroomRepository(
                         contentType(ContentType.Application.Json)
                         setBody(CreateClassInviteRequest(ttlMinutes = ttlMinutes))
                     }.requireBody<ApiResponse<ClassInvite>>()
+            }.map { it.data }
+        }
+
+    suspend fun addMembers(
+        classroomId: String,
+        identifiers: List<String>,
+    ): Outcome<List<ClassroomMembership>> =
+        authorized { token ->
+            apiCall {
+                client
+                    .post("classrooms/$classroomId/members") {
+                        bearerAuth(token)
+                        contentType(ContentType.Application.Json)
+                        setBody(AddClassMembersRequest(identifiers))
+                    }.requireBody<ApiResponse<List<ClassroomMembership>>>()
             }.map { it.data }
         }
 

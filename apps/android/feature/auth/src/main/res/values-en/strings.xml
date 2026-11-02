@@ -7,7 +7,7 @@
 <string name="auth_footer">DISCIPLINE TODAY, A BETTER TOMORROW</string>
 <string name="auth_title">Sign in</string>
 <string name="auth_subtitle">Use your school account or student ID.</string>
-<string name="auth_identifier">Email or ID</string>
+<string name="auth_identifier">Email or student ID</string>
 <string name="auth_password">Password</string>
 <string name="auth_show_password">Show password</string>
 <string name="auth_hide_password">Hide password</string>

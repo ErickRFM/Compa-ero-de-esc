@@ -125,6 +125,45 @@ class ChannelTaskServiceTest {
         }
 
     @Test
+    fun `teacher scores submitted work and only the student reads the own published score`() =
+        runTest {
+            val task = createTask()
+            val submitted = service.submit(STUDENT, "Ana", setOf(UserRole.STUDENT), CHANNEL, task.id, SubmitTaskRequest())
+            assertFailsWith<ApiException.Validation> {
+                service.review(
+                    TEACHER,
+                    setOf(UserRole.TEACHER),
+                    CHANNEL,
+                    task.id,
+                    submitted.id,
+                    ReviewSubmissionRequest(TaskStatus.REVIEWED, "Revisado", 1, 11.0),
+                )
+            }
+            assertFailsWith<ApiException.Validation> {
+                service.review(
+                    TEACHER,
+                    setOf(UserRole.TEACHER),
+                    CHANNEL,
+                    task.id,
+                    submitted.id,
+                    ReviewSubmissionRequest(TaskStatus.RETURNED, "Corrige", 1, 7.0),
+                )
+            }
+            val reviewed = service.review(
+                TEACHER,
+                setOf(UserRole.TEACHER),
+                CHANNEL,
+                task.id,
+                submitted.id,
+                ReviewSubmissionRequest(TaskStatus.REVIEWED, "Muy bien", 1, 9.5),
+            )
+            assertEquals(9.5, reviewed.score)
+            assertEquals(9.5, reviewed.history.last().score)
+            val own = service.submissionsFor(STUDENT, setOf(UserRole.STUDENT), CHANNEL, task.id)
+            assertEquals(listOf(9.5), own.map { it.score })
+        }
+
+    @Test
     fun `concurrent reviews with the same version allow exactly one write`() =
         runTest {
             val task = createTask()

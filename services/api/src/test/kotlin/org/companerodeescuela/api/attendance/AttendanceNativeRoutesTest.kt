@@ -42,6 +42,7 @@ import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.AttendanceIdentitySource
 import org.companerodeescuela.shared.contracts.AttendanceNotificationEnqueueResponse
+import org.companerodeescuela.shared.contracts.AttendanceRosterResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
 import org.companerodeescuela.shared.contracts.ClassroomMemberRole
@@ -80,7 +81,16 @@ class AttendanceNativeRoutesTest {
                     .InMemoryAcademicScheduleOverrideRepository(),
                 clock,
             )
-        val service = AttendanceSessionService(repository, resolver, policy, clock, nativeProjection = projection)
+        val service =
+            AttendanceSessionService(
+                repository,
+                resolver,
+                policy,
+                clock,
+                nativeProjection = projection,
+                accounts = accounts,
+                classrooms = ClassroomService(classes, groups, clock, accounts = accounts),
+            )
 
         suspend fun initialize() {
             accounts.create(ScopedAcademicFixtures.account(admin))
@@ -175,6 +185,16 @@ class AttendanceNativeRoutesTest {
                 }
             }
             block(f)
+        }
+
+    @Test fun `native teacher roster lists real eligible students without claiming their presence`() =
+        scenario { f ->
+            val token = f.token(f.teacher)
+            val response = client.get("/attendance/sessions/own/roster") { bearerAuth(token) }
+            assertEquals(HttpStatusCode.OK, response.status)
+            val roster = Json.decodeFromString<ApiResponse<AttendanceRosterResponse>>(response.bodyAsText()).data
+            assertEquals(listOf("student-test"), roster.eligibleStudents.map { it.studentId })
+            assertEquals(emptyList(), roster.records)
         }
 
     @Test fun `teacher marks a linked native student manually with revision control`() =

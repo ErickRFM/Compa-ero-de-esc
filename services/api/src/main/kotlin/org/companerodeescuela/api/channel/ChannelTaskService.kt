@@ -127,14 +127,17 @@ class ChannelTaskService(
     ): List<TaskSubmission> {
         accessPolicy.requireCanRead(userId, roles, channelId, actor, identitySource)
         val task = requireTask(channelId, taskId)
+        val isTaskManager =
+            (UserRole.TEACHER in roles && task.teacherId == userId) ||
+                roles.any { it == UserRole.ADMIN || it == UserRole.SUPER_ADMIN }
         val values =
             when {
-                UserRole.STUDENT in roles -> listOfNotNull(repository.findSubmissionByStudent(task.id, userId))
-                roles.any { it == UserRole.TEACHER || it == UserRole.ADMIN || it == UserRole.SUPER_ADMIN } -> {
+                isTaskManager -> {
                     val channel = accessPolicy.requireCanPublish(userId, roles, channelId, actor, identitySource)
                     requireTaskOwner(task, userId, roles, channel.canPublish)
                     repository.listSubmissions(channelId, taskId)
                 }
+                UserRole.STUDENT in roles -> listOfNotNull(repository.findSubmissionByStudent(task.id, userId))
                 else -> throw ApiException.Forbidden("Student or task teacher role is required")
             }
         return values.map { it.withFiles() }

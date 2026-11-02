@@ -824,19 +824,28 @@ class AttendanceViewModel
         ) {
             val snapshot = _state.value
             val session = snapshot.teacherSession ?: return
-            if (snapshot.mode != AttendanceMode.TEACHER || snapshot.actionInProgress ||
-                session.identitySource != AttendanceIdentitySource.NATIVE || session.academicSource != null ||
-                studentId.isBlank() || note.trim().length !in 3..500
+            if (
+                snapshot.mode != AttendanceMode.TEACHER ||
+                snapshot.actionInProgress ||
+                session.identitySource != AttendanceIdentitySource.NATIVE ||
+                session.academicSource != null ||
+                studentId.isBlank() ||
+                note.trim().length !in 3..500
             ) {
                 return
             }
-            val expectedRevision = snapshot.roster?.records?.firstOrNull { it.studentId == studentId }?.recordRevision ?: 0L
+            val expectedRevision =
+                snapshot.roster
+                    ?.records
+                    ?.firstOrNull { it.studentId == studentId }
+                    ?.recordRevision ?: 0L
             launchTeacherRequest {
                 _state.update { it.copy(actionInProgress = true, errorMessage = null) }
-                val result = repository.markNative(
-                    session.id,
-                    ManualAttendanceMarkRequest(studentId.trim(), disposition, note.trim(), expectedRevision),
-                )
+                val result =
+                    repository.markNative(
+                        session.id,
+                        ManualAttendanceMarkRequest(studentId.trim(), disposition, note.trim(), expectedRevision),
+                    )
                 ensureActive()
                 when (result) {
                     is Outcome.Success -> {
@@ -847,9 +856,11 @@ class AttendanceViewModel
                                 val roster = current.roster
                                 current.copy(
                                     actionInProgress = false,
-                                    roster = roster?.copy(
-                                        records = roster.records.filterNot { it.studentId == result.value.studentId } + result.value,
-                                    ),
+                                    roster =
+                                        roster?.copy(
+                                            records =
+                                                roster.records.filterNot { it.studentId == result.value.studentId } + result.value,
+                                        ),
                                     successMessage = "Decisión manual registrada por el servidor.",
                                 )
                             }

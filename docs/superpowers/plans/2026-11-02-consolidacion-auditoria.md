@@ -58,7 +58,9 @@
 - [x] Crear matriz por módulo/rol con ruta UI → repositorio → API → persistencia y evidencia.
 - [x] Separar problemas corregidos, pendientes reales y aceptación futura en emulador/dispositivo.
 - [x] Revisar diff final, pruebas, secretos y whitespace.
-- [ ] Commit y push de la rama; PR con evidencia concreta. Integrar únicamente con checks requeridos satisfactorios.
+- [x] Commit y push de la rama; PR #268 con evidencia concreta.
+
+**Gate de integración:** fusionar únicamente con checks requeridos y matriz Android satisfactorios en el último SHA; el estado verificable queda en el PR.
 
 ## Execution ledger
 

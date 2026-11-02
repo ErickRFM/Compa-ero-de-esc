@@ -45,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -417,7 +418,10 @@ fun ChannelScreen(
                 }
             }
             if (taskComposerOpen) {
-                ModalBottomSheet(onDismissRequest = { taskComposerOpen = false }) {
+                ModalBottomSheet(
+                    onDismissRequest = { taskComposerOpen = false },
+                    sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                ) {
                     TaskComposer(
                         title = state.draftTaskTitle,
                         instructions = state.draftTaskInstructions,

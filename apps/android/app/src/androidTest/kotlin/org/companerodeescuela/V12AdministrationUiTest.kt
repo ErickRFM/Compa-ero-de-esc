@@ -16,6 +16,7 @@ import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -328,6 +329,9 @@ class V12AdministrationUiTest {
     private fun dismissKeyboardBeforeSubmit() {
         compose.runOnIdle {
             inputFocusManager.clearFocus(force = true)
+        }
+        compose.waitForIdle()
+        compose.runOnIdle {
             WindowCompat
                 .getInsetsController(compose.activity.window, compose.activity.window.decorView)
                 .hide(WindowInsetsCompat.Type.ime())
@@ -508,9 +512,12 @@ class V12AdministrationUiTest {
             compose.onNodeWithTag("staff_identity").performScrollTo().performTextInput("TEST-REFERENCE")
             compose.onNodeWithTag("staff_preference").performScrollTo().performTextInput("QA Group preference")
             dismissKeyboardBeforeSubmit()
-            compose
-                .onNodeWithTag("staff_submit")
-                .performScrollTo()
+            val submit =
+                compose
+                    .onNodeWithTag("staff_submit")
+                    .performScrollTo()
+            compose.waitUntil(10000) { submit.isDisplayed() }
+            submit
                 .assertIsDisplayed()
                 .assertIsEnabled()
                 // Exercise the exposed accessibility action once. Native IME animations on API35

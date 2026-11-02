@@ -54,6 +54,7 @@ Las rutas de esta tabla son relativas a `apps/android/feature/` y `services/api/
 | UI-02 | P2 | Docente no ve nota guardada al pasar entrega a REVIEWED | Mostrar nota persistida junto con la revisión; regresión Android |
 | UI-03 | P2 | Porcentaje de categoría derivado directamente de Double impide borrar o completar un decimal | Borradores de texto y validación antes de guardar/publicar |
 | UI-04 | P2 | Pestañas de Canal de ancho fijo partían palabras con texto al 200%, comprobado en captura | Ancho de contenido y desplazamiento horizontal con selección visible; regresión de una línea completa |
+| UI-05 | P1 | En ventana compacta, el compositor abierto parcialmente dejaba Publicar fuera de la ventana pese a `performScrollTo` | El formulario abre expandido; rojo reproducido en 320 × 640 y regresión verde sin rebajar visibilidad |
 | PERF-01 | P1 | Importación de gradebook lee archivo completo sin límite antes de validar y procesa en hilo UI | Lectura acotada y trabajo de archivo/parser fuera de UI; regresiones de límites |
 | DATA-01 | P1 | Tras guardar una revisión, editar pesos o importar otro archivo deja publicar la revisión anterior aunque la UI muestra datos nuevos | Marcar cambios sin guardar y exigir guardar de nuevo antes de publicar; regresión ViewModel |
 | NAV-01 | P2 | Push de tarea de clase B abre primer/último canal A porque se descarta channelId | Propagar identidad del canal y seleccionar solo entre canales autorizados vigentes |
@@ -91,7 +92,7 @@ Secuencia de afinado posterior:
 
 ## 6. Verificación y estado de entrega
 
-La última comprobación global terminó con `BUILD SUCCESSFUL`, 1364 tareas y salida 0. Se reutilizaron resultados válidos de Gradle; se ejecutaron de nuevo las regresiones y tareas afectadas por las últimas modificaciones. Registro local: `build/audit-delivery-verified-20261102.log`.
+La última comprobación global terminó con `BUILD SUCCESSFUL`, 1364 tareas y salida 0. Se reutilizaron resultados válidos de Gradle; se ejecutaron de nuevo las regresiones y tareas afectadas por las últimas modificaciones. Registro local: `build/audit-ci-fix-verified-20261102.log`.
 
 | Grupo | Casos registrados | Ejecutados sin fallos | Omitidos |
 |---|---:|---:|---:|
@@ -100,28 +101,29 @@ La última comprobación global terminó con `BUILD SUCCESSFUL`, 1364 tareas y s
 | Bibliotecas Android | 357 | 357 | 0 |
 | App Académica unit | 7 | 7 | 0 |
 | App Gestión unit | 7 | 7 | 0 |
-| Layout Tareas, emulador API 30 | 4 | 4 | 0 |
-| **Total** | **1097** | **1094** | **3** |
+| Tareas y administración/MFA, emulador API 30 | 10 | 10 | 0 |
+| **Total** | **1103** | **1100** | **3** |
 
 También pasaron `ktlintCheck`, `lint` y la compilación de ambas APK debug. La revisión independiente de los diffs de seguridad, estado, navegación, UI y runner CI terminó sin hallazgos pendientes dentro del lote corregido. Los problemas de producto de la sección 4 permanecen abiertos.
 
 Comando reproducible, con JDK 21 y `V12_TEST_MONGODB_URI=mongodb://127.0.0.1:27017` apuntando exclusivamente al Mongo desechable local:
 
 ```powershell
-.\gradlew.bat :apps:android:feature:grading:testDebugUnitTest :services:api:test :shared:contracts:test :shared:models:test :shared:validation:test testDebugUnitTest :apps:android:app:testAcademicDebugUnitTest :apps:android:app:testManagementDebugUnitTest ktlintCheck lint :apps:android:app:assembleAcademicDebug :apps:android:app:assembleManagementDebug :apps:android:app:connectedAcademicDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=org.companerodeescuela.ChannelTaskLayoutUiTest' '-Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true' --continue --console=plain --max-workers=1 --no-daemon '-Dorg.gradle.jvmargs=-Xmx1536m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process'
+.\gradlew.bat :apps:android:feature:grading:testDebugUnitTest :services:api:test :shared:contracts:test :shared:models:test :shared:validation:test testDebugUnitTest :apps:android:app:testAcademicDebugUnitTest :apps:android:app:testManagementDebugUnitTest ktlintCheck lint :apps:android:app:assembleAcademicDebug :apps:android:app:assembleManagementDebug :apps:android:app:connectedAcademicDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=org.companerodeescuela.ChannelTaskLayoutUiTest,org.companerodeescuela.V12AdministrationUiTest' '-Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true' --continue --console=plain --max-workers=1 --no-daemon '-Dorg.gradle.jvmargs=-Xmx1536m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process'
 ```
 
 Las nuevas cuatro pruebas son obligatorias en CI para **Académica/Gestión × API 31/35**, sin omisiones, con exportación de tres PNG validados. El estado de CI y SHA de integración se consultan en el PR asociado a esta rama; no se hereda el CI verde de otro commit.
 
 ### Evidencia visual local
 
-Capturas Android directas, 1080 × 2340, emulador API 30, texto al 200%, transporte y usuarios **sintéticos**. Se inspeccionaron los PNG; la captura inicial reveló palabras partidas en las pestañas y motivó la regresión adicional. Las capturas enlazadas son posteriores a esa corrección.
+Capturas Android directas, tres de 1080 × 2340 y una de 320 × 640, emulador API 30, texto al 200%, transporte y usuarios **sintéticos**. Se inspeccionaron los PNG; la captura inicial reveló palabras partidas en las pestañas y motivó la regresión adicional. Las capturas enlazadas son posteriores a las correcciones.
 
 - [Revisión docente y acciones alcanzables](evidence/20261102/teacher-review-200.png).
 - [Entrega del estudiante tras instrucciones largas](evidence/20261102/student-submit-200.png).
 - [Composición de tarea y pestañas con palabras completas](evidence/20261102/task-composer-200.png).
+- [Compositor expandido en ventana compacta](evidence/20261102/task-composer-compact-200.png).
 
-Estas pruebas verifican alcance por scroll y renderizado de nota/etiquetas; no ejecutan publicación, revisión ni entrega real y no acreditan IME/TalkBack ni toda la matriz visual de la sección 5.
+Las cuatro pruebas de Tareas verifican alcance por scroll y renderizado de nota/etiquetas; no ejecutan publicación, revisión ni entrega real. Los seis casos de administración ejercitan repositorios/ViewModels con transporte HTTP sintético y comprobaciones estrictas de MFA. No acreditan identidad institucional real, TalkBack ni toda la matriz visual de la sección 5.
 
 ### APK locales de QA
 
@@ -129,8 +131,8 @@ Sin distribución productiva ni prueba física. Las rutas se mantienen bajo `app
 
 | Variante | Ruta relativa | SHA-256 |
 |---|---|---|
-| Académica debug | `academic/debug/app-academic-debug.apk` | `ca3271d6cab46b9a4686c04c7dbe8a1fcf8e2838f60bc774ed1fd99e6cfb3eb1` |
-| Gestión debug | `management/debug/app-management-debug.apk` | `2fb3985a1c87936089b877fc8414df6bf38ffcf0a72af33dbf151c554e353cbb` |
+| Académica debug | `academic/debug/app-academic-debug.apk` | `45fd139a163bf1ba36c7a349adde17d600350ea3eb29bad33a20c5556443abce` |
+| Gestión debug | `management/debug/app-management-debug.apk` | `5ee4d6308e45fe589a16a24be96c951659b9f9900e06375b43f503ac67d3e26f` |
 
 - Exportador de evidencia: 10 pruebas Python pasan; el primer intento en sandbox falló por permisos de temporales, repetición con acceso normal satisfactoria.
 - Configuración Firebase Académica: prueba PowerShell acepta Academic y rechaza Management/sender discordantes sin imprimir configuración.
@@ -138,3 +140,11 @@ Sin distribución productiva ni prueba física. Las rutas se mantienen bajo `app
 - Un daemon Gradle terminó inesperadamente durante compilación; comprobaciones posteriores limitan workers/memoria y conservan el fallo ambiental en los logs locales.
 - API con Mongo local: 694 casos registrados, 691 ejecutados sin fallo y tres omitidos. Las omisiones son `SiiiLiveContractTest`, `SiiiPushLiveContractTest` y `SiiiFullChainLiveContractTest`: requieren un laboratorio Next/PostgreSQL SIII de loopback y sus variables sintéticas, no configurados en esta ejecución. No se sustituyeron por éxito ni se deshabilitaron pruebas.
 - Las dos regresiones de revocación durante consumo MFA pasaron en la suite API completa; antes de la corrección ambas fallaban porque la operación se completaba.
+
+### Hallazgos de la primera matriz CI y comprobación compacta
+
+- La primera matriz del PR #268 hizo visible el fallo del compositor en 320 × 640. Se reprodujo también localmente antes de cambiarlo; abrir el formulario expandido conserva la aserción de visibilidad y permite llegar al botón.
+- El helper V12 ahora deja propagarse la pérdida de foco antes de pedir el cierre de IME. Conserva los 10 segundos, exige insets disponibles/IME oculto/bottom cero y mantiene el fallo diagnóstico. El envío de solicitud espera además la geometría visible, conservando `assertIsDisplayed`, `assertIsEnabled` y su acción HTTP.
+- Después del ajuste pasaron localmente, aislados en 320 × 640, los cuatro casos de Tareas y los casos de configuración MFA y solicitud de tutor que habían fallado. Registros: `build/compact-tasks-green-20261102.log`, `build/compact-mfa-profile-green-20261102.log` y `build/compact-mfa-staff-green-20261102.log`.
+- Una ampliación exploratoria a los diez casos en esa ventana artificial dejó de avanzar en `administrativeTutorApprovalSelectsActualGroupAndUsesBoundProof`. Se detuvo el proceso y se restauró la pantalla; **esa corrida no se contabiliza como aprobada**. El sistema no reportó ANR. Queda pendiente aislar esa espera del runner en el afinado API 30 compacto; los diez casos sí pasaron en la geometría normal.
+- Otro job API 35 falló antes de arrancar por `Error on ZipFile unknown archive` al descargar la imagen SDK; no fue una assertion de la app. El CI del commit corregido se exige completo en el mismo PR.

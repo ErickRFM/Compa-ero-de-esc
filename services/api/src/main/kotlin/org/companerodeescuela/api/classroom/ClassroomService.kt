@@ -311,13 +311,15 @@ class ClassroomService(
         }
         val group = scopedGroupFor(actor, classroomId)
         val directory = accounts ?: throw ApiException.DependencyUnavailable("Current student identities are unavailable")
-        val invalid = identifiers.any {
-            it.isBlank() || it != it.trim() || it.length > 128 || it.any(Char::isISOControl)
-        }
+        val invalid =
+            identifiers.any {
+                it.isBlank() || it != it.trim() || it.length > 128 || it.any(Char::isISOControl)
+            }
         if (identifiers.isEmpty() || identifiers.size > 100 || invalid) {
             throw ApiException.Validation("Provide 1 to 100 account emails or ids")
         }
-        val unique = identifiers.distinctBy { it.lowercase() }
+        val unique =
+            identifiers.distinctBy { it.lowercase() }
         // Resolve the whole batch before modifying any membership: never persist partial imports.
         val students =
             unique.map { identifier ->
@@ -334,13 +336,15 @@ class ClassroomService(
                     throw ApiException.Forbidden("Students require verified accounts in the same institution")
                 }
                 student
-            }.distinctBy { it.id }
+            }
+                .distinctBy { it.id }
         val now = clock.instant()
-        return students.map { student ->
-            repository.addMembershipIfAbsent(
-                NativeClassroomMembership(classroomId, student.id, ClassroomMemberRole.STUDENT, now),
-            ).toContract()
-        }
+        return students
+            .map { student ->
+                repository.addMembershipIfAbsent(
+                    NativeClassroomMembership(classroomId, student.id, ClassroomMemberRole.STUDENT, now),
+                ).toContract()
+            }
     }
 
     suspend fun revokeInvite(

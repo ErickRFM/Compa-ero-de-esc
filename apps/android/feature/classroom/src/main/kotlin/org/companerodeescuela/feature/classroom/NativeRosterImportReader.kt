@@ -68,11 +68,9 @@ internal fun parseNativeRosterIdentifiers(text: String): List<String> {
     for (line in text.lineSequence()) {
         val row = line.trim()
         if (row.isEmpty()) continue
-        val candidate =
-            email.find(row)?.value
-                ?: row.split(',', ';', '\t', ' ')
-                    .firstOrNull { id.matches(it.trim()) }
-                    ?.trim()
+        val fields = row.split(',', ';', '\t', ' ')
+        val idMatch = fields.firstOrNull { id.matches(it.trim()) }
+        val candidate = email.find(row)?.value ?: idMatch?.trim()
         if (candidate != null) {
             identifiers += candidate.lowercase()
             if (identifiers.size > 100) throw IllegalArgumentException("Máximo 100 alumnos por lote")

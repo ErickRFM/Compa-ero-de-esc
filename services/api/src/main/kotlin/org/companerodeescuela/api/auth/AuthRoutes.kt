@@ -1,15 +1,9 @@
 package org.companerodeescuela.api.auth
 
-import java.time.Clock
-import kotlinx.coroutines.delay
-import org.companerodeescuela.api.institutions.InstitutionRepository
-import org.companerodeescuela.api.institutions.InMemoryInstitutionRepository
-import org.companerodeescuela.api.mail.VerificationEmailGateway
-import org.companerodeescuela.api.mail.UnavailableVerificationEmailGateway
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.AuthenticationStrategy
+import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
 import io.ktor.server.response.header
@@ -18,17 +12,23 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
+import kotlinx.coroutines.delay
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
+import org.companerodeescuela.api.institutions.InMemoryInstitutionRepository
+import org.companerodeescuela.api.institutions.InstitutionRepository
 import org.companerodeescuela.api.integrations.identity.IdentityProvider
+import org.companerodeescuela.api.mail.UnavailableVerificationEmailGateway
+import org.companerodeescuela.api.mail.VerificationEmailGateway
 import org.companerodeescuela.api.plugins.clientAddress
 import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.api.runCatchingCancellable
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.LoginRequest
 import org.companerodeescuela.shared.contracts.RefreshSessionRequest
-import org.companerodeescuela.shared.contracts.VerifyEmailRequest
 import org.companerodeescuela.shared.contracts.RegisterRequest
+import org.companerodeescuela.shared.contracts.VerifyEmailRequest
+import java.time.Clock
 
 /**
  * Platform authentication endpoints.
@@ -53,73 +53,78 @@ fun Route.authRoutes(
     val registrationAddressLimiter = LoginAttemptLimiter(maxAttempts = 20)
     val verificationLimiter = LoginAttemptLimiter(maxAttempts = 8)
     val refreshLogoutLimiter = LoginAttemptLimiter(maxAttempts = 30, window = java.time.Duration.ofMinutes(5))
-    val loginLimiter = loginAttemptLimiter ?: LoginAttemptLimiter(
-        progressiveDelayBase = java.time.Duration.ofSeconds(settings.loginProgressiveDelayBaseSeconds),
-        progressiveDelayMaximum = java.time.Duration.ofSeconds(settings.loginProgressiveDelayMaxSeconds),
-    )
+    val loginLimiter =
+        loginAttemptLimiter ?: LoginAttemptLimiter(
+            progressiveDelayBase = java.time.Duration.ofSeconds(settings.loginProgressiveDelayBaseSeconds),
+            progressiveDelayMaximum = java.time.Duration.ofSeconds(settings.loginProgressiveDelayMaxSeconds),
+        )
 
     route("/auth") {
         post("/login") {
-            val service = tokenService?.let {
-                AuthService(
-                    identityProvider,
-                    it,
-                    sessions,
-                    accounts = accounts,
-                    institutions = institutions,
-                    verification = verification,
-                    refreshRotationGrace = java.time.Duration.ofSeconds(settings.refreshRotationGraceSeconds),
-                    maximumRefreshSessionAge = java.time.Duration.ofDays(settings.maximumRefreshSessionAgeDays),
-                    sessionAuthority = sessionAuthority,
-                )
-            }
-                ?: throw ApiException.DependencyUnavailable(
-                    "Authentication is not configured",
-                )
+            val service =
+                tokenService?.let {
+                    AuthService(
+                        identityProvider,
+                        it,
+                        sessions,
+                        accounts = accounts,
+                        institutions = institutions,
+                        verification = verification,
+                        refreshRotationGrace = java.time.Duration.ofSeconds(settings.refreshRotationGraceSeconds),
+                        maximumRefreshSessionAge = java.time.Duration.ofDays(settings.maximumRefreshSessionAgeDays),
+                        sessionAuthority = sessionAuthority,
+                    )
+                }
+                    ?: throw ApiException.DependencyUnavailable(
+                        "Authentication is not configured",
+                    )
 
             val request =
                 runCatchingCancellable { call.boundedBody(LoginRequest.serializer(), AUTH_BODY_MAX_BYTES) }
-                .getOrElse {
-                    throw ApiException.Validation("Invalid login request")
-                }
+                    .getOrElse {
+                        throw ApiException.Validation("Invalid login request")
+                    }
 
             val clientAddress = call.clientAddress()
-            val result = try {
-                service.login(request)
-            } catch (error: ApiException.Unauthorized) {
-                val failure = loginLimiter.recordLoginFailure(request.username.trim(), clientAddress)
-                if (!failure.progressiveDelay.isZero) delay(failure.progressiveDelay.toMillis())
-                failure.retryAfterSeconds?.let { retryAfter ->
-                    call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
-                    throw ApiException.RateLimited()
+            val result =
+                try {
+                    service.login(request)
+                } catch (error: ApiException.Unauthorized) {
+                    val failure = loginLimiter.recordLoginFailure(request.username.trim(), clientAddress)
+                    if (!failure.progressiveDelay.isZero) delay(failure.progressiveDelay.toMillis())
+                    failure.retryAfterSeconds?.let { retryAfter ->
+                        call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
+                        throw ApiException.RateLimited()
+                    }
+                    throw error
                 }
-                throw error
-            }
             loginLimiter.resetLogin(request.username.trim(), clientAddress)
 
             call.respond(
                 status = HttpStatusCode.OK,
-                message = ApiResponse(
-                    data = result,
-                    requestId = call.requestId(),
-                ),
+                message =
+                    ApiResponse(
+                        data = result,
+                        requestId = call.requestId(),
+                    ),
             )
         }
 
         post("/register") {
-            val service = tokenService?.let {
-                AuthService(
-                    identityProvider,
-                    it,
-                    sessions,
-                    accounts = accounts,
-                    institutions = institutions,
-                    verification = verification,
-                    sessionAuthority = sessionAuthority,
+            val service =
+                tokenService?.let {
+                    AuthService(
+                        identityProvider,
+                        it,
+                        sessions,
+                        accounts = accounts,
+                        institutions = institutions,
+                        verification = verification,
+                        sessionAuthority = sessionAuthority,
+                    )
+                } ?: throw ApiException.DependencyUnavailable(
+                    "Authentication is not configured",
                 )
-            } ?: throw ApiException.DependencyUnavailable(
-                "Authentication is not configured",
-            )
             val clientAddress = call.clientAddress()
             registrationAddressLimiter.acquireAddress(clientAddress)?.let { retryAfter ->
                 call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
@@ -127,17 +132,18 @@ fun Route.authRoutes(
             }
             val request =
                 runCatchingCancellable { call.boundedBody(RegisterRequest.serializer(), AUTH_BODY_MAX_BYTES) }
-                .getOrElse { throw ApiException.Validation("Invalid registration request") }
+                    .getOrElse { throw ApiException.Validation("Invalid registration request") }
             registrationLimiter.acquire(request.email, clientAddress)?.let { retryAfter ->
                 call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
                 throw ApiException.RateLimited()
             }
             call.respond(
                 status = HttpStatusCode.Created,
-                message = ApiResponse(
-                    data = service.register(request),
-                    requestId = call.requestId(),
-                ),
+                message =
+                    ApiResponse(
+                        data = service.register(request),
+                        requestId = call.requestId(),
+                    ),
             )
         }
 
@@ -146,18 +152,24 @@ fun Route.authRoutes(
                 call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
                 throw ApiException.RateLimited()
             }
-            val service = tokenService?.let {
-                AuthService(
-                    identityProvider, it, sessions, accounts = accounts, institutions = institutions, verification = verification,
-                    refreshRotationGrace = java.time.Duration.ofSeconds(settings.refreshRotationGraceSeconds),
-                    maximumRefreshSessionAge = java.time.Duration.ofDays(settings.maximumRefreshSessionAgeDays),
-                    sessionAuthority = sessionAuthority,
-                )
-            }
-                ?: throw ApiException.DependencyUnavailable("Authentication is not configured")
+            val service =
+                tokenService?.let {
+                    AuthService(
+                        identityProvider,
+                        it,
+                        sessions,
+                        accounts = accounts,
+                        institutions = institutions,
+                        verification = verification,
+                        refreshRotationGrace = java.time.Duration.ofSeconds(settings.refreshRotationGraceSeconds),
+                        maximumRefreshSessionAge = java.time.Duration.ofDays(settings.maximumRefreshSessionAgeDays),
+                        sessionAuthority = sessionAuthority,
+                    )
+                }
+                    ?: throw ApiException.DependencyUnavailable("Authentication is not configured")
             val request =
                 runCatchingCancellable { call.boundedBody(RefreshSessionRequest.serializer(), AUTH_BODY_MAX_BYTES) }
-                .getOrElse { throw ApiException.Unauthorized() }
+                    .getOrElse { throw ApiException.Unauthorized() }
             call.respond(
                 ApiResponse(
                     data = service.refresh(request),
@@ -171,18 +183,24 @@ fun Route.authRoutes(
                 call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
                 throw ApiException.RateLimited()
             }
-            val service = tokenService?.let {
-                AuthService(
-                    identityProvider, it, sessions, accounts = accounts, institutions = institutions, verification = verification,
-                    refreshRotationGrace = java.time.Duration.ofSeconds(settings.refreshRotationGraceSeconds),
-                    maximumRefreshSessionAge = java.time.Duration.ofDays(settings.maximumRefreshSessionAgeDays),
-                    sessionAuthority = sessionAuthority,
-                )
-            }
-                ?: throw ApiException.DependencyUnavailable("Authentication is not configured")
+            val service =
+                tokenService?.let {
+                    AuthService(
+                        identityProvider,
+                        it,
+                        sessions,
+                        accounts = accounts,
+                        institutions = institutions,
+                        verification = verification,
+                        refreshRotationGrace = java.time.Duration.ofSeconds(settings.refreshRotationGraceSeconds),
+                        maximumRefreshSessionAge = java.time.Duration.ofDays(settings.maximumRefreshSessionAgeDays),
+                        sessionAuthority = sessionAuthority,
+                    )
+                }
+                    ?: throw ApiException.DependencyUnavailable("Authentication is not configured")
             val request =
                 runCatchingCancellable { call.boundedBody(RefreshSessionRequest.serializer(), AUTH_BODY_MAX_BYTES) }
-                .getOrElse { throw ApiException.Unauthorized() }
+                    .getOrElse { throw ApiException.Unauthorized() }
             service.logout(request)
             call.respond(HttpStatusCode.NoContent)
         }
@@ -219,16 +237,17 @@ fun Route.authRoutes(
                     }
                     val request =
                         runCatchingCancellable { call.boundedBody(VerifyEmailRequest.serializer(), AUTH_BODY_MAX_BYTES) }
-                        .getOrElse { throw ApiException.Validation("Invalid email verification request") }
-                    val service = AuthService(
-                        identityProvider,
-                        tokenService,
-                        sessions,
-                        accounts = accounts,
-                        institutions = institutions,
-                        verification = verification,
-                        sessionAuthority = sessionAuthority,
-                    )
+                            .getOrElse { throw ApiException.Validation("Invalid email verification request") }
+                    val service =
+                        AuthService(
+                            identityProvider,
+                            tokenService,
+                            sessions,
+                            accounts = accounts,
+                            institutions = institutions,
+                            verification = verification,
+                            sessionAuthority = sessionAuthority,
+                        )
                     call.respond(ApiResponse(service.verifyEmail(user.id, request.token), call.requestId()))
                 }
                 get("/me") {

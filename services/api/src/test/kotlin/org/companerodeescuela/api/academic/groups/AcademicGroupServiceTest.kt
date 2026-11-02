@@ -1,79 +1,125 @@
 package org.companerodeescuela.api.academic.groups
 
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneOffset
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlinx.coroutines.test.runTest
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.shared.contracts.AssignAcademicGroupMemberRequest
 import org.companerodeescuela.shared.contracts.CreateAcademicGroupRequest
 import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
+import java.time.Instant
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class AcademicGroupServiceTest {
     @Test
-    fun adminCreatesGroupAndAssignsStudent() = runTest {
-        val repository = InMemoryAcademicGroupRepository()
-        val clock=org.companerodeescuela.api.test.QaClock(Instant.parse("2026-10-06T17:00:00Z"))
-        val accounts=org.companerodeescuela.api.auth.InMemoryPlatformAccountRepository()
-        val operator=org.companerodeescuela.api.test.QaMfaOperator.create(accounts,ADMIN,clock)
-        accounts.create(org.companerodeescuela.api.test.ScopedAcademicFixtures.account(STUDENT))
-        val service=AcademicGroupService(repository,clock,accounts,operator.mfa,org.companerodeescuela.api.institutions.InMemoryInstitutionRepository(listOf(org.companerodeescuela.shared.contracts.InstitutionSummary("qa-campus","QA Campus"))))
-        var creation=CreateAcademicGroupRequest("9a","9A","qa-campus","qa-period",0,4102444800L,"create")
-        creation=creation.copy(proof=operator.proof(org.companerodeescuela.shared.contracts.StepUpAction.MANAGE_ACADEMICS,"9A","create",org.companerodeescuela.shared.contracts.PrivilegedCommandDigests.groupCreation("9A",creation)))
-        val group=service.create(ADMIN,creation)
-        var assignment=AssignAcademicGroupMemberRequest(STUDENT.id,"member",group.scopeRevision)
-        assignment=assignment.copy(proof=operator.proof(org.companerodeescuela.shared.contracts.StepUpAction.MANAGE_ACADEMICS,group.id,"member",org.companerodeescuela.shared.contracts.PrivilegedCommandDigests.groupMembership(group.id,assignment)))
-        val membership=service.assignMember(ADMIN,group.id,assignment)
+    fun adminCreatesGroupAndAssignsStudent() =
+        runTest {
+            val repository = InMemoryAcademicGroupRepository()
+            val clock =
+                org.companerodeescuela.api.test
+                    .QaClock(Instant.parse("2026-10-06T17:00:00Z"))
+            val accounts =
+                org.companerodeescuela.api.auth
+                    .InMemoryPlatformAccountRepository()
+            val operator =
+                org.companerodeescuela.api.test.QaMfaOperator
+                    .create(accounts, ADMIN, clock)
+            accounts.create(
+                org.companerodeescuela.api.test.ScopedAcademicFixtures
+                    .account(STUDENT),
+            )
+            val service =
+                AcademicGroupService(
+                    repository,
+                    clock,
+                    accounts,
+                    operator.mfa,
+                    org.companerodeescuela.api.institutions.InMemoryInstitutionRepository(
+                        listOf(
+                            org.companerodeescuela.shared.contracts
+                                .InstitutionSummary("qa-campus", "QA Campus"),
+                        ),
+                    ),
+                )
+            var creation = CreateAcademicGroupRequest("9a", "9A", "qa-campus", "qa-period", 0, 4102444800L, "create")
+            creation =
+                creation.copy(
+                    proof =
+                        operator.proof(
+                            org.companerodeescuela.shared.contracts.StepUpAction.MANAGE_ACADEMICS,
+                            "9A",
+                            "create",
+                            org.companerodeescuela.shared.contracts.PrivilegedCommandDigests
+                                .groupCreation("9A", creation),
+                        ),
+                )
+            val group = service.create(ADMIN, creation)
+            var assignment = AssignAcademicGroupMemberRequest(STUDENT.id, "member", group.scopeRevision)
+            assignment =
+                assignment.copy(
+                    proof =
+                        operator.proof(
+                            org.companerodeescuela.shared.contracts.StepUpAction.MANAGE_ACADEMICS,
+                            group.id,
+                            "member",
+                            org.companerodeescuela.shared.contracts.PrivilegedCommandDigests
+                                .groupMembership(group.id, assignment),
+                        ),
+                )
+            val membership = service.assignMember(ADMIN, group.id, assignment)
 
-        assertEquals("9A", group.id)
-        assertEquals(STUDENT.id, membership.userId)
-        assertEquals(listOf("9A"), service.listFor(STUDENT).map { it.id })
-    }
+            assertEquals("9A", group.id)
+            assertEquals(STUDENT.id, membership.userId)
+            assertEquals(listOf("9A"), service.listFor(STUDENT).map { it.id })
+        }
 
     @Test
-    fun teacherCannotCreateOrAssignGroups() = runTest {
-        val repository = InMemoryAcademicGroupRepository()
-        val service = AcademicGroupService(repository)
-        repository.create(
-            AcademicGroupRecord(
-                id = "9A",
-                name = "9A",
-                active = true,
-                createdAt = Instant.EPOCH,
-            ),
-        )
-
-        assertFailsWith<ApiException.Forbidden> {
-            service.create(TEACHER, CreateAcademicGroupRequest("9B", "9B"))
-        }
-        assertFailsWith<ApiException.Forbidden> {
-            service.assignMember(
-                TEACHER,
-                "9A",
-                AssignAcademicGroupMemberRequest(STUDENT.id),
+    fun teacherCannotCreateOrAssignGroups() =
+        runTest {
+            val repository = InMemoryAcademicGroupRepository()
+            val service = AcademicGroupService(repository)
+            repository.create(
+                AcademicGroupRecord(
+                    id = "9A",
+                    name = "9A",
+                    active = true,
+                    createdAt = Instant.EPOCH,
+                ),
             )
+
+            assertFailsWith<ApiException.Forbidden> {
+                service.create(TEACHER, CreateAcademicGroupRequest("9B", "9B"))
+            }
+            assertFailsWith<ApiException.Forbidden> {
+                service.assignMember(
+                    TEACHER,
+                    "9A",
+                    AssignAcademicGroupMemberRequest(STUDENT.id),
+                )
+            }
         }
-    }
 
     private companion object {
-        val ADMIN = UserSummary(
-            id = "admin-1",
-            displayName = "Control escolar",
-            roles = setOf(UserRole.ADMIN),institutionId="qa-campus",
-        )
-        val TEACHER = UserSummary(
-            id = "teacher-1",
-            displayName = "Mtra. Elena",
-            roles = setOf(UserRole.TEACHER),
-        )
-        val STUDENT = UserSummary(
-            id = "student-1",
-            displayName = "Ana",
-            roles = setOf(UserRole.STUDENT),institutionId="qa-campus",
-        )
+        val ADMIN =
+            UserSummary(
+                id = "admin-1",
+                displayName = "Control escolar",
+                roles = setOf(UserRole.ADMIN),
+                institutionId = "qa-campus",
+            )
+        val TEACHER =
+            UserSummary(
+                id = "teacher-1",
+                displayName = "Mtra. Elena",
+                roles = setOf(UserRole.TEACHER),
+            )
+        val STUDENT =
+            UserSummary(
+                id = "student-1",
+                displayName = "Ana",
+                roles = setOf(UserRole.STUDENT),
+                institutionId = "qa-campus",
+            )
     }
 }

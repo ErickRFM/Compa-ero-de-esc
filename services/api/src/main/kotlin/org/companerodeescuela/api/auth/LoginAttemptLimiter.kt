@@ -43,7 +43,10 @@ class LoginAttemptLimiter(
     private var operationsSincePrune = 0
 
     @Synchronized
-    fun acquire(username: String, clientAddress: String): Long? = acquireKey(key(username, clientAddress))
+    fun acquire(
+        username: String,
+        clientAddress: String,
+    ): Long? = acquireKey(key(username, clientAddress))
 
     @Synchronized
     fun acquireAddress(clientAddress: String): Long? = acquireKey("ip|$clientAddress")
@@ -71,7 +74,10 @@ class LoginAttemptLimiter(
     }
 
     @Synchronized
-    fun reset(username: String, clientAddress: String) {
+    fun reset(
+        username: String,
+        clientAddress: String,
+    ) {
         maintain(clock.instant())
         buckets.remove(storageKey(key(username, clientAddress)))
     }
@@ -83,7 +89,10 @@ class LoginAttemptLimiter(
     }
 
     @Synchronized
-    fun recordLoginFailure(username: String, clientAddress: String): LoginFailureResult {
+    fun recordLoginFailure(
+        username: String,
+        clientAddress: String,
+    ): LoginFailureResult {
         val addressRetry = acquireAddress(clientAddress)
         val accountAddressRetry = acquire(username, clientAddress)
         val now = clock.instant()
@@ -93,31 +102,44 @@ class LoginAttemptLimiter(
         val expired = current == null || Duration.between(current.startedAt, now) >= window
         val attempts = if (expired) 1 else current!!.attempts + 1
         if (current == null) makeRoom(accountFailures)
-        accountFailures[accountKey] = Bucket(
-            startedAt = if (expired) now else current!!.startedAt,
-            attempts = attempts,
-        )
+        accountFailures[accountKey] =
+            Bucket(
+                startedAt = if (expired) now else current!!.startedAt,
+                attempts = attempts,
+            )
         val exponent = (attempts - 1).coerceAtMost(62)
         val baseSeconds = progressiveDelayBase.seconds
         val maximumSeconds = progressiveDelayMaximum.seconds
         val multiplier = 1L shl exponent
-        val delaySeconds = if (baseSeconds == 0L || maximumSeconds == 0L) 0L else if (
-            baseSeconds > maximumSeconds / multiplier
-        ) maximumSeconds else baseSeconds * multiplier
+        val delaySeconds =
+            if (baseSeconds == 0L || maximumSeconds == 0L) {
+                0L
+            } else if (
+                baseSeconds > maximumSeconds / multiplier
+            ) {
+                maximumSeconds
+            } else {
+                baseSeconds * multiplier
+            }
         val retryAfter = listOfNotNull(addressRetry, accountAddressRetry).maxOrNull()
         return LoginFailureResult(retryAfter, Duration.of(delaySeconds, ChronoUnit.SECONDS))
     }
 
     @Synchronized
-    fun resetLogin(username: String, clientAddress: String) {
+    fun resetLogin(
+        username: String,
+        clientAddress: String,
+    ) {
         resetAddress(clientAddress)
         reset(username, clientAddress)
         maintain(clock.instant())
         accountFailures.remove(storageKey("account|${username.trim().lowercase()}"))
     }
 
-    private fun key(username: String, clientAddress: String): String =
-        username.trim().lowercase() + "|" + clientAddress
+    private fun key(
+        username: String,
+        clientAddress: String,
+    ): String = username.trim().lowercase() + "|" + clientAddress
 
     private fun maintain(now: Instant) {
         operationsSincePrune += 1
@@ -132,9 +154,11 @@ class LoginAttemptLimiter(
         map.remove(map.keys.first())
     }
 
-    private fun storageKey(value: String): String = MessageDigest.getInstance("SHA-256")
-        .digest(value.toByteArray(StandardCharsets.UTF_8))
-        .joinToString(separator = "") { byte -> "%02x".format(byte) }
+    private fun storageKey(value: String): String =
+        MessageDigest
+            .getInstance("SHA-256")
+            .digest(value.toByteArray(StandardCharsets.UTF_8))
+            .joinToString(separator = "") { byte -> "%02x".format(byte) }
 
     private companion object {
         const val MAX_RETAINED_KEYS = 4_096

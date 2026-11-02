@@ -1,14 +1,14 @@
 package org.companerodeescuela.api.auth
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
-import kotlinx.coroutines.withContext
 
 data class PasswordVerificationResult(
     val verified: Boolean,
@@ -29,7 +29,10 @@ open class PasswordHasher(
         ).joinToString(":")
     }
 
-    open fun verify(password: String, encoded: String): Boolean {
+    open fun verify(
+        password: String,
+        encoded: String,
+    ): Boolean {
         val parts = encoded.split(":")
         val iterations = encodedIterationCount(parts) ?: return false
         val salt = runCatching { Base64.getUrlDecoder().decode(parts[2]) }.getOrNull() ?: return false
@@ -40,21 +43,30 @@ open class PasswordHasher(
 
     suspend fun hashAsync(password: String): String = limited { hash(password) }
 
-    suspend fun verifyAsync(password: String, encoded: String): Boolean = limited { verify(password, encoded) }
+    suspend fun verifyAsync(
+        password: String,
+        encoded: String,
+    ): Boolean = limited { verify(password, encoded) }
 
-    suspend fun verifyAndUpgradeAsync(password: String, encoded: String): PasswordVerificationResult = limited {
-        val iterations = encodedIterationCount(encoded.split(":"))
-            ?: return@limited PasswordVerificationResult(verified = false)
-        if (!verify(password, encoded)) return@limited PasswordVerificationResult(verified = false)
-        PasswordVerificationResult(
-            verified = true,
-            upgradedHash = if (iterations < ITERATIONS) hash(password) else null,
-        )
-    }
+    suspend fun verifyAndUpgradeAsync(
+        password: String,
+        encoded: String,
+    ): PasswordVerificationResult =
+        limited {
+            val iterations =
+                encodedIterationCount(encoded.split(":"))
+                    ?: return@limited PasswordVerificationResult(verified = false)
+            if (!verify(password, encoded)) return@limited PasswordVerificationResult(verified = false)
+            PasswordVerificationResult(
+                verified = true,
+                upgradedHash = if (iterations < ITERATIONS) hash(password) else null,
+            )
+        }
 
-    private suspend fun <T> limited(block: () -> T): T = HASH_SEMAPHORE.withPermit {
-        withContext(Dispatchers.Default) { block() }
-    }
+    private suspend fun <T> limited(block: () -> T): T =
+        HASH_SEMAPHORE.withPermit {
+            withContext(Dispatchers.Default) { block() }
+        }
 
     private fun encodedIterationCount(parts: List<String>): Int? {
         if (parts.size != 4 || parts[0] != PREFIX) return null
@@ -62,7 +74,11 @@ open class PasswordHasher(
         return iterations.takeIf { it in MIN_ITERATIONS..MAX_ITERATIONS }
     }
 
-    private fun derive(password: String, salt: ByteArray, iterations: Int): ByteArray {
+    private fun derive(
+        password: String,
+        salt: ByteArray,
+        iterations: Int,
+    ): ByteArray {
         val spec = PBEKeySpec(password.toCharArray(), salt, iterations, KEY_BITS)
         return try {
             SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded

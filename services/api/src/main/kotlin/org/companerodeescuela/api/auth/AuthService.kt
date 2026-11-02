@@ -1,24 +1,24 @@
 package org.companerodeescuela.api.auth
 
-import java.security.MessageDigest
-import java.security.SecureRandom
-import java.time.Clock
-import java.time.Duration
-import java.util.Base64
-import java.util.UUID
 import org.companerodeescuela.api.errors.ApiException
+import org.companerodeescuela.api.institutions.InMemoryInstitutionRepository
+import org.companerodeescuela.api.institutions.InstitutionRepository
 import org.companerodeescuela.api.integrations.identity.IdentityProvider
 import org.companerodeescuela.api.integrations.identity.InstitutionalCredentials
-import org.companerodeescuela.shared.contracts.AccountStatus
-import org.companerodeescuela.api.institutions.InstitutionRepository
-import org.companerodeescuela.api.institutions.InMemoryInstitutionRepository
 import org.companerodeescuela.api.mail.UnavailableVerificationEmailGateway
+import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.LoginRequest
 import org.companerodeescuela.shared.contracts.LoginResponse
 import org.companerodeescuela.shared.contracts.RefreshSessionRequest
 import org.companerodeescuela.shared.contracts.RegisterRequest
 import org.companerodeescuela.shared.contracts.RegistrationAccountType
 import org.companerodeescuela.shared.contracts.UserSummary
+import java.security.MessageDigest
+import java.security.SecureRandom
+import java.time.Clock
+import java.time.Duration
+import java.util.Base64
+import java.util.UUID
 
 /**
  * Authentication use case.
@@ -47,6 +47,7 @@ class AuthService(
     }
 
     private val authority = sessionAuthority ?: PlatformSessionAuthority(accounts, identityProvider, clock)
+
     suspend fun register(request: RegisterRequest): LoginResponse {
         val displayName = request.displayName.trim()
         val email = request.email.trim().lowercase()
@@ -54,16 +55,23 @@ class AuthService(
         if (displayName.length !in 2..80 || displayName.any { it.isISOControl() }) {
             throw ApiException.Validation("Display name must contain between 2 and 80 characters")
         }
-        if (!EMAIL_REGEX.matches(email) || email.length > 128 || email.substringBefore('@').length > 64 ||
+        if (!EMAIL_REGEX.matches(email) ||
+            email.length > 128 ||
+            email.substringBefore('@').length > 64 ||
             email.substringBefore('@').let { it.startsWith('.') || it.endsWith('.') || ".." in it } ||
-            email.substringAfter('@').split('.').any { it.length !in 1..63 || it.startsWith('-') || it.endsWith('-') }) {
+            email.substringAfter('@').split('.').any { it.length !in 1..63 || it.startsWith('-') || it.endsWith('-') }
+        ) {
             throw ApiException.Validation("A valid email is required")
         }
         if (request.password.length !in 8..256 || request.password.any { it.isISOControl() }) {
             throw ApiException.Validation("Password must contain between 8 and 256 characters")
         }
 
-        fun bounded(value: String?, maximum: Int, field: String): String? {
+        fun bounded(
+            value: String?,
+            maximum: Int,
+            field: String,
+        ): String? {
             val cleaned = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
             if (cleaned.length > maximum || cleaned.any { it.isISOControl() }) throw ApiException.Validation("Invalid $field")
             return cleaned
@@ -72,21 +80,29 @@ class AuthService(
         val reference = bounded(request.identityReference, 160, "identity reference")
         val groupPreference = bounded(request.preferredGroup, 128, "group preference")
         if (request.accountType in setOf(RegistrationAccountType.TEACHER, RegistrationAccountType.TUTOR) &&
-            (institutionPreference == null || reference == null)) throw ApiException.Validation("Institution and identity reference are required")
-        if (institutionPreference != null && authenticationDependency { institutions.findEnabled(institutionPreference) } == null)
+            (institutionPreference == null || reference == null)
+        ) {
+            throw ApiException.Validation("Institution and identity reference are required")
+        }
+        if (institutionPreference != null && authenticationDependency { institutions.findEnabled(institutionPreference) } == null) {
             throw ApiException.Validation("Institution is not available for registration")
+        }
         if (request.accountType == RegistrationAccountType.PARTICIPANT &&
-            (institutionPreference != null || reference != null || groupPreference != null)) throw ApiException.Validation("Participant registration does not request academic scope")
-        val account = PlatformAccount(
-            id = UUID.randomUUID().toString(),
-            displayName = displayName,
-            email = email,
-            passwordHash = passwordHasher.hashAsync(request.password),
-            roles = emptySet(),
-            accountStatus = AccountStatus.PENDING_VERIFICATION,
-            registrationIntent = RegistrationIntent(request.accountType, institutionPreference, reference, groupPreference),
-            createdAt = clock.instant(),
-        )
+            (institutionPreference != null || reference != null || groupPreference != null)
+        ) {
+            throw ApiException.Validation("Participant registration does not request academic scope")
+        }
+        val account =
+            PlatformAccount(
+                id = UUID.randomUUID().toString(),
+                displayName = displayName,
+                email = email,
+                passwordHash = passwordHasher.hashAsync(request.password),
+                roles = emptySet(),
+                accountStatus = AccountStatus.PENDING_VERIFICATION,
+                registrationIntent = RegistrationIntent(request.accountType, institutionPreference, reference, groupPreference),
+                createdAt = clock.instant(),
+            )
         if (!authenticationDependency { accounts.create(account) }) {
             throw ApiException.Conflict("An account with that email already exists")
         }
@@ -94,8 +110,10 @@ class AuthService(
         return createSession(account.toUserSummary().copy(verificationDelivery = delivery.status), SessionIdentitySource.NATIVE)
     }
 
-    suspend fun verifyEmail(userId: String, token: String): LoginResponse =
-        createSession(verification.verify(userId, token).toUserSummary(), SessionIdentitySource.NATIVE)
+    suspend fun verifyEmail(
+        userId: String,
+        token: String,
+    ): LoginResponse = createSession(verification.verify(userId, token).toUserSummary(), SessionIdentitySource.NATIVE)
 
     suspend fun login(request: LoginRequest): LoginResponse {
         if (request.username.length > 128 || request.username.any(Char::isISOControl)) {
@@ -122,12 +140,15 @@ class AuthService(
         }
 
         passwordHasher.verifyAsync(request.password, DUMMY_PASSWORD_HASH)
-        val institutional = authenticationDependency { identityProvider.authenticate(
-            InstitutionalCredentials(
-                username = username,
-                password = request.password,
-            ),
-        ) } ?: throw ApiException.Unauthorized("Invalid username or password")
+        val institutional =
+            authenticationDependency {
+                identityProvider.authenticate(
+                    InstitutionalCredentials(
+                        username = username,
+                        password = request.password,
+                    ),
+                )
+            } ?: throw ApiException.Unauthorized("Invalid username or password")
 
         return createSession(
             UserSummary(
@@ -146,19 +167,22 @@ class AuthService(
             throw ApiException.Unauthorized()
         }
         val now = clock.instant()
-        val session = authenticationDependency { sessions.find(request.sessionId) }
-            ?.takeIf {
-                it.revokedAt == null && it.expiresAt > now && now.isBefore(it.createdAt.plus(maximumRefreshSessionAge))
-            }
-            ?: throw ApiException.Unauthorized()
+        val session =
+            authenticationDependency { sessions.find(request.sessionId) }
+                ?.takeIf {
+                    it.revokedAt == null && it.expiresAt > now && now.isBefore(it.createdAt.plus(maximumRefreshSessionAge))
+                }
+                ?: throw ApiException.Unauthorized()
 
         val presentedHash = hashRefreshToken(request.refreshToken)
-        val currentHashMatches = MessageDigest.isEqual(
-            session.tokenHash.toByteArray(Charsets.UTF_8),
-            presentedHash.toByteArray(Charsets.UTF_8),
-        )
-        val previousHashInGrace = session.immediatelyPreviousTokenHash == presentedHash &&
-            session.lastRotatedAt?.plus(refreshRotationGrace)?.let { !now.isAfter(it) } == true
+        val currentHashMatches =
+            MessageDigest.isEqual(
+                session.tokenHash.toByteArray(Charsets.UTF_8),
+                presentedHash.toByteArray(Charsets.UTF_8),
+            )
+        val previousHashInGrace =
+            session.immediatelyPreviousTokenHash == presentedHash &&
+                session.lastRotatedAt?.plus(refreshRotationGrace)?.let { !now.isAfter(it) } == true
         if (!currentHashMatches && !previousHashInGrace) {
             authenticationDependency { sessions.revoke(session.id, presentedHash, now) }
             throw ApiException.Unauthorized()
@@ -167,47 +191,59 @@ class AuthService(
         val updatedUser = authority.currentUser(session) ?: throw ApiException.Unauthorized()
 
         val nextRefreshToken = newRefreshToken()
-        val rotated = authenticationDependency { sessions.rotate(
-            sessionId = session.id,
-            currentTokenHash = presentedHash,
-            nextTokenHash = hashRefreshToken(nextRefreshToken),
-            user = updatedUser,
-            now = now,
-            expiresAt = minOf(now.plus(REFRESH_TOKEN_TTL), session.createdAt.plus(maximumRefreshSessionAge)),
-            rotationGrace = refreshRotationGrace,
-        ) } ?: throw ApiException.Unauthorized()
+        val rotated =
+            authenticationDependency {
+                sessions.rotate(
+                    sessionId = session.id,
+                    currentTokenHash = presentedHash,
+                    nextTokenHash = hashRefreshToken(nextRefreshToken),
+                    user = updatedUser,
+                    now = now,
+                    expiresAt = minOf(now.plus(REFRESH_TOKEN_TTL), session.createdAt.plus(maximumRefreshSessionAge)),
+                    rotationGrace = refreshRotationGrace,
+                )
+            } ?: throw ApiException.Unauthorized()
 
         return response(rotated, nextRefreshToken)
     }
 
     suspend fun logout(request: RefreshSessionRequest) {
         if (request.sessionId.isBlank() || request.refreshToken.isBlank()) return
-        authenticationDependency { sessions.revoke(
-            sessionId = request.sessionId,
-            presentedTokenHash = hashRefreshToken(request.refreshToken),
-            now = clock.instant(),
-        ) }
+        authenticationDependency {
+            sessions.revoke(
+                sessionId = request.sessionId,
+                presentedTokenHash = hashRefreshToken(request.refreshToken),
+                now = clock.instant(),
+            )
+        }
     }
 
-    private suspend fun createSession(user: UserSummary, source: SessionIdentitySource): LoginResponse {
+    private suspend fun createSession(
+        user: UserSummary,
+        source: SessionIdentitySource,
+    ): LoginResponse {
         val now = clock.instant()
         val sessionId = UUID.randomUUID().toString()
         val refreshToken = newRefreshToken()
-        val pending = RefreshSession(
-            id = sessionId,
-            tokenHash = hashRefreshToken(refreshToken),
-            user = user,
-            createdAt = now,
-            expiresAt = minOf(now.plus(REFRESH_TOKEN_TTL), now.plus(maximumRefreshSessionAge)),
-            identitySource = source,
-        )
+        val pending =
+            RefreshSession(
+                id = sessionId,
+                tokenHash = hashRefreshToken(refreshToken),
+                user = user,
+                createdAt = now,
+                expiresAt = minOf(now.plus(REFRESH_TOKEN_TTL), now.plus(maximumRefreshSessionAge)),
+                identitySource = source,
+            )
         val currentUser = authority.currentUser(pending) ?: throw ApiException.Unauthorized()
         val session = pending.copy(user = currentUser)
         authenticationDependency { sessions.create(session) }
         return response(session, refreshToken)
     }
 
-    private fun response(session: RefreshSession, refreshToken: String): LoginResponse {
+    private fun response(
+        session: RefreshSession,
+        refreshToken: String,
+    ): LoginResponse {
         val accessToken = tokenService.issue(session.user, session.id, session.generation)
         return LoginResponse(
             accessToken = accessToken.value,
@@ -224,9 +260,11 @@ class AuthService(
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
     }
 
-    private fun hashRefreshToken(token: String): String = Base64.getUrlEncoder()
-        .withoutPadding()
-        .encodeToString(MessageDigest.getInstance("SHA-256").digest(token.toByteArray()))
+    private fun hashRefreshToken(token: String): String =
+        Base64
+            .getUrlEncoder()
+            .withoutPadding()
+            .encodeToString(MessageDigest.getInstance("SHA-256").digest(token.toByteArray()))
 
     private companion object {
         const val DUMMY_PASSWORD_HASH = "pbkdf2-sha256:600000:AAECAwQFBgcICQoLDA0ODw:yq8_JTOd2RABK-PjQsVxm5wklWj_j4ZQ2eTaDf-qxDI"

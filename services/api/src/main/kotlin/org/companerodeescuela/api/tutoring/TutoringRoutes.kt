@@ -2,23 +2,22 @@ package org.companerodeescuela.api.tutoring
 
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
-import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
-import io.ktor.server.routing.post
 import io.ktor.server.routing.patch
+import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import org.companerodeescuela.api.auth.AuthTokenService
-import org.companerodeescuela.api.auth.requireNativeActor
 import org.companerodeescuela.api.auth.boundedAuthRequest
-import org.companerodeescuela.shared.contracts.RevokeTutorAssignmentRequest
+import org.companerodeescuela.api.auth.requireNativeActor
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.api.runCatchingCancellable
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.CreateTutorAssignmentRequest
+import org.companerodeescuela.shared.contracts.RevokeTutorAssignmentRequest
 
 fun Route.tutoringRoutes(
     settings: ApiSettings,
@@ -41,8 +40,9 @@ fun Route.tutoringRoutes(
 
             get("/groups/{groupId}/students") {
                 val actor = call.requireNativeActor(tokenService)
-                val groupId = call.parameters["groupId"]
-                    ?: throw ApiException.Validation("groupId is required")
+                val groupId =
+                    call.parameters["groupId"]
+                        ?: throw ApiException.Validation("groupId is required")
                 call.respond(ApiResponse(data = service.studentsForGroup(actor, groupId), requestId = call.requestId()))
             }
 
@@ -53,11 +53,15 @@ fun Route.tutoringRoutes(
 
             patch("/assignments/{assignmentId}/revoke") {
                 val actor = call.requireNativeActor(tokenService)
-                val assignmentId = call.parameters["assignmentId"]
-                    ?: throw ApiException.Validation("assignmentId is required")
+                val assignmentId =
+                    call.parameters["assignmentId"]
+                        ?: throw ApiException.Validation("assignmentId is required")
                 val request =
                     runCatchingCancellable { call.boundedAuthRequest(RevokeTutorAssignmentRequest.serializer()) }
-                    .getOrElse { if(it is kotlinx.coroutines.CancellationException) throw it;throw ApiException.Validation("Invalid tutor revocation request") }
+                        .getOrElse {
+                            if (it is kotlinx.coroutines.CancellationException) throw it
+                            throw ApiException.Validation("Invalid tutor revocation request")
+                        }
                 call.respond(ApiResponse(data = service.revoke(actor, assignmentId, request), requestId = call.requestId()))
             }
 
@@ -65,13 +69,17 @@ fun Route.tutoringRoutes(
                 val actor = call.requireNativeActor(tokenService)
                 val request =
                     runCatchingCancellable { call.boundedAuthRequest(CreateTutorAssignmentRequest.serializer()) }
-                    .getOrElse { if(it is kotlinx.coroutines.CancellationException) throw it;throw ApiException.Validation("Invalid tutor assignment request") }
+                        .getOrElse {
+                            if (it is kotlinx.coroutines.CancellationException) throw it
+                            throw ApiException.Validation("Invalid tutor assignment request")
+                        }
                 call.respond(
                     status = HttpStatusCode.Created,
-                    message = ApiResponse(
-                        data = service.create(actor, request),
-                        requestId = call.requestId(),
-                    ),
+                    message =
+                        ApiResponse(
+                            data = service.create(actor, request),
+                            requestId = call.requestId(),
+                        ),
                 )
             }
         }

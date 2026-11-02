@@ -2,15 +2,15 @@ package org.companerodeescuela.api.auth
 
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
-import com.auth0.jwt.interfaces.Payload
 import com.auth0.jwt.interfaces.JWTVerifier
-import java.time.Clock
-import java.time.Duration
-import java.util.Date
+import com.auth0.jwt.interfaces.Payload
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
+import java.time.Clock
+import java.time.Duration
+import java.util.Date
 
 /**
  * Issues and verifies short-lived platform access tokens.
@@ -29,16 +29,19 @@ class AuthTokenService(
     val verifier: JWTVerifier
 
     init {
-        val secret = requireNotNull(settings.jwtSecret) {
-            "JWT_SECRET must be configured before AuthTokenService is created"
-        }
+        val secret =
+            requireNotNull(settings.jwtSecret) {
+                "JWT_SECRET must be configured before AuthTokenService is created"
+            }
         require(secret.isNotEmpty()) { "JWT secret must not be empty" }
 
         algorithm = Algorithm.HMAC256(secret.concatToString())
-        verifier = JWT.require(algorithm)
-            .withIssuer(issuer)
-            .withAudience(audience)
-            .build()
+        verifier =
+            JWT
+                .require(algorithm)
+                .withIssuer(issuer)
+                .withAudience(audience)
+                .build()
     }
 
     fun issue(
@@ -49,19 +52,21 @@ class AuthTokenService(
         val issuedAt = clock.instant()
         val expiresAt = issuedAt.plus(ACCESS_TOKEN_TTL)
 
-        val builder = JWT.create()
-            .withIssuer(issuer)
-            .withAudience(audience)
-            .withSubject(user.id)
-            .withClaim(CLAIM_SESSION_ID, sessionId)
-            .withClaim(CLAIM_SESSION_GENERATION, sessionGeneration)
-            .withIssuedAt(Date.from(issuedAt))
-            .withExpiresAt(Date.from(expiresAt))
-            .withClaim(CLAIM_DISPLAY_NAME, user.displayName)
-            .withClaim(CLAIM_ROLES, user.roles.map(UserRole::name))
-            .withClaim(CLAIM_ACTIVE, user.active)
-            .withClaim(CLAIM_ACCOUNT_STATUS, user.accountStatus.name)
-            .withClaim(CLAIM_AUTH_REVISION, user.authRevision)
+        val builder =
+            JWT
+                .create()
+                .withIssuer(issuer)
+                .withAudience(audience)
+                .withSubject(user.id)
+                .withClaim(CLAIM_SESSION_ID, sessionId)
+                .withClaim(CLAIM_SESSION_GENERATION, sessionGeneration)
+                .withIssuedAt(Date.from(issuedAt))
+                .withExpiresAt(Date.from(expiresAt))
+                .withClaim(CLAIM_DISPLAY_NAME, user.displayName)
+                .withClaim(CLAIM_ROLES, user.roles.map(UserRole::name))
+                .withClaim(CLAIM_ACTIVE, user.active)
+                .withClaim(CLAIM_ACCOUNT_STATUS, user.accountStatus.name)
+                .withClaim(CLAIM_AUTH_REVISION, user.authRevision)
 
         user.email?.let { builder.withClaim(CLAIM_EMAIL, it) }
         user.institutionId?.let { builder.withClaim(CLAIM_INSTITUTION_ID, it) }
@@ -70,18 +75,23 @@ class AuthTokenService(
     }
 
     fun userFrom(jwt: Payload): UserSummary {
-        val id = jwt.subject?.takeIf { it.isNotBlank() }
-            ?: error("Verified token has no subject")
-        val displayName = jwt.getClaim(CLAIM_DISPLAY_NAME).asString()
-            ?.takeIf { it.isNotBlank() }
-            ?: error("Verified token has no display name")
-        val roles = jwt.getClaim(CLAIM_ROLES)
-            .asList(String::class.java)
-            .orEmpty()
-            .mapNotNull { encoded ->
-                runCatching { UserRole.valueOf(encoded) }.getOrNull()
-            }
-            .toSet()
+        val id =
+            jwt.subject?.takeIf { it.isNotBlank() }
+                ?: error("Verified token has no subject")
+        val displayName =
+            jwt
+                .getClaim(CLAIM_DISPLAY_NAME)
+                .asString()
+                ?.takeIf { it.isNotBlank() }
+                ?: error("Verified token has no display name")
+        val roles =
+            jwt
+                .getClaim(CLAIM_ROLES)
+                .asList(String::class.java)
+                .orEmpty()
+                .mapNotNull { encoded ->
+                    runCatching { UserRole.valueOf(encoded) }.getOrNull()
+                }.toSet()
 
         return UserSummary(
             id = id,
@@ -89,23 +99,35 @@ class AuthTokenService(
             email = jwt.getClaim(CLAIM_EMAIL).asString(),
             roles = roles,
             active = jwt.getClaim(CLAIM_ACTIVE).asBoolean() ?: false,
-            accountStatus = if (jwt.getClaim(CLAIM_ACCOUNT_STATUS).isMissing) AccountStatus.ACTIVE
-                else runCatching { AccountStatus.valueOf(jwt.getClaim(CLAIM_ACCOUNT_STATUS).asString()) }
-                    .getOrDefault(AccountStatus.REVOKED),
-            authRevision = if (jwt.getClaim(CLAIM_AUTH_REVISION).isMissing) 0L
-                else nonNegativeIntegerClaim(jwt, CLAIM_AUTH_REVISION) ?: -1L,
+            accountStatus =
+                if (jwt.getClaim(CLAIM_ACCOUNT_STATUS).isMissing) {
+                    AccountStatus.ACTIVE
+                } else {
+                    runCatching { AccountStatus.valueOf(jwt.getClaim(CLAIM_ACCOUNT_STATUS).asString()) }
+                        .getOrDefault(AccountStatus.REVOKED)
+                },
+            authRevision =
+                if (jwt.getClaim(CLAIM_AUTH_REVISION).isMissing) {
+                    0L
+                } else {
+                    nonNegativeIntegerClaim(jwt, CLAIM_AUTH_REVISION) ?: -1L
+                },
             institutionId = jwt.getClaim(CLAIM_INSTITUTION_ID).asString(),
         )
     }
 
-    fun sessionIdFrom(jwt: Payload): String? = jwt.getClaim(CLAIM_SESSION_ID)
-        .asString()
-        ?.takeIf(String::isNotBlank)
+    fun sessionIdFrom(jwt: Payload): String? =
+        jwt
+            .getClaim(CLAIM_SESSION_ID)
+            .asString()
+            ?.takeIf(String::isNotBlank)
 
-    fun sessionGenerationFrom(jwt: Payload): Long? =
-        nonNegativeIntegerClaim(jwt, CLAIM_SESSION_GENERATION)
+    fun sessionGenerationFrom(jwt: Payload): Long? = nonNegativeIntegerClaim(jwt, CLAIM_SESSION_GENERATION)
 
-    private fun nonNegativeIntegerClaim(jwt: Payload, name: String): Long? {
+    private fun nonNegativeIntegerClaim(
+        jwt: Payload,
+        name: String,
+    ): Long? {
         // Claim.asLong coerces fractions. Inspect JSON representation before conversion.
         val encoded = jwt.getClaim(name).toString()
         return encoded.takeIf { NON_NEGATIVE_INTEGER.matches(it) }?.toLongOrNull()

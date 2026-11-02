@@ -19,12 +19,13 @@ import kotlin.system.exitProcess
 fun main() {
     val log = LoggerFactory.getLogger("org.companerodeescuela.api.Application")
 
-    val settings = try {
-        SettingsLoader(env = System::getenv).load()
-    } catch (error: ConfigurationException) {
-        log.error("Cannot start: invalid configuration. {}", error.message)
-        exitProcess(1)
-    }
+    val settings =
+        try {
+            SettingsLoader(env = System::getenv).load()
+        } catch (error: ConfigurationException) {
+            log.error("Cannot start: invalid configuration. {}", error.message)
+            exitProcess(1)
+        }
 
     val mongoConnection = DriverMongoConnectionFactory().create(settings.mongo)
 

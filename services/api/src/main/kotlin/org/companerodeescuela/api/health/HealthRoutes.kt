@@ -26,11 +26,12 @@ fun Route.healthRoutes(
 
     get("/ready") {
         val readiness: ReadinessResponse = healthService.readiness()
-        val status = if (readiness.status == ServiceStatus.UP) {
-            HttpStatusCode.OK
-        } else {
-            HttpStatusCode.ServiceUnavailable
-        }
+        val status =
+            if (readiness.status == ServiceStatus.UP) {
+                HttpStatusCode.OK
+            } else {
+                HttpStatusCode.ServiceUnavailable
+            }
         call.respond(status = status, message = readiness)
     }
 

@@ -1,14 +1,14 @@
 package org.companerodeescuela.api.health
 
-import org.companerodeescuela.api.runCatchingCancellable
-import java.time.Clock
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.database.MongoConnection
+import org.companerodeescuela.api.runCatchingCancellable
 import org.companerodeescuela.shared.contracts.DependencyStatus
 import org.companerodeescuela.shared.contracts.HealthResponse
 import org.companerodeescuela.shared.contracts.ReadinessResponse
 import org.companerodeescuela.shared.contracts.ServiceStatus
 import org.slf4j.LoggerFactory
+import java.time.Clock
 
 /**
  * Builds the payload for `GET /health`.

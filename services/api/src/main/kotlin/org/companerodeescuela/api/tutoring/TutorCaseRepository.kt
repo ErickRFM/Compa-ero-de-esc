@@ -8,9 +8,6 @@ import com.mongodb.client.model.Indexes
 import com.mongodb.client.model.ReturnDocument
 import com.mongodb.kotlin.client.coroutine.MongoCollection
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
-import java.time.Instant
-import java.util.Date
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
@@ -18,6 +15,9 @@ import kotlinx.coroutines.sync.withLock
 import org.bson.Document
 import org.companerodeescuela.shared.contracts.TutorCaseStatus
 import org.companerodeescuela.shared.contracts.TutorNoteVisibility
+import java.time.Instant
+import java.util.Date
+import java.util.concurrent.ConcurrentHashMap
 
 data class TutorCaseNoteRecord(
     val id: String,
@@ -38,21 +38,30 @@ data class TutorCaseRecord(
     val updatedAt: Instant,
     val notes: List<TutorCaseNoteRecord> = emptyList(),
     val version: Long = 0L,
-    val institutionId:String?=null,
-    val groupScopeRevision:Long=-1,
+    val institutionId: String? = null,
+    val groupScopeRevision: Long = -1,
 )
 
 interface TutorCaseRepository {
     suspend fun create(value: TutorCaseRecord): TutorCaseRecord
+
     suspend fun find(id: String): TutorCaseRecord?
+
     suspend fun listForGroups(ids: Set<String>): List<TutorCaseRecord>
+
     suspend fun listForStudent(id: String): List<TutorCaseRecord>
+
     suspend fun listAll(): List<TutorCaseRecord>
-    suspend fun compareAndUpdate(expected: TutorCaseRecord, updated: TutorCaseRecord): TutorCaseRecord?
+
+    suspend fun compareAndUpdate(
+        expected: TutorCaseRecord,
+        updated: TutorCaseRecord,
+    ): TutorCaseRecord?
 }
 
 class InMemoryTutorCaseRepository : TutorCaseRepository {
     private val data = ConcurrentHashMap<String, TutorCaseRecord>()
+
     override suspend fun create(value: TutorCaseRecord): TutorCaseRecord {
         data[value.id] = value
         return value
@@ -66,25 +75,32 @@ class InMemoryTutorCaseRepository : TutorCaseRepository {
     override suspend fun listForStudent(id: String): List<TutorCaseRecord> =
         data.values.filter { it.studentId == id }.sortedByDescending(TutorCaseRecord::updatedAt)
 
-    override suspend fun listAll(): List<TutorCaseRecord> =
-        data.values.sortedByDescending(TutorCaseRecord::updatedAt)
+    override suspend fun listAll(): List<TutorCaseRecord> = data.values.sortedByDescending(TutorCaseRecord::updatedAt)
 
-    override suspend fun compareAndUpdate(expected: TutorCaseRecord, updated: TutorCaseRecord): TutorCaseRecord? {
-        if(!validCaseUpdate(expected,updated)) return null
+    override suspend fun compareAndUpdate(
+        expected: TutorCaseRecord,
+        updated: TutorCaseRecord,
+    ): TutorCaseRecord? {
+        if (!validCaseUpdate(expected, updated)) return null
         var changed = false
         data.computeIfPresent(expected.id) { _, previous ->
             if (previous.version == expected.version) {
                 changed = true
                 updated
-            } else previous
+            } else {
+                previous
+            }
         }
         return if (changed) updated else null
     }
 }
 
-class MongoTutorCaseRepository(database: MongoDatabase) : TutorCaseRepository {
+class MongoTutorCaseRepository(
+    database: MongoDatabase,
+) : TutorCaseRepository {
     private val collection: MongoCollection<Document> = database.getCollection("tutoring_cases")
     private val mutex = Mutex()
+
     @Volatile private var indexesReady = false
 
     override suspend fun create(value: TutorCaseRecord): TutorCaseRecord {
@@ -101,90 +117,140 @@ class MongoTutorCaseRepository(database: MongoDatabase) : TutorCaseRepository {
     override suspend fun listForGroups(ids: Set<String>): List<TutorCaseRecord> {
         ensureIndexes()
         if (ids.isEmpty()) return emptyList()
-        return collection.find(com.mongodb.client.model.Filters.`in`("academicGroupId", ids)).toList()
-            .map { it.toRecord() }.sortedByDescending(TutorCaseRecord::updatedAt)
+        return collection
+            .find(
+                com.mongodb.client.model.Filters
+                    .`in`("academicGroupId", ids),
+            ).toList()
+            .map { it.toRecord() }
+            .sortedByDescending(TutorCaseRecord::updatedAt)
     }
 
     override suspend fun listForStudent(id: String): List<TutorCaseRecord> {
         ensureIndexes()
-        return collection.find(eq("studentId", id)).toList()
-            .map { it.toRecord() }.sortedByDescending(TutorCaseRecord::updatedAt)
+        return collection
+            .find(eq("studentId", id))
+            .toList()
+            .map { it.toRecord() }
+            .sortedByDescending(TutorCaseRecord::updatedAt)
     }
 
     override suspend fun listAll(): List<TutorCaseRecord> {
         ensureIndexes()
-        return collection.find().toList()
-            .map { it.toRecord() }.sortedByDescending(TutorCaseRecord::updatedAt)
+        return collection
+            .find()
+            .toList()
+            .map { it.toRecord() }
+            .sortedByDescending(TutorCaseRecord::updatedAt)
     }
 
-    override suspend fun compareAndUpdate(expected: TutorCaseRecord, updated: TutorCaseRecord): TutorCaseRecord? {
-        if(!validCaseUpdate(expected,updated)) return null
+    override suspend fun compareAndUpdate(
+        expected: TutorCaseRecord,
+        updated: TutorCaseRecord,
+    ): TutorCaseRecord? {
+        if (!validCaseUpdate(expected, updated)) return null
         ensureIndexes()
-        return collection.findOneAndReplace(
-            and(eq("_id",expected.id),eq("version",expected.version),eq("institutionId",expected.institutionId),eq("groupScopeRevision",expected.groupScopeRevision),eq("academicGroupId",expected.academicGroupId),eq("studentId",expected.studentId)),
-            updated.toDocument(),
-            FindOneAndReplaceOptions().returnDocument(ReturnDocument.AFTER),
-        )?.toRecord()
+        return collection
+            .findOneAndReplace(
+                and(
+                    eq("_id", expected.id),
+                    eq("version", expected.version),
+                    eq("institutionId", expected.institutionId),
+                    eq("groupScopeRevision", expected.groupScopeRevision),
+                    eq("academicGroupId", expected.academicGroupId),
+                    eq("studentId", expected.studentId),
+                ),
+                updated.toDocument(),
+                FindOneAndReplaceOptions().returnDocument(ReturnDocument.AFTER),
+            )?.toRecord()
     }
 
     private suspend fun ensureIndexes() {
         if (indexesReady) return
         mutex.withLock {
             if (indexesReady) return@withLock
-            collection.createIndex(Indexes.ascending("academicGroupId"),
-                IndexOptions().name("ix_tutoring_case_group"))
-            collection.createIndex(Indexes.ascending("studentId"),
-                IndexOptions().name("ix_tutoring_case_student"))
+            collection.createIndex(
+                Indexes.ascending("academicGroupId"),
+                IndexOptions().name("ix_tutoring_case_group"),
+            )
+            collection.createIndex(
+                Indexes.ascending("studentId"),
+                IndexOptions().name("ix_tutoring_case_student"),
+            )
             indexesReady = true
         }
     }
 
-    private fun TutorCaseRecord.toDocument(): Document = Document()
-        .append("_id", id)
-        .append("academicGroupId", academicGroupId)
-        .append("studentId", studentId)
-        .append("summary", summary)
-        .append("status", status.name)
-        .append("createdBy", createdBy)
-        .append("createdAt", Date.from(createdAt))
-        .append("updatedAt", Date.from(updatedAt))
-        .append("version", version)
-        .append("institutionId",institutionId)
-        .append("groupScopeRevision",groupScopeRevision)
-        .append("notes", notes.map { note ->
-            Document()
-                .append("id", note.id)
-                .append("body", note.body)
-                .append("visibility", note.visibility.name)
-                .append("authorId", note.authorId)
-                .append("createdAt", Date.from(note.createdAt))
-        })
-
-    private fun Document.toRecord(): TutorCaseRecord = TutorCaseRecord(
-        id = getString("_id"),
-        academicGroupId = getString("academicGroupId"),
-        studentId = getString("studentId"),
-        summary = getString("summary"),
-        status = TutorCaseStatus.valueOf(getString("status")),
-        createdBy = getString("createdBy"),
-        createdAt = getDate("createdAt").toInstant(),
-        updatedAt = getDate("updatedAt").toInstant(),
-        version = strictLong("version"),
-        institutionId=getString("institutionId"),groupScopeRevision=strictLong("groupScopeRevision"),
-        notes = (getList("notes", Document::class.java) ?: emptyList()).map { note ->
-            TutorCaseNoteRecord(
-                id = note.getString("id"),
-                body = note.getString("body"),
-                visibility = TutorNoteVisibility.valueOf(note.getString("visibility")),
-                authorId = note.getString("authorId"),
-                createdAt = note.getDate("createdAt").toInstant(),
+    private fun TutorCaseRecord.toDocument(): Document =
+        Document()
+            .append("_id", id)
+            .append("academicGroupId", academicGroupId)
+            .append("studentId", studentId)
+            .append("summary", summary)
+            .append("status", status.name)
+            .append("createdBy", createdBy)
+            .append("createdAt", Date.from(createdAt))
+            .append("updatedAt", Date.from(updatedAt))
+            .append("version", version)
+            .append("institutionId", institutionId)
+            .append("groupScopeRevision", groupScopeRevision)
+            .append(
+                "notes",
+                notes.map { note ->
+                    Document()
+                        .append("id", note.id)
+                        .append("body", note.body)
+                        .append("visibility", note.visibility.name)
+                        .append("authorId", note.authorId)
+                        .append("createdAt", Date.from(note.createdAt))
+                },
             )
-        },
-    )
-    private fun Document.strictLong(name:String):Long = when(val value=get(name)) { is Long -> value;is Int -> value.toLong();else -> -1 }
 
+    private fun Document.toRecord(): TutorCaseRecord =
+        TutorCaseRecord(
+            id = getString("_id"),
+            academicGroupId = getString("academicGroupId"),
+            studentId = getString("studentId"),
+            summary = getString("summary"),
+            status = TutorCaseStatus.valueOf(getString("status")),
+            createdBy = getString("createdBy"),
+            createdAt = getDate("createdAt").toInstant(),
+            updatedAt = getDate("updatedAt").toInstant(),
+            version = strictLong("version"),
+            institutionId = getString("institutionId"),
+            groupScopeRevision = strictLong("groupScopeRevision"),
+            notes =
+                (getList("notes", Document::class.java) ?: emptyList()).map { note ->
+                    TutorCaseNoteRecord(
+                        id = note.getString("id"),
+                        body = note.getString("body"),
+                        visibility = TutorNoteVisibility.valueOf(note.getString("visibility")),
+                        authorId = note.getString("authorId"),
+                        createdAt = note.getDate("createdAt").toInstant(),
+                    )
+                },
+        )
+
+    private fun Document.strictLong(name: String): Long =
+        when (val value = get(name)) {
+            is Long -> value
+            is Int -> value.toLong()
+            else -> -1
+        }
 }
 
-private fun validCaseUpdate(expected:TutorCaseRecord,next:TutorCaseRecord)=expected.version>=0 && expected.version<Long.MAX_VALUE && next.version==expected.version+1 &&
-    !expected.institutionId.isNullOrBlank() && expected.groupScopeRevision>=0 && next.institutionId==expected.institutionId && next.groupScopeRevision==expected.groupScopeRevision &&
-    next.id==expected.id && next.academicGroupId==expected.academicGroupId && next.studentId==expected.studentId && next.createdAt==expected.createdAt && next.createdBy==expected.createdBy
+private fun validCaseUpdate(
+    expected: TutorCaseRecord,
+    next: TutorCaseRecord,
+) = expected.version >= 0 &&
+    expected.version < Long.MAX_VALUE &&
+    next.version == expected.version + 1 &&
+    !expected.institutionId.isNullOrBlank() &&
+    expected.groupScopeRevision >= 0 &&
+    next.institutionId == expected.institutionId &&
+    next.groupScopeRevision == expected.groupScopeRevision &&
+    next.id == expected.id &&
+    next.academicGroupId == expected.academicGroupId &&
+    next.studentId == expected.studentId &&
+    next.createdAt == expected.createdAt &&
+    next.createdBy == expected.createdBy

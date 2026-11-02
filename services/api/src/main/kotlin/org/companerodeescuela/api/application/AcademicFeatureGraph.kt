@@ -1,6 +1,5 @@
 package org.companerodeescuela.api.application
 
-import org.companerodeescuela.api.academic.AcademicScheduleManagementService
 import org.companerodeescuela.api.academic.AcademicScheduleOverrideRepository
 import org.companerodeescuela.api.academic.InMemoryAcademicScheduleOverrideRepository
 import org.companerodeescuela.api.academic.MongoAcademicScheduleOverrideRepository
@@ -39,53 +38,60 @@ fun buildAcademicFeatureGraph(
     mongoConnection: MongoConnection,
     accounts: PlatformAccountRepository? = null,
     mfa: org.companerodeescuela.api.security.MfaService? = null,
-    institutions:org.companerodeescuela.api.institutions.InstitutionRepository?=null,
+    institutions: org.companerodeescuela.api.institutions.InstitutionRepository? = null,
 ): AcademicFeatureGraph {
-    val groupRepository = when {
-        !settings.hasAuthentication -> InMemoryAcademicGroupRepository()
-        settings.mongo.isConfigured -> MongoAcademicGroupRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemoryAcademicGroupRepository()
-        else -> error("Academic groups require MONGODB_URI outside local development")
-    }
-    val tutorRepository: TutorAssignmentRepository = when {
-        !settings.hasAuthentication -> InMemoryTutorAssignmentRepository()
-        settings.mongo.isConfigured -> MongoTutorAssignmentRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemoryTutorAssignmentRepository()
-        else -> error("Tutor assignments require MONGODB_URI outside local development")
-    }
-    val caseRepository: TutorCaseRepository = when {
-        !settings.hasAuthentication -> InMemoryTutorCaseRepository()
-        settings.mongo.isConfigured -> MongoTutorCaseRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemoryTutorCaseRepository()
-        else -> error("Tutoring cases require MONGODB_URI outside local development")
-    }
-    val representativeRepository: GroupRepresentativeRepository = when {
-        !settings.hasAuthentication -> InMemoryGroupRepresentativeRepository()
-        settings.mongo.isConfigured -> MongoGroupRepresentativeRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemoryGroupRepresentativeRepository()
-        else -> error("Group representatives require MONGODB_URI outside local development")
-    }
-    val scheduleOverrides: AcademicScheduleOverrideRepository = when {
-        !settings.hasAuthentication -> InMemoryAcademicScheduleOverrideRepository()
-        settings.mongo.isConfigured ->
-            MongoAcademicScheduleOverrideRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemoryAcademicScheduleOverrideRepository()
-        else -> error("Manual academic schedules require MONGODB_URI outside local development")
-    }
+    val groupRepository =
+        when {
+            !settings.hasAuthentication -> InMemoryAcademicGroupRepository()
+            settings.mongo.isConfigured -> MongoAcademicGroupRepository(mongoConnection.database())
+            settings.environment == Environment.LOCAL -> InMemoryAcademicGroupRepository()
+            else -> error("Academic groups require MONGODB_URI outside local development")
+        }
+    val tutorRepository: TutorAssignmentRepository =
+        when {
+            !settings.hasAuthentication -> InMemoryTutorAssignmentRepository()
+            settings.mongo.isConfigured -> MongoTutorAssignmentRepository(mongoConnection.database())
+            settings.environment == Environment.LOCAL -> InMemoryTutorAssignmentRepository()
+            else -> error("Tutor assignments require MONGODB_URI outside local development")
+        }
+    val caseRepository: TutorCaseRepository =
+        when {
+            !settings.hasAuthentication -> InMemoryTutorCaseRepository()
+            settings.mongo.isConfigured -> MongoTutorCaseRepository(mongoConnection.database())
+            settings.environment == Environment.LOCAL -> InMemoryTutorCaseRepository()
+            else -> error("Tutoring cases require MONGODB_URI outside local development")
+        }
+    val representativeRepository: GroupRepresentativeRepository =
+        when {
+            !settings.hasAuthentication -> InMemoryGroupRepresentativeRepository()
+            settings.mongo.isConfigured -> MongoGroupRepresentativeRepository(mongoConnection.database())
+            settings.environment == Environment.LOCAL -> InMemoryGroupRepresentativeRepository()
+            else -> error("Group representatives require MONGODB_URI outside local development")
+        }
+    val scheduleOverrides: AcademicScheduleOverrideRepository =
+        when {
+            !settings.hasAuthentication -> InMemoryAcademicScheduleOverrideRepository()
+            settings.mongo.isConfigured ->
+                MongoAcademicScheduleOverrideRepository(mongoConnection.database())
+            settings.environment == Environment.LOCAL -> InMemoryAcademicScheduleOverrideRepository()
+            else -> error("Manual academic schedules require MONGODB_URI outside local development")
+        }
 
-    val tutoringService = TutorAssignmentService(
-        repository = tutorRepository,
-        groupRepository = groupRepository,
-        accounts = accounts,
-        mfa = mfa,
-    )
-    val representativeService = GroupRepresentativeService(
-        repository = representativeRepository,
-        tutorAssignmentService = tutoringService,
-    )
+    val tutoringService =
+        TutorAssignmentService(
+            repository = tutorRepository,
+            groupRepository = groupRepository,
+            accounts = accounts,
+            mfa = mfa,
+        )
+    val representativeService =
+        GroupRepresentativeService(
+            repository = representativeRepository,
+            tutorAssignmentService = tutoringService,
+        )
     return AcademicFeatureGraph(
         groupRepository = groupRepository,
-        groupService = AcademicGroupService(groupRepository,accounts=accounts,mfa=mfa,institutions=institutions),
+        groupService = AcademicGroupService(groupRepository, accounts = accounts, mfa = mfa, institutions = institutions),
         tutoringService = tutoringService,
         caseService = TutorCaseService(caseRepository, tutoringService, groupRepository),
         representativeService = representativeService,

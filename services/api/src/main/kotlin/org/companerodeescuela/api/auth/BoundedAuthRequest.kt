@@ -5,8 +5,8 @@ import io.ktor.server.request.receiveChannel
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.DeserializationStrategy
-import org.companerodeescuela.api.plugins.ApiJson
 import org.companerodeescuela.api.errors.ApiException
+import org.companerodeescuela.api.plugins.ApiJson
 
 /** Limits allocation before JSON decoding, including bodies without Content-Length. */
 internal const val DEFAULT_BODY_MAX_BYTES = 64 * 1024
@@ -40,5 +40,4 @@ internal suspend fun <T> ApplicationCall.boundedBody(
     }
 }
 
-internal suspend fun <T> ApplicationCall.boundedAuthRequest(serializer: DeserializationStrategy<T>): T =
-    boundedBody(serializer)
+internal suspend fun <T> ApplicationCall.boundedAuthRequest(serializer: DeserializationStrategy<T>): T = boundedBody(serializer)

@@ -14,8 +14,12 @@ internal fun AttendanceRecordResponse.withCurrentPresencePolicy(): AttendanceRec
     if (!requiresAttendancePresenceReview(
             status == AttendanceStatus.VERIFIED,
             disposition in setOf(AttendanceDisposition.PRESENT, AttendanceDisposition.LATE),
-            reviewedBy, reviewedAtEpochSeconds,
-        )) return this
+            reviewedBy,
+            reviewedAtEpochSeconds,
+        )
+    ) {
+        return this
+    }
     return copy(
         status = AttendanceStatus.REVIEW_REQUIRED,
         disposition = null,

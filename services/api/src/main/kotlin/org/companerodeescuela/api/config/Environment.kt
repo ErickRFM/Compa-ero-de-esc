@@ -19,15 +19,16 @@ enum class Environment {
 
     companion object {
         /** Parses [raw] into an [Environment], failing fast when it is absent or unknown. */
-        fun parse(raw: String?): Environment = when (raw?.trim()?.lowercase()) {
-            null, "" -> throw ConfigurationException("APP_ENV is required: local, development, staging, or production")
-            "local" -> LOCAL
-            "dev", "development" -> DEVELOPMENT
-            "staging", "stage" -> STAGING
-            "prod", "production" -> PRODUCTION
-            else -> throw ConfigurationException(
-                "APP_ENV must be one of: local, development, staging, production",
-            )
-        }
+        fun parse(raw: String?): Environment =
+            when (raw?.trim()?.lowercase()) {
+                null, "" -> throw ConfigurationException("APP_ENV is required: local, development, staging, or production")
+                "local" -> LOCAL
+                "dev", "development" -> DEVELOPMENT
+                "staging", "stage" -> STAGING
+                "prod", "production" -> PRODUCTION
+                else -> throw ConfigurationException(
+                    "APP_ENV must be one of: local, development, staging, production",
+                )
+            }
     }
 }

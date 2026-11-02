@@ -5,23 +5,31 @@ import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
 import com.mongodb.client.model.Sorts
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
-import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import org.companerodeescuela.api.errors.ApiException
-import kotlinx.coroutines.flow.toList
 import org.bson.codecs.pojo.annotations.BsonId
 import org.bson.codecs.pojo.annotations.BsonProperty
+import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.shared.contracts.GroupRepresentativeAssignment
 import org.companerodeescuela.shared.contracts.RepresentativePosition
 import org.companerodeescuela.shared.contracts.RepresentativeStatus
+import java.util.concurrent.ConcurrentHashMap
 
 interface GroupRepresentativeRepository {
     suspend fun findById(id: String): GroupRepresentativeAssignment?
+
     suspend fun listByGroup(groupId: String): List<GroupRepresentativeAssignment>
+
     suspend fun listByStudent(studentUserId: String): List<GroupRepresentativeAssignment>
-    suspend fun findActivePosition(groupId: String, position: RepresentativePosition): GroupRepresentativeAssignment?
+
+    suspend fun findActivePosition(
+        groupId: String,
+        position: RepresentativePosition,
+    ): GroupRepresentativeAssignment?
+
     suspend fun save(assignment: GroupRepresentativeAssignment): GroupRepresentativeAssignment
+
     suspend fun update(assignment: GroupRepresentativeAssignment): GroupRepresentativeAssignment?
 }
 
@@ -42,26 +50,28 @@ internal data class GroupRepresentativeDocument(
     @param:BsonProperty("revokedAtEpochSeconds") val revokedAtEpochSeconds: Long?,
     @param:BsonProperty("revokedBy") val revokedBy: String?,
     @param:BsonProperty("version") val version: Long,
-    @param:BsonProperty("groupScopeRevision") val groupScopeRevision:Long?=null,
+    @param:BsonProperty("groupScopeRevision") val groupScopeRevision: Long? = null,
 ) {
-    fun toModel(): GroupRepresentativeAssignment = GroupRepresentativeAssignment(
-        id = id,
-        institutionId = institutionId,
-        academicGroupId = academicGroupId,
-        academicGroupName = academicGroupName,
-        academicTermId = academicTermId,
-        studentUserId = studentUserId,
-        studentDisplayName = studentDisplayName,
-        position = RepresentativePosition.valueOf(position),
-        status = RepresentativeStatus.valueOf(status),
-        appointedBy = appointedBy,
-        appointedAtEpochSeconds = appointedAtEpochSeconds,
-        acceptedAtEpochSeconds = acceptedAtEpochSeconds,
-        expiresAtEpochSeconds = expiresAtEpochSeconds,
-        revokedAtEpochSeconds = revokedAtEpochSeconds,
-        revokedBy = revokedBy,
-        version = version,groupScopeRevision=groupScopeRevision ?: -1,
-    )
+    fun toModel(): GroupRepresentativeAssignment =
+        GroupRepresentativeAssignment(
+            id = id,
+            institutionId = institutionId,
+            academicGroupId = academicGroupId,
+            academicGroupName = academicGroupName,
+            academicTermId = academicTermId,
+            studentUserId = studentUserId,
+            studentDisplayName = studentDisplayName,
+            position = RepresentativePosition.valueOf(position),
+            status = RepresentativeStatus.valueOf(status),
+            appointedBy = appointedBy,
+            appointedAtEpochSeconds = appointedAtEpochSeconds,
+            acceptedAtEpochSeconds = acceptedAtEpochSeconds,
+            expiresAtEpochSeconds = expiresAtEpochSeconds,
+            revokedAtEpochSeconds = revokedAtEpochSeconds,
+            revokedBy = revokedBy,
+            version = version,
+            groupScopeRevision = groupScopeRevision ?: -1,
+        )
 
     companion object {
         fun fromModel(model: GroupRepresentativeAssignment): GroupRepresentativeDocument =
@@ -81,23 +91,26 @@ internal data class GroupRepresentativeDocument(
                 expiresAtEpochSeconds = model.expiresAtEpochSeconds,
                 revokedAtEpochSeconds = model.revokedAtEpochSeconds,
                 revokedBy = model.revokedBy,
-                version = model.version,groupScopeRevision=model.groupScopeRevision,
+                version = model.version,
+                groupScopeRevision = model.groupScopeRevision,
             )
     }
 }
 
 class InMemoryGroupRepresentativeRepository : GroupRepresentativeRepository {
     private val storage = ConcurrentHashMap<String, GroupRepresentativeAssignment>()
-    private val mutex=Mutex()
+    private val mutex = Mutex()
 
     override suspend fun findById(id: String): GroupRepresentativeAssignment? = storage[id]
 
     override suspend fun listByGroup(groupId: String): List<GroupRepresentativeAssignment> =
-        storage.values.filter { it.academicGroupId == groupId }
+        storage.values
+            .filter { it.academicGroupId == groupId }
             .sortedByDescending { it.appointedAtEpochSeconds }
 
     override suspend fun listByStudent(studentUserId: String): List<GroupRepresentativeAssignment> =
-        storage.values.filter { it.studentUserId == studentUserId }
+        storage.values
+            .filter { it.studentUserId == studentUserId }
             .sortedByDescending { it.appointedAtEpochSeconds }
 
     override suspend fun findActivePosition(
@@ -110,28 +123,35 @@ class InMemoryGroupRepresentativeRepository : GroupRepresentativeRepository {
                 (it.status == RepresentativeStatus.ACTIVE || it.status == RepresentativeStatus.PENDING)
         }
 
-    override suspend fun save(assignment: GroupRepresentativeAssignment): GroupRepresentativeAssignment = mutex.withLock {
-        if(storage.containsKey(assignment.id)) throw ApiException.Conflict("Representative appointment ID already exists")
-        ensurePositionAvailable(assignment)
-        storage[assignment.id]=assignment
-        assignment
-    }
+    override suspend fun save(assignment: GroupRepresentativeAssignment): GroupRepresentativeAssignment =
+        mutex.withLock {
+            if (storage.containsKey(assignment.id)) throw ApiException.Conflict("Representative appointment ID already exists")
+            ensurePositionAvailable(assignment)
+            storage[assignment.id] = assignment
+            assignment
+        }
 
-    override suspend fun update(assignment: GroupRepresentativeAssignment): GroupRepresentativeAssignment? = mutex.withLock {
-        val existing=storage[assignment.id] ?: return@withLock null
-        if(existing.version!=assignment.version-1) return@withLock null
-        ensurePositionAvailable(assignment)
-        storage[assignment.id]=assignment
-        assignment
-    }
+    override suspend fun update(assignment: GroupRepresentativeAssignment): GroupRepresentativeAssignment? =
+        mutex.withLock {
+            val existing = storage[assignment.id] ?: return@withLock null
+            if (existing.version != assignment.version - 1) return@withLock null
+            ensurePositionAvailable(assignment)
+            storage[assignment.id] = assignment
+            assignment
+        }
 
-    private fun ensurePositionAvailable(candidate:GroupRepresentativeAssignment) {
-        if(candidate.status !in setOf(RepresentativeStatus.ACTIVE,RepresentativeStatus.PENDING)) return
-        if(storage.values.any { it.id!=candidate.id && it.academicGroupId==candidate.academicGroupId &&
-                it.groupScopeRevision==candidate.groupScopeRevision &&
-                (it.position==candidate.position || it.studentUserId==candidate.studentUserId) &&
-                it.status in setOf(RepresentativeStatus.ACTIVE,RepresentativeStatus.PENDING) })
+    private fun ensurePositionAvailable(candidate: GroupRepresentativeAssignment) {
+        if (candidate.status !in setOf(RepresentativeStatus.ACTIVE, RepresentativeStatus.PENDING)) return
+        if (storage.values.any {
+                it.id != candidate.id &&
+                    it.academicGroupId == candidate.academicGroupId &&
+                    it.groupScopeRevision == candidate.groupScopeRevision &&
+                    (it.position == candidate.position || it.studentUserId == candidate.studentUserId) &&
+                    it.status in setOf(RepresentativeStatus.ACTIVE, RepresentativeStatus.PENDING)
+            }
+        ) {
             throw ApiException.Conflict("A current representative appointment already occupies this position")
+        }
     }
 }
 
@@ -142,35 +162,51 @@ class MongoGroupRepresentativeRepository(
 
     suspend fun ensureIndexes() {
         collection.createIndex(
-            Indexes.compoundIndex(Indexes.ascending("academicGroupId"),Indexes.ascending("groupScopeRevision"),
-                Indexes.ascending("position")),
+            Indexes.compoundIndex(
+                Indexes.ascending("academicGroupId"),
+                Indexes.ascending("groupScopeRevision"),
+                Indexes.ascending("position"),
+            ),
             IndexOptions().unique(true).name("uq_pending_active_representative_position").partialFilterExpression(
-                Filters.or(Filters.eq("status",RepresentativeStatus.PENDING.name),
-                    Filters.eq("status",RepresentativeStatus.ACTIVE.name))
+                Filters.or(
+                    Filters.eq("status", RepresentativeStatus.PENDING.name),
+                    Filters.eq("status", RepresentativeStatus.ACTIVE.name),
+                ),
             ),
         )
         collection.createIndex(
-            Indexes.compoundIndex(Indexes.ascending("academicGroupId"),Indexes.ascending("groupScopeRevision"),
-                Indexes.ascending("studentUserId")),
+            Indexes.compoundIndex(
+                Indexes.ascending("academicGroupId"),
+                Indexes.ascending("groupScopeRevision"),
+                Indexes.ascending("studentUserId"),
+            ),
             IndexOptions().unique(true).name("uq_pending_active_representative_student").partialFilterExpression(
-                Filters.or(Filters.eq("status",RepresentativeStatus.PENDING.name),
-                    Filters.eq("status",RepresentativeStatus.ACTIVE.name))
+                Filters.or(
+                    Filters.eq("status", RepresentativeStatus.PENDING.name),
+                    Filters.eq("status", RepresentativeStatus.ACTIVE.name),
+                ),
             ),
         )
         collection.createIndex(Indexes.ascending("studentUserId"))
     }
 
     override suspend fun findById(id: String): GroupRepresentativeAssignment? =
-        collection.find(Filters.eq("_id", id)).toList().firstOrNull()?.toModel()
+        collection
+            .find(Filters.eq("_id", id))
+            .toList()
+            .firstOrNull()
+            ?.toModel()
 
     override suspend fun listByGroup(groupId: String): List<GroupRepresentativeAssignment> =
-        collection.find(Filters.eq("academicGroupId", groupId))
+        collection
+            .find(Filters.eq("academicGroupId", groupId))
             .sort(Sorts.descending("appointedAtEpochSeconds"))
             .toList()
             .map { it.toModel() }
 
     override suspend fun listByStudent(studentUserId: String): List<GroupRepresentativeAssignment> =
-        collection.find(Filters.eq("studentUserId", studentUserId))
+        collection
+            .find(Filters.eq("studentUserId", studentUserId))
             .sort(Sorts.descending("appointedAtEpochSeconds"))
             .toList()
             .map { it.toModel() }
@@ -179,20 +215,24 @@ class MongoGroupRepresentativeRepository(
         groupId: String,
         position: RepresentativePosition,
     ): GroupRepresentativeAssignment? =
-        collection.find(
-            Filters.and(
-                Filters.eq("academicGroupId", groupId),
-                Filters.eq("position", position.name),
-                Filters.`in`("status", listOf(RepresentativeStatus.ACTIVE.name, RepresentativeStatus.PENDING.name)),
-            ),
-        ).toList().firstOrNull()?.toModel()
+        collection
+            .find(
+                Filters.and(
+                    Filters.eq("academicGroupId", groupId),
+                    Filters.eq("position", position.name),
+                    Filters.`in`("status", listOf(RepresentativeStatus.ACTIVE.name, RepresentativeStatus.PENDING.name)),
+                ),
+            ).toList()
+            .firstOrNull()
+            ?.toModel()
 
     override suspend fun save(assignment: GroupRepresentativeAssignment): GroupRepresentativeAssignment {
         // Index creation intentionally fails closed if historic duplicates need manual remediation.
         ensureIndexes()
-        try { collection.insertOne(GroupRepresentativeDocument.fromModel(assignment)) }
-        catch(error:com.mongodb.MongoWriteException) {
-            if(error.error.code==11000) throw ApiException.Conflict("Representative position is already assigned")
+        try {
+            collection.insertOne(GroupRepresentativeDocument.fromModel(assignment))
+        } catch (error: com.mongodb.MongoWriteException) {
+            if (error.error.code == 11000) throw ApiException.Conflict("Representative position is already assigned")
             throw error
         }
         return assignment
@@ -200,10 +240,11 @@ class MongoGroupRepresentativeRepository(
 
     override suspend fun update(assignment: GroupRepresentativeAssignment): GroupRepresentativeAssignment? {
         ensureIndexes()
-        val filter = Filters.and(
-            Filters.eq("_id", assignment.id),
-            Filters.eq("version", assignment.version - 1),
-        )
+        val filter =
+            Filters.and(
+                Filters.eq("_id", assignment.id),
+                Filters.eq("version", assignment.version - 1),
+            )
         val result = collection.replaceOne(filter, GroupRepresentativeDocument.fromModel(assignment))
         return if (result.matchedCount > 0) assignment else null
     }

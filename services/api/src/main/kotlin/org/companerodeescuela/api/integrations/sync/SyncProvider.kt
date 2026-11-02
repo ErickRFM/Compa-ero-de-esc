@@ -1,7 +1,7 @@
 package org.companerodeescuela.api.integrations.sync
 
-import java.time.Instant
 import org.companerodeescuela.api.integrations.IntegrationProvider
+import java.time.Instant
 
 /** What a single sync run touched. */
 data class SyncOutcome(
@@ -25,7 +25,6 @@ data class SyncOutcome(
  * yet the system of record for any institutional data.
  */
 interface SyncProvider : IntegrationProvider {
-
     /** Short name of the dataset, for example `academic-load`. */
     val dataset: String
 
@@ -35,5 +34,8 @@ interface SyncProvider : IntegrationProvider {
      * @param externalId person whose data is being synchronised.
      * @param since lower bound; providers must return only newer records.
      */
-    suspend fun sync(externalId: String, since: Instant?): SyncOutcome
+    suspend fun sync(
+        externalId: String,
+        since: Instant?,
+    ): SyncOutcome
 }

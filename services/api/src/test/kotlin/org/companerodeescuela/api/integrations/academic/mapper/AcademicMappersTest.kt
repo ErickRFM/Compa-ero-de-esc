@@ -1,12 +1,5 @@
 package org.companerodeescuela.api.integrations.academic.mapper
 
-import java.time.DayOfWeek
-import java.time.Instant
-import java.time.LocalTime
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 import org.companerodeescuela.api.integrations.IntegrationException
 import org.companerodeescuela.api.integrations.academic.dto.ExternalCourse
 import org.companerodeescuela.api.integrations.academic.dto.ExternalEnrollment
@@ -17,25 +10,33 @@ import org.companerodeescuela.api.integrations.academic.dto.ExternalTeacher
 import org.companerodeescuela.shared.model.PersonId
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import java.time.DayOfWeek
+import java.time.Instant
+import java.time.LocalTime
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class AcademicMappersTest {
-
-    private val teacher = ExternalTeacher(
-        externalId = "T-0001",
-        fullName = "Mtra. Elena Ríos Salgado",
-        institutionalEmail = "Elena.Rios@Escuela.EDU",
-        departmentCode = "MAT",
-    )
+    private val teacher =
+        ExternalTeacher(
+            externalId = "T-0001",
+            fullName = "Mtra. Elena Ríos Salgado",
+            institutionalEmail = "Elena.Rios@Escuela.EDU",
+            departmentCode = "MAT",
+        )
 
     private val subject = ExternalSubject("MAT-101", "Álgebra Lineal", credits = 8)
 
-    private val course = ExternalCourse(
-        externalId = "C-9001",
-        subject = subject,
-        teacher = teacher,
-        term = "2026-1",
-        groupName = "101-A",
-    )
+    private val course =
+        ExternalCourse(
+            externalId = "C-9001",
+            subject = subject,
+            teacher = teacher,
+            term = "2026-1",
+            groupName = "101-A",
+        )
 
     private fun slot(
         weekday: String = "Lunes",
@@ -57,13 +58,14 @@ class AcademicMappersTest {
     @Test
     @DisplayName("Student mapping trims the name and lowercases the email")
     fun mapsStudent() {
-        val student = AcademicMappers.toStudent(
-            ExternalStudent(
-                externalId = "2020-10455",
-                fullName = "  Ana López Hernández  ",
-                institutionalEmail = "  ANA.Lopez@Escuela.EDU ",
-            ),
-        )
+        val student =
+            AcademicMappers.toStudent(
+                ExternalStudent(
+                    externalId = "2020-10455",
+                    fullName = "  Ana López Hernández  ",
+                    institutionalEmail = "  ANA.Lopez@Escuela.EDU ",
+                ),
+            )
 
         assertEquals(PersonId("2020-10455"), student.person.id)
         assertEquals("Ana López Hernández", student.person.displayName)
@@ -73,12 +75,14 @@ class AcademicMappersTest {
     @Test
     @DisplayName("Blank upstream values become null instead of empty strings")
     fun normalisesBlankOptionals() {
-        val student = AcademicMappers.toStudent(
-            ExternalStudent(externalId = "1", fullName = "Ana", institutionalEmail = "   "),
-        )
-        val mappedTeacher = AcademicMappers.toTeacher(
-            ExternalTeacher(externalId = "T-1", fullName = "Ana", departmentCode = ""),
-        )
+        val student =
+            AcademicMappers.toStudent(
+                ExternalStudent(externalId = "1", fullName = "Ana", institutionalEmail = "   "),
+            )
+        val mappedTeacher =
+            AcademicMappers.toTeacher(
+                ExternalTeacher(externalId = "T-1", fullName = "Ana", departmentCode = ""),
+            )
 
         assertNull(student.person.institutionalEmail)
         assertNull(mappedTeacher.departmentCode)
@@ -108,10 +112,11 @@ class AcademicMappersTest {
     @Test
     @DisplayName("Enrollment parses the upstream timestamp")
     fun mapsEnrollment() {
-        val enrollment = AcademicMappers.toEnrollment(
-            studentId = PersonId("2020-10455"),
-            externalEnrollment = ExternalEnrollment(course, "2026-01-12T09:00:00Z"),
-        )
+        val enrollment =
+            AcademicMappers.toEnrollment(
+                studentId = PersonId("2020-10455"),
+                externalEnrollment = ExternalEnrollment(course, "2026-01-12T09:00:00Z"),
+            )
 
         assertEquals(PersonId("2020-10455"), enrollment.studentId)
         assertEquals(Instant.parse("2026-01-12T09:00:00Z"), enrollment.enrolledAt)
@@ -120,15 +125,17 @@ class AcademicMappersTest {
     @Test
     @DisplayName("Schedule normalises Spanish and English weekday names")
     fun mapsWeekdays() {
-        val schedule = AcademicMappers.toSchedule(
-            ownerId = PersonId("2020-10455"),
-            slots = listOf(
-                slot(weekday = "Lunes"),
-                slot(weekday = "martes"),
-                slot(weekday = "Wednesday"),
-            ),
-            coursesById = mapOf("C-9001" to course),
-        )
+        val schedule =
+            AcademicMappers.toSchedule(
+                ownerId = PersonId("2020-10455"),
+                slots =
+                    listOf(
+                        slot(weekday = "Lunes"),
+                        slot(weekday = "martes"),
+                        slot(weekday = "Wednesday"),
+                    ),
+                coursesById = mapOf("C-9001" to course),
+            )
 
         assertEquals(
             listOf(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY),
@@ -139,11 +146,12 @@ class AcademicMappersTest {
     @Test
     @DisplayName("Schedule resolves real course data when the course is known")
     fun scheduleResolvesCourse() {
-        val schedule = AcademicMappers.toSchedule(
-            ownerId = PersonId("2020-10455"),
-            slots = listOf(slot()),
-            coursesById = mapOf("C-9001" to course),
-        )
+        val schedule =
+            AcademicMappers.toSchedule(
+                ownerId = PersonId("2020-10455"),
+                slots = listOf(slot()),
+                coursesById = mapOf("C-9001" to course),
+            )
 
         val mapped = schedule.slots.single()
         assertEquals("Álgebra Lineal", mapped.group.course.subject.name)
@@ -153,10 +161,11 @@ class AcademicMappersTest {
     @Test
     @DisplayName("An unknown course keeps the slot but marks the subject as unresolved")
     fun scheduleWithUnknownCourseIsStillVisible() {
-        val schedule = AcademicMappers.toSchedule(
-            ownerId = PersonId("2020-10455"),
-            slots = listOf(slot(courseId = "C-UNKNOWN")),
-        )
+        val schedule =
+            AcademicMappers.toSchedule(
+                ownerId = PersonId("2020-10455"),
+                slots = listOf(slot(courseId = "C-UNKNOWN")),
+            )
 
         val mapped = schedule.slots.single()
         assertEquals(AcademicMappers.UNKNOWN_COURSE, mapped.group.course.subject.name)
@@ -165,11 +174,12 @@ class AcademicMappersTest {
     @Test
     @DisplayName("Classroom is built from campus, building and room codes")
     fun mapsClassroom() {
-        val schedule = AcademicMappers.toSchedule(
-            ownerId = PersonId("2020-10455"),
-            slots = listOf(slot()),
-            coursesById = mapOf("C-9001" to course),
-        )
+        val schedule =
+            AcademicMappers.toSchedule(
+                ownerId = PersonId("2020-10455"),
+                slots = listOf(slot()),
+                coursesById = mapOf("C-9001" to course),
+            )
 
         val classroom = requireNotNull(schedule.slots.single().classroom)
         assertEquals("A-204", classroom.name)
@@ -180,12 +190,14 @@ class AcademicMappersTest {
     @Test
     @DisplayName("A slot without a classroom maps to null instead of failing")
     fun slotWithoutClassroom() {
-        val schedule = AcademicMappers.toSchedule(
-            ownerId = PersonId("2020-10455"),
-            slots = listOf(
-                ExternalScheduleSlot("C-9001", "101-A", "Lunes", "07:00", "08:30"),
-            ),
-        )
+        val schedule =
+            AcademicMappers.toSchedule(
+                ownerId = PersonId("2020-10455"),
+                slots =
+                    listOf(
+                        ExternalScheduleSlot("C-9001", "101-A", "Lunes", "07:00", "08:30"),
+                    ),
+            )
 
         assertNull(schedule.slots.single().classroom)
     }
@@ -193,12 +205,13 @@ class AcademicMappersTest {
     @Test
     @DisplayName("An unrecognised weekday is reported as a malformed response")
     fun rejectsUnknownWeekday() {
-        val error = assertFailsWith<IntegrationException> {
-            AcademicMappers.toSchedule(
-                ownerId = PersonId("1"),
-                slots = listOf(slot(weekday = "Someday")),
-            )
-        }
+        val error =
+            assertFailsWith<IntegrationException> {
+                AcademicMappers.toSchedule(
+                    ownerId = PersonId("1"),
+                    slots = listOf(slot(weekday = "Someday")),
+                )
+            }
 
         assertEquals(IntegrationException.Category.MALFORMED_RESPONSE, error.category)
         assertTrue(error.message!!.contains("Someday"))
@@ -207,12 +220,13 @@ class AcademicMappersTest {
     @Test
     @DisplayName("A slot that ends before it starts is rejected")
     fun rejectsInvertedSlot() {
-        val error = assertFailsWith<IntegrationException> {
-            AcademicMappers.toSchedule(
-                ownerId = PersonId("1"),
-                slots = listOf(slot(start = "09:00", end = "08:00")),
-            )
-        }
+        val error =
+            assertFailsWith<IntegrationException> {
+                AcademicMappers.toSchedule(
+                    ownerId = PersonId("1"),
+                    slots = listOf(slot(start = "09:00", end = "08:00")),
+                )
+            }
 
         assertEquals(IntegrationException.Category.MALFORMED_RESPONSE, error.category)
     }
@@ -220,12 +234,13 @@ class AcademicMappersTest {
     @Test
     @DisplayName("Unparsable times are rejected rather than defaulted")
     fun rejectsUnparsableTime() {
-        val error = assertFailsWith<IntegrationException> {
-            AcademicMappers.toSchedule(
-                ownerId = PersonId("1"),
-                slots = listOf(slot(start = "7am")),
-            )
-        }
+        val error =
+            assertFailsWith<IntegrationException> {
+                AcademicMappers.toSchedule(
+                    ownerId = PersonId("1"),
+                    slots = listOf(slot(start = "7am")),
+                )
+            }
 
         assertEquals(IntegrationException.Category.MALFORMED_RESPONSE, error.category)
     }
@@ -233,14 +248,16 @@ class AcademicMappersTest {
     @Test
     @DisplayName("Schedule groups slots by day and orders them by start time")
     fun scheduleOrdersSlotsPerDay() {
-        val schedule = AcademicMappers.toSchedule(
-            ownerId = PersonId("1"),
-            slots = listOf(
-                slot(weekday = "Lunes", start = "09:00", end = "10:30"),
-                slot(weekday = "Lunes", start = "07:00", end = "08:30"),
-                slot(weekday = "Martes", start = "11:00", end = "12:30"),
-            ),
-        )
+        val schedule =
+            AcademicMappers.toSchedule(
+                ownerId = PersonId("1"),
+                slots =
+                    listOf(
+                        slot(weekday = "Lunes", start = "09:00", end = "10:30"),
+                        slot(weekday = "Lunes", start = "07:00", end = "08:30"),
+                        slot(weekday = "Martes", start = "11:00", end = "12:30"),
+                    ),
+            )
 
         val monday = schedule.slotsFor(DayOfWeek.MONDAY)
         assertEquals(2, monday.size)

@@ -20,14 +20,19 @@ object GradeCalculator {
         }
     }
 
-    fun weightedFinal(categories: List<GradeCategoryDraft>, values: Map<String, Double>): Double {
+    fun weightedFinal(
+        categories: List<GradeCategoryDraft>,
+        values: Map<String, Double>,
+    ): Double {
         validateScheme(categories)
-        val result = categories.fold(BigDecimal.ZERO) { total, category ->
-            val value = values[category.name]
-                ?: throw ApiException.Validation("Missing grade for ${category.name}")
-            if (value !in 0.0..10.0) throw ApiException.Validation("Grades must be between 0 and 10")
-            total.add(BigDecimal.valueOf(value).multiply(BigDecimal.valueOf(category.weightPercent)).divide(BigDecimal.valueOf(100)))
-        }
+        val result =
+            categories.fold(BigDecimal.ZERO) { total, category ->
+                val value =
+                    values[category.name]
+                        ?: throw ApiException.Validation("Missing grade for ${category.name}")
+                if (value !in 0.0..10.0) throw ApiException.Validation("Grades must be between 0 and 10")
+                total.add(BigDecimal.valueOf(value).multiply(BigDecimal.valueOf(category.weightPercent)).divide(BigDecimal.valueOf(100)))
+            }
         return result.setScale(2, RoundingMode.HALF_UP).toDouble()
     }
 }

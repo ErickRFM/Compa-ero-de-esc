@@ -1,9 +1,9 @@
 package org.companerodeescuela.api.classroom
 
-import java.time.Instant
-import java.util.concurrent.ConcurrentHashMap
 import org.companerodeescuela.shared.contracts.ClassroomMemberRole
 import org.companerodeescuela.shared.contracts.ClassroomStatus
+import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
 
 data class NativeClassroom(
     val id: String,
@@ -16,11 +16,11 @@ data class NativeClassroom(
     val teacherDisplayName: String,
     val status: ClassroomStatus,
     val createdAt: Instant,
-    val groupScopeRevision:Long=-1,
-    val teacherRoleGeneration:Long=-1,
-    val assignedBy:String?=null,
-    val assignmentOperationId:String?=null,
-    val assignmentDigest:String?=null,
+    val groupScopeRevision: Long = -1,
+    val teacherRoleGeneration: Long = -1,
+    val assignedBy: String? = null,
+    val assignmentOperationId: String? = null,
+    val assignmentDigest: String? = null,
 )
 
 data class NativeClassroomMembership(
@@ -44,17 +44,38 @@ data class NativeClassInviteRecord(
 
 interface ClassroomRepository {
     suspend fun createClassroom(classroom: NativeClassroom)
+
     suspend fun findClassroom(classroomId: String): NativeClassroom?
+
     suspend fun listClassrooms(): List<NativeClassroom>
+
     suspend fun listClassroomsForGroups(groupIds: Set<String>): List<NativeClassroom>
+
     suspend fun listClassroomsForUser(userId: String): List<Pair<NativeClassroom, NativeClassroomMembership>>
-    suspend fun listMembershipsForClass(classroomId:String):List<NativeClassroomMembership>
-    suspend fun findMembership(classroomId: String, userId: String): NativeClassroomMembership?
+
+    suspend fun listMembershipsForClass(classroomId: String): List<NativeClassroomMembership>
+
+    suspend fun findMembership(
+        classroomId: String,
+        userId: String,
+    ): NativeClassroomMembership?
+
     suspend fun addMembershipIfAbsent(membership: NativeClassroomMembership): NativeClassroomMembership
+
     suspend fun createInvite(invite: NativeClassInviteRecord)
+
     suspend fun findInviteByHash(tokenHash: String): NativeClassInviteRecord?
-    suspend fun consumeInvite(inviteId: String, now: Instant): NativeClassInviteRecord?
-    suspend fun revokeInvite(inviteId: String, classroomId: String, now: Instant): Boolean
+
+    suspend fun consumeInvite(
+        inviteId: String,
+        now: Instant,
+    ): NativeClassInviteRecord?
+
+    suspend fun revokeInvite(
+        inviteId: String,
+        classroomId: String,
+        now: Instant,
+    ): Boolean
 }
 
 class InMemoryClassroomRepository : ClassroomRepository {
@@ -63,7 +84,7 @@ class InMemoryClassroomRepository : ClassroomRepository {
     private val invites = ConcurrentHashMap<String, NativeClassInviteRecord>()
 
     override suspend fun createClassroom(classroom: NativeClassroom) {
-        classrooms.putIfAbsent(classroom.id,classroom)?.let { it.requireExactAssignment(classroom) }
+        classrooms.putIfAbsent(classroom.id, classroom)?.let { it.requireExactAssignment(classroom) }
     }
 
     override suspend fun findClassroom(classroomId: String): NativeClassroom? = classrooms[classroomId]
@@ -71,28 +92,31 @@ class InMemoryClassroomRepository : ClassroomRepository {
     override suspend fun listClassrooms(): List<NativeClassroom> = classrooms.values.toList()
 
     override suspend fun listClassroomsForGroups(groupIds: Set<String>): List<NativeClassroom> =
-        if (groupIds.isEmpty()) emptyList()
-        else classrooms.values.filter { it.groupId != null && it.groupId in groupIds }
+        if (groupIds.isEmpty()) {
+            emptyList()
+        } else {
+            classrooms.values.filter { it.groupId != null && it.groupId in groupIds }
+        }
 
-    override suspend fun listClassroomsForUser(
-        userId: String,
-    ): List<Pair<NativeClassroom, NativeClassroomMembership>> =
+    override suspend fun listClassroomsForUser(userId: String): List<Pair<NativeClassroom, NativeClassroomMembership>> =
         memberships.values
             .filter { it.userId == userId }
             .mapNotNull { membership ->
                 classrooms[membership.classroomId]?.let { it to membership }
             }
 
-    override suspend fun listMembershipsForClass(classroomId:String):List<NativeClassroomMembership> = memberships.values.filter { it.classroomId==classroomId }
+    override suspend fun listMembershipsForClass(classroomId: String): List<NativeClassroomMembership> =
+        memberships.values.filter {
+            it.classroomId ==
+                classroomId
+        }
 
     override suspend fun findMembership(
         classroomId: String,
         userId: String,
     ): NativeClassroomMembership? = memberships[membershipKey(classroomId, userId)]
 
-    override suspend fun addMembershipIfAbsent(
-        membership: NativeClassroomMembership,
-    ): NativeClassroomMembership =
+    override suspend fun addMembershipIfAbsent(membership: NativeClassroomMembership): NativeClassroomMembership =
         memberships.putIfAbsent(
             membershipKey(membership.classroomId, membership.userId),
             membership,
@@ -105,14 +129,19 @@ class InMemoryClassroomRepository : ClassroomRepository {
     override suspend fun findInviteByHash(tokenHash: String): NativeClassInviteRecord? =
         invites.values.firstOrNull { it.tokenHash == tokenHash }
 
-    override suspend fun consumeInvite(inviteId: String, now: Instant): NativeClassInviteRecord? =
+    override suspend fun consumeInvite(
+        inviteId: String,
+        now: Instant,
+    ): NativeClassInviteRecord? =
         synchronized(invites) {
             val current = invites[inviteId] ?: return@synchronized null
             if (
                 current.revokedAt != null ||
                 current.expiresAt <= now ||
                 current.uses >= current.maxUses
-            ) return@synchronized null
+            ) {
+                return@synchronized null
+            }
             val updated = current.copy(uses = current.uses + 1)
             invites[inviteId] = updated
             updated
@@ -122,19 +151,27 @@ class InMemoryClassroomRepository : ClassroomRepository {
         inviteId: String,
         classroomId: String,
         now: Instant,
-    ): Boolean = synchronized(invites) {
-        val current = invites[inviteId] ?: return@synchronized false
-        if (current.classroomId != classroomId || current.revokedAt != null) {
-            return@synchronized false
+    ): Boolean =
+        synchronized(invites) {
+            val current = invites[inviteId] ?: return@synchronized false
+            if (current.classroomId != classroomId || current.revokedAt != null) {
+                return@synchronized false
+            }
+            invites[inviteId] = current.copy(revokedAt = now)
+            true
         }
-        invites[inviteId] = current.copy(revokedAt = now)
-        true
-    }
 
-    private fun membershipKey(classroomId: String, userId: String): String =
-        "$classroomId::$userId"
+    private fun membershipKey(
+        classroomId: String,
+        userId: String,
+    ): String = "$classroomId::$userId"
 }
 
-internal fun NativeClassroom.requireExactAssignment(request:NativeClassroom) {
-    if(copy(createdAt=Instant.EPOCH)!=request.copy(createdAt=Instant.EPOCH)) throw org.companerodeescuela.api.errors.ApiException.Conflict("Classroom assignment belongs to a different operation or scope")
+internal fun NativeClassroom.requireExactAssignment(request: NativeClassroom) {
+    if (copy(createdAt = Instant.EPOCH) !=
+        request.copy(createdAt = Instant.EPOCH)
+    ) {
+        throw org.companerodeescuela.api.errors.ApiException
+            .Conflict("Classroom assignment belongs to a different operation or scope")
+    }
 }

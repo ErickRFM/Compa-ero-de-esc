@@ -4,8 +4,8 @@ import org.companerodeescuela.shared.contracts.AcademicLoadResponse
 import org.companerodeescuela.shared.contracts.AcademicProfile
 import org.companerodeescuela.shared.contracts.AcademicScheduleResponse
 import org.companerodeescuela.shared.contracts.ScheduleEntry
-import org.companerodeescuela.shared.contracts.ScheduleSource
 import org.companerodeescuela.shared.contracts.ScheduleRecurrence
+import org.companerodeescuela.shared.contracts.ScheduleSource
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime

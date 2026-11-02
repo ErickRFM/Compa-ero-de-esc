@@ -41,8 +41,11 @@ class SchoolNetworkVerifier(
     }
 
     private fun normalizeSsid(value: String?): String? =
-        value?.trim()?.removePrefix("\"")?.removeSuffix("\"")?.takeIf { it.isNotBlank() }
+        value
+            ?.trim()
+            ?.removePrefix("\"")
+            ?.removeSuffix("\"")
+            ?.takeIf { it.isNotBlank() }
 
-    private fun normalizeBssid(value: String?): String? =
-        value?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
+    private fun normalizeBssid(value: String?): String? = value?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
 }

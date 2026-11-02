@@ -43,7 +43,6 @@ class IntegrationException(
     message: String,
     cause: Throwable? = null,
 ) : RuntimeException("$providerId/${category.name}: $message", cause) {
-
     enum class Category {
         /** The provider is not reachable (DNS, TLS, connection refused). */
         UNAVAILABLE,

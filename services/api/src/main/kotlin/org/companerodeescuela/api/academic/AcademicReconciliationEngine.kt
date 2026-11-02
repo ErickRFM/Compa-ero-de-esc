@@ -24,17 +24,19 @@ class AcademicReconciliationEngine {
             val remoteBlock = remoteByKey[key]
             val localBlock = localByKey[key]
             when {
-                remoteBlock != null && localBlock == null -> AcademicReconciliationItem(
-                    key = key,
-                    classification = ReconciliationClassification.NEW_REMOTE,
-                    remote = remoteBlock,
-                )
+                remoteBlock != null && localBlock == null ->
+                    AcademicReconciliationItem(
+                        key = key,
+                        classification = ReconciliationClassification.NEW_REMOTE,
+                        remote = remoteBlock,
+                    )
 
-                remoteBlock == null && localBlock != null -> AcademicReconciliationItem(
-                    key = key,
-                    classification = ReconciliationClassification.NEW_LOCAL,
-                    local = localBlock,
-                )
+                remoteBlock == null && localBlock != null ->
+                    AcademicReconciliationItem(
+                        key = key,
+                        classification = ReconciliationClassification.NEW_LOCAL,
+                        local = localBlock,
+                    )
 
                 remoteBlock != null && localBlock != null && sameAcademicValue(remoteBlock, localBlock) ->
                     AcademicReconciliationItem(
@@ -44,7 +46,8 @@ class AcademicReconciliationEngine {
                         local = localBlock,
                     )
 
-                remoteBlock != null && localBlock != null &&
+                remoteBlock != null &&
+                    localBlock != null &&
                     localBlock.provenance.source == AcademicDataSource.SCHOOL_API ->
                     AcademicReconciliationItem(
                         key = key,
@@ -53,12 +56,13 @@ class AcademicReconciliationEngine {
                         local = localBlock,
                     )
 
-                else -> AcademicReconciliationItem(
-                    key = key,
-                    classification = ReconciliationClassification.CONFLICT,
-                    remote = remoteBlock,
-                    local = localBlock,
-                )
+                else ->
+                    AcademicReconciliationItem(
+                        key = key,
+                        classification = ReconciliationClassification.CONFLICT,
+                        remote = remoteBlock,
+                        local = localBlock,
+                    )
             }
         }
     }
@@ -67,7 +71,10 @@ class AcademicReconciliationEngine {
         block.provenance.sourceId?.takeIf(String::isNotBlank)
             ?: block.id
 
-    private fun sameAcademicValue(a: ScheduleBlock, b: ScheduleBlock): Boolean =
+    private fun sameAcademicValue(
+        a: ScheduleBlock,
+        b: ScheduleBlock,
+    ): Boolean =
         a.dayOfWeek == b.dayOfWeek &&
             a.startTime == b.startTime &&
             a.endTime == b.endTime &&

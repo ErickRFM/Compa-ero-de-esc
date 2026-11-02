@@ -1,10 +1,10 @@
 package org.companerodeescuela.api.grading
 
+import org.companerodeescuela.shared.contracts.GradeSyncResult
+import org.companerodeescuela.shared.contracts.GradeSyncStatus
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.companerodeescuela.shared.contracts.GradeSyncResult
-import org.companerodeescuela.shared.contracts.GradeSyncStatus
 
 class GradeSyncCapabilityTest {
     @Test fun `placeholder provider must report unavailable`() {

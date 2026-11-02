@@ -1,10 +1,6 @@
 package org.companerodeescuela.api.excuses
 
-import java.time.Clock
-import java.time.LocalDate
-import java.time.format.DateTimeParseException
 import org.companerodeescuela.api.academic.groups.AcademicGroupRepository
-import java.util.UUID
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.tutoring.TutorAssignmentService
 import org.companerodeescuela.shared.contracts.ExcuseRequestSummary
@@ -13,6 +9,10 @@ import org.companerodeescuela.shared.contracts.ReviewExcuseRequest
 import org.companerodeescuela.shared.contracts.SubmitExcuseRequest
 import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
+import java.time.Clock
+import java.time.LocalDate
+import java.time.format.DateTimeParseException
+import java.util.UUID
 
 class ExcuseService(
     private val repository: ExcuseRepository,
@@ -27,18 +27,27 @@ class ExcuseService(
         if (UserRole.STUDENT !in actor.roles) {
             throw ApiException.Forbidden("Only students can submit excuses")
         }
-        val groupId = request.academicGroupId.trim().uppercase()
-            .takeIf(String::isNotBlank)
-            ?: throw ApiException.Validation("academicGroupId is required")
-        val groupRepository = groupRepository
-            ?: throw ApiException.DependencyUnavailable("Academic group verification is not configured")
-        val group = groupRepository.find(groupId)
-            ?: throw ApiException.NotFound("Academic group was not found")
-        if (!group.active || group.institutionId==null || group.periodId.isNullOrBlank() ||
-            group.scopeRevision<0 || !groupRepository.isUserInGroup(actor.id, group.id)) {
+        val groupId =
+            request.academicGroupId
+                .trim()
+                .uppercase()
+                .takeIf(String::isNotBlank)
+                ?: throw ApiException.Validation("academicGroupId is required")
+        val groupRepository =
+            groupRepository
+                ?: throw ApiException.DependencyUnavailable("Academic group verification is not configured")
+        val group =
+            groupRepository.find(groupId)
+                ?: throw ApiException.NotFound("Academic group was not found")
+        if (!group.active ||
+            group.institutionId == null ||
+            group.periodId.isNullOrBlank() ||
+            group.scopeRevision < 0 ||
+            !groupRepository.isUserInGroup(actor.id, group.id)
+        ) {
             throw ApiException.Forbidden("Student is not enrolled in this active academic group")
         }
-        tutoring.requireStudentGroup(actor,group.id)
+        tutoring.requireStudentGroup(actor, group.id)
         val date = request.attendanceDateIso.trim()
         try {
             LocalDate.parse(date)
@@ -55,19 +64,20 @@ class ExcuseService(
             throw ApiException.Validation("reason must contain between 5 and 1000 characters")
         }
 
-        val record = ExcuseRecord(
-            id = UUID.randomUUID().toString(),
-            studentId = actor.id,
-            academicGroupId = groupId,
-            attendanceDateIso = date,
-            reason = reason,
-            attachmentRefs = emptyList(),
-            status = ExcuseStatus.PENDING,
-            submittedAt = clock.instant(),
-            institutionId = group.institutionId,
-            periodId = group.periodId,
-            groupScopeRevision = group.scopeRevision,
-        )
+        val record =
+            ExcuseRecord(
+                id = UUID.randomUUID().toString(),
+                studentId = actor.id,
+                academicGroupId = groupId,
+                attendanceDateIso = date,
+                reason = reason,
+                attachmentRefs = emptyList(),
+                status = ExcuseStatus.PENDING,
+                submittedAt = clock.instant(),
+                institutionId = group.institutionId,
+                periodId = group.periodId,
+                groupScopeRevision = group.scopeRevision,
+            )
         repository.create(record)
         return record.toSummary()
     }
@@ -75,7 +85,7 @@ class ExcuseService(
     suspend fun listFor(actor: UserSummary): List<ExcuseRequestSummary> =
         when {
             isAdmin(actor) -> {
-                val authorized=tutoring.administrativeGroupIds(actor)
+                val authorized = tutoring.administrativeGroupIds(actor)
                 repository.listForGroups(authorized).filter { scopedRecord(it) }.map { it.toSummary() }
             }
 
@@ -85,7 +95,12 @@ class ExcuseService(
             }
 
             UserRole.TUTOR in actor.roles -> {
-                val authorizedGroups = tutoring.scopeFor(actor).groups.map { it.id }.toSet()
+                val authorizedGroups =
+                    tutoring
+                        .scopeFor(actor)
+                        .groups
+                        .map { it.id }
+                        .toSet()
                 repository.listForGroups(authorizedGroups).filter { scopedRecord(it) }.map { it.toSummary() }
             }
 
@@ -97,11 +112,17 @@ class ExcuseService(
         excuseId: String,
         request: ReviewExcuseRequest,
     ): ExcuseRequestSummary {
-        val current = repository.find(excuseId)
-            ?: throw ApiException.NotFound("Excuse request was not found")
+        val current =
+            repository.find(excuseId)
+                ?: throw ApiException.NotFound("Excuse request was not found")
 
-        tutoring.requireCanAccessGroup(actor,current.academicGroupId)
-        if (!scopedRecord(current)) throw ApiException.Forbidden("Excuse scope is historical or unknown; administrative migration is required")
+        tutoring.requireCanAccessGroup(actor, current.academicGroupId)
+        if (!scopedRecord(
+                current,
+            )
+        ) {
+            throw ApiException.Forbidden("Excuse scope is historical or unknown; administrative migration is required")
+        }
 
         if (current.status !in setOf(ExcuseStatus.PENDING, ExcuseStatus.UNDER_REVIEW)) {
             throw ApiException.Conflict("Excuse request is already finalized")
@@ -110,27 +131,35 @@ class ExcuseService(
             throw ApiException.Validation("Invalid review status")
         }
 
-        val updated = current.copy(
-            status = request.status,
-            reviewedAt = clock.instant(),
-            reviewedBy = actor.id,
-            reviewComment = request.comment?.trim()?.takeIf(String::isNotBlank)?.take(1000),
-            version = current.version + 1,
-        )
-        return (repository.compareAndUpdate(current, updated)
-            ?: throw ApiException.Conflict("Excuse request changed; reload before reviewing")).toSummary()
+        val updated =
+            current.copy(
+                status = request.status,
+                reviewedAt = clock.instant(),
+                reviewedBy = actor.id,
+                reviewComment =
+                    request.comment
+                        ?.trim()
+                        ?.takeIf(String::isNotBlank)
+                        ?.take(1000),
+                version = current.version + 1,
+            )
+        return (
+            repository.compareAndUpdate(current, updated)
+                ?: throw ApiException.Conflict("Excuse request changed; reload before reviewing")
+        ).toSummary()
     }
 
     /** Legacy records without provenance remain retained but are not disclosed in current views. */
-    private suspend fun scopedRecord(record:ExcuseRecord):Boolean {
-        if(record.institutionId.isNullOrBlank() || record.periodId.isNullOrBlank() || record.groupScopeRevision<0) return false
-        val group=groupRepository?.find(record.academicGroupId) ?: return false
-        return group.active && group.institutionId==record.institutionId && group.periodId==record.periodId &&
-            group.scopeRevision==record.groupScopeRevision
+    private suspend fun scopedRecord(record: ExcuseRecord): Boolean {
+        if (record.institutionId.isNullOrBlank() || record.periodId.isNullOrBlank() || record.groupScopeRevision < 0) return false
+        val group = groupRepository?.find(record.academicGroupId) ?: return false
+        return group.active &&
+            group.institutionId == record.institutionId &&
+            group.periodId == record.periodId &&
+            group.scopeRevision == record.groupScopeRevision
     }
 
-    private fun isAdmin(actor: UserSummary): Boolean =
-        UserRole.ADMIN in actor.roles || UserRole.SUPER_ADMIN in actor.roles
+    private fun isAdmin(actor: UserSummary): Boolean = UserRole.ADMIN in actor.roles || UserRole.SUPER_ADMIN in actor.roles
 
     private fun ExcuseRecord.toSummary(): ExcuseRequestSummary =
         ExcuseRequestSummary(

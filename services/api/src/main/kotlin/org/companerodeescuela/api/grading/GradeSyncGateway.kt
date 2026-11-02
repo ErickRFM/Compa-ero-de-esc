@@ -12,15 +12,20 @@ import org.companerodeescuela.shared.contracts.GradeSyncResult
  * school credentials from ever shipping in the APK.
  */
 fun interface GradeSyncGateway {
-    suspend fun sync(teacherId: String, request: GradeSyncRequest): GradeSyncResult
+    suspend fun sync(
+        teacherId: String,
+        request: GradeSyncRequest,
+    ): GradeSyncResult
 }
 
 object UnavailableGradeSyncGateway : GradeSyncGateway {
-    override suspend fun sync(teacherId: String, request: GradeSyncRequest): GradeSyncResult {
+    override suspend fun sync(
+        teacherId: String,
+        request: GradeSyncRequest,
+    ): GradeSyncResult =
         throw ApiException.DependencyUnavailable(
             "The institutional grade API is not configured",
         )
-    }
 }
 
 /** A registered non-placeholder gateway can attempt institutional grade publishing. */

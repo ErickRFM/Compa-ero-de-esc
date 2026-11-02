@@ -21,7 +21,9 @@ import org.companerodeescuela.shared.contracts.ChannelPostState
 import org.companerodeescuela.shared.contracts.ChannelPostType
 import org.companerodeescuela.shared.contracts.ChannelPresetResponse
 
-class MongoChannelRepository(database: MongoDatabase) : ChannelRepository {
+class MongoChannelRepository(
+    database: MongoDatabase,
+) : ChannelRepository {
     private val posts: MongoCollection<Document> = database.getCollection(POSTS_COLLECTION)
     private val acknowledgements: MongoCollection<Document> =
         database.getCollection(ACKS_COLLECTION)
@@ -32,7 +34,8 @@ class MongoChannelRepository(database: MongoDatabase) : ChannelRepository {
 
     override suspend fun listPosts(channelId: String): List<ChannelPost> {
         ensureIndexes()
-        return posts.find(eq("channelId", channelId))
+        return posts
+            .find(eq("channelId", channelId))
             .sort(descending("pinned", "createdAtEpochSeconds"))
             .toList()
             .map { it.toPost() }
@@ -54,9 +57,7 @@ class MongoChannelRepository(database: MongoDatabase) : ChannelRepository {
         posts.replaceOne(eq("_id", post.id), post.toDocument(), ReplaceOptions().upsert(false))
     }
 
-    override suspend fun upsertAcknowledgement(
-        value: ChannelAcknowledgement,
-    ): ChannelAcknowledgement {
+    override suspend fun upsertAcknowledgement(value: ChannelAcknowledgement): ChannelAcknowledgement {
         ensureIndexes()
         acknowledgements.replaceOne(
             and(eq("postId", value.postId), eq("studentId", value.studentId)),
@@ -68,7 +69,8 @@ class MongoChannelRepository(database: MongoDatabase) : ChannelRepository {
 
     override suspend fun acknowledgementsFor(postId: String): List<ChannelAcknowledgement> {
         ensureIndexes()
-        return acknowledgements.find(eq("postId", postId))
+        return acknowledgements
+            .find(eq("postId", postId))
             .toList()
             .map { it.toAcknowledgement() }
     }
@@ -100,28 +102,28 @@ class MongoChannelRepository(database: MongoDatabase) : ChannelRepository {
         }
     }
 
-    private fun ChannelPost.toDocument(): Document = Document()
-        .append("_id", id)
-        .append("channelId", channelId)
-        .append("authorId", authorId)
-        .append("authorDisplayName", authorDisplayName)
-        .append("type", type.name)
-        .append("title", title)
-        .append("body", body)
-        .append(
-            "attachments",
-            attachments.map { attachment ->
-                Document()
-                    .append("type", attachment.type.name)
-                    .append("label", attachment.label)
-                    .append("url", attachment.url)
-            },
-        )
-        .append("allowedResponses", allowedResponses.map(ChannelPresetResponse::name))
-        .append("pinned", pinned)
-        .append("state", state.name)
-        .append("createdAtEpochSeconds", createdAtEpochSeconds)
-        .append("editedAtEpochSeconds", editedAtEpochSeconds)
+    private fun ChannelPost.toDocument(): Document =
+        Document()
+            .append("_id", id)
+            .append("channelId", channelId)
+            .append("authorId", authorId)
+            .append("authorDisplayName", authorDisplayName)
+            .append("type", type.name)
+            .append("title", title)
+            .append("body", body)
+            .append(
+                "attachments",
+                attachments.map { attachment ->
+                    Document()
+                        .append("type", attachment.type.name)
+                        .append("label", attachment.label)
+                        .append("url", attachment.url)
+                },
+            ).append("allowedResponses", allowedResponses.map(ChannelPresetResponse::name))
+            .append("pinned", pinned)
+            .append("state", state.name)
+            .append("createdAtEpochSeconds", createdAtEpochSeconds)
+            .append("editedAtEpochSeconds", editedAtEpochSeconds)
 
     private fun Document.toPost(): ChannelPost =
         ChannelPost(
@@ -132,29 +134,32 @@ class MongoChannelRepository(database: MongoDatabase) : ChannelRepository {
             type = ChannelPostType.valueOf(getString("type")),
             title = getString("title"),
             body = getString("body"),
-            attachments = getList("attachments", Document::class.java).orEmpty().map { attachment ->
-                ChannelAttachment(
-                    type = ChannelAttachmentType.valueOf(attachment.getString("type")),
-                    label = attachment.getString("label"),
-                    url = attachment.getString("url"),
-                )
-            },
-            allowedResponses = getList("allowedResponses", String::class.java)
-                .orEmpty()
-                .map(ChannelPresetResponse::valueOf)
-                .toSet(),
+            attachments =
+                getList("attachments", Document::class.java).orEmpty().map { attachment ->
+                    ChannelAttachment(
+                        type = ChannelAttachmentType.valueOf(attachment.getString("type")),
+                        label = attachment.getString("label"),
+                        url = attachment.getString("url"),
+                    )
+                },
+            allowedResponses =
+                getList("allowedResponses", String::class.java)
+                    .orEmpty()
+                    .map(ChannelPresetResponse::valueOf)
+                    .toSet(),
             pinned = getBoolean("pinned", false),
             state = ChannelPostState.valueOf(getString("state")),
             createdAtEpochSeconds = requireLong("createdAtEpochSeconds"),
             editedAtEpochSeconds = numberAsLong("editedAtEpochSeconds"),
         )
 
-    private fun ChannelAcknowledgement.toDocument(): Document = Document()
-        .append("postId", postId)
-        .append("studentId", studentId)
-        .append("response", response?.name)
-        .append("viewedAtEpochSeconds", viewedAtEpochSeconds)
-        .append("respondedAtEpochSeconds", respondedAtEpochSeconds)
+    private fun ChannelAcknowledgement.toDocument(): Document =
+        Document()
+            .append("postId", postId)
+            .append("studentId", studentId)
+            .append("response", response?.name)
+            .append("viewedAtEpochSeconds", viewedAtEpochSeconds)
+            .append("respondedAtEpochSeconds", respondedAtEpochSeconds)
 
     private fun Document.toAcknowledgement(): ChannelAcknowledgement =
         ChannelAcknowledgement(
@@ -165,11 +170,9 @@ class MongoChannelRepository(database: MongoDatabase) : ChannelRepository {
             respondedAtEpochSeconds = numberAsLong("respondedAtEpochSeconds"),
         )
 
-    private fun Document.requireLong(name: String): Long =
-        numberAsLong(name) ?: error("Missing numeric field: $name")
+    private fun Document.requireLong(name: String): Long = numberAsLong(name) ?: error("Missing numeric field: $name")
 
-    private fun Document.numberAsLong(name: String): Long? =
-        (get(name) as? Number)?.toLong()
+    private fun Document.numberAsLong(name: String): Long? = (get(name) as? Number)?.toLong()
 
     private companion object {
         const val POSTS_COLLECTION = "class_channel_posts"

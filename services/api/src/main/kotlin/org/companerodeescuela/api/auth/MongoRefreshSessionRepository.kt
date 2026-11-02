@@ -8,14 +8,11 @@ import com.mongodb.client.model.Filters.ne
 import com.mongodb.client.model.FindOneAndUpdateOptions
 import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
-import com.mongodb.client.model.ReturnDocument
 import com.mongodb.client.model.PushOptions
+import com.mongodb.client.model.ReturnDocument
 import com.mongodb.client.model.Updates
 import com.mongodb.kotlin.client.coroutine.MongoCollection
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
-import java.time.Instant
-import java.util.Date
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -23,6 +20,9 @@ import org.bson.Document
 import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
+import java.time.Instant
+import java.util.Date
+import java.util.concurrent.TimeUnit
 
 /** Stores only a one-way hash of the current refresh token for each device session. */
 class MongoRefreshSessionRepository(
@@ -41,7 +41,9 @@ class MongoRefreshSessionRepository(
 
     override suspend fun find(sessionId: String): RefreshSession? {
         ensureIndexes()
-        return sessions.find(eq("_id", sessionId)).firstOrNull()
+        return sessions
+            .find(eq("_id", sessionId))
+            .firstOrNull()
             ?.let(RefreshSessionDocumentCodec::decode)
     }
 
@@ -55,42 +57,51 @@ class MongoRefreshSessionRepository(
         rotationGrace: java.time.Duration,
     ): RefreshSession? {
         ensureIndexes()
-        val filter = and(
-            eq("_id", sessionId),
-            eq("tokenHash", currentTokenHash),
-            eq("revokedAt", null),
-            gt("expiresAt", Date.from(now)),
-        )
+        val filter =
+            and(
+                eq("_id", sessionId),
+                eq("tokenHash", currentTokenHash),
+                eq("revokedAt", null),
+                gt("expiresAt", Date.from(now)),
+            )
         val update = rotationUpdate(currentTokenHash, nextTokenHash, user, now, expiresAt)
-        sessions.findOneAndUpdate(
-            filter,
-            update,
-            FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
-        )?.let { return RefreshSessionDocumentCodec.decode(it) }
+        sessions
+            .findOneAndUpdate(
+                filter,
+                update,
+                FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
+            )?.let { return RefreshSessionDocumentCodec.decode(it) }
 
         val cutoff = Date.from(now.minus(rotationGrace))
         for (attempt in 0 until 3) {
-            val active = sessions.find(and(
-                eq("_id", sessionId),
-                eq("revokedAt", null),
-                gt("expiresAt", Date.from(now)),
-            )).firstOrNull()?.let(RefreshSessionDocumentCodec::decode) ?: return null
-            val withinGrace = active.immediatelyPreviousTokenHash == currentTokenHash &&
-                active.lastRotatedAt?.let { rotatedAt -> !now.isAfter(rotatedAt.plus(rotationGrace)) } == true
+            val active =
+                sessions
+                    .find(
+                        and(
+                            eq("_id", sessionId),
+                            eq("revokedAt", null),
+                            gt("expiresAt", Date.from(now)),
+                        ),
+                    ).firstOrNull()
+                    ?.let(RefreshSessionDocumentCodec::decode) ?: return null
+            val withinGrace =
+                active.immediatelyPreviousTokenHash == currentTokenHash &&
+                    active.lastRotatedAt?.let { rotatedAt -> !now.isAfter(rotatedAt.plus(rotationGrace)) } == true
             if (!withinGrace) break
 
-            sessions.findOneAndUpdate(
-                and(
-                    eq("_id", sessionId),
-                    eq("tokenHash", active.tokenHash),
-                    eq("immediatelyPreviousTokenHash", currentTokenHash),
-                    gte("lastRotatedAt", cutoff),
-                    eq("revokedAt", null),
-                    gt("expiresAt", Date.from(now)),
-                ),
-                rotationUpdate(active.tokenHash, nextTokenHash, user, now, expiresAt),
-                FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
-            )?.let { return RefreshSessionDocumentCodec.decode(it) }
+            sessions
+                .findOneAndUpdate(
+                    and(
+                        eq("_id", sessionId),
+                        eq("tokenHash", active.tokenHash),
+                        eq("immediatelyPreviousTokenHash", currentTokenHash),
+                        gte("lastRotatedAt", cutoff),
+                        eq("revokedAt", null),
+                        gt("expiresAt", Date.from(now)),
+                    ),
+                    rotationUpdate(active.tokenHash, nextTokenHash, user, now, expiresAt),
+                    FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
+                )?.let { return RefreshSessionDocumentCodec.decode(it) }
         }
 
         revokeOnReplay(sessionId, currentTokenHash, now)
@@ -104,16 +115,21 @@ class MongoRefreshSessionRepository(
     ): Boolean {
         ensureIndexes()
         val active = and(eq("_id", sessionId), eq("revokedAt", null))
-        val result = sessions.updateOne(
-            and(active, eq("tokenHash", presentedTokenHash)),
-            Updates.set("revokedAt", Date.from(now)),
-        )
+        val result =
+            sessions.updateOne(
+                and(active, eq("tokenHash", presentedTokenHash)),
+                Updates.set("revokedAt", Date.from(now)),
+            )
         if (result.modifiedCount > 0L) return true
         revokeOnReplay(sessionId, presentedTokenHash, now)
         return false
     }
 
-    private suspend fun revokeOnReplay(sessionId: String, presentedHash: String, now: Instant) {
+    private suspend fun revokeOnReplay(
+        sessionId: String,
+        presentedHash: String,
+        now: Instant,
+    ) {
         // Recognize and revoke in a single atomic update. A later rotation must not
         // invalidate replay detection by changing the current token between read/write.
         sessions.updateOne(
@@ -161,18 +177,19 @@ class MongoRefreshSessionRepository(
 }
 
 internal object RefreshSessionDocumentCodec {
-    fun encode(session: RefreshSession): Document = Document()
-        .append("_id", session.id)
-        .append("tokenHash", session.tokenHash)
-        .append("user", encodeUser(session.user))
-        .append("createdAt", Date.from(session.createdAt))
-        .append("expiresAt", Date.from(session.expiresAt))
-        .append("generation", session.generation)
-        .append("identitySource", session.identitySource.name)
-        .append("previousTokenHashes", session.previousTokenHashes.toList())
-        .append("immediatelyPreviousTokenHash", session.immediatelyPreviousTokenHash)
-        .append("lastRotatedAt", session.lastRotatedAt?.let(Date::from))
-        .append("revokedAt", session.revokedAt?.let(Date::from))
+    fun encode(session: RefreshSession): Document =
+        Document()
+            .append("_id", session.id)
+            .append("tokenHash", session.tokenHash)
+            .append("user", encodeUser(session.user))
+            .append("createdAt", Date.from(session.createdAt))
+            .append("expiresAt", Date.from(session.expiresAt))
+            .append("generation", session.generation)
+            .append("identitySource", session.identitySource.name)
+            .append("previousTokenHashes", session.previousTokenHashes.toList())
+            .append("immediatelyPreviousTokenHash", session.immediatelyPreviousTokenHash)
+            .append("lastRotatedAt", session.lastRotatedAt?.let(Date::from))
+            .append("revokedAt", session.revokedAt?.let(Date::from))
 
     fun decode(document: Document): RefreshSession {
         val userDocument = document.get("user", Document::class.java)
@@ -183,29 +200,37 @@ internal object RefreshSessionDocumentCodec {
             createdAt = document.getDate("createdAt").toInstant(),
             expiresAt = document.getDate("expiresAt").toInstant(),
             generation = nonNegativeInteger(document, "generation"),
-            identitySource = runCatching { SessionIdentitySource.valueOf(document.getString("identitySource")) }
-                .getOrDefault(SessionIdentitySource.LEGACY),
-            previousTokenHashes = document.getList("previousTokenHashes", String::class.java)
-                .orEmpty()
-                .toSet(),
-            immediatelyPreviousTokenHash = document.getString("immediatelyPreviousTokenHash")
-                ?: document.getList("previousTokenHashes", String::class.java)?.lastOrNull(),
+            identitySource =
+                runCatching { SessionIdentitySource.valueOf(document.getString("identitySource")) }
+                    .getOrDefault(SessionIdentitySource.LEGACY),
+            previousTokenHashes =
+                document
+                    .getList("previousTokenHashes", String::class.java)
+                    .orEmpty()
+                    .toSet(),
+            immediatelyPreviousTokenHash =
+                document.getString("immediatelyPreviousTokenHash")
+                    ?: document.getList("previousTokenHashes", String::class.java)?.lastOrNull(),
             lastRotatedAt = document.getDate("lastRotatedAt")?.toInstant(),
             revokedAt = document.getDate("revokedAt")?.toInstant(),
         )
     }
 
-    fun encodeUser(user: UserSummary): Document = Document()
-        .append("id", user.id)
-        .append("displayName", user.displayName)
-        .append("email", user.email)
-        .append("roles", user.roles.map { it.name })
-        .append("active", user.active)
-        .append("accountStatus", user.accountStatus.name)
-        .append("authRevision", user.authRevision)
-        .append("institutionId", user.institutionId)
+    fun encodeUser(user: UserSummary): Document =
+        Document()
+            .append("id", user.id)
+            .append("displayName", user.displayName)
+            .append("email", user.email)
+            .append("roles", user.roles.map { it.name })
+            .append("active", user.active)
+            .append("accountStatus", user.accountStatus.name)
+            .append("authRevision", user.authRevision)
+            .append("institutionId", user.institutionId)
 
-    private fun nonNegativeInteger(document: Document, key: String): Long {
+    private fun nonNegativeInteger(
+        document: Document,
+        key: String,
+    ): Long {
         if (!document.containsKey(key)) return 0L // Truly absent legacy field only.
         return when (val encoded = document[key]) {
             is Int -> encoded.toLong().takeIf { it >= 0 } ?: -1L
@@ -214,17 +239,25 @@ internal object RefreshSessionDocumentCodec {
         }
     }
 
-    private fun decodeUser(document: Document): UserSummary = UserSummary(
-        id = document.getString("id"),
-        displayName = document.getString("displayName"),
-        email = document.getString("email"),
-        roles = document.getList("roles", String::class.java).mapNotNull { encoded ->
-            runCatching { UserRole.valueOf(encoded) }.getOrNull()
-        }.toSet(),
-        active = document.get("active") == true,
-        accountStatus = if (!document.containsKey("accountStatus")) AccountStatus.ACTIVE
-            else runCatching { AccountStatus.valueOf(document.getString("accountStatus")) }.getOrDefault(AccountStatus.REVOKED),
-        authRevision = nonNegativeInteger(document, "authRevision"),
-        institutionId = document.getString("institutionId"),
-    )
+    private fun decodeUser(document: Document): UserSummary =
+        UserSummary(
+            id = document.getString("id"),
+            displayName = document.getString("displayName"),
+            email = document.getString("email"),
+            roles =
+                document
+                    .getList("roles", String::class.java)
+                    .mapNotNull { encoded ->
+                        runCatching { UserRole.valueOf(encoded) }.getOrNull()
+                    }.toSet(),
+            active = document.get("active") == true,
+            accountStatus =
+                if (!document.containsKey("accountStatus")) {
+                    AccountStatus.ACTIVE
+                } else {
+                    runCatching { AccountStatus.valueOf(document.getString("accountStatus")) }.getOrDefault(AccountStatus.REVOKED)
+                },
+            authRevision = nonNegativeInteger(document, "authRevision"),
+            institutionId = document.getString("institutionId"),
+        )
 }

@@ -1,16 +1,15 @@
 package org.companerodeescuela.api.auth
 
-import kotlin.test.Test
-import kotlin.test.assertFalse
+import kotlinx.coroutines.test.runTest
 import java.util.Base64
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
+import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlinx.coroutines.test.runTest
 
 class PasswordHasherTest {
     @Test
@@ -50,17 +49,18 @@ class PasswordHasherTest {
     }
 
     @Test
-    fun `legacy hash verifies and requests a current hash`() = runTest {
-        val password = "Correct horse battery staple"
-        val oldHash = legacyHash(password, 210_000)
+    fun `legacy hash verifies and requests a current hash`() =
+        runTest {
+            val password = "Correct horse battery staple"
+            val oldHash = legacyHash(password, 210_000)
 
-        val result = PasswordHasher().verifyAndUpgradeAsync(password, oldHash)
+            val result = PasswordHasher().verifyAndUpgradeAsync(password, oldHash)
 
-        assertTrue(result.verified)
-        val upgraded = assertNotNull(result.upgradedHash)
-        assertEquals(600_000, upgraded.split(":")[1].toInt())
-        assertTrue(PasswordHasher().verifyAsync(password, upgraded))
-    }
+            assertTrue(result.verified)
+            val upgraded = assertNotNull(result.upgradedHash)
+            assertEquals(600_000, upgraded.split(":")[1].toInt())
+            assertTrue(PasswordHasher().verifyAsync(password, upgraded))
+        }
 
     @Test
     fun `fixed unknown account dummy hash is a valid current hash`() {
@@ -69,26 +69,36 @@ class PasswordHasherTest {
     }
 
     @Test
-    fun `asynchronous hashing and verification run on the default dispatcher`() = runTest {
-        val hasher = ThreadCapturingPasswordHasher()
-        val caller = Thread.currentThread().name
-        val encoded = hasher.hashAsync("Correct horse battery staple")
+    fun `asynchronous hashing and verification run on the default dispatcher`() =
+        runTest {
+            val hasher = ThreadCapturingPasswordHasher()
+            val caller = Thread.currentThread().name
+            val encoded = hasher.hashAsync("Correct horse battery staple")
 
-        assertNotEquals(caller, hasher.lastHashThread)
-        assertTrue(hasher.verifyAsync("Correct horse battery staple", encoded))
-        assertNotEquals(caller, hasher.lastVerifyThread)
-    }
+            assertNotEquals(caller, hasher.lastHashThread)
+            assertTrue(hasher.verifyAsync("Correct horse battery staple", encoded))
+            assertNotEquals(caller, hasher.lastVerifyThread)
+        }
 
-    private fun legacyHash(password: String, iterations: Int): String {
+    private fun legacyHash(
+        password: String,
+        iterations: Int,
+    ): String {
         val salt = ByteArray(16) { it.toByte() }
         val spec = PBEKeySpec(password.toCharArray(), salt, iterations, 256)
-        val digest = try {
-            SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
-        } finally {
-            spec.clearPassword()
-        }
+        val digest =
+            try {
+                SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
+            } finally {
+                spec.clearPassword()
+            }
         val encoder = Base64.getUrlEncoder().withoutPadding()
-        return listOf("pbkdf2-sha256", iterations.toString(), encoder.encodeToString(salt), encoder.encodeToString(digest)).joinToString(":")
+        return listOf(
+            "pbkdf2-sha256",
+            iterations.toString(),
+            encoder.encodeToString(salt),
+            encoder.encodeToString(digest),
+        ).joinToString(":")
     }
 
     private class ThreadCapturingPasswordHasher : PasswordHasher() {
@@ -100,7 +110,10 @@ class PasswordHasherTest {
             return super.hash(password)
         }
 
-        override fun verify(password: String, encoded: String): Boolean {
+        override fun verify(
+            password: String,
+            encoded: String,
+        ): Boolean {
             lastVerifyThread = Thread.currentThread().name
             return super.verify(password, encoded)
         }

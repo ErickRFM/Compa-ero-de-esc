@@ -1,8 +1,8 @@
 package org.companerodeescuela.api.integrations.events
 
+import org.companerodeescuela.api.integrations.IntegrationProvider
 import java.time.LocalDate
 import java.time.LocalTime
-import org.companerodeescuela.api.integrations.IntegrationProvider
 
 /** An institutional event as published by the campus calendar system. */
 data class ExternalEvent(
@@ -25,5 +25,8 @@ data class ExternalEvent(
  * locally in the platform's own database.
  */
 interface EventsProvider : IntegrationProvider {
-    suspend fun listEvents(from: LocalDate, to: LocalDate): List<ExternalEvent>
+    suspend fun listEvents(
+        from: LocalDate,
+        to: LocalDate,
+    ): List<ExternalEvent>
 }

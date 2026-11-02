@@ -6,20 +6,17 @@ import io.ktor.server.auth.principal
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.shared.contracts.UserRole
 
-fun ApplicationCall.requirePlatformPrincipal(): JWTPrincipal =
-    principal<JWTPrincipal>() ?: throw ApiException.Unauthorized()
+fun ApplicationCall.requirePlatformPrincipal(): JWTPrincipal = principal<JWTPrincipal>() ?: throw ApiException.Unauthorized()
 
-fun ApplicationCall.requireActor(tokenService: AuthTokenService) =
-    tokenService.userFrom(requirePlatformPrincipal().payload)
+fun ApplicationCall.requireActor(tokenService: AuthTokenService) = tokenService.userFrom(requirePlatformPrincipal().payload)
 
-fun JWTPrincipal.subjectId(): String =
-    payload.subject?.takeIf { it.isNotBlank() } ?: throw ApiException.Unauthorized()
+fun JWTPrincipal.subjectId(): String = payload.subject?.takeIf { it.isNotBlank() } ?: throw ApiException.Unauthorized()
 
-fun JWTPrincipal.displayNameOr(default: String): String =
-    payload.getClaim("display_name").asString()?.takeIf { it.isNotBlank() } ?: default
+fun JWTPrincipal.displayNameOr(default: String): String = payload.getClaim("display_name").asString()?.takeIf { it.isNotBlank() } ?: default
 
 fun JWTPrincipal.platformRoles(): Set<UserRole> =
-    payload.getClaim("roles")
+    payload
+        .getClaim("roles")
         .asList(String::class.java)
         .orEmpty()
         .mapNotNull { encoded -> runCatching { UserRole.valueOf(encoded) }.getOrNull() }
@@ -43,12 +40,18 @@ fun JWTPrincipal.requireAdministrative() {
     }
 }
 
-fun JWTPrincipal.hasAdministrativeScope(): Boolean =
-    platformRoles().any { it.isAdministrative }
+fun JWTPrincipal.hasAdministrativeScope(): Boolean = platformRoles().any { it.isAdministrative }
 
-val VERIFIED_SESSION_SOURCE=io.ktor.util.AttributeKey<SessionIdentitySource>("verified-session-source")
-fun ApplicationCall.verifiedSessionSource():SessionIdentitySource = attributes.getOrNull(VERIFIED_SESSION_SOURCE) ?: throw ApiException.Unauthorized()
-fun ApplicationCall.requireNativeActor(tokenService:AuthTokenService):org.companerodeescuela.shared.contracts.UserSummary {
-    if(verifiedSessionSource()!=SessionIdentitySource.NATIVE) throw ApiException.Forbidden("A native platform identity is required; institutional identities need an explicit adapter")
+val VERIFIED_SESSION_SOURCE = io.ktor.util.AttributeKey<SessionIdentitySource>("verified-session-source")
+
+fun ApplicationCall.verifiedSessionSource(): SessionIdentitySource =
+    attributes.getOrNull(VERIFIED_SESSION_SOURCE) ?: throw ApiException.Unauthorized()
+
+fun ApplicationCall.requireNativeActor(tokenService: AuthTokenService): org.companerodeescuela.shared.contracts.UserSummary {
+    if (verifiedSessionSource() !=
+        SessionIdentitySource.NATIVE
+    ) {
+        throw ApiException.Forbidden("A native platform identity is required; institutional identities need an explicit adapter")
+    }
     return requireActor(tokenService)
 }

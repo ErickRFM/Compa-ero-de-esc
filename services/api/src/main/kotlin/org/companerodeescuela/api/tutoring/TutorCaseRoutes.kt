@@ -1,7 +1,5 @@
 package org.companerodeescuela.api.tutoring
 
-import org.companerodeescuela.api.auth.boundedBody
-
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.response.respond
@@ -10,6 +8,7 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import org.companerodeescuela.api.auth.AuthTokenService
+import org.companerodeescuela.api.auth.boundedBody
 import org.companerodeescuela.api.auth.requireNativeActor
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
@@ -18,7 +17,10 @@ import org.companerodeescuela.shared.contracts.AddTutorCaseNoteRequest
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.CreateTutorCaseRequest
 
-fun Route.tutorCaseRoutes(settings: ApiSettings, service: TutorCaseService) {
+fun Route.tutorCaseRoutes(
+    settings: ApiSettings,
+    service: TutorCaseService,
+) {
     route("/tutoring/cases") {
         if (!settings.hasAuthentication) {
             get { throw ApiException.DependencyUnavailable("Authentication is not configured") }
@@ -37,8 +39,10 @@ fun Route.tutorCaseRoutes(settings: ApiSettings, service: TutorCaseService) {
             post {
                 val actor = call.requireNativeActor(tokens)
                 val request = call.boundedBody(CreateTutorCaseRequest.serializer())
-                call.respond(HttpStatusCode.Created,
-                    ApiResponse(data = service.create(actor, request), requestId = call.requestId()))
+                call.respond(
+                    HttpStatusCode.Created,
+                    ApiResponse(data = service.create(actor, request), requestId = call.requestId()),
+                )
             }
             get("/{caseId}") {
                 val actor = call.requireNativeActor(tokens)
@@ -49,8 +53,10 @@ fun Route.tutorCaseRoutes(settings: ApiSettings, service: TutorCaseService) {
                 val actor = call.requireNativeActor(tokens)
                 val caseId = call.parameters["caseId"] ?: throw ApiException.Validation("caseId is required")
                 val request = call.boundedBody(AddTutorCaseNoteRequest.serializer())
-                call.respond(HttpStatusCode.Created,
-                    ApiResponse(data = service.addNote(actor, caseId, request), requestId = call.requestId()))
+                call.respond(
+                    HttpStatusCode.Created,
+                    ApiResponse(data = service.addNote(actor, caseId, request), requestId = call.requestId()),
+                )
             }
         }
     }

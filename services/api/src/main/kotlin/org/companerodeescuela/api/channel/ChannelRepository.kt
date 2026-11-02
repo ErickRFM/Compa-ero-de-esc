@@ -7,10 +7,15 @@ import org.companerodeescuela.shared.contracts.ChannelPost
 
 interface ChannelRepository {
     suspend fun listPosts(channelId: String): List<ChannelPost>
+
     suspend fun findPost(postId: String): ChannelPost?
+
     suspend fun createPost(post: ChannelPost): ChannelPost
+
     suspend fun replacePost(post: ChannelPost)
+
     suspend fun upsertAcknowledgement(value: ChannelAcknowledgement): ChannelAcknowledgement
+
     suspend fun acknowledgementsFor(postId: String): List<ChannelAcknowledgement>
 }
 
@@ -29,8 +34,7 @@ class InMemoryChannelRepository : ChannelRepository {
                 )
         }
 
-    override suspend fun findPost(postId: String): ChannelPost? =
-        mutex.withLock { posts[postId] }
+    override suspend fun findPost(postId: String): ChannelPost? = mutex.withLock { posts[postId] }
 
     override suspend fun createPost(post: ChannelPost): ChannelPost =
         mutex.withLock {
@@ -43,12 +47,11 @@ class InMemoryChannelRepository : ChannelRepository {
         mutex.withLock { posts[post.id] = post }
     }
 
-    override suspend fun upsertAcknowledgement(
-        value: ChannelAcknowledgement,
-    ): ChannelAcknowledgement = mutex.withLock {
-        acknowledgements[value.postId to value.studentId] = value
-        value
-    }
+    override suspend fun upsertAcknowledgement(value: ChannelAcknowledgement): ChannelAcknowledgement =
+        mutex.withLock {
+            acknowledgements[value.postId to value.studentId] = value
+            value
+        }
 
     override suspend fun acknowledgementsFor(postId: String): List<ChannelAcknowledgement> =
         mutex.withLock {

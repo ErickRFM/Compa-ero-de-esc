@@ -1,7 +1,7 @@
 package org.companerodeescuela.api.integrations.library
 
-import java.time.LocalDate
 import org.companerodeescuela.api.integrations.IntegrationProvider
+import java.time.LocalDate
 
 /** A catalogue entry, as exposed by the library system. */
 data class ExternalLibraryItem(
@@ -27,7 +27,10 @@ data class ExternalLoan(
  * channels until the institution confirms the platform may write.
  */
 interface LibraryProvider : IntegrationProvider {
-    suspend fun search(query: String, limit: Int = DEFAULT_LIMIT): List<ExternalLibraryItem>
+    suspend fun search(
+        query: String,
+        limit: Int = DEFAULT_LIMIT,
+    ): List<ExternalLibraryItem>
 
     suspend fun listLoans(borrowerExternalId: String): List<ExternalLoan>
 

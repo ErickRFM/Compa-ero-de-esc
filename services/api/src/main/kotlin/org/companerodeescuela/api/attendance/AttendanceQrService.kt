@@ -1,5 +1,8 @@
 package org.companerodeescuela.api.attendance
 
+import org.companerodeescuela.api.errors.ApiException
+import org.companerodeescuela.shared.contracts.AttendanceQrResponse
+import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -8,9 +11,6 @@ import java.time.Duration
 import java.util.Base64
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
-import org.companerodeescuela.api.errors.ApiException
-import org.companerodeescuela.shared.contracts.AttendanceQrResponse
-import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
 
 sealed interface QrEvidenceResult {
     data class Valid(
@@ -26,6 +26,7 @@ sealed interface QrEvidenceResult {
     ) : QrEvidenceResult
 
     data object WrongSession : QrEvidenceResult
+
     data object Invalid : QrEvidenceResult
 }
 
@@ -74,8 +75,9 @@ class AttendanceQrService(
         allowCrossOwner: Boolean,
         nativeActor: org.companerodeescuela.shared.contracts.UserSummary?,
     ): org.companerodeescuela.shared.contracts.AttendanceSessionResponse {
-        val session = repository.findSession(sessionId)
-            ?: throw ApiException.NotFound("Attendance session was not found")
+        val session =
+            repository.findSession(sessionId)
+                ?: throw ApiException.NotFound("Attendance session was not found")
         accessPolicy.requireOwnerOrAdministrative(actorId, session, allowCrossOwner, nativeActor)
         val now = clock.instant().epochSecond
         if (session.status != AttendanceSessionStatus.OPEN || session.closesAtEpochSeconds <= now) {
@@ -91,9 +93,14 @@ class AttendanceQrService(
     ): AttendanceQrResponse {
         val expiresAt = minOf(issuedAt + TOKEN_TTL.seconds, sessionClose)
         val nonce = encoder.encodeToString(ByteArray(NONCE_BYTES).also(secureRandom::nextBytes))
-        val prefix = listOf(
-            TOKEN_VERSION, encodeText(sessionId), nonce, issuedAt.toString(), expiresAt.toString(),
-        ).joinToString(".")
+        val prefix =
+            listOf(
+                TOKEN_VERSION,
+                encodeText(sessionId),
+                nonce,
+                issuedAt.toString(),
+                expiresAt.toString(),
+            ).joinToString(".")
         return AttendanceQrResponse(
             token = "$prefix.${encoder.encodeToString(sign(prefix))}",
             issuedAtEpochSeconds = issuedAt,
@@ -115,8 +122,9 @@ class AttendanceQrService(
         val issuedAt = parts[3].toLongOrNull() ?: return QrEvidenceResult.Invalid
         val expiresAt = parts[4].toLongOrNull() ?: return QrEvidenceResult.Invalid
         val nonceBytes = runCatching { decoder.decode(parts[2]) }.getOrNull() ?: return QrEvidenceResult.Invalid
-        val nonce = parts[2].takeIf { nonceBytes.size == NONCE_BYTES && encoder.encodeToString(nonceBytes) == it }
-            ?: return QrEvidenceResult.Invalid
+        val nonce =
+            parts[2].takeIf { nonceBytes.size == NONCE_BYTES && encoder.encodeToString(nonceBytes) == it }
+                ?: return QrEvidenceResult.Invalid
         if (
             expiresAt <= issuedAt ||
             expiresAt - issuedAt > TOKEN_TTL.seconds ||
@@ -127,8 +135,9 @@ class AttendanceQrService(
 
         val prefix = parts.take(TOKEN_PARTS - 1).joinToString(".")
         val encodedSignature = parts.last()
-        val supplied = runCatching { decoder.decode(encodedSignature) }.getOrNull()
-            ?: return QrEvidenceResult.Invalid
+        val supplied =
+            runCatching { decoder.decode(encodedSignature) }.getOrNull()
+                ?: return QrEvidenceResult.Invalid
         if (encoder.encodeToString(supplied) != encodedSignature) {
             return QrEvidenceResult.Invalid
         }
@@ -154,8 +163,7 @@ class AttendanceQrService(
             doFinal(value.toByteArray(StandardCharsets.UTF_8))
         }
 
-    private fun encodeText(value: String): String =
-        encoder.encodeToString(value.toByteArray(StandardCharsets.UTF_8))
+    private fun encodeText(value: String): String = encoder.encodeToString(value.toByteArray(StandardCharsets.UTF_8))
 
     private fun decodeText(value: String): String? =
         runCatching {

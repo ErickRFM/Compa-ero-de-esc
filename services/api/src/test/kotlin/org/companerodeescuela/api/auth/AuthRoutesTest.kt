@@ -1,7 +1,7 @@
 package org.companerodeescuela.api.auth
 
-import io.ktor.client.request.header
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -10,191 +10,227 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
+import kotlinx.serialization.json.Json
+import org.companerodeescuela.api.config.ApiSettings
+import org.companerodeescuela.api.integrations.mock.MockIdentityProvider
+import org.companerodeescuela.api.plugins.configurePlugins
+import org.companerodeescuela.api.test.TestFixtures
+import org.companerodeescuela.shared.contracts.ApiResponse
+import org.companerodeescuela.shared.contracts.LoginResponse
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
-import kotlinx.serialization.json.Json
-import org.companerodeescuela.api.config.ApiSettings
-import org.companerodeescuela.api.config.Environment
-import org.companerodeescuela.api.config.MongoSettings
-import org.companerodeescuela.api.plugins.configurePlugins
-import org.companerodeescuela.api.test.TestFixtures
-import org.companerodeescuela.api.integrations.mock.MockIdentityProvider
-import org.companerodeescuela.shared.contracts.ApiResponse
-import org.companerodeescuela.shared.contracts.LoginResponse
 
 class AuthRoutesTest {
     private val json = Json
 
     @Test
-    fun `login refresh rotates token and logout revokes it`() = testApplication {
-        val sessions = InMemoryRefreshSessionRepository()
-        val settings = authenticatedSettings()
-        application {
-            configurePlugins(settings, refreshSessions = sessions,
-                sessionAuthority = PlatformSessionAuthority(InMemoryPlatformAccountRepository(), MockIdentityProvider()))
-            routing {
-                authRoutes(settings, MockIdentityProvider(), sessions = sessions)
+    fun `login refresh rotates token and logout revokes it`() =
+        testApplication {
+            val sessions = InMemoryRefreshSessionRepository()
+            val settings = authenticatedSettings()
+            application {
+                configurePlugins(
+                    settings,
+                    refreshSessions = sessions,
+                    sessionAuthority = PlatformSessionAuthority(InMemoryPlatformAccountRepository(), MockIdentityProvider()),
+                )
+                routing {
+                    authRoutes(settings, MockIdentityProvider(), sessions = sessions)
+                }
             }
-        }
 
-        val login = client.post("/auth/login") {
-            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-            setBody("""{"username":"ana.lopez","password":"development-only"}""")
-        }
-        assertEquals(HttpStatusCode.OK, login.status)
-        val initial = json.decodeFromString<ApiResponse<LoginResponse>>(login.bodyAsText()).data
+            val login =
+                client.post("/auth/login") {
+                    header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    setBody("""{"username":"ana.lopez","password":"development-only"}""")
+                }
+            assertEquals(HttpStatusCode.OK, login.status)
+            val initial = json.decodeFromString<ApiResponse<LoginResponse>>(login.bodyAsText()).data
 
-        val refresh = client.post("/auth/refresh") {
-            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-            setBody(
-                """{"sessionId":"${initial.sessionId}","refreshToken":"${initial.refreshToken}"}""",
-            )
-        }
-        assertEquals(HttpStatusCode.OK, refresh.status)
-        val rotated = json.decodeFromString<ApiResponse<LoginResponse>>(refresh.bodyAsText()).data
-        assertNotEquals(initial.refreshToken, rotated.refreshToken)
+            val refresh =
+                client.post("/auth/refresh") {
+                    header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    setBody(
+                        """{"sessionId":"${initial.sessionId}","refreshToken":"${initial.refreshToken}"}""",
+                    )
+                }
+            assertEquals(HttpStatusCode.OK, refresh.status)
+            val rotated = json.decodeFromString<ApiResponse<LoginResponse>>(refresh.bodyAsText()).data
+            assertNotEquals(initial.refreshToken, rotated.refreshToken)
 
-        val logout = client.post("/auth/logout") {
-            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-            setBody(
-                """{"sessionId":"${rotated.sessionId}","refreshToken":"${rotated.refreshToken}"}""",
-            )
-        }
-        assertEquals(HttpStatusCode.NoContent, logout.status)
+            val logout =
+                client.post("/auth/logout") {
+                    header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    setBody(
+                        """{"sessionId":"${rotated.sessionId}","refreshToken":"${rotated.refreshToken}"}""",
+                    )
+                }
+            assertEquals(HttpStatusCode.NoContent, logout.status)
 
-        val meAfterLogout = client.get("/auth/me") {
-            header(HttpHeaders.Authorization, "Bearer ${rotated.accessToken}")
-        }
-        assertEquals(HttpStatusCode.Unauthorized, meAfterLogout.status)
+            val meAfterLogout =
+                client.get("/auth/me") {
+                    header(HttpHeaders.Authorization, "Bearer ${rotated.accessToken}")
+                }
+            assertEquals(HttpStatusCode.Unauthorized, meAfterLogout.status)
 
-        val afterLogout = client.post("/auth/refresh") {
-            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-            setBody(
-                """{"sessionId":"${rotated.sessionId}","refreshToken":"${rotated.refreshToken}"}""",
-            )
+            val afterLogout =
+                client.post("/auth/refresh") {
+                    header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    setBody(
+                        """{"sessionId":"${rotated.sessionId}","refreshToken":"${rotated.refreshToken}"}""",
+                    )
+                }
+            assertEquals(HttpStatusCode.Unauthorized, afterLogout.status)
         }
-        assertEquals(HttpStatusCode.Unauthorized, afterLogout.status)
-    }
 
     @Test
-    fun `unknown session is denied by refresh route`() = testApplication {
-        val settings = authenticatedSettings()
-        val sessions = InMemoryRefreshSessionRepository()
-        application {
-            configurePlugins(settings, refreshSessions = sessions,
-                sessionAuthority = PlatformSessionAuthority(InMemoryPlatformAccountRepository(), MockIdentityProvider()))
-            routing {
-                authRoutes(settings, MockIdentityProvider(), sessions = sessions)
+    fun `unknown session is denied by refresh route`() =
+        testApplication {
+            val settings = authenticatedSettings()
+            val sessions = InMemoryRefreshSessionRepository()
+            application {
+                configurePlugins(
+                    settings,
+                    refreshSessions = sessions,
+                    sessionAuthority = PlatformSessionAuthority(InMemoryPlatformAccountRepository(), MockIdentityProvider()),
+                )
+                routing {
+                    authRoutes(settings, MockIdentityProvider(), sessions = sessions)
+                }
             }
-        }
 
-        val response = client.post("/auth/refresh") {
-            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-            setBody("""{"sessionId":"missing","refreshToken":"not-a-token"}""")
-        }
+            val response =
+                client.post("/auth/refresh") {
+                    header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    setBody("""{"sessionId":"missing","refreshToken":"not-a-token"}""")
+                }
 
-        assertEquals(HttpStatusCode.Unauthorized, response.status)
-    }
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+        }
 
     @Test
-    fun `failed attempts cannot lock out a correct password from the same client`() = testApplication {
-        val settings = authenticatedSettings()
-        val sessions = InMemoryRefreshSessionRepository()
-        val identity = MockIdentityProvider()
-        application {
-            configurePlugins(settings, refreshSessions = sessions,
-                sessionAuthority = PlatformSessionAuthority(InMemoryPlatformAccountRepository(), identity))
-            routing {
-                authRoutes(settings, identity, loginAttemptLimiter = LoginAttemptLimiter(maxAttempts = 2), sessions = sessions)
+    fun `failed attempts cannot lock out a correct password from the same client`() =
+        testApplication {
+            val settings = authenticatedSettings()
+            val sessions = InMemoryRefreshSessionRepository()
+            val identity = MockIdentityProvider()
+            application {
+                configurePlugins(
+                    settings,
+                    refreshSessions = sessions,
+                    sessionAuthority = PlatformSessionAuthority(InMemoryPlatformAccountRepository(), identity),
+                )
+                routing {
+                    authRoutes(settings, identity, loginAttemptLimiter = LoginAttemptLimiter(maxAttempts = 2), sessions = sessions)
+                }
             }
+
+            repeat(2) {
+                val denied =
+                    client.post("/auth/login") {
+                        header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                        setBody("""{"username":"ana.lopez","password":"wrong"}""")
+                    }
+                assertEquals(HttpStatusCode.Unauthorized, denied.status)
+            }
+
+            val valid =
+                client.post("/auth/login") {
+                    header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    setBody("""{"username":"ana.lopez","password":"development-only"}""")
+                }
+            assertEquals(HttpStatusCode.OK, valid.status)
         }
 
-        repeat(2) {
-            val denied = client.post("/auth/login") {
-                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-                setBody("""{"username":"ana.lopez","password":"wrong"}""")
+    @Test
+    fun `failed attempts from another client cannot lock out a correct login`() =
+        testApplication {
+            val settings = authenticatedSettings().copy(trustedProxy = true)
+            val sessions = InMemoryRefreshSessionRepository()
+            val identity = MockIdentityProvider()
+            application {
+                configurePlugins(
+                    settings,
+                    refreshSessions = sessions,
+                    sessionAuthority = PlatformSessionAuthority(InMemoryPlatformAccountRepository(), identity),
+                )
+                routing {
+                    authRoutes(settings, identity, loginAttemptLimiter = LoginAttemptLimiter(maxAttempts = 1), sessions = sessions)
+                }
             }
+
+            val denied =
+                client.post("/auth/login") {
+                    header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    header("X-Forwarded-For", "198.51.100.10")
+                    setBody("""{"username":"ana.lopez","password":"wrong"}""")
+                }
             assertEquals(HttpStatusCode.Unauthorized, denied.status)
-        }
 
-        val valid = client.post("/auth/login") {
-            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-            setBody("""{"username":"ana.lopez","password":"development-only"}""")
+            val valid =
+                client.post("/auth/login") {
+                    header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    header("X-Forwarded-For", "203.0.113.20")
+                    setBody("""{"username":"ana.lopez","password":"development-only"}""")
+                }
+            assertEquals(HttpStatusCode.OK, valid.status)
         }
-        assertEquals(HttpStatusCode.OK, valid.status)
-    }
 
     @Test
-    fun `failed attempts from another client cannot lock out a correct login`() = testApplication {
-        val settings = authenticatedSettings().copy(trustedProxy = true)
-        val sessions = InMemoryRefreshSessionRepository()
-        val identity = MockIdentityProvider()
-        application {
-            configurePlugins(settings, refreshSessions = sessions,
-                sessionAuthority = PlatformSessionAuthority(InMemoryPlatformAccountRepository(), identity))
-            routing {
-                authRoutes(settings, identity, loginAttemptLimiter = LoginAttemptLimiter(maxAttempts = 1), sessions = sessions)
+    fun `refresh and logout are rate limited by client address`() =
+        testApplication {
+            val settings = authenticatedSettings()
+            val sessions = InMemoryRefreshSessionRepository()
+            val identity = MockIdentityProvider()
+            application {
+                configurePlugins(
+                    settings,
+                    refreshSessions = sessions,
+                    sessionAuthority = PlatformSessionAuthority(InMemoryPlatformAccountRepository(), identity),
+                )
+                routing { authRoutes(settings, identity, sessions = sessions) }
             }
-        }
 
-        val denied = client.post("/auth/login") {
-            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-            header("X-Forwarded-For", "198.51.100.10")
-            setBody("""{"username":"ana.lopez","password":"wrong"}""")
-        }
-        assertEquals(HttpStatusCode.Unauthorized, denied.status)
+            var lastStatus = HttpStatusCode.OK
+            repeat(31) {
+                lastStatus =
+                    client
+                        .post("/auth/refresh") {
+                            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                            setBody("{}")
+                        }.status
+            }
 
-        val valid = client.post("/auth/login") {
-            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-            header("X-Forwarded-For", "203.0.113.20")
-            setBody("""{"username":"ana.lopez","password":"development-only"}""")
+            assertEquals(HttpStatusCode.TooManyRequests, lastStatus)
         }
-        assertEquals(HttpStatusCode.OK, valid.status)
-    }
 
     @Test
-    fun `refresh and logout are rate limited by client address`() = testApplication {
-        val settings = authenticatedSettings()
-        val sessions = InMemoryRefreshSessionRepository()
-        val identity = MockIdentityProvider()
-        application {
-            configurePlugins(settings, refreshSessions = sessions,
-                sessionAuthority = PlatformSessionAuthority(InMemoryPlatformAccountRepository(), identity))
-            routing { authRoutes(settings, identity, sessions = sessions) }
+    fun `one megabyte login body is rejected before deserialization`() =
+        testApplication {
+            val settings = authenticatedSettings()
+            val sessions = InMemoryRefreshSessionRepository()
+            val identity = MockIdentityProvider()
+            application {
+                configurePlugins(
+                    settings,
+                    refreshSessions = sessions,
+                    sessionAuthority = PlatformSessionAuthority(InMemoryPlatformAccountRepository(), identity),
+                )
+                routing { authRoutes(settings, identity, sessions = sessions) }
+            }
+
+            val response =
+                client.post("/auth/login") {
+                    header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    setBody("""{"username":"ana.lopez","password":"wrong","extra":"${"x".repeat(1_048_576)}"}""")
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
         }
 
-        var lastStatus = HttpStatusCode.OK
-        repeat(31) {
-            lastStatus = client.post("/auth/refresh") {
-                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-                setBody("{}")
-            }.status
-        }
-
-        assertEquals(HttpStatusCode.TooManyRequests, lastStatus)
-    }
-
-    @Test
-    fun `one megabyte login body is rejected before deserialization`() = testApplication {
-        val settings = authenticatedSettings()
-        val sessions = InMemoryRefreshSessionRepository()
-        val identity = MockIdentityProvider()
-        application {
-            configurePlugins(settings, refreshSessions = sessions,
-                sessionAuthority = PlatformSessionAuthority(InMemoryPlatformAccountRepository(), identity))
-            routing { authRoutes(settings, identity, sessions = sessions) }
-        }
-
-        val response = client.post("/auth/login") {
-            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-            setBody("""{"username":"ana.lopez","password":"wrong","extra":"${"x".repeat(1_048_576)}"}""")
-        }
-
-        assertEquals(HttpStatusCode.BadRequest, response.status)
-    }
-
-    private fun authenticatedSettings(): ApiSettings = TestFixtures.settings().copy(
-        jwtSecret = "0123456789abcdef0123456789abcdef".toCharArray(),
-    )
+    private fun authenticatedSettings(): ApiSettings =
+        TestFixtures.settings().copy(
+            jwtSecret = "0123456789abcdef0123456789abcdef".toCharArray(),
+        )
 }

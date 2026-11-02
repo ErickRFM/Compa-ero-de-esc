@@ -1,10 +1,10 @@
 package org.companerodeescuela.api.auth
 
-import java.time.Instant
-import java.time.Duration
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.companerodeescuela.shared.contracts.UserSummary
+import java.time.Duration
+import java.time.Instant
 
 enum class SessionIdentitySource { NATIVE, INSTITUTIONAL, LEGACY }
 
@@ -24,6 +24,7 @@ data class RefreshSession(
 
 interface RefreshSessionRepository {
     suspend fun create(session: RefreshSession)
+
     suspend fun find(sessionId: String): RefreshSession?
 
     /** Atomically rotates the active token; a stale-token replay revokes its family. */
@@ -37,7 +38,11 @@ interface RefreshSessionRepository {
         rotationGrace: Duration = Duration.ofSeconds(60),
     ): RefreshSession?
 
-    suspend fun revoke(sessionId: String, presentedTokenHash: String, now: Instant): Boolean
+    suspend fun revoke(
+        sessionId: String,
+        presentedTokenHash: String,
+        now: Instant,
+    ): Boolean
 }
 
 class InMemoryRefreshSessionRepository : RefreshSessionRepository {
@@ -51,9 +56,10 @@ class InMemoryRefreshSessionRepository : RefreshSessionRepository {
         }
     }
 
-    override suspend fun find(sessionId: String): RefreshSession? = mutex.withLock {
-        sessions[sessionId]
-    }
+    override suspend fun find(sessionId: String): RefreshSession? =
+        mutex.withLock {
+            sessions[sessionId]
+        }
 
     override suspend fun rotate(
         sessionId: String,
@@ -63,47 +69,51 @@ class InMemoryRefreshSessionRepository : RefreshSessionRepository {
         now: Instant,
         expiresAt: Instant,
         rotationGrace: Duration,
-    ): RefreshSession? = mutex.withLock {
-        val current = sessions[sessionId] ?: return@withLock null
-        if (current.revokedAt != null || current.expiresAt <= now) return@withLock null
-        val isCurrentToken = current.tokenHash == currentTokenHash
-        val isGraceRetry = current.immediatelyPreviousTokenHash == currentTokenHash &&
-            current.lastRotatedAt?.plus(rotationGrace)?.let { !now.isAfter(it) } == true
-        if (!isCurrentToken && !isGraceRetry) {
-            if (currentTokenHash in current.previousTokenHashes) {
-                sessions[sessionId] = current.copy(revokedAt = now)
+    ): RefreshSession? =
+        mutex.withLock {
+            val current = sessions[sessionId] ?: return@withLock null
+            if (current.revokedAt != null || current.expiresAt <= now) return@withLock null
+            val isCurrentToken = current.tokenHash == currentTokenHash
+            val isGraceRetry =
+                current.immediatelyPreviousTokenHash == currentTokenHash &&
+                    current.lastRotatedAt?.plus(rotationGrace)?.let { !now.isAfter(it) } == true
+            if (!isCurrentToken && !isGraceRetry) {
+                if (currentTokenHash in current.previousTokenHashes) {
+                    sessions[sessionId] = current.copy(revokedAt = now)
+                }
+                return@withLock null
             }
-            return@withLock null
-        }
 
-        val previousHashes = (current.previousTokenHashes + current.tokenHash).toList().takeLast(MAX_PREVIOUS_TOKEN_HASHES).toSet()
-        current.copy(
-            tokenHash = nextTokenHash,
-            user = user,
-            generation = current.generation + 1,
-            previousTokenHashes = previousHashes,
-            immediatelyPreviousTokenHash = current.tokenHash,
-            lastRotatedAt = now,
-            expiresAt = expiresAt,
-        ).also { sessions[sessionId] = it }
-    }
+            val previousHashes = (current.previousTokenHashes + current.tokenHash).toList().takeLast(MAX_PREVIOUS_TOKEN_HASHES).toSet()
+            current
+                .copy(
+                    tokenHash = nextTokenHash,
+                    user = user,
+                    generation = current.generation + 1,
+                    previousTokenHashes = previousHashes,
+                    immediatelyPreviousTokenHash = current.tokenHash,
+                    lastRotatedAt = now,
+                    expiresAt = expiresAt,
+                ).also { sessions[sessionId] = it }
+        }
 
     override suspend fun revoke(
         sessionId: String,
         presentedTokenHash: String,
         now: Instant,
-    ): Boolean = mutex.withLock {
-        val current = sessions[sessionId] ?: return@withLock false
-        if (current.revokedAt != null) return@withLock false
-        if (current.tokenHash != presentedTokenHash) {
-            if (presentedTokenHash in current.previousTokenHashes) {
-                sessions[sessionId] = current.copy(revokedAt = now)
+    ): Boolean =
+        mutex.withLock {
+            val current = sessions[sessionId] ?: return@withLock false
+            if (current.revokedAt != null) return@withLock false
+            if (current.tokenHash != presentedTokenHash) {
+                if (presentedTokenHash in current.previousTokenHashes) {
+                    sessions[sessionId] = current.copy(revokedAt = now)
+                }
+                return@withLock false
             }
-            return@withLock false
+            sessions[sessionId] = current.copy(revokedAt = now)
+            true
         }
-        sessions[sessionId] = current.copy(revokedAt = now)
-        true
-    }
 
     private companion object {
         const val MAX_PREVIOUS_TOKEN_HASHES = 5

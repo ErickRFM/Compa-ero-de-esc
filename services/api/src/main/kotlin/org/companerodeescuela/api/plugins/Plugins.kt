@@ -18,29 +18,29 @@ import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.plugins.defaultheaders.DefaultHeaders
 import io.ktor.server.plugins.forwardedheaders.XForwardedHeaders
+import io.ktor.server.plugins.origin
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.request.httpMethod
-import io.ktor.server.plugins.origin
 import io.ktor.server.request.path
-import io.ktor.server.response.respond
 import io.ktor.server.response.header
+import io.ktor.server.response.respond
+import io.ktor.util.AttributeKey
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import org.companerodeescuela.api.auth.AuthTokenService
-import org.companerodeescuela.api.auth.RefreshSessionRepository
 import org.companerodeescuela.api.auth.PlatformSessionAuthority
+import org.companerodeescuela.api.auth.RefreshSessionRepository
 import org.companerodeescuela.api.auth.authenticationDependency
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.errors.toApiError
 import org.companerodeescuela.shared.contracts.AccountStatus
-import org.companerodeescuela.shared.contracts.UserRole
-import org.companerodeescuela.shared.contracts.UserSummary
 import org.companerodeescuela.shared.contracts.ApiError
 import org.companerodeescuela.shared.contracts.ApiErrorCode
+import org.companerodeescuela.shared.contracts.UserRole
+import org.companerodeescuela.shared.contracts.UserSummary
 import org.slf4j.event.Level
-import io.ktor.util.AttributeKey
-import kotlinx.coroutines.CancellationException
 
 /**
  * JSON format used by every endpoint.
@@ -48,13 +48,14 @@ import kotlinx.coroutines.CancellationException
  * `ignoreUnknownKeys` keeps older Android builds working when a new optional
  * field is added, which is what makes the contract forward compatible.
  */
-val ApiJson: Json = Json {
-    prettyPrint = false
-    isLenient = false
-    ignoreUnknownKeys = true
-    explicitNulls = false
-    encodeDefaults = true
-}
+val ApiJson: Json =
+    Json {
+        prettyPrint = false
+        isLenient = false
+        ignoreUnknownKeys = true
+        explicitNulls = false
+        encodeDefaults = true
+    }
 
 /** Header used to correlate a client report with server logs. */
 const val REQUEST_ID_HEADER: String = "X-Request-Id"
@@ -99,7 +100,11 @@ fun Application.configurePlugins(
 
     install(CallId) {
         header(REQUEST_ID_HEADER)
-        generate { java.util.UUID.randomUUID().toString() }
+        generate {
+            java.util.UUID
+                .randomUUID()
+                .toString()
+        }
         verify { REQUEST_ID_PATTERN.matches(it) }
     }
 
@@ -139,41 +144,75 @@ fun Application.configurePlugins(
     install(Authentication) {
         settings.jwtSecret?.let {
             val tokenService = AuthTokenService(settings)
-            fun registerJwtProvider(providerName: String, accepts: (UserSummary) -> Boolean) {
+
+            fun registerJwtProvider(
+                providerName: String,
+                accepts: (UserSummary) -> Boolean,
+            ) {
                 jwt(providerName) {
                     realm = AuthTokenService.REALM
                     verifier(tokenService.verifier)
                     validate { credential ->
                         try {
                             val sessionId = tokenService.sessionIdFrom(credential.payload)
-                            val session = sessionId?.let {
-                                authenticationDependency { requireNotNull(configuredRefreshSessions).find(it) }
-                            }
+                            val session =
+                                sessionId?.let {
+                                    authenticationDependency { requireNotNull(configuredRefreshSessions).find(it) }
+                                }
                             val user = tokenService.userFrom(credential.payload)
-                            if (session != null && accepts(user) &&
-                                requireNotNull(configuredSessionAuthority).permits(credential.payload, session, tokenService)) {
+                            if (
+                                session != null &&
+                                accepts(user) &&
+                                requireNotNull(configuredSessionAuthority)
+                                    .permits(credential.payload, session, tokenService)
+                            ) {
                                 attributes.put(org.companerodeescuela.api.auth.VERIFIED_SESSION_SOURCE, session.identitySource)
                                 JWTPrincipal(credential.payload)
-                            } else null
+                            } else {
+                                null
+                            }
                         } catch (cancelled: CancellationException) {
                             throw cancelled
                         } catch (error: ApiException.DependencyUnavailable) {
-                            authLogger.warn("JWT authority unavailable type={} requestId={}", error::class.java.simpleName, requestId())
+                            authLogger.warn(
+                                "JWT authority unavailable type={} requestId={}",
+                                error::class.java.simpleName,
+                                requestId(),
+                            )
                             attributes.put(AUTHORITY_UNAVAILABLE, true)
                             null
                         } catch (error: Exception) {
-                            authLogger.warn("JWT validation failed type={} requestId={}", error::class.java.simpleName, requestId())
+                            authLogger.warn(
+                                "JWT validation failed type={} requestId={}",
+                                error::class.java.simpleName,
+                                requestId(),
+                            )
                             null
                         }
                     }
                     challenge { scheme, challengeRealm ->
                         val unavailable = call.attributes.getOrNull(AUTHORITY_UNAVAILABLE) == true
-                        if (!unavailable) call.response.header(HttpHeaders.WWWAuthenticate, "$scheme realm=\"$challengeRealm\"")
+                        if (!unavailable) {
+                            call.response.header(
+                                HttpHeaders.WWWAuthenticate,
+                                "$scheme realm=\"$challengeRealm\"",
+                            )
+                        }
                         call.respond(
                             if (unavailable) HttpStatusCode.ServiceUnavailable else HttpStatusCode.Unauthorized,
                             ApiError(
-                                code = if (unavailable) ApiErrorCode.DEPENDENCY_UNAVAILABLE else ApiErrorCode.UNAUTHORIZED,
-                                message = if (unavailable) "Identity authority is temporarily unavailable" else "Authentication is required",
+                                code =
+                                    if (unavailable) {
+                                        ApiErrorCode.DEPENDENCY_UNAVAILABLE
+                                    } else {
+                                        ApiErrorCode.UNAUTHORIZED
+                                    },
+                                message =
+                                    if (unavailable) {
+                                        "Identity authority is temporarily unavailable"
+                                    } else {
+                                        "Authentication is required"
+                                    },
                                 requestId = call.requestId(),
                             ),
                         )
@@ -183,17 +222,26 @@ fun Application.configurePlugins(
             registerJwtProvider(AuthTokenService.PROVIDER_NAME) {
                 it.accountStatus == AccountStatus.ACTIVE && it.roles != setOf(UserRole.WORKSHOP_PARTICIPANT)
             }
-            registerJwtProvider(AuthTokenService.ACTIVE_PROVIDER_NAME) { it.accountStatus == AccountStatus.ACTIVE }
-            registerJwtProvider(AuthTokenService.PENDING_VERIFICATION_PROVIDER_NAME) { it.accountStatus == AccountStatus.PENDING_VERIFICATION }
-            registerJwtProvider(AuthTokenService.PENDING_APPROVAL_PROVIDER_NAME) { it.accountStatus == AccountStatus.PENDING_APPROVAL }
+            registerJwtProvider(AuthTokenService.ACTIVE_PROVIDER_NAME) {
+                it.accountStatus == AccountStatus.ACTIVE
+            }
+            registerJwtProvider(AuthTokenService.PENDING_VERIFICATION_PROVIDER_NAME) {
+                it.accountStatus ==
+                    AccountStatus.PENDING_VERIFICATION
+            }
+            registerJwtProvider(AuthTokenService.PENDING_APPROVAL_PROVIDER_NAME) {
+                it.accountStatus == AccountStatus.PENDING_APPROVAL
+            }
         }
     }
 
     val appLogger = log
     install(StatusPages) {
         exception<ApiException> { call, cause ->
-            if (cause is ApiException.RateLimited) cause.retryAfterSeconds?.let {
-                call.response.headers.append(HttpHeaders.RetryAfter, it.toString())
+            if (cause is ApiException.RateLimited) {
+                cause.retryAfterSeconds?.let {
+                    call.response.headers.append(HttpHeaders.RetryAfter, it.toString())
+                }
             }
             call.respond(
                 status = cause.httpStatus,
@@ -204,21 +252,23 @@ fun Application.configurePlugins(
             appLogger.error("Unhandled exception type={} requestId={}", cause::class.java.simpleName, call.requestId())
             call.respond(
                 status = HttpStatusCode.InternalServerError,
-                message = ApiError(
-                    code = ApiErrorCode.INTERNAL_ERROR,
-                    message = "Unexpected server error",
-                    requestId = call.requestId(),
-                ),
+                message =
+                    ApiError(
+                        code = ApiErrorCode.INTERNAL_ERROR,
+                        message = "Unexpected server error",
+                        requestId = call.requestId(),
+                    ),
             )
         }
         status(HttpStatusCode.NotFound) { call, _ ->
             call.respond(
                 status = HttpStatusCode.NotFound,
-                message = ApiError(
-                    code = ApiErrorCode.NOT_FOUND,
-                    message = "Resource not found",
-                    requestId = call.requestId(),
-                ),
+                message =
+                    ApiError(
+                        code = ApiErrorCode.NOT_FOUND,
+                        message = "Resource not found",
+                        requestId = call.requestId(),
+                    ),
             )
         }
     }

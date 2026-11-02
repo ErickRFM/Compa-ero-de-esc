@@ -39,7 +39,6 @@ data class InstitutionalIdentityState(
  * adapter detail; callers only learn whether authentication succeeded.
  */
 interface IdentityProvider : IntegrationProvider {
-
     /**
      * Verifies [credentials] and returns the corresponding account.
      *

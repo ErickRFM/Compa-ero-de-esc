@@ -76,22 +76,23 @@ data class ExternalAcademicLoad(
  * the slot instead of guessing a day.
  */
 object ExternalWeekdays {
-    private val byName: Map<String, DayOfWeek> = buildMap {
-        put("lunes", DayOfWeek.MONDAY)
-        put("martes", DayOfWeek.TUESDAY)
-        put("miercoles", DayOfWeek.WEDNESDAY)
-        put("jueves", DayOfWeek.THURSDAY)
-        put("viernes", DayOfWeek.FRIDAY)
-        put("sabado", DayOfWeek.SATURDAY)
-        put("domingo", DayOfWeek.SUNDAY)
-        put("monday", DayOfWeek.MONDAY)
-        put("tuesday", DayOfWeek.TUESDAY)
-        put("wednesday", DayOfWeek.WEDNESDAY)
-        put("thursday", DayOfWeek.THURSDAY)
-        put("friday", DayOfWeek.FRIDAY)
-        put("saturday", DayOfWeek.SATURDAY)
-        put("sunday", DayOfWeek.SUNDAY)
-    }
+    private val byName: Map<String, DayOfWeek> =
+        buildMap {
+            put("lunes", DayOfWeek.MONDAY)
+            put("martes", DayOfWeek.TUESDAY)
+            put("miercoles", DayOfWeek.WEDNESDAY)
+            put("jueves", DayOfWeek.THURSDAY)
+            put("viernes", DayOfWeek.FRIDAY)
+            put("sabado", DayOfWeek.SATURDAY)
+            put("domingo", DayOfWeek.SUNDAY)
+            put("monday", DayOfWeek.MONDAY)
+            put("tuesday", DayOfWeek.TUESDAY)
+            put("wednesday", DayOfWeek.WEDNESDAY)
+            put("thursday", DayOfWeek.THURSDAY)
+            put("friday", DayOfWeek.FRIDAY)
+            put("saturday", DayOfWeek.SATURDAY)
+            put("sunday", DayOfWeek.SUNDAY)
+        }
 
     fun fromName(raw: String): DayOfWeek? = byName[raw.trim().lowercase()]
 }

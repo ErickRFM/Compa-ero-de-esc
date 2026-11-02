@@ -1,51 +1,53 @@
 package org.companerodeescuela.api.attendance
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlinx.coroutines.test.runTest
 import org.companerodeescuela.shared.contracts.AttendanceReasonCode
 import org.companerodeescuela.shared.contracts.AttendanceRecordResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
 import org.companerodeescuela.shared.contracts.AttendanceStatus
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
 
 class AttendanceRepositoryTest {
+    @Test
+    fun `one occurrence maps to one attendance session`() =
+        runTest {
+            val repository = InMemoryAttendanceRepository()
+            val first = session("s-1")
+            val second = session("s-2")
+
+            assertIs<SessionWriteResult.Created>(repository.createSession(first))
+            val duplicate = assertIs<SessionWriteResult.Existing>(repository.createSession(second))
+
+            assertEquals(first, duplicate.session)
+        }
 
     @Test
-    fun `one occurrence maps to one attendance session`() = runTest {
-        val repository = InMemoryAttendanceRepository()
-        val first = session("s-1")
-        val second = session("s-2")
+    fun `operation id cannot be reused for another attendance record`() =
+        runTest {
+            val repository = InMemoryAttendanceRepository()
+            val first = record("session-1:student-1", "session-1", "student-1", "op-1")
+            val conflicting = record("session-2:student-2", "session-2", "student-2", "op-1")
 
-        assertIs<SessionWriteResult.Created>(repository.createSession(first))
-        val duplicate = assertIs<SessionWriteResult.Existing>(repository.createSession(second))
-
-        assertEquals(first, duplicate.session)
-    }
-
-    @Test
-    fun `operation id cannot be reused for another attendance record`() = runTest {
-        val repository = InMemoryAttendanceRepository()
-        val first = record("session-1:student-1", "session-1", "student-1", "op-1")
-        val conflicting = record("session-2:student-2", "session-2", "student-2", "op-1")
-
-        assertIs<AttemptWriteResult.Created>(repository.writeAttempt(first))
-        assertIs<AttemptWriteResult.OperationConflict>(repository.writeAttempt(conflicting))
-    }
+            assertIs<AttemptWriteResult.Created>(repository.writeAttempt(first))
+            assertIs<AttemptWriteResult.OperationConflict>(repository.writeAttempt(conflicting))
+        }
 
     @Test
-    fun `same student and session cannot create two records with different operations`() = runTest {
-        val repository = InMemoryAttendanceRepository()
-        val first = record("session-1:student-1", "session-1", "student-1", "op-1")
-        val retry = record("session-1:student-1", "session-1", "student-1", "op-2")
+    fun `same student and session cannot create two records with different operations`() =
+        runTest {
+            val repository = InMemoryAttendanceRepository()
+            val first = record("session-1:student-1", "session-1", "student-1", "op-1")
+            val retry = record("session-1:student-1", "session-1", "student-1", "op-2")
 
-        assertIs<AttemptWriteResult.Created>(repository.writeAttempt(first))
-        val existing = assertIs<AttemptWriteResult.Existing>(repository.writeAttempt(retry))
+            assertIs<AttemptWriteResult.Created>(repository.writeAttempt(first))
+            val existing = assertIs<AttemptWriteResult.Existing>(repository.writeAttempt(retry))
 
-        assertEquals(first.id, existing.record.id)
-        assertEquals(1, repository.recordsForSession("session-1").size)
-    }
+            assertEquals(first.id, existing.record.id)
+            assertEquals(1, repository.recordsForSession("session-1").size)
+        }
 
     @Test
     fun `new record id does not duplicate an existing legacy session student record`() =
@@ -69,66 +71,72 @@ class AttendanceRepositoryTest {
         }
 
     @Test
-    fun `QR nonce usage counts distinct students per session until the session TTL`() = runTest {
-        val repository = InMemoryAttendanceRepository()
+    fun `QR nonce usage counts distinct students per session until the session TTL`() =
+        runTest {
+            val repository = InMemoryAttendanceRepository()
 
-        assertEquals(1L, repository.recordQrNonceUse("session-1", "nonce", "student-a", 100, 50))
-        assertEquals(1L, repository.recordQrNonceUse("session-1", "nonce", "student-a", 100, 60))
-        assertEquals(2L, repository.recordQrNonceUse("session-1", "nonce", "student-b", 100, 60))
-        assertEquals(1L, repository.recordQrNonceUse("session-2", "nonce", "student-c", 200, 60))
-        assertEquals(1L, repository.recordQrNonceUse("session-1", "nonce", "student-c", 200, 100))
-    }
+            assertEquals(1L, repository.recordQrNonceUse("session-1", "nonce", "student-a", 100, 50))
+            assertEquals(1L, repository.recordQrNonceUse("session-1", "nonce", "student-a", 100, 60))
+            assertEquals(2L, repository.recordQrNonceUse("session-1", "nonce", "student-b", 100, 60))
+            assertEquals(1L, repository.recordQrNonceUse("session-2", "nonce", "student-c", 200, 60))
+            assertEquals(1L, repository.recordQrNonceUse("session-1", "nonce", "student-c", 200, 100))
+        }
 
     @Test
-    fun `open attendance query filters by enrollment pairs and institution`() = runTest {
-        val repository = InMemoryAttendanceRepository()
-        val enrolled = session("s-enrolled").copy(
-            occurrenceId = "occ-enrolled",
-            courseId = "math",
-            groupName = "9A",
-            institutionId = "school-a",
-        )
-        val otherGroup = session("s-group").copy(
-            occurrenceId = "occ-group",
-            courseId = "math",
-            groupName = "9B",
-            institutionId = "school-a",
-        )
-        val otherInstitution = session("s-school").copy(
-            occurrenceId = "occ-school",
-            courseId = "math",
-            groupName = "9A",
-            institutionId = "school-b",
-        )
-        repository.createSession(enrolled)
-        repository.createSession(otherGroup)
-        repository.createSession(otherInstitution)
+    fun `open attendance query filters by enrollment pairs and institution`() =
+        runTest {
+            val repository = InMemoryAttendanceRepository()
+            val enrolled =
+                session("s-enrolled").copy(
+                    occurrenceId = "occ-enrolled",
+                    courseId = "math",
+                    groupName = "9A",
+                    institutionId = "school-a",
+                )
+            val otherGroup =
+                session("s-group").copy(
+                    occurrenceId = "occ-group",
+                    courseId = "math",
+                    groupName = "9B",
+                    institutionId = "school-a",
+                )
+            val otherInstitution =
+                session("s-school").copy(
+                    occurrenceId = "occ-school",
+                    courseId = "math",
+                    groupName = "9A",
+                    institutionId = "school-b",
+                )
+            repository.createSession(enrolled)
+            repository.createSession(otherGroup)
+            repository.createSession(otherInstitution)
 
-        assertEquals(
-            listOf(enrolled),
-            repository.findOpenSessions(
-                setOf("math" to "9A"),
-                institutionId = "school-a",
-                afterEpochSeconds = 1,
-                unscopedInstitutionalOnly = true,
-                limit = 100,
-            ),
-        )
-    }
+            assertEquals(
+                listOf(enrolled),
+                repository.findOpenSessions(
+                    setOf("math" to "9A"),
+                    institutionId = "school-a",
+                    afterEpochSeconds = 1,
+                    unscopedInstitutionalOnly = true,
+                    limit = 100,
+                ),
+            )
+        }
 
-    private fun session(id: String) = AttendanceSessionResponse(
-        id = id,
-        occurrenceId = "occ-1",
-        courseId = "C-1",
-        groupName = "A",
-        occurrenceDate = "2026-10-05",
-        scheduledStartsAt = "07:00",
-        scheduledEndsAt = "08:30",
-        openedBy = "teacher-1",
-        openedAtEpochSeconds = 1,
-        closesAtEpochSeconds = 300,
-        status = AttendanceSessionStatus.OPEN,
-    )
+    private fun session(id: String) =
+        AttendanceSessionResponse(
+            id = id,
+            occurrenceId = "occ-1",
+            courseId = "C-1",
+            groupName = "A",
+            occurrenceDate = "2026-10-05",
+            scheduledStartsAt = "07:00",
+            scheduledEndsAt = "08:30",
+            openedBy = "teacher-1",
+            openedAtEpochSeconds = 1,
+            closesAtEpochSeconds = 300,
+            status = AttendanceSessionStatus.OPEN,
+        )
 
     private fun record(
         id: String,

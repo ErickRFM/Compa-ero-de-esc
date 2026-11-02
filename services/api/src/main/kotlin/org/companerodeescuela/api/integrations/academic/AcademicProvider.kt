@@ -1,12 +1,12 @@
 package org.companerodeescuela.api.integrations.academic
 
-import java.time.LocalDate
 import org.companerodeescuela.api.integrations.IntegrationProvider
 import org.companerodeescuela.api.integrations.academic.dto.ExternalAcademicLoad
 import org.companerodeescuela.api.integrations.academic.dto.ExternalCourse
 import org.companerodeescuela.api.integrations.academic.dto.ExternalScheduleSlot
 import org.companerodeescuela.api.integrations.academic.dto.ExternalStudent
 import org.companerodeescuela.api.integrations.academic.dto.ExternalTeacher
+import java.time.LocalDate
 
 /**
  * Adapter for the institution's enrolment and records system.
@@ -23,7 +23,6 @@ import org.companerodeescuela.api.integrations.academic.dto.ExternalTeacher
  * leaking transport or vendor exception types.
  */
 interface AcademicProvider : IntegrationProvider {
-
     /** Looks up one student by their identifier in the institutional system. */
     suspend fun getStudent(externalId: String): ExternalStudent?
 
@@ -45,7 +44,10 @@ interface AcademicProvider : IntegrationProvider {
      * @param weekOf any date inside the requested week; providers that cannot
      *   resolve a specific week must ignore it rather than fail.
      */
-    suspend fun getSchedule(externalId: String, weekOf: LocalDate? = null): List<ExternalScheduleSlot>
+    suspend fun getSchedule(
+        externalId: String,
+        weekOf: LocalDate? = null,
+    ): List<ExternalScheduleSlot>
 
     /** Staff directory, used to resolve teacher names for subjects. */
     suspend fun listTeachers(): List<ExternalTeacher>

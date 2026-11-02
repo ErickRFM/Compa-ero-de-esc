@@ -21,43 +21,49 @@ data class PresenceFeatureGraph(
 fun buildPresenceFeatureGraph(
     settings: ApiSettings,
     mongoConnection: MongoConnection,
-    accounts:org.companerodeescuela.api.auth.PlatformAccountRepository,
-    mfa:org.companerodeescuela.api.security.MfaService,
-    institutions:org.companerodeescuela.api.institutions.InstitutionRepository,
+    accounts: org.companerodeescuela.api.auth.PlatformAccountRepository,
+    mfa: org.companerodeescuela.api.security.MfaService,
+    institutions: org.companerodeescuela.api.institutions.InstitutionRepository,
 ): PresenceFeatureGraph? {
     if (!settings.hasSchoolPresenceVerification) return null
 
-    val presenceRepository = when {
-        settings.mongo.isConfigured -> MongoSchoolPresenceRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemorySchoolPresenceRepository()
-        else -> error("School presence requires MONGODB_URI outside local development")
-    }
-    val entryQrRepository = when {
-        settings.mongo.isConfigured -> MongoSchoolEntryQrRepository(mongoConnection.database())
-        settings.environment == Environment.LOCAL -> InMemorySchoolEntryQrRepository()
-        else -> error("School entry QR management requires MONGODB_URI outside local development")
-    }
+    val presenceRepository =
+        when {
+            settings.mongo.isConfigured -> MongoSchoolPresenceRepository(mongoConnection.database())
+            settings.environment == Environment.LOCAL -> InMemorySchoolPresenceRepository()
+            else -> error("School presence requires MONGODB_URI outside local development")
+        }
+    val entryQrRepository =
+        when {
+            settings.mongo.isConfigured -> MongoSchoolEntryQrRepository(mongoConnection.database())
+            settings.environment == Environment.LOCAL -> InMemorySchoolEntryQrRepository()
+            else -> error("School entry QR management requires MONGODB_URI outside local development")
+        }
 
-    val entryQrService = SchoolEntryQrService(entryQrRepository,accounts=accounts,mfa=mfa,institutions=institutions)
-    val policy = SchoolPresencePolicy(
-        entryQrSha256 = settings.schoolPresenceQrSha256,
-        allowedSsids = settings.schoolWifiSsids,
-        allowedBssids = settings.schoolWifiBssids,
-        institutionId=settings.schoolPresenceInstitutionId,
-    )
-    val service = SchoolPresenceService(
-        repository = presenceRepository,
-        accounts=accounts,
-        policy = policy,
-        qrVerifier = SchoolEntryQrVerifier(
-            managedQrService = entryQrService,
-            legacyQrSha256 = policy.entryQrSha256,
-        ),
-        networkVerifier = SchoolNetworkVerifier(
-            allowedSsids = policy.allowedSsids,
-            allowedBssids = policy.allowedBssids,
-        ),
-    )
+    val entryQrService = SchoolEntryQrService(entryQrRepository, accounts = accounts, mfa = mfa, institutions = institutions)
+    val policy =
+        SchoolPresencePolicy(
+            entryQrSha256 = settings.schoolPresenceQrSha256,
+            allowedSsids = settings.schoolWifiSsids,
+            allowedBssids = settings.schoolWifiBssids,
+            institutionId = settings.schoolPresenceInstitutionId,
+        )
+    val service =
+        SchoolPresenceService(
+            repository = presenceRepository,
+            accounts = accounts,
+            policy = policy,
+            qrVerifier =
+                SchoolEntryQrVerifier(
+                    managedQrService = entryQrService,
+                    legacyQrSha256 = policy.entryQrSha256,
+                ),
+            networkVerifier =
+                SchoolNetworkVerifier(
+                    allowedSsids = policy.allowedSsids,
+                    allowedBssids = policy.allowedBssids,
+                ),
+        )
     return PresenceFeatureGraph(
         service = service,
         qrAdminService = entryQrService,

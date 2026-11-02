@@ -2,7 +2,6 @@ package org.companerodeescuela.api.classroom
 
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
-import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
@@ -10,8 +9,8 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import org.companerodeescuela.api.auth.AuthTokenService
-import org.companerodeescuela.api.auth.requireNativeActor
 import org.companerodeescuela.api.auth.boundedAuthRequest
+import org.companerodeescuela.api.auth.requireNativeActor
 import org.companerodeescuela.api.config.ApiSettings
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.plugins.requestId
@@ -49,13 +48,17 @@ fun Route.classroomRoutes(
                 val actor = call.requireNativeActor(tokenService)
                 val request =
                     runCatchingCancellable { call.boundedAuthRequest(CreateClassroomRequest.serializer()) }
-                    .getOrElse { if(it is kotlinx.coroutines.CancellationException) throw it;throw ApiException.Validation("Invalid classroom request") }
+                        .getOrElse {
+                            if (it is kotlinx.coroutines.CancellationException) throw it
+                            throw ApiException.Validation("Invalid classroom request")
+                        }
                 call.respond(
                     status = HttpStatusCode.Created,
-                    message = ApiResponse(
-                        data = service.create(actor, request),
-                        requestId = call.requestId(),
-                    ),
+                    message =
+                        ApiResponse(
+                            data = service.create(actor, request),
+                            requestId = call.requestId(),
+                        ),
                 )
             }
 
@@ -63,7 +66,10 @@ fun Route.classroomRoutes(
                 val actor = call.requireNativeActor(tokenService)
                 val request =
                     runCatchingCancellable { call.boundedAuthRequest(JoinClassInviteRequest.serializer()) }
-                    .getOrElse { if(it is kotlinx.coroutines.CancellationException) throw it;throw ApiException.Validation("Invalid invite request") }
+                        .getOrElse {
+                            if (it is kotlinx.coroutines.CancellationException) throw it
+                            throw ApiException.Validation("Invalid invite request")
+                        }
                 call.respond(
                     ApiResponse(
                         data = service.join(actor, request.code),
@@ -77,13 +83,17 @@ fun Route.classroomRoutes(
                 val classroomId = call.requireClassroomId()
                 val request =
                     runCatchingCancellable { call.boundedAuthRequest(CreateClassInviteRequest.serializer()) }
-                    .getOrElse { if(it is kotlinx.coroutines.CancellationException) throw it;throw ApiException.Validation("Invalid invite configuration") }
+                        .getOrElse {
+                            if (it is kotlinx.coroutines.CancellationException) throw it
+                            throw ApiException.Validation("Invalid invite configuration")
+                        }
                 call.respond(
                     status = HttpStatusCode.Created,
-                    message = ApiResponse(
-                        data = service.createInvite(actor, classroomId, request),
-                        requestId = call.requestId(),
-                    ),
+                    message =
+                        ApiResponse(
+                            data = service.createInvite(actor, classroomId, request),
+                            requestId = call.requestId(),
+                        ),
                 )
             }
 
@@ -92,16 +102,16 @@ fun Route.classroomRoutes(
                 service.revokeInvite(
                     actor = actor,
                     classroomId = call.requireClassroomId(),
-                    inviteId = call.parameters["inviteId"]
-                        ?.takeIf(String::isNotBlank)
-                        ?: throw ApiException.Validation("inviteId is required"),
+                    inviteId =
+                        call.parameters["inviteId"]
+                            ?.takeIf(String::isNotBlank)
+                            ?: throw ApiException.Validation("inviteId is required"),
                 )
                 call.respond(HttpStatusCode.NoContent)
             }
         }
     }
 }
-
 
 private fun io.ktor.server.application.ApplicationCall.requireClassroomId(): String =
     parameters["classroomId"]?.takeIf(String::isNotBlank)

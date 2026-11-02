@@ -10,8 +10,6 @@ import com.mongodb.client.model.ReturnDocument
 import com.mongodb.client.model.Updates
 import com.mongodb.kotlin.client.coroutine.MongoCollection
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
-import java.time.Instant
-import java.util.Date
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
@@ -19,8 +17,12 @@ import kotlinx.coroutines.sync.withLock
 import org.bson.Document
 import org.companerodeescuela.shared.contracts.ClassroomMemberRole
 import org.companerodeescuela.shared.contracts.ClassroomStatus
+import java.time.Instant
+import java.util.Date
 
-class MongoClassroomRepository(database: MongoDatabase) : ClassroomRepository {
+class MongoClassroomRepository(
+    database: MongoDatabase,
+) : ClassroomRepository {
     private val classrooms: MongoCollection<Document> = database.getCollection(CLASSROOMS)
     private val memberships: MongoCollection<Document> = database.getCollection(MEMBERSHIPS)
     private val invites: MongoCollection<Document> = database.getCollection(INVITES)
@@ -31,8 +33,10 @@ class MongoClassroomRepository(database: MongoDatabase) : ClassroomRepository {
 
     override suspend fun createClassroom(classroom: NativeClassroom) {
         ensureIndexes()
-        try { classrooms.insertOne(classroom.toDocument()) } catch(error:com.mongodb.MongoWriteException) {
-            if(error.error.code!=11000) throw error
+        try {
+            classrooms.insertOne(classroom.toDocument())
+        } catch (error: com.mongodb.MongoWriteException) {
+            if (error.error.code != 11000) throw error
             (findClassroom(classroom.id) ?: throw error).requireExactAssignment(classroom)
         }
     }
@@ -50,44 +54,50 @@ class MongoClassroomRepository(database: MongoDatabase) : ClassroomRepository {
     override suspend fun listClassroomsForGroups(groupIds: Set<String>): List<NativeClassroom> {
         ensureIndexes()
         if (groupIds.isEmpty()) return emptyList()
-        return classrooms.find(com.mongodb.client.model.Filters.`in`("groupId", groupIds))
-            .toList()
+        return classrooms
+            .find(
+                com.mongodb.client.model.Filters
+                    .`in`("groupId", groupIds),
+            ).toList()
             .map { it.toClassroom() }
     }
 
-    override suspend fun listClassroomsForUser(
-        userId: String,
-    ): List<Pair<NativeClassroom, NativeClassroomMembership>> {
+    override suspend fun listClassroomsForUser(userId: String): List<Pair<NativeClassroom, NativeClassroomMembership>> {
         ensureIndexes()
-        val userMemberships = memberships.find(eq("userId", userId)).toList()
-            .map { it.toMembership() }
+        val userMemberships =
+            memberships
+                .find(eq("userId", userId))
+                .toList()
+                .map { it.toMembership() }
         return userMemberships.mapNotNull { membership ->
             findClassroom(membership.classroomId)?.let { it to membership }
         }
     }
 
-    override suspend fun listMembershipsForClass(classroomId:String):List<NativeClassroomMembership> {
+    override suspend fun listMembershipsForClass(classroomId: String): List<NativeClassroomMembership> {
         ensureIndexes()
-        return memberships.find(eq("classroomId",classroomId)).toList().map { it.toMembership() }
+        return memberships.find(eq("classroomId", classroomId)).toList().map { it.toMembership() }
     }
+
     override suspend fun findMembership(
         classroomId: String,
         userId: String,
     ): NativeClassroomMembership? {
         ensureIndexes()
-        return memberships.find(
-            and(eq("classroomId", classroomId), eq("userId", userId)),
-        ).firstOrNull()?.toMembership()
+        return memberships
+            .find(
+                and(eq("classroomId", classroomId), eq("userId", userId)),
+            ).firstOrNull()
+            ?.toMembership()
     }
 
-    override suspend fun addMembershipIfAbsent(
-        membership: NativeClassroomMembership,
-    ): NativeClassroomMembership {
+    override suspend fun addMembershipIfAbsent(membership: NativeClassroomMembership): NativeClassroomMembership {
         ensureIndexes()
-        val filter = and(
-            eq("classroomId", membership.classroomId),
-            eq("userId", membership.userId),
-        )
+        val filter =
+            and(
+                eq("classroomId", membership.classroomId),
+                eq("userId", membership.userId),
+            )
         val existing = memberships.find(filter).firstOrNull()?.toMembership()
         if (existing != null) return existing
         return try {
@@ -118,17 +128,20 @@ class MongoClassroomRepository(database: MongoDatabase) : ClassroomRepository {
             current.revokedAt != null ||
             current.expiresAt <= now ||
             current.uses >= current.maxUses
-        ) return null
-        val document = invites.findOneAndUpdate(
-            and(
-                eq("_id", inviteId),
-                eq("revokedAt", null),
-                gt("expiresAt", Date.from(now)),
-                eq("uses", current.uses),
-            ),
-            Updates.inc("uses", 1),
-            FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
-        ) ?: return null
+        ) {
+            return null
+        }
+        val document =
+            invites.findOneAndUpdate(
+                and(
+                    eq("_id", inviteId),
+                    eq("revokedAt", null),
+                    gt("expiresAt", Date.from(now)),
+                    eq("uses", current.uses),
+                ),
+                Updates.inc("uses", 1),
+                FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
+            ) ?: return null
         return document.toInvite()
     }
 
@@ -138,14 +151,15 @@ class MongoClassroomRepository(database: MongoDatabase) : ClassroomRepository {
         now: Instant,
     ): Boolean {
         ensureIndexes()
-        val result = invites.updateOne(
-            and(
-                eq("_id", inviteId),
-                eq("classroomId", classroomId),
-                eq("revokedAt", null),
-            ),
-            Updates.set("revokedAt", Date.from(now)),
-        )
+        val result =
+            invites.updateOne(
+                and(
+                    eq("_id", inviteId),
+                    eq("classroomId", classroomId),
+                    eq("revokedAt", null),
+                ),
+                Updates.set("revokedAt", Date.from(now)),
+            )
         return result.modifiedCount > 0L
     }
 
@@ -180,72 +194,91 @@ class MongoClassroomRepository(database: MongoDatabase) : ClassroomRepository {
         }
     }
 
-    private fun NativeClassroom.toDocument(): Document = Document()
-        .append("_id", id)
-        .append("name", name)
-        .append("description", description)
-        .append("room", room)
-        .append("groupId", groupId)
-        .append("groupName", groupName)
-        .append("teacherId", teacherId)
-        .append("teacherDisplayName", teacherDisplayName)
-        .append("groupScopeRevision",groupScopeRevision).append("teacherRoleGeneration",teacherRoleGeneration)
-        .append("assignedBy",assignedBy).append("assignmentOperationId",assignmentOperationId).append("assignmentDigest",assignmentDigest)
-        .append("status", status.name)
-        .append("createdAt", Date.from(createdAt))
+    private fun NativeClassroom.toDocument(): Document =
+        Document()
+            .append("_id", id)
+            .append("name", name)
+            .append("description", description)
+            .append("room", room)
+            .append("groupId", groupId)
+            .append("groupName", groupName)
+            .append("teacherId", teacherId)
+            .append("teacherDisplayName", teacherDisplayName)
+            .append("groupScopeRevision", groupScopeRevision)
+            .append("teacherRoleGeneration", teacherRoleGeneration)
+            .append(
+                "assignedBy",
+                assignedBy,
+            ).append("assignmentOperationId", assignmentOperationId)
+            .append("assignmentDigest", assignmentDigest)
+            .append("status", status.name)
+            .append("createdAt", Date.from(createdAt))
 
-    private fun Document.toClassroom(): NativeClassroom = NativeClassroom(
-        id = getString("_id"),
-        name = getString("name"),
-        description = getString("description"),
-        room = getString("room"),
-        groupId = getString("groupId"),
-        groupName = getString("groupName"),
-        teacherId = getString("teacherId"),
-        teacherDisplayName = getString("teacherDisplayName"),
-        groupScopeRevision=strictRevision("groupScopeRevision"),teacherRoleGeneration=strictRevision("teacherRoleGeneration"),
-        assignedBy=getString("assignedBy"),assignmentOperationId=getString("assignmentOperationId"),assignmentDigest=getString("assignmentDigest"),
-        status = ClassroomStatus.valueOf(getString("status")),
-        createdAt = getDate("createdAt").toInstant(),
-    )
+    private fun Document.toClassroom(): NativeClassroom =
+        NativeClassroom(
+            id = getString("_id"),
+            name = getString("name"),
+            description = getString("description"),
+            room = getString("room"),
+            groupId = getString("groupId"),
+            groupName = getString("groupName"),
+            teacherId = getString("teacherId"),
+            teacherDisplayName = getString("teacherDisplayName"),
+            groupScopeRevision = strictRevision("groupScopeRevision"),
+            teacherRoleGeneration = strictRevision("teacherRoleGeneration"),
+            assignedBy = getString("assignedBy"),
+            assignmentOperationId = getString("assignmentOperationId"),
+            assignmentDigest = getString("assignmentDigest"),
+            status = ClassroomStatus.valueOf(getString("status")),
+            createdAt = getDate("createdAt").toInstant(),
+        )
 
-    private fun NativeClassroomMembership.toDocument(): Document = Document()
-        .append("classroomId", classroomId)
-        .append("userId", userId)
-        .append("role", role.name)
-        .append("joinedAt", Date.from(joinedAt))
+    private fun NativeClassroomMembership.toDocument(): Document =
+        Document()
+            .append("classroomId", classroomId)
+            .append("userId", userId)
+            .append("role", role.name)
+            .append("joinedAt", Date.from(joinedAt))
 
-    private fun Document.toMembership(): NativeClassroomMembership = NativeClassroomMembership(
-        classroomId = getString("classroomId"),
-        userId = getString("userId"),
-        role = ClassroomMemberRole.valueOf(getString("role")),
-        joinedAt = getDate("joinedAt").toInstant(),
-    )
+    private fun Document.toMembership(): NativeClassroomMembership =
+        NativeClassroomMembership(
+            classroomId = getString("classroomId"),
+            userId = getString("userId"),
+            role = ClassroomMemberRole.valueOf(getString("role")),
+            joinedAt = getDate("joinedAt").toInstant(),
+        )
 
-    private fun NativeClassInviteRecord.toDocument(): Document = Document()
-        .append("_id", id)
-        .append("classroomId", classroomId)
-        .append("tokenHash", tokenHash)
-        .append("createdBy", createdBy)
-        .append("createdAt", Date.from(createdAt))
-        .append("expiresAt", Date.from(expiresAt))
-        .append("maxUses", maxUses)
-        .append("uses", uses)
-        .append("revokedAt", revokedAt?.let(Date::from))
+    private fun NativeClassInviteRecord.toDocument(): Document =
+        Document()
+            .append("_id", id)
+            .append("classroomId", classroomId)
+            .append("tokenHash", tokenHash)
+            .append("createdBy", createdBy)
+            .append("createdAt", Date.from(createdAt))
+            .append("expiresAt", Date.from(expiresAt))
+            .append("maxUses", maxUses)
+            .append("uses", uses)
+            .append("revokedAt", revokedAt?.let(Date::from))
 
-    private fun Document.toInvite(): NativeClassInviteRecord = NativeClassInviteRecord(
-        id = getString("_id"),
-        classroomId = getString("classroomId"),
-        tokenHash = getString("tokenHash"),
-        createdBy = getString("createdBy"),
-        createdAt = getDate("createdAt").toInstant(),
-        expiresAt = getDate("expiresAt").toInstant(),
-        maxUses = (get("maxUses") as Number).toInt(),
-        uses = (get("uses") as Number).toInt(),
-        revokedAt = getDate("revokedAt")?.toInstant(),
-    )
+    private fun Document.toInvite(): NativeClassInviteRecord =
+        NativeClassInviteRecord(
+            id = getString("_id"),
+            classroomId = getString("classroomId"),
+            tokenHash = getString("tokenHash"),
+            createdBy = getString("createdBy"),
+            createdAt = getDate("createdAt").toInstant(),
+            expiresAt = getDate("expiresAt").toInstant(),
+            maxUses = (get("maxUses") as Number).toInt(),
+            uses = (get("uses") as Number).toInt(),
+            revokedAt = getDate("revokedAt")?.toInstant(),
+        )
 
-    private fun Document.strictRevision(key:String)=when(val value=get(key)) { is Long->value;is Int->value.toLong();else-> -1L }
+    private fun Document.strictRevision(key: String) =
+        when (val value = get(key)) {
+            is Long -> value
+            is Int -> value.toLong()
+            else -> -1L
+        }
 
     private companion object {
         const val CLASSROOMS = "native_classrooms"

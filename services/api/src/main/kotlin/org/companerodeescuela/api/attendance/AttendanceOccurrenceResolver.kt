@@ -1,6 +1,5 @@
 package org.companerodeescuela.api.attendance
 
-import java.time.LocalDate
 import org.companerodeescuela.api.academic.AcademicOccurrenceProjection
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.integrations.IntegrationException
@@ -8,6 +7,7 @@ import org.companerodeescuela.api.integrations.academic.AcademicProvider
 import org.companerodeescuela.api.integrations.academic.mapper.AcademicMappers
 import org.companerodeescuela.shared.model.ClassOccurrence
 import org.companerodeescuela.shared.model.PersonId
+import java.time.LocalDate
 
 interface AttendanceOccurrenceResolver {
     suspend fun resolveTeacherOccurrence(
@@ -20,28 +20,30 @@ interface AttendanceOccurrenceResolver {
 class ProviderAttendanceOccurrenceResolver(
     private val provider: AcademicProvider,
 ) : AttendanceOccurrenceResolver {
-
     override suspend fun resolveTeacherOccurrence(
         teacherId: String,
         occurrenceId: String,
         occurrenceDate: LocalDate,
-    ): ClassOccurrence = translateIntegrationFailure {
-        val courses = provider.listCourses().associateBy { it.externalId }
-        val schedule = AcademicMappers.toSchedule(
-            ownerId = PersonId(teacherId),
-            slots = provider.getSchedule(teacherId, occurrenceDate),
-            coursesById = courses,
-        )
-        val occurrence = AcademicOccurrenceProjection
-            .project(schedule, occurrenceDate)
-            .firstOrNull { it.id.value == occurrenceId }
-            ?: throw ApiException.NotFound("Class occurrence was not found")
+    ): ClassOccurrence =
+        translateIntegrationFailure {
+            val courses = provider.listCourses().associateBy { it.externalId }
+            val schedule =
+                AcademicMappers.toSchedule(
+                    ownerId = PersonId(teacherId),
+                    slots = provider.getSchedule(teacherId, occurrenceDate),
+                    coursesById = courses,
+                )
+            val occurrence =
+                AcademicOccurrenceProjection
+                    .project(schedule, occurrenceDate)
+                    .firstOrNull { it.id.value == occurrenceId }
+                    ?: throw ApiException.NotFound("Class occurrence was not found")
 
-        if (occurrence.teacher.person.id.value != teacherId) {
-            throw ApiException.Forbidden("This class occurrence belongs to another teacher")
+            if (occurrence.teacher.person.id.value != teacherId) {
+                throw ApiException.Forbidden("This class occurrence belongs to another teacher")
+            }
+            occurrence
         }
-        occurrence
-    }
 
     private suspend fun <T> translateIntegrationFailure(block: suspend () -> T): T =
         try {

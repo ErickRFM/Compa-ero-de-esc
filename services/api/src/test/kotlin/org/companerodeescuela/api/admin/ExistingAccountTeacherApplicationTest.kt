@@ -85,11 +85,11 @@ class ExistingAccountTeacherApplicationTest {
                 )
             val proof =
                 operator.proof(
-                StepUpAction.APPROVE_STAFF,
-                student.id,
-                approval.operationId,
-                PrivilegedCommandDigests.staffApproval(student.id, approval),
-            )
+                    StepUpAction.APPROVE_STAFF,
+                    student.id,
+                    approval.operationId,
+                    PrivilegedCommandDigests.staffApproval(student.id, approval),
+                )
             val result = service.approveStaff(operator.actor, student.id, approval.copy(proof = proof))
             assertEquals(setOf(UserRole.TEACHER), result.user.roles)
             assertEquals("campus", result.user.institutionId)

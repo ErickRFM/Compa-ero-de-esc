@@ -197,8 +197,7 @@ class InMemoryDeviceTokenRepository : DeviceTokenRepository {
                         null -> true
                         else -> it.appDistribution == appDistribution
                     }
-                }
-                .map { it.token }
+                }.map { it.token }
                 .distinct()
         }
 

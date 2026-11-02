@@ -75,14 +75,16 @@ class ExistingAccountTeacherApplicationTest {
             assertEquals(student.emailVerifiedAt, pending.emailVerifiedAt)
             assertEquals(application.id, service.requestTeacher(student, request).id)
 
-            val approval = ApproveStaffRequest(
+            val approval =
+                ApproveStaffRequest(
                 operationId = "approve-teacher",
                 expectedAuthRevision = 0,
                 applicationId = application.id,
                 institutionId = "campus",
                 proof = "",
             )
-            val proof = operator.proof(
+            val proof =
+                operator.proof(
                 StepUpAction.APPROVE_STAFF,
                 student.id,
                 approval.operationId,

@@ -71,6 +71,64 @@ class ChannelTaskService(
         }
     }
 
+    /** A teacher receives delivery notices only while the assignment remains valid. */
+    suspend fun eligibleSubmissionNotice(
+        owner: String,
+        channelId: String,
+        taskId: String,
+    ): Boolean {
+        val id = owner.takeIf { it.startsWith("NATIVE:") }?.removePrefix("NATIVE:") ?: return false
+        val teacher = accounts?.findById(id) ?: return false
+        if (!teacher.permitsSession || teacher.emailVerifiedAt == null || UserRole.TEACHER !in teacher.roles) {
+            return false
+        }
+        return try {
+            accessPolicy.requireCanPublish(
+                id,
+                teacher.roles,
+                channelId,
+                teacher.toUserSummary(),
+                SessionIdentitySource.NATIVE,
+            )
+            repository.findTask(channelId, taskId)?.teacherId == id
+        } catch (_: ApiException.Forbidden) {
+            false
+        } catch (_: ApiException.NotFound) {
+            false
+        } catch (_: ApiException.Unauthorized) {
+            false
+        }
+    }
+
+    private suspend fun queueSubmittedNotice(
+        task: ChannelTask,
+        submission: TaskSubmission,
+        identitySource: SessionIdentitySource,
+    ) {
+        if (identitySource != SessionIdentitySource.NATIVE) return
+        val service = notifications ?: return
+        try {
+            service.enqueueForOwner(
+                eventId = "task:${task.id}:submission:${submission.id}:${submission.version}",
+                owner = "NATIVE:${task.teacherId}",
+                title = "Nueva entrega",
+                body = "Hay una entrega para revisar en Compañero.",
+                data =
+                    mapOf(
+                        "type" to "channel_task_submission",
+                        "destination" to "channel",
+                        "channelId" to task.channelId,
+                        "taskId" to task.id,
+                    ),
+                appDistribution = "ACADEMIC",
+            )
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // A notification failure must not turn a persisted submission into an HTTP error.
+        }
+    }
+
     private suspend fun queueNotice(
         eventId: String,
         studentIds: List<String>,
@@ -166,8 +224,14 @@ class ChannelTaskService(
             UserRole.TEACHER in roles &&
             task.teacherId == actor.id
         ) {
-            val students = classrooms?.activeStudentIdsForTeacher(actor, channelId).orEmpty()
-            queueNotice("task:${task.id}:published", students, channelId, task.id)
+            try {
+                val students = classrooms?.activeStudentIdsForTeacher(actor, channelId).orEmpty()
+                queueNotice("task:${task.id}:published", students, channelId, task.id)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Task creation already committed; delivery errors must not cause retries to duplicate it.
+            }
         }
         return task
     }
@@ -326,6 +390,7 @@ class ChannelTaskService(
                 if (winner != null && isSameSubmission(winner, request)) return winner.withFiles()
                 throw ApiException.Conflict("Submission was updated by another request")
             }
+            queueSubmittedNotice(task, updated, identitySource)
             return updated.withFiles()
         }
 
@@ -364,6 +429,7 @@ class ChannelTaskService(
             if (winner != null && isSameSubmission(winner, request)) return winner.withFiles()
             throw ApiException.Conflict("A submission already exists for this task")
         }
+        queueSubmittedNotice(task, created, identitySource)
         return created.withFiles()
     }
 

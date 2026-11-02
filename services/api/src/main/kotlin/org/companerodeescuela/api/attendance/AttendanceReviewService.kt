@@ -53,10 +53,14 @@ class AttendanceReviewService(
             if (note.length !in 3..500 || request.expectedRevision < 0) {
                 throw ApiException.Validation("Manual decision requires a reason and current record revision")
             }
-            val student = directory.findById(studentId)
-                ?: throw ApiException.Forbidden("Student must have a linked account")
-            if (!student.permitsSession || student.emailVerifiedAt == null ||
-                UserRole.STUDENT !in student.roles || student.institutionId != session.institutionId
+            val student =
+                directory.findById(studentId)
+                    ?: throw ApiException.Forbidden("Student must have a linked account")
+            if (
+                !student.permitsSession ||
+                student.emailVerifiedAt == null ||
+                UserRole.STUDENT !in student.roles ||
+                student.institutionId != session.institutionId
             ) {
                 throw ApiException.Forbidden("Verified student in the same institution is required")
             }

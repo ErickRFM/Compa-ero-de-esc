@@ -83,3 +83,7 @@ Revisar **Hoy, Horario, Clase, Canal, Tareas, Pase, Perfil y Administración** c
 **Pruebas y aceptación:** el último SHA anteriormente aprobado antes de este bloque fue `b3400faa`, con backend y cinco trabajos de Android satisfactorios; su CI iOS constaba como `failure` con el job cancelado. Las nuevas modificaciones disparan CI independiente y **no son aprobadas hasta que ese CI termine**. Permanece obligatorio medir entrega FCM real en equipo físico con Android en foreground/background/cerrada, y comparar capturas Android 360/390/430 dp, texto al 200%, TalkBack y tema oscuro.
 
 **Alcance fuera de PR #266:** OCR de PDF escaneado, registros provisionales sin cuenta, propuestas oficiales SIII con revisión/aprobación y recibos de sincronización, motor de horarios compartidos y libro de calificaciones nativo completo. No representar esas funciones como operativas.
+
+### Enlace profundo de Canal — corrección final del bloque
+
+Se identificó y reparó una carrera en `ChannelScreen`: antes consumía `requestedTab = 2` aunque el listado de aulas aún no había elegido un canal. La posterior carga cambiaba `selectedChannelId` y reiniciaba `selectedTab` a cero, perdiendo Tareas. Ahora `LaunchedEffect` depende de la clase seleccionada y consume el evento sólo cuando `selected != null`; prueba unitaria incluida. La ejecución CI del último commit y la prueba física de apertura en frío aún son criterios pendientes.

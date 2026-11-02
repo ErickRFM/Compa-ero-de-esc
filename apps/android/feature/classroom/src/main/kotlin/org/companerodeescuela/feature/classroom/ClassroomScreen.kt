@@ -101,6 +101,7 @@ fun ClassroomScreen(
                 onGenerateInvite = model::generateInvite,
                 onRevokeInvite = model::revokeInvite,
                 onAddMembers = model::addMembers,
+                onLoadMembers = model::loadMembers,
                 modifier = modifier,
             )
         } else {
@@ -360,6 +361,7 @@ private fun TeacherAssignedClassrooms(
     onGenerateInvite: (String) -> Unit,
     onRevokeInvite: () -> Unit,
     onAddMembers: (String, List<String>) -> Unit = { _, _ -> },
+    onLoadMembers: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -517,6 +519,26 @@ private fun TeacherAssignedClassrooms(
                                     modifier = Modifier.fillMaxWidth(),
                                 ) {
                                     Text("Generar código para compartir")
+                                }
+                                OutlinedButton(
+                                    onClick = { onLoadMembers(classroom.id) },
+                                    enabled = !state.submitting,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) { Text("Ver integrantes de la clase") }
+                                state.members[classroom.id]?.let { members ->
+                                    Text("${members.size} alumnos con cuenta vinculada", style = MaterialTheme.typography.titleSmall)
+                                    if (members.isEmpty()) {
+                                        Text("Aún no hay alumnos vinculados a este Canal.")
+                                    }
+                                    members.take(50).forEach { student ->
+                                        Text(
+                                            student.displayName + " · " +
+                                                java.time.Instant.ofEpochSecond(student.joinedAtEpochSeconds)
+                                                    .atZone(java.time.ZoneId.systemDefault())
+                                                    .format(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy")),
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
+                                    }
                                 }
                                 OutlinedButton(
                                     onClick = {

@@ -341,15 +341,17 @@ fun Route.attendanceRoutes(
                 val principal = call.requirePlatformPrincipal()
                 principal.requireRole(UserRole.TEACHER)
                 val actor = call.requireNativeActor(tokens!!)
-                val sessionId = call.parameters["sessionId"]
-                    ?: throw ApiException.Validation("sessionId is required")
+                val sessionId =
+                    call.parameters["sessionId"]
+                        ?: throw ApiException.Validation("sessionId is required")
                 call.respond(
                     ApiResponse(
-                        data = reviewService.markNative(
-                            reviewer = actor,
-                            sessionId = sessionId,
-                            request = call.boundedBody(ManualAttendanceMarkRequest.serializer()),
-                        ),
+                        data =
+                            reviewService.markNative(
+                                reviewer = actor,
+                                sessionId = sessionId,
+                                request = call.boundedBody(ManualAttendanceMarkRequest.serializer()),
+                            ),
                         requestId = call.requestId(),
                     ),
                 )

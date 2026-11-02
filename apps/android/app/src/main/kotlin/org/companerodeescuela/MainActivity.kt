@@ -87,6 +87,7 @@ import org.companerodeescuela.feature.tutoring.TutorRequestsScreen
 import org.companerodeescuela.notifications.PushRegistrationDiagnostics
 import org.companerodeescuela.notifications.PushRegistrationSchedule
 import org.companerodeescuela.notifications.isChannelNotificationIntent
+import org.companerodeescuela.notifications.isTaskNotificationType
 import org.companerodeescuela.notifications.parseAttendanceSessionId
 import org.companerodeescuela.shared.contracts.AttendancePushContract
 import org.companerodeescuela.shared.contracts.TeacherClassContext
@@ -113,7 +114,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         pendingAttendanceSessionId = attendanceSessionId(intent)
         pendingChannelNavigation = isChannelNotificationIntent(intent?.action, intent?.getStringExtra("destination"))
-        pendingChannelTasksTab = intent?.getStringExtra("type") in setOf("channel_task", "channel_task_review", "channel_task_submission")
+        pendingChannelTasksTab = isTaskNotificationType(intent?.getStringExtra("type"))
         appearancePreferences.applySavedLanguage()
         val appDistribution = AppDistribution.valueOf(BuildConfig.APP_DISTRIBUTION)
 
@@ -741,7 +742,7 @@ class MainActivity : AppCompatActivity() {
         if (isChannelNotificationIntent(intent.action, intent.getStringExtra("destination"))) {
             pendingChannelNavigation = true
             pendingChannelTasksTab =
-                intent.getStringExtra("type") in setOf("channel_task", "channel_task_review", "channel_task_submission")
+                isTaskNotificationType(intent.getStringExtra("type"))
         }
     }
 

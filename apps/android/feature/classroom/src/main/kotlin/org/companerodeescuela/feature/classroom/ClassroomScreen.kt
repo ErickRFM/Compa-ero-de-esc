@@ -371,17 +371,21 @@ private fun TeacherAssignedClassrooms(
     var importCandidates by remember { mutableStateOf<List<String>>(emptyList()) }
     var manualIdentifier by remember { mutableStateOf("") }
     var importError by remember { mutableStateOf<String?>(null) }
+    var importLoading by remember { mutableStateOf(false) }
+    var pickerClassId by remember { mutableStateOf<String?>(null) }
     val documentPicker =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            if (uri != null) {
+            val expectedClassId = pickerClassId
+            if (uri != null && expectedClassId != null && selectedImportClass == expectedClassId) {
+                importLoading = true
+                importCandidates = emptyList()
+                importError = null
                 scope.launch {
-                    runCatching { importReader.read(uri) }
-                        .onSuccess {
-                            importCandidates = it
-                            importError = null
-                        }.onFailure {
-                            importError = it.message ?: "No se pudo importar la lista"
-                        }
+                    val result = runCatching { importReader.read(uri) }
+                    if (selectedImportClass != expectedClassId) return@launch
+                    importLoading = false
+                    result.onSuccess { importCandidates = it }
+                        .onFailure { importError = it.message ?: "No se pudo importar la lista" }
                 }
             }
         }
@@ -535,7 +539,7 @@ private fun TeacherAssignedClassrooms(
                                     if (members.isEmpty()) {
                                         Text("Aún no hay alumnos vinculados a este Canal.")
                                     }
-                                    members.take(50).forEach { student ->
+                                    members.take(6).forEach { student ->
                                         val joinedAt =
                                             Instant.ofEpochSecond(student.joinedAtEpochSeconds)
                                                 .atZone(ZoneId.systemDefault())
@@ -545,6 +549,13 @@ private fun TeacherAssignedClassrooms(
                                             style = MaterialTheme.typography.bodySmall,
                                         )
                                     }
+                                    if (members.size > 6) {
+                                        Text(
+                                            "+${members.size - 6} integrantes más en la lista de la clase",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                 }
                                 OutlinedButton(
                                     onClick = {
@@ -552,6 +563,8 @@ private fun TeacherAssignedClassrooms(
                                         importCandidates = emptyList()
                                         manualIdentifier = ""
                                         importError = null
+                                        importLoading = false
+                                        pickerClassId = null
                                     },
                                     enabled = !state.submitting,
                                     modifier = Modifier.fillMaxWidth(),
@@ -572,19 +585,28 @@ private fun TeacherAssignedClassrooms(
                                     OutlinedButton(
                                         onClick = {
                                             onAddMembers(classroom.id, listOf(manualIdentifier.trim()))
-                                            manualIdentifier = ""
                                         },
                                         enabled = !state.submitting && manualIdentifier.trim().isNotEmpty(),
                                         modifier = Modifier.fillMaxWidth(),
                                     ) { Text("Vincular alumno registrado") }
                                     OutlinedButton(
                                         onClick = {
+                                            pickerClassId = classroom.id
                                             documentPicker.launch(arrayOf("application/pdf", "text/csv", "text/plain"))
                                         },
-                                        enabled = !state.submitting,
+                                        enabled = !state.submitting && !importLoading,
                                         modifier = Modifier.fillMaxWidth(),
                                     ) { Text("Elegir lista PDF / CSV / TXT") }
-                                    importError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                                    if (importLoading) {
+                                        CircularProgressIndicator()
+                                        Text("Leyendo lista de alumnos…", style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    importError?.let {
+                                        StatusNotice(
+                                            title = "No se pudo leer la lista",
+                                            message = it,
+                                        )
+                                    }
                                     if (importCandidates.isNotEmpty()) {
                                         Text(
                                             "${importCandidates.size} identificadores detectados. Revisa antes de confirmar:",
@@ -595,14 +617,12 @@ private fun TeacherAssignedClassrooms(
                                                 if (importCandidates.size > 10) "\n…" else "",
                                             style = MaterialTheme.typography.bodySmall,
                                         )
-                                        Button(
-                                            onClick = {
-                                                onAddMembers(classroom.id, importCandidates)
-                                                importCandidates = emptyList()
-                                            },
-                                            enabled = !state.submitting,
+                                        V8RedPrimaryButton(
+                                            text = "Confirmar incorporación a Compañero",
+                                            onClick = { onAddMembers(classroom.id, importCandidates) },
+                                            enabled = !state.submitting && !importLoading,
                                             modifier = Modifier.fillMaxWidth(),
-                                        ) { Text("Confirmar incorporación a Compañero") }
+                                        )
                                     }
                                 }
                             }

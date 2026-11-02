@@ -57,6 +57,7 @@ class CompaneroFirebaseMessagingService : FirebaseMessagingService() {
                 runCatching { UUID.fromString(raw).toString() }.getOrNull()?.takeIf { it.equals(raw, ignoreCase = true) }
             }
         val academicNotice = message.data["type"] == AcademicChangePushContract.TYPE && academicInstitution != null
+        val taskNotice = isTaskNotificationType(message.data["type"])
         val channelNotice =
             message.data["type"] in setOf("channel", "channel_notice", "institutional_notice", "notice") ||
                 message.data["destination"] == "channel"
@@ -87,7 +88,7 @@ class CompaneroFirebaseMessagingService : FirebaseMessagingService() {
                     data = Uri.parse("companero://channel")
                     putExtra("destination", "channel")
                     val taskType = message.data["type"]
-                    if (taskType in setOf("channel_task", "channel_task_review", "channel_task_submission")) {
+                    if (isTaskNotificationType(taskType)) {
                         putExtra("type", taskType)
                     }
                 }
@@ -103,6 +104,7 @@ class CompaneroFirebaseMessagingService : FirebaseMessagingService() {
             when {
                 attendanceNotice -> "Tu docente abrió el pase de lista. Toca para revisarlo."
                 academicNotice -> "La institución actualizó tu información académica. Consulta tu horario oficial."
+                taskNotice -> "Tienes una actualización de tareas. Toca para revisarla."
                 channelNotice -> "Nuevo aviso en el Canal Institucional. Toca para revisarlo."
                 else ->
                     if (managementApp) {

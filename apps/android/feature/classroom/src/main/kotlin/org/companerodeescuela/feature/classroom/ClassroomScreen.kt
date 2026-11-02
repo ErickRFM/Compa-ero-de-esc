@@ -6,6 +6,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -376,20 +377,24 @@ private fun TeacherAssignedClassrooms(
     var importLoading by remember { mutableStateOf(false) }
     var pickerClassId by remember { mutableStateOf<String?>(null) }
     val documentPicker =
-        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            val expectedClassId = pickerClassId
-            if (uri != null && expectedClassId != null && selectedImportClass == expectedClassId) {
-                importLoading = true
-                importCandidates = emptyList()
-                importError = null
-                scope.launch {
-                    val result = runCatching { importReader.read(uri) }
-                    if (selectedImportClass != expectedClassId) return@launch
-                    importLoading = false
-                    result.onSuccess { importCandidates = it }
-                    result.onFailure { importError = it.message ?: "No se pudo importar la lista" }
+        if (LocalActivityResultRegistryOwner.current != null) {
+            rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+                val expectedClassId = pickerClassId
+                if (uri != null && expectedClassId != null && selectedImportClass == expectedClassId) {
+                    importLoading = true
+                    importCandidates = emptyList()
+                    importError = null
+                    scope.launch {
+                        val result = runCatching { importReader.read(uri) }
+                        if (selectedImportClass != expectedClassId) return@launch
+                        importLoading = false
+                        result.onSuccess { importCandidates = it }
+                        result.onFailure { importError = it.message ?: "No se pudo importar la lista" }
+                    }
                 }
             }
+        } else {
+            null
         }
     val assigned =
         state.classrooms.filter {
@@ -596,9 +601,9 @@ private fun TeacherAssignedClassrooms(
                                     OutlinedButton(
                                         onClick = {
                                             pickerClassId = classroom.id
-                                            documentPicker.launch(arrayOf("application/pdf", "text/csv", "text/plain"))
+                                            documentPicker?.launch(arrayOf("application/pdf", "text/csv", "text/plain"))
                                         },
-                                        enabled = !state.submitting && !importLoading,
+                                        enabled = !state.submitting && !importLoading && documentPicker != null,
                                         modifier = Modifier.fillMaxWidth(),
                                     ) { Text("Elegir lista PDF / CSV / TXT") }
                                     if (importLoading) {

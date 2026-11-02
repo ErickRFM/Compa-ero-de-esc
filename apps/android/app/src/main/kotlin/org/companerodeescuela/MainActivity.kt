@@ -97,6 +97,7 @@ import javax.inject.Inject
 class MainActivity : AppCompatActivity() {
     private var pendingAttendanceSessionId by mutableStateOf<String?>(null)
     private var pendingChannelNavigation by mutableStateOf(false)
+    private var pendingChannelTasksTab by mutableStateOf(false)
 
     @Inject
     lateinit var attendanceSyncScheduler: AttendanceSyncScheduler
@@ -112,6 +113,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         pendingAttendanceSessionId = attendanceSessionId(intent)
         pendingChannelNavigation = isChannelNotificationIntent(intent?.action, intent?.getStringExtra("destination"))
+        pendingChannelTasksTab = intent?.getStringExtra("type") in setOf("channel_task", "channel_task_submission")
         appearancePreferences.applySavedLanguage()
         val appDistribution = AppDistribution.valueOf(BuildConfig.APP_DISTRIBUTION)
 
@@ -319,6 +321,8 @@ class MainActivity : AppCompatActivity() {
                                                 }
                                                 else -> {
                                                     pendingChannelNavigation = false
+                                                    channelTabRequest = if (pendingChannelTasksTab) 2 else 0
+                                                    pendingChannelTasksTab = false
                                                     navController.navigate(Destination.Channel.route) {
                                                         launchSingleTop = true
                                                     }
@@ -736,6 +740,8 @@ class MainActivity : AppCompatActivity() {
         pendingAttendanceSessionId = attendanceSessionId(intent)
         if (isChannelNotificationIntent(intent.action, intent.getStringExtra("destination"))) {
             pendingChannelNavigation = true
+            pendingChannelTasksTab =
+                intent.getStringExtra("type") in setOf("channel_task", "channel_task_submission")
         }
     }
 

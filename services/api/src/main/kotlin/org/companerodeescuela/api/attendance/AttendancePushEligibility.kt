@@ -28,6 +28,11 @@ class AttendancePushEligibility(
             val taskId = item.data["taskId"] ?: return false
             return tasks?.eligibleTaskNotice(item.owner, channelId, taskId) ?: false
         }
+        if (item.data["type"] == "channel_task_submission") {
+            val channelId = item.data["channelId"] ?: return false
+            val taskId = item.data["taskId"] ?: return false
+            return tasks?.eligibleSubmissionNotice(item.owner, channelId, taskId) ?: false
+        }
         if (item.data["type"] == org.companerodeescuela.api.integrations.academic.siii.SiiiAcademicChangeNotifier.TYPE) {
             val id = item.owner.takeIf { it.startsWith("NATIVE:") }?.removePrefix("NATIVE:") ?: return false
             val current = accounts.findById(id) ?: return false

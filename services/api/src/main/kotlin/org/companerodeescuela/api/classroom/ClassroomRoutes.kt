@@ -93,9 +93,10 @@ fun Route.classroomRoutes(
             post("/{classroomId}/members") {
                 val actor = call.requireNativeActor(tokenService)
                 val classroomId = call.requireClassroomId()
-                val request = runCatchingCancellable {
-                    call.boundedAuthRequest(AddClassMembersRequest.serializer())
-                }.getOrElse {
+                val request =
+                    runCatchingCancellable {
+                        call.boundedAuthRequest(AddClassMembersRequest.serializer())
+                    }.getOrElse {
                     if (it is kotlinx.coroutines.CancellationException) throw it
                     throw ApiException.Validation("Invalid native member import")
                 }

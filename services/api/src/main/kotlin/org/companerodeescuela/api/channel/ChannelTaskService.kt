@@ -23,6 +23,24 @@ import java.security.MessageDigest
 import java.time.Clock
 import java.util.UUID
 
+/** Only the current student's own review may trigger a delayed review push. */
+internal fun isCurrentTaskNotice(
+    task: ChannelTask?,
+    submission: TaskSubmission?,
+    channelId: String,
+    reviewSubmissionId: String?,
+    reviewVersion: Int?,
+): Boolean {
+    if (task == null || task.channelId != channelId) return false
+    if (reviewSubmissionId == null) return !task.closed
+    return submission != null &&
+        submission.channelId == channelId &&
+        submission.taskId == task.id &&
+        submission.id == reviewSubmissionId &&
+        submission.version == reviewVersion &&
+        submission.status in setOf(TaskStatus.RETURNED, TaskStatus.REVIEWED)
+}
+
 class ChannelTaskService(
     private val repository: ChannelTaskRepository,
     private val accessPolicy: ChannelAccessPolicy,
@@ -62,17 +80,9 @@ class ChannelTaskService(
                 account.toUserSummary(),
                 SessionIdentitySource.NATIVE,
             )
-            val task = repository.findTask(channelId, taskId) ?: return false
-            if (reviewSubmissionId == null) {
-                !task.closed
-            } else {
-                val submission = repository.findSubmissionByStudent(taskId, id)
-                submission != null &&
-                    submission.channelId == channelId &&
-                    submission.id == reviewSubmissionId &&
-                    submission.version == reviewVersion &&
-                    submission.status in setOf(TaskStatus.RETURNED, TaskStatus.REVIEWED)
-            }
+            val task = repository.findTask(channelId, taskId)
+            val submission = if (reviewSubmissionId != null) repository.findSubmissionByStudent(taskId, id) else null
+            isCurrentTaskNotice(task, submission, channelId, reviewSubmissionId, reviewVersion)
         } catch (_: ApiException.Forbidden) {
             false
         } catch (_: ApiException.NotFound) {

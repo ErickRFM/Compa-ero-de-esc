@@ -6,6 +6,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +59,7 @@ import org.companerodeescuela.shared.contracts.ClassInvite
 import org.companerodeescuela.shared.contracts.ClassroomStatus
 import org.companerodeescuela.shared.contracts.ClassroomSummary
 import org.companerodeescuela.shared.contracts.UserRole
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -96,6 +100,7 @@ fun ClassroomScreen(
                 onOpenGrading = onOpenGrading,
                 onGenerateInvite = model::generateInvite,
                 onRevokeInvite = model::revokeInvite,
+                onAddMembers = model::addMembers,
                 modifier = modifier,
             )
         } else {
@@ -354,9 +359,25 @@ private fun TeacherAssignedClassrooms(
     onOpenGrading: (ClassroomSummary) -> Unit,
     onGenerateInvite: (String) -> Unit,
     onRevokeInvite: () -> Unit,
+    onAddMembers: (String, List<String>) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val importReader = remember(context) { NativeRosterImportReader(context) }
+    var selectedImportClass by remember { mutableStateOf<String?>(null) }
+    var importCandidates by remember { mutableStateOf<List<String>>(emptyList()) }
+    var manualIdentifier by remember { mutableStateOf("") }
+    var importError by remember { mutableStateOf<String?>(null) }
+    val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                runCatching { importReader.read(uri) }
+                    .onSuccess { importCandidates = it; importError = null }
+                    .onFailure { importError = it.message ?: "No se pudo importar la lista" }
+            }
+        }
+    }
     val assigned =
         state.classrooms.filter {
             it.canManage && it.status == ClassroomStatus.ACTIVE && it.teacherId == teacherUserId
@@ -496,6 +517,65 @@ private fun TeacherAssignedClassrooms(
                                     modifier = Modifier.fillMaxWidth(),
                                 ) {
                                     Text("Generar código para compartir")
+                                }
+                                OutlinedButton(
+                                    onClick = {
+                                        selectedImportClass = classroom.id
+                                        importCandidates = emptyList()
+                                        manualIdentifier = ""
+                                        importError = null
+                                    },
+                                    enabled = !state.submitting,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) { Text("Añadir alumnos · lista o manual") }
+                                if (selectedImportClass == classroom.id) {
+                                    Text(
+                                        "Se vinculan cuentas registradas en Compañero, no matrículas oficiales de SIII.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    OutlinedTextField(
+                                        value = manualIdentifier,
+                                        onValueChange = { manualIdentifier = it.take(128) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        label = { Text("Correo o ID de alumno") },
+                                        singleLine = true,
+                                    )
+                                    OutlinedButton(
+                                        onClick = {
+                                            onAddMembers(classroom.id, listOf(manualIdentifier.trim()))
+                                            manualIdentifier = ""
+                                        },
+                                        enabled = !state.submitting && manualIdentifier.trim().isNotEmpty(),
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) { Text("Vincular alumno registrado") }
+                                    OutlinedButton(
+                                        onClick = {
+                                            documentPicker.launch(arrayOf("application/pdf", "text/csv", "text/plain"))
+                                        },
+                                        enabled = !state.submitting,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) { Text("Elegir lista PDF / CSV / TXT") }
+                                    importError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                                    if (importCandidates.isNotEmpty()) {
+                                        Text(
+                                            "${importCandidates.size} identificadores detectados. Revisa antes de confirmar:",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                        )
+                                        Text(
+                                            importCandidates.take(10).joinToString("\n") +
+                                                if (importCandidates.size > 10) "\n…" else "",
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
+                                        Button(
+                                            onClick = {
+                                                onAddMembers(classroom.id, importCandidates)
+                                                importCandidates = emptyList()
+                                            },
+                                            enabled = !state.submitting,
+                                            modifier = Modifier.fillMaxWidth(),
+                                        ) { Text("Confirmar incorporación a Compañero") }
+                                    }
                                 }
                             }
                         }

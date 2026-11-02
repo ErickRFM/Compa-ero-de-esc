@@ -22,6 +22,7 @@ import org.companerodeescuela.shared.contracts.StaffApplication
 import org.companerodeescuela.shared.contracts.StaffApplicationStatus
 import org.companerodeescuela.shared.contracts.StaffRole
 import org.companerodeescuela.shared.contracts.StepUpAction
+import org.companerodeescuela.shared.contracts.TeacherApplicationRequest
 import org.companerodeescuela.shared.contracts.TutorApplicationRequest
 import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
@@ -140,6 +141,51 @@ class AccountAdministrationService(
             if (results.size == 500) break
         }
         return results
+    }
+
+    /** Teacher authority is granted only later by an independently authorized administrator with MFA. */
+    suspend fun requestTeacher(
+        actor: PlatformAccount,
+        request: TeacherApplicationRequest,
+    ): StaffApplication {
+        val current = policy.live(actor.toUserSummary())
+        if (current.roles != setOf(UserRole.STUDENT) ||
+            current.emailVerifiedAt == null ||
+            current.accountStatus != AccountStatus.ACTIVE
+        ) {
+            throw ApiException.Forbidden("A verified student account is required to request teacher access")
+        }
+        identifier(request.operationId)
+        identifier(request.institutionId)
+        if (request.expectedAuthRevision != current.authRevision ||
+            (current.institutionId != null && current.institutionId != request.institutionId)
+        ) {
+            throw ApiException.Conflict("Account institution or revision is not current")
+        }
+        if (institutions.findEnabled(request.institutionId) == null) {
+            throw ApiException.Validation("Requested institution is unavailable")
+        }
+        val reference = request.identityReference.trim()
+        val preference = request.preferredGroup?.trim()
+        if (reference.length !in 1..160 ||
+            reference.any(Char::isISOControl) ||
+            (preference != null && (preference.length !in 1..120 || preference.any(Char::isISOControl)))
+        ) {
+            throw ApiException.Validation("Teacher identity reference or preferred group is invalid")
+        }
+        val application =
+            StaffApplication(
+                id = "teacher-request-" + request.operationId,
+                role = StaffRole.TEACHER,
+                requestedInstitutionId = request.institutionId,
+                identityReference = reference,
+                preferredGroup = preference,
+                requestedAtEpochSeconds = clock.instant().epochSecond,
+            )
+        val saved =
+            accounts.submitStaffApplication(current.id, current.authRevision, application)
+                ?: throw ApiException.Conflict("Teacher application is already pending or authority changed")
+        return saved.roleApplications.first { it.id == application.id }
     }
 
     suspend fun requestTutor(
@@ -281,7 +327,15 @@ class AccountAdministrationService(
                         request.operationId,
                         currentActor.id,
                         AccountStatus.ACTIVE,
-                        target.roles + role,
+                        if (application.role == StaffRole.TEACHER &&
+                            target.roles == setOf(UserRole.STUDENT) &&
+                            target.institutionId == null
+                        ) {
+                            // A teacher conversion must not imply previously unapproved student affiliation.
+                            setOf(UserRole.TEACHER)
+                        } else {
+                            target.roles + role
+                        },
                         request.institutionId,
                         clock.instant(),
                         digest,
@@ -436,13 +490,18 @@ class AccountAdministrationService(
             account.toUserSummary(),
             account.staffApplications(),
             account.adminCapabilities,
-            account.registrationIntent?.requestedInstitutionId.takeIf {
-                account.institutionId == null &&
-                    account.registrationIntent?.profile == org.companerodeescuela.shared.contracts.RegistrationAccountType.STUDENT
-            },
+            effectiveInstitution(account).takeIf { account.institutionId == null },
         )
 
-    private fun effectiveInstitution(account: PlatformAccount) = account.institutionId ?: account.registrationIntent?.requestedInstitutionId
+    private fun effectiveInstitution(account: PlatformAccount): String? {
+        val pendingTeacher =
+            account.staffApplications().firstOrNull {
+                it.role == StaffRole.TEACHER && it.status == StaffApplicationStatus.PENDING
+            }
+        return account.institutionId
+            ?: account.registrationIntent?.requestedInstitutionId
+            ?: pendingTeacher?.requestedInstitutionId
+    }
 
     private fun identifier(value: String) {
         if (value.isBlank() ||

@@ -31,6 +31,7 @@ import org.companerodeescuela.shared.contracts.AccountLifecycleRequest
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.ApproveStaffRequest
 import org.companerodeescuela.shared.contracts.ApproveStudentAffiliationRequest
+import org.companerodeescuela.shared.contracts.TeacherApplicationRequest
 import org.companerodeescuela.shared.contracts.TutorApplicationRequest
 
 fun Route.accountAdministrationRoutes(
@@ -71,6 +72,11 @@ fun Route.accountAdministrationRoutes(
                 val actor = call.actor(true)
                 val request = call.administrationRequest(TutorApplicationRequest.serializer())
                 call.respond(HttpStatusCode.Created, ApiResponse(service.requestTutor(actor, request), call.requestId()))
+            }
+            post("/teacher") {
+                val actor = call.actor(true)
+                val request = call.administrationRequest(TeacherApplicationRequest.serializer())
+                call.respond(HttpStatusCode.Created, ApiResponse(service.requestTeacher(actor, request), call.requestId()))
             }
         }
     }

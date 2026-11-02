@@ -206,7 +206,7 @@ class AttendanceNativeRoutesTest {
     @Test fun `teacher marks a linked native student manually with revision control`() =
         scenario { f ->
             val token = f.token(f.teacher)
-            val request = 
+            val request =
                 """{"studentId":"student-test","disposition":"present","note":"Pase manual revisado por docente","expectedRevision":0}"""
             val first =
                 client.post("/attendance/sessions/own/manual-record") {

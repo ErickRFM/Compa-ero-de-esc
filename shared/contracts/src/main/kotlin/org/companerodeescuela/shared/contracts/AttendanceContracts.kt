@@ -226,6 +226,15 @@ data class ReviewAttendanceRequest(
     val note: String? = null,
 )
 
+/** A teacher decision for a verified native class member; not campus/QR proof. */
+@Serializable
+data class ManualAttendanceMarkRequest(
+    val studentId: String,
+    val disposition: AttendanceDisposition,
+    val note: String,
+    val expectedRevision: Long = 0,
+)
+
 /** A class check-in must be verified server-side; receiving a notification does not count. */
 @Serializable
 data class ClassCallConfirmationRequest(

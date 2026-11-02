@@ -79,6 +79,17 @@ fun Route.classroomRoutes(
                 )
             }
 
+            get("/{classroomId}/members") {
+                val actor = call.requireNativeActor(tokenService)
+                call.response.headers.append("Cache-Control", "no-store")
+                call.respond(
+                    ApiResponse(
+                        data = service.listMembers(actor, call.requireClassroomId()),
+                        requestId = call.requestId(),
+                    ),
+                )
+            }
+
             post("/{classroomId}/members") {
                 val actor = call.requireNativeActor(tokenService)
                 val classroomId = call.requireClassroomId()

@@ -306,9 +306,23 @@ class MainActivity : AppCompatActivity() {
                                     }
                                     LaunchedEffect(pendingChannelNavigation, roleConfig.experience, session.roles) {
                                         if (pendingChannelNavigation && userId != null) {
-                                            pendingChannelNavigation = false
-                                            navController.navigate(Destination.Channel.route) {
-                                                launchSingleTop = true
+                                            val destinationExperience =
+                                                AcademicRoutePolicy.channelExperience(
+                                                    current = roleConfig.experience,
+                                                    roles = session.roles,
+                                                    distribution = appDistribution,
+                                                )
+                                            when {
+                                                destinationExperience == null -> pendingChannelNavigation = false
+                                                destinationExperience != roleConfig.experience -> {
+                                                    preferredExperience = destinationExperience
+                                                }
+                                                else -> {
+                                                    pendingChannelNavigation = false
+                                                    navController.navigate(Destination.Channel.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                }
                                             }
                                         }
                                     }

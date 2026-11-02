@@ -276,6 +276,7 @@ fun Application.module(
             identityGraph.accounts,
             presenceGraph?.service,
             institutions = identityGraph.institutions,
+            tasks = classroomGraph.channelTaskService,
         )
     val operationsGraph =
         buildOperationsFeatureGraph(
@@ -290,6 +291,7 @@ fun Application.module(
             refreshSessions = identityGraph.refreshSessions,
             authorizePushMessage = attendancePushEligibility::allows,
         )
+    classroomGraph.channelTaskService.attachNotifications(operationsGraph.pushService)
     val attendanceGraph =
         buildAttendanceFeatureGraph(
             settings = settings,

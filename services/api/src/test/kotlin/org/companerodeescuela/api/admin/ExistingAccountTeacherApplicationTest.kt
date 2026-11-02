@@ -75,19 +75,21 @@ class ExistingAccountTeacherApplicationTest {
             assertEquals(student.emailVerifiedAt, pending.emailVerifiedAt)
             assertEquals(application.id, service.requestTeacher(student, request).id)
 
-            val approval = ApproveStaffRequest(
-                operationId = "approve-teacher",
-                expectedAuthRevision = 0,
-                applicationId = application.id,
-                institutionId = "campus",
-                proof = "",
-            )
-            val proof = operator.proof(
-                StepUpAction.APPROVE_STAFF,
-                student.id,
-                approval.operationId,
-                PrivilegedCommandDigests.staffApproval(student.id, approval),
-            )
+            val approval =
+                ApproveStaffRequest(
+                    operationId = "approve-teacher",
+                    expectedAuthRevision = 0,
+                    applicationId = application.id,
+                    institutionId = "campus",
+                    proof = "",
+                )
+            val proof =
+                operator.proof(
+                    StepUpAction.APPROVE_STAFF,
+                    student.id,
+                    approval.operationId,
+                    PrivilegedCommandDigests.staffApproval(student.id, approval),
+                )
             val result = service.approveStaff(operator.actor, student.id, approval.copy(proof = proof))
             assertEquals(setOf(UserRole.TEACHER), result.user.roles)
             assertEquals("campus", result.user.institutionId)

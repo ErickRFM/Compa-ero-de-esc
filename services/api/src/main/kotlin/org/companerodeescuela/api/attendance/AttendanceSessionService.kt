@@ -395,7 +395,8 @@ class AttendanceSessionService(
             ) {
                 val directory = accounts ?: throw ApiException.DependencyUnavailable("Native student directory is unavailable")
                 val classes = classrooms ?: throw ApiException.DependencyUnavailable("Native classroom roster is unavailable")
-                classes.activeStudentIdsForTeacher(nativeActor, session.courseId)
+                val ids = classes.activeStudentIdsForTeacher(nativeActor, session.courseId)
+                ids
                     .mapNotNull { studentId ->
                         directory.findById(studentId)?.let { student ->
                             AttendanceEligibleStudent(student.id, student.displayName)

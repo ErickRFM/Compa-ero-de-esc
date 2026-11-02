@@ -65,6 +65,8 @@ fun buildAttendanceFeatureGraph(
                 nativeProjection = nativeProjection,
                 pushService = pushService,
                 schoolPresenceService = schoolPresenceService,
+                accounts = accounts,
+                classrooms = classrooms,
             ),
         studentService =
             AttendanceStudentService(

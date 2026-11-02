@@ -21,16 +21,16 @@ internal class NativeRosterImportReader(
                     ?: throw IOException("No se pudo leer el archivo")
             val bytes =
                 content.use { stream ->
-                val output = ByteArrayOutputStream()
-                val buffer = ByteArray(8192)
-                while (true) {
-                    val read = stream.read(buffer)
-                    if (read < 0) break
-                    output.write(buffer, 0, read)
-                    if (output.size() > MAX_BYTES) throw IOException("La lista excede 2 MB")
+                    val output = ByteArrayOutputStream()
+                    val buffer = ByteArray(8192)
+                    while (true) {
+                        val read = stream.read(buffer)
+                        if (read < 0) break
+                        output.write(buffer, 0, read)
+                        if (output.size() > MAX_BYTES) throw IOException("La lista excede 2 MB")
+                    }
+                    output.toByteArray()
                 }
-                output.toByteArray()
-            }
             val mime = context.contentResolver.getType(uri).orEmpty()
             val isPdfMime = mime.equals("application/pdf", ignoreCase = true)
             val isPdfName = uri.lastPathSegment?.endsWith(".pdf", ignoreCase = true) == true

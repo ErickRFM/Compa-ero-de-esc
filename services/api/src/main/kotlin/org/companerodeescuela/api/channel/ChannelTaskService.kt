@@ -457,7 +457,8 @@ class ChannelTaskService(
         }
         if (request.expectedVersion != current.version) throw ApiException.Conflict("Submission version is stale")
         val feedback = request.feedback?.trim()?.takeIf(String::isNotEmpty)
-        if (request.score != null && (!request.score.isFinite() || request.score !in 0.0..10.0)) {
+        val score = request.score
+        if (score != null && (!score.isFinite() || score !in 0.0..10.0)) {
             throw ApiException.Validation("Task grade must be between 0 and 10")
         }
         if (request.status == TaskStatus.RETURNED && request.score != null) {

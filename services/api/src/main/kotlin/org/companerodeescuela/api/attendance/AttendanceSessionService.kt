@@ -387,7 +387,7 @@ class AttendanceSessionService(
         accessPolicy.requireOwnerOrAdministrative(actorId, session, allowCrossOwner, nativeActor)
         val students =
             if (nativeActor != null &&
-                !allowCrossOwner &&
+                session.openedBy == nativeActor.id &&
                 UserRole.TEACHER in nativeActor.roles &&
                 session.identitySource == AttendanceIdentitySource.NATIVE &&
                 session.academicSource == null

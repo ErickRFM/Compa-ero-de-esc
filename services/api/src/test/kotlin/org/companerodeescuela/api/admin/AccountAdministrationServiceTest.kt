@@ -14,8 +14,10 @@ import org.companerodeescuela.api.auth.RegistrationIntent
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.institutions.InMemoryInstitutionRepository
 import org.companerodeescuela.api.security.InMemoryMfaRepository
+import org.companerodeescuela.api.security.MfaRepository
 import org.companerodeescuela.api.security.MfaSecretCipher
 import org.companerodeescuela.api.security.MfaService
+import org.companerodeescuela.api.security.StepUpBinding
 import org.companerodeescuela.api.security.Totp
 import org.companerodeescuela.api.tutoring.InMemoryTutorAssignmentRepository
 import org.companerodeescuela.api.tutoring.TutorAssignmentService
@@ -61,7 +63,8 @@ class AccountAdministrationServiceTest {
         val assignments = InMemoryTutorAssignmentRepository()
         val directory =
             InMemoryInstitutionRepository(listOf(InstitutionSummary("campus", "QA Campus"), InstitutionSummary("other", "Other QA campus")))
-        val mfa = MfaService(accounts, InMemoryMfaRepository(), MfaSecretCipher(ByteArray(32) { it.toByte() }), clock)
+        val mfaRepository = InMemoryMfaRepository()
+        val mfa = MfaService(accounts, mfaRepository, MfaSecretCipher(ByteArray(32) { it.toByte() }), clock)
         val tutoring = TutorAssignmentService(assignments, groups, clock, accounts)
         val service = AccountAdministrationService(accounts, directory, groups, tutoring, mfa, clock)
         lateinit var actor: PlatformAccount
@@ -434,6 +437,81 @@ class AccountAdministrationServiceTest {
             f.accounts.create(manager)
             assertFailsWith<ApiException.Forbidden> { f.service.approvalGroups(manager) }
             assertFailsWith<ApiException.Unauthorized> { f.service.approvalGroups(reviewer.copy(institutionId = "other")) }
+        }
+
+    private class RevokeOnProofConsumption(
+        private val delegate: MfaRepository,
+        private val revoke: suspend () -> Unit,
+    ) : MfaRepository by delegate {
+        override suspend fun consumeProof(
+            hash: String,
+            binding: StepUpBinding,
+            now: Instant,
+        ): Boolean {
+            revoke()
+            return delegate.consumeProof(hash, binding, now)
+        }
+    }
+
+    private fun Fixture.revokingService(): AccountAdministrationService {
+        val repository =
+            RevokeOnProofConsumption(mfaRepository) {
+                val revoked =
+                    accounts.changeIdentity(
+                        actor.id,
+                        actor.authRevision,
+                        AccountIdentityChange(
+                            "concurrent-operator-revocation",
+                            "owner",
+                            AccountStatus.REVOKED,
+                            actor.roles,
+                            actor.institutionId,
+                            clock.now,
+                        ),
+                    )
+                assertEquals(AccountStatus.REVOKED, revoked?.accountStatus)
+            }
+        val guardedMfa = MfaService(accounts, repository, MfaSecretCipher(ByteArray(32) { it.toByte() }), clock)
+        return AccountAdministrationService(accounts, directory, groups, tutoring, guardedMfa, clock)
+    }
+
+    @Test fun `operator revocation during MFA consumption prevents staff approval`() =
+        runBlocking<Unit> {
+            val f = Fixture()
+            f.initialize()
+            val applicant = f.pending()
+            val request = f.proof(applicant.id, f.request())
+
+            assertFailsWith<ApiException.Unauthorized> {
+                f.revokingService().approveStaff(f.actor, applicant.id, request)
+            }
+
+            assertEquals(applicant, f.accounts.findById(applicant.id))
+        }
+
+    @Test fun `operator revocation during MFA consumption prevents account suspension`() =
+        runBlocking<Unit> {
+            val f = Fixture()
+            f.initialize()
+            val target = f.pending()
+            val request = AccountLifecycleRequest("suspend-after-revocation", 0, AccountStatus.SUSPENDED, "")
+            f.clock.now = f.clock.now.plusSeconds(30)
+            val proof =
+                f.mfa.issueStepUp(
+                    f.actor,
+                    password,
+                    Totp.code(f.seed, f.clock.now.epochSecond),
+                    StepUpAction.ACCOUNT_LIFECYCLE,
+                    target.id,
+                    request.operationId,
+                    PrivilegedCommandDigests.accountLifecycle(target.id, request),
+                )
+
+            assertFailsWith<ApiException.Unauthorized> {
+                f.revokingService().lifecycle(f.actor, target.id, request.copy(proof = proof.proof))
+            }
+
+            assertEquals(target, f.accounts.findById(target.id))
         }
 
     @Test fun `delegated academic manager reads only verified scoped academic identities without contact or application data`() =

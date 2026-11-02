@@ -59,7 +59,8 @@ class CompaneroFirebaseMessagingService : FirebaseMessagingService() {
         val academicNotice = message.data["type"] == AcademicChangePushContract.TYPE && academicInstitution != null
         val taskNotice = isTaskNotificationType(message.data["type"])
         val channelNotice =
-            message.data["type"] in setOf("channel", "channel_notice", "institutional_notice", "notice") ||
+            taskNotice ||
+                message.data["type"] in setOf("channel", "channel_notice", "institutional_notice", "notice") ||
                 message.data["destination"] == "channel"
         if (message.notification == null && !attendanceNotice && !channelNotice && !academicNotice) return
         val hasSession =
@@ -85,8 +86,16 @@ class CompaneroFirebaseMessagingService : FirebaseMessagingService() {
                     putExtra(AttendancePushContract.SESSION_ID, sessionId)
                 } else if (channelNotice) {
                     action = CHANNEL_CLICK_ACTION
-                    data = Uri.parse("companero://channel")
+                    data =
+                        Uri
+                            .Builder()
+                            .scheme("companero")
+                            .authority("channel")
+                            .apply { message.data["channelId"]?.let(::appendPath) }
+                            .build()
                     putExtra("destination", "channel")
+                    message.data["channelId"]?.let { putExtra("channelId", it) }
+                    message.data["taskId"]?.let { putExtra("taskId", it) }
                     val taskType = message.data["type"]
                     if (isTaskNotificationType(taskType)) {
                         putExtra("type", taskType)

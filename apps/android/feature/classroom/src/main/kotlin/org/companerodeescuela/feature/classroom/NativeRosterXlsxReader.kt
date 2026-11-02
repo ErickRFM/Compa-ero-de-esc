@@ -130,5 +130,4 @@ private fun parseSafeXlsxXml(payload: ByteArray): org.w3c.dom.Document {
 
 private fun NodeList.firstText(): String? = item(0)?.textContent
 
-private fun NodeList.allText(): String =
-    (0 until length).joinToString("") { item(it).textContent }
+private fun NodeList.allText(): String = (0 until length).joinToString("") { item(it).textContent }

@@ -21,6 +21,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.AttachFile
@@ -41,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -63,7 +68,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassAssistChip
@@ -109,15 +116,22 @@ fun ChannelScreen(
     requestedTab: Int = -1,
     onConsumeRequestedTab: () -> Unit = {},
     viewModel: ChannelViewModel = hiltViewModel(),
+    requestedChannelId: String? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(requestedClassroom) { requestedClassroom?.let(viewModel::requestClassroom) }
+    LaunchedEffect(requestedChannelId, state.actionInProgress) {
+        if (!state.actionInProgress) requestedChannelId?.let(viewModel::requestChannel)
+    }
     val selected = state.channels.firstOrNull { it.id == state.selectedChannelId }
     var selectedTab by remember(state.selectedChannelId) { mutableIntStateOf(0) }
+    val tabListState = rememberLazyListState()
+    LaunchedEffect(selectedTab) { tabListState.scrollToItem(selectedTab) }
     var composerOpen by remember(state.selectedChannelId) { mutableStateOf(false) }
     var taskComposerOpen by remember(state.selectedChannelId) { mutableStateOf(false) }
     var selectedTask by remember(state.selectedChannelId) { mutableStateOf<ChannelTask?>(null) }
     var pendingUpload by remember(state.selectedChannelId) { mutableStateOf<PendingChannelTaskUpload?>(null) }
+    var localFileInProgress by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -137,21 +151,30 @@ fun ChannelScreen(
         rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
             val target = pendingUpload
             pendingUpload = null
-            if (target != null && uris.isNotEmpty()) {
+            if (target != null && uris.isNotEmpty() && !localFileInProgress) {
+                val sourceChannelId = state.selectedChannelId
+
+                fun reportSourceFileError(message: String) {
+                    if (viewModel.state.value.selectedChannelId == sourceChannelId) viewModel.reportLocalFileError(message)
+                }
+                localFileInProgress = true
                 scope.launch {
                     try {
-                        val uploads = readChannelTaskUploads(context.contentResolver, uris)
+                        val uploads = withContext(Dispatchers.IO) { readChannelTaskUploads(context.contentResolver, uris) }
+                        if (viewModel.state.value.selectedChannelId != sourceChannelId) return@launch
                         if (target.comment == null) {
                             viewModel.uploadTaskFiles(target.taskId, uploads)
                         } else {
                             viewModel.submitTask(target.taskId, target.comment, uploads)
                         }
                     } catch (error: IOException) {
-                        viewModel.reportLocalFileError(error.message ?: "No se pudieron leer los archivos.")
+                        reportSourceFileError(error.message ?: "No se pudieron leer los archivos.")
                     } catch (error: SecurityException) {
-                        viewModel.reportLocalFileError("No hay permiso para leer uno de los archivos seleccionados.")
+                        reportSourceFileError("No hay permiso para leer uno de los archivos seleccionados.")
                     } catch (error: IllegalArgumentException) {
-                        viewModel.reportLocalFileError(error.message ?: "El archivo seleccionado no es válido.")
+                        reportSourceFileError(error.message ?: "El archivo seleccionado no es válido.")
+                    } finally {
+                        localFileInProgress = false
                     }
                 }
             }
@@ -160,19 +183,29 @@ fun ChannelScreen(
         rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri ->
             val download = state.downloadReady
             if (uri != null && download != null) {
-                try {
-                    val output =
-                        context.contentResolver.openOutputStream(uri)
-                            ?: throw IOException("No se pudo abrir el destino seleccionado.")
-                    output.use {
-                        it.write(download.bytes)
-                        it.flush()
+                scope.launch {
+                    val success =
+                        try {
+                            withContext(Dispatchers.IO) {
+                                val output =
+                                    context.contentResolver.openOutputStream(uri)
+                                        ?: throw IOException("No se pudo abrir el destino seleccionado.")
+                                output.use {
+                                    it.write(download.bytes)
+                                    it.flush()
+                                }
+                            }
+                            true
+                        } catch (error: IOException) {
+                            false
+                        } catch (error: SecurityException) {
+                            false
+                        }
+                    if (viewModel.state.value.downloadReady
+                            ?.requestId == download.requestId
+                    ) {
+                        viewModel.finishFileDownload(success)
                     }
-                    viewModel.finishFileDownload(success = true)
-                } catch (error: IOException) {
-                    viewModel.finishFileDownload(success = false)
-                } catch (error: SecurityException) {
-                    viewModel.finishFileDownload(success = false)
                 }
             } else if (uri == null) {
                 viewModel.cancelFileDownload()
@@ -181,9 +214,26 @@ fun ChannelScreen(
     LaunchedEffect(state.downloadReady?.requestId) {
         state.downloadReady?.let { downloadPicker.launch(it.fileName) }
     }
-    LaunchedEffect(requestedTab, selected?.id) {
-        if (shouldConsumeChannelTabRequest(requestedTab, selected != null)) {
+    LaunchedEffect(
+        requestedTab,
+        selected?.id,
+        requestedChannelId,
+        state.loading,
+        state.actionInProgress,
+        state.resolvedNotificationChannelId,
+    ) {
+        if (state.loading || state.actionInProgress) return@LaunchedEffect
+        if (requestedChannelId != null && state.resolvedNotificationChannelId != requestedChannelId) return@LaunchedEffect
+        if (requestedChannelId != null && selected == null) {
+            viewModel.consumeRequestedChannel()
+            onConsumeRequestedTab()
+        } else if (shouldConsumeChannelTabRequest(
+                requestedTab,
+                selected != null && (requestedChannelId == null || selected.id == requestedChannelId),
+            )
+        ) {
             selectedTab = requestedTab
+            viewModel.consumeRequestedChannel()
             onConsumeRequestedTab()
         }
     }
@@ -287,9 +337,13 @@ fun ChannelScreen(
                         }
                     }
                     item {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("Avisos", "Recursos", "Tareas").forEachIndexed { index, label ->
-                                V8ChannelTab(label, selectedTab == index, { selectedTab = index }, Modifier.weight(1f))
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            state = tabListState,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            itemsIndexed(listOf("Avisos", "Recursos", "Tareas")) { index, label ->
+                                V8ChannelTab(label, selectedTab == index, { selectedTab = index }, Modifier.widthIn(min = 96.dp))
                             }
                         }
                     }
@@ -364,11 +418,14 @@ fun ChannelScreen(
                 }
             }
             if (taskComposerOpen) {
-                ModalBottomSheet(onDismissRequest = { taskComposerOpen = false }) {
+                ModalBottomSheet(
+                    onDismissRequest = { taskComposerOpen = false },
+                    sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                ) {
                     TaskComposer(
                         title = state.draftTaskTitle,
                         instructions = state.draftTaskInstructions,
-                        busy = state.actionInProgress,
+                        busy = state.actionInProgress || localFileInProgress,
                         onTitleChange = viewModel::updateDraftTaskTitle,
                         onInstructionsChange = viewModel::updateDraftTaskInstructions,
                         onCreate = { dueDate ->
@@ -387,7 +444,7 @@ fun ChannelScreen(
                         submissions = state.submissions[task.id].orEmpty(),
                         submissionsLoading = task.id in state.submissionsLoading,
                         errorMessage = state.errorMessage,
-                        busy = state.actionInProgress,
+                        busy = state.actionInProgress || localFileInProgress,
                         onSubmit = { comment -> viewModel.submitTask(task.id, comment, emptyList()) },
                         onPickSubmissionFiles = { comment ->
                             pendingUpload = PendingChannelTaskUpload(task.id, comment)
@@ -550,7 +607,7 @@ private fun TaskComposer(
             Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
         }
 
-    V8GlassCard(modifier = Modifier.fillMaxWidth()) {
+    V8GlassCard(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
         Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
             Text("Nueva tarea", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             OutlinedTextField(
@@ -678,7 +735,12 @@ private fun ChannelTaskDetails(
     val submission = submissions.singleOrNull()
     var comment by remember(task.id, submission?.version) { mutableStateOf(submission?.comment.orEmpty()) }
     Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.md),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(
+                    rememberScrollState(),
+                ).padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.md),
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
     ) {
         Text(task.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -840,6 +902,15 @@ private fun TaskSubmissionReviewCard(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
+            if (submission.status == TaskStatus.REVIEWED) {
+                submission.score?.let { persistedScore ->
+                    Text(
+                        "Calificación de tarea: $persistedScore / 10",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
             submission.comment?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
             if (submission.files.isNotEmpty()) {
                 TaskFileRows(submission.files, busy, onDownload)

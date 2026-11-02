@@ -2,15 +2,15 @@ package org.companerodeescuela.api.auth
 
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
+import kotlinx.coroutines.test.runTest
+import org.companerodeescuela.api.mail.ResendVerificationEmailGateway
+import org.companerodeescuela.shared.contracts.VerificationDeliveryStatus
 import java.net.InetSocketAddress
 import java.net.URI
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlinx.coroutines.test.runTest
-import org.companerodeescuela.api.mail.ResendVerificationEmailGateway
-import org.companerodeescuela.shared.contracts.VerificationDeliveryStatus
 
 class VerificationEmailTransportTest {
     @Test

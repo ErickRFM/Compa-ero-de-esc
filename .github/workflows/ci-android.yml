@@ -300,6 +300,7 @@ jobs:
           require_distinct('org.companerodeescuela.CoordinationAttendanceIndicatorsUiTest', 3)
           require_distinct('org.companerodeescuela.NotificationConsentUiTest', 3)
           require_distinct('org.companerodeescuela.AttendanceTruthUiTest', 8)
+          require_distinct('org.companerodeescuela.ChannelTaskLayoutUiTest', 4)
           if flavor == 'management':
               require_distinct('org.companerodeescuela.DistributionLoginUiTest', 2)
               require_distinct('org.companerodeescuela.V14RoleNavigationUiTest', 7)
@@ -315,6 +316,7 @@ jobs:
           path: |
             build/v10-device-evidence/**
             build/v19-institutional-evidence/**
+            build/channel-task-layout-evidence/**
             build/v10-runner-diagnostics/**
             apps/android/app/build/outputs/androidTest-results/connected/**
           retention-days: 7

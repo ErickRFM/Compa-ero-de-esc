@@ -4,7 +4,7 @@ A school companion app: one place to see today's classes, attendance,
 timetable and institutional notices, designed for the network and hardware
 realities of a public school rather than for a campus with fibre.
 
-The technical foundation is merged and the first student product slice is implemented: secure platform authentication, **Hoy**, **Agenda** and student-scoped offline academic cache. Real-school identity and academic providers are still required before a student pilot. See [Roadmap](docs/product/ROADMAP.md).
+Android now includes Academic and Management distributions, role-based access, **Hoy**, **Agenda**, classrooms, attendance, private class tasks, native gradebook and tutoring. Ktor provides scoped authorization and Mongo persistence. Institutional adapters and projections are present, but official SIII grade publishing and schedule proposals remain incomplete. See the [current consolidation and UI/logic audit (2026-11-02)](docs/audits/CONSOLIDACION_UI_LOGICA_20261102.md) for evidence, remaining work and the emulator acceptance matrix. Older roadmap and release documents retain their historical cutoffs.
 
 ---
 
@@ -13,13 +13,14 @@ The technical foundation is merged and the first student product slice is implem
 | Area | Status |
 |---|---|
 | Technical foundation | merged to `main` |
-| Student product foundation | implemented in the product-foundation line |
-| Android | Compose app with auth, Hoy, Agenda, profile/logout and encrypted session storage |
-| API | Ktor auth + academic endpoints behind provider boundaries |
-| Offline | Room snapshot cache scoped by authenticated student id |
-| Real institutional identity | pending external provider integration |
-| Real institutional schedule | pending external provider integration |
-| Attendance / QR | implemented: student/teacher UI, signed rotating QR, offline outbox and WorkManager reconciliation |
+| Android | Compose Academic/Management apps; role-aware student, teacher, tutor and management routes |
+| API | Ktor identity, academics, classrooms, attendance, channel/tasks, grading, tutoring and scoped management |
+| Offline | User-scoped Room academic cache and attendance outbox with WorkManager reconciliation |
+| Institutional integration | Identity/academic adapters, signed projections and authorized attendance history; environment E2E acceptance required |
+| Attendance / QR | Signed rotating QR, eligible student roster, audited teacher manual decisions and offline reconciliation |
+| Class tasks | Private files/submissions, teacher feedback, 0–10 task scores and revision history; durable notification gaps tracked in audit |
+| Native gradebook | Implemented; official SIII publishing remains unavailable |
+| UI and delivery acceptance | Build/tests and visual/device acceptance are separate gates; consult current audit |
 
 ## What is here
 

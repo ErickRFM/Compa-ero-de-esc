@@ -5,19 +5,12 @@ import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
-import io.ktor.http.contentType
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
-import java.time.Clock
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneOffset
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.Test
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.companerodeescuela.api.academic.groups.InMemoryAcademicGroupRepository
@@ -49,6 +42,13 @@ import org.companerodeescuela.shared.contracts.ClassroomMemberRole
 import org.companerodeescuela.shared.contracts.ClassroomStatus
 import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
 class AttendanceNativeRoutesTest {
     private class Fixture {

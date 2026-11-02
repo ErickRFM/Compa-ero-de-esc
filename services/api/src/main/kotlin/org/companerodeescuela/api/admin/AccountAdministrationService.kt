@@ -316,6 +316,7 @@ class AccountAdministrationService(
         } else if (request.tutorScopes.isNotEmpty()) {
             throw ApiException.Validation("Teacher approval cannot grant tutor assignments")
         }
+        val authorizedActor = policy.require(currentActor.toUserSummary(), AdminCapability.APPROVE_STAFF, request.institutionId)
         val approved =
             if (retry) {
                 target
@@ -325,7 +326,7 @@ class AccountAdministrationService(
                     request.expectedAuthRevision,
                     AccountIdentityChange(
                         request.operationId,
-                        currentActor.id,
+                        authorizedActor.id,
                         AccountStatus.ACTIVE,
                         if (application.role == StaffRole.TEACHER &&
                             target.roles == setOf(UserRole.STUDENT) &&
@@ -356,7 +357,7 @@ class AccountAdministrationService(
         }
         for (scope in request.tutorScopes) {
             tutoring.createApproved(
-                currentActor,
+                authorizedActor,
                 approved,
                 request.institutionId,
                 scope,
@@ -444,10 +445,11 @@ class AccountAdministrationService(
         }
         val digest = PrivilegedCommandDigests.accountLifecycle(targetId, request)
         mfa.requireStepUp(currentActor, request.proof, StepUpAction.ACCOUNT_LIFECYCLE, targetId, request.operationId, digest)
+        val authorizedActor = policy.require(currentActor.toUserSummary(), AdminCapability.MANAGE_USERS, institution)
         val exact =
             target.identityAudit.any {
                 it.operationId == request.operationId &&
-                    it.actorId == currentActor.id &&
+                    it.actorId == authorizedActor.id &&
                     it.fromRevision == request.expectedAuthRevision &&
                     it.scopeDigest == digest &&
                     it.toStatus == request.status
@@ -473,7 +475,7 @@ class AccountAdministrationService(
                 target.authRevision,
                 AccountIdentityChange(
                     request.operationId,
-                    currentActor.id,
+                    authorizedActor.id,
                     request.status,
                     target.roles,
                     target.institutionId,

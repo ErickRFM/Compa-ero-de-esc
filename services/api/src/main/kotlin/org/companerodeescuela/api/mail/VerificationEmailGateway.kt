@@ -1,8 +1,5 @@
 package org.companerodeescuela.api.mail
 
-import java.io.ByteArrayOutputStream
-import java.net.HttpURLConnection
-import java.net.URI
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -16,6 +13,9 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.companerodeescuela.shared.contracts.VerificationDeliveryStatus
+import java.io.ByteArrayOutputStream
+import java.net.HttpURLConnection
+import java.net.URI
 
 fun interface VerificationEmailGateway {
     suspend fun send(

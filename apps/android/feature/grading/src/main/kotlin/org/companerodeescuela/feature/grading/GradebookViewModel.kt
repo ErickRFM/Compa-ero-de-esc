@@ -40,6 +40,8 @@ data class GradebookUiState(
     val submitting: Boolean = false,
     val gradebookRevision: Long? = null,
     val gradebookPublished: Boolean = false,
+    val draftHasUnsavedChanges: Boolean = false,
+    val gradebookLoading: Boolean = false,
     val capabilityLoading: Boolean = true,
     val institutionalSyncAvailable: Boolean = false,
     val errorMessage: String? = null,
@@ -76,6 +78,11 @@ class GradebookViewModel
                         it.copy(
                             classroomId = "",
                             categories = emptyList(),
+                            categoryIds = emptyList(),
+                            gradebookRevision = null,
+                            gradebookPublished = false,
+                            draftHasUnsavedChanges = false,
+                            gradebookLoading = false,
                             preview = null,
                             importedFileName = null,
                             errorMessage = "La clase solicitada ya no está asignada a tu cuenta.",
@@ -138,6 +145,11 @@ class GradebookViewModel
                                 classroomId = selection,
                                 classroomLoadError = null,
                                 categories = if (selection == current.classroomId) current.categories else emptyList(),
+                                categoryIds = if (selection == current.classroomId) current.categoryIds else emptyList(),
+                                gradebookRevision = if (selection == current.classroomId) current.gradebookRevision else null,
+                                gradebookPublished = selection == current.classroomId && current.gradebookPublished,
+                                draftHasUnsavedChanges = selection == current.classroomId && current.draftHasUnsavedChanges,
+                                gradebookLoading = selection == current.classroomId && current.gradebookLoading,
                                 preview = if (selection == current.classroomId) current.preview else null,
                                 importedFileName = if (selection == current.classroomId) current.importedFileName else null,
                                 gradingPeriod = if (selection == current.classroomId) current.gradingPeriod else "",
@@ -153,6 +165,10 @@ class GradebookViewModel
                                 classroomId = "",
                                 categories = emptyList(),
                                 categoryIds = emptyList(),
+                                gradebookRevision = null,
+                                gradebookPublished = false,
+                                draftHasUnsavedChanges = false,
+                                gradebookLoading = false,
                                 preview = null,
                                 importedFileName = null,
                                 gradingPeriod = "",
@@ -175,6 +191,8 @@ class GradebookViewModel
                     categoryIds = emptyList(),
                     gradebookRevision = null,
                     gradebookPublished = false,
+                    draftHasUnsavedChanges = false,
+                    gradebookLoading = false,
                     preview = null,
                     importedFileName = null,
                     gradingPeriod = "",
@@ -197,6 +215,8 @@ class GradebookViewModel
                         importedFileName = null,
                         gradebookRevision = null,
                         gradebookPublished = false,
+                        draftHasUnsavedChanges = false,
+                        gradebookLoading = false,
                     )
                 }
             }
@@ -205,12 +225,13 @@ class GradebookViewModel
 
         fun addCategory() =
             _state.update {
-                if (it.submitting) {
+                if (it.submitting || it.gradebookPublished) {
                     it
                 } else {
                     it.copy(
                         categories = it.categories + GradeCategoryDraft("", 0.0),
                         categoryIds = it.categoryIds + UUID.randomUUID().toString(),
+                        draftHasUnsavedChanges = true,
                         errorMessage = null,
                     )
                 }
@@ -218,12 +239,13 @@ class GradebookViewModel
 
         fun removeCategory(index: Int) =
             _state.update {
-                if (it.submitting) {
+                if (it.submitting || it.gradebookPublished) {
                     it
                 } else {
                     it.copy(
                         categories = it.categories.filterIndexed { position, _ -> position != index },
                         categoryIds = it.categoryIds.filterIndexed { position, _ -> position != index },
+                        draftHasUnsavedChanges = true,
                     )
                 }
             }
@@ -233,19 +255,21 @@ class GradebookViewModel
             name: String? = null,
             weight: Double? = null,
         ) = _state.update { current ->
-            if (current.submitting) return@update current
+            if (current.submitting || current.gradebookPublished) return@update current
+            val categories =
+                current.categories.mapIndexed { position, category ->
+                    if (position != index) {
+                        category
+                    } else {
+                        category.copy(
+                            name = name?.take(80) ?: category.name,
+                            weightPercent = weight ?: category.weightPercent,
+                        )
+                    }
+                }
             current.copy(
-                categories =
-                    current.categories.mapIndexed { position, category ->
-                        if (position != index) {
-                            category
-                        } else {
-                            category.copy(
-                                name = name?.take(80) ?: category.name,
-                                weightPercent = weight ?: category.weightPercent,
-                            )
-                        }
-                    },
+                categories = categories,
+                draftHasUnsavedChanges = current.draftHasUnsavedChanges || categories != current.categories,
                 errorMessage = null,
             )
         }
@@ -253,33 +277,64 @@ class GradebookViewModel
         fun importSpreadsheet(
             fileName: String,
             bytes: ByteArray,
+            expectedClassroomId: String = _state.value.classroomId,
+            expectedGradingPeriod: String = _state.value.gradingPeriod,
         ) {
-            if (_state.value.submitting) return
+            val current = _state.value
+            if (current.submitting ||
+                current.gradebookPublished ||
+                current.classroomId != expectedClassroomId ||
+                current.gradingPeriod != expectedGradingPeriod
+            ) {
+                return
+            }
             runCatching { SpreadsheetReader.read(fileName, bytes) }
                 .onSuccess { preview ->
                     _state.update {
+                        if (it.submitting ||
+                            it.gradebookPublished ||
+                            it.classroomId != expectedClassroomId ||
+                            it.gradingPeriod != expectedGradingPeriod
+                        ) {
+                            return@update it
+                        }
                         it.copy(
                             preview = preview,
                             importedFileName = fileName,
+                            draftHasUnsavedChanges = true,
                             errorMessage = null,
                             successMessage = "${preview.rows.size} alumnos leídos. Revisa antes de sincronizar.",
                         )
                     }
                 }.onFailure { error ->
-                    _state.update {
-                        it.copy(
-                            preview = null,
-                            importedFileName = null,
-                            errorMessage = error.message ?: "No se pudo leer el archivo.",
-                            successMessage = null,
-                        )
-                    }
+                    reportImportFailure(error.message ?: "No se pudo leer el archivo.", expectedClassroomId, expectedGradingPeriod)
                 }
+        }
+
+        fun reportImportFailure(
+            message: String,
+            expectedClassroomId: String,
+            expectedGradingPeriod: String,
+        ) = _state.update {
+            if (it.submitting ||
+                it.gradebookPublished ||
+                it.classroomId != expectedClassroomId ||
+                it.gradingPeriod != expectedGradingPeriod
+            ) {
+                return@update it
+            }
+            it.copy(
+                preview = null,
+                importedFileName = null,
+                draftHasUnsavedChanges = true,
+                errorMessage = message,
+                successMessage = null,
+            )
         }
 
         fun saveDraft() {
             val current = _state.value
-            if (current.submitting) return
+            if (current.submitting || current.gradebookLoading || current.gradebookPublished) return
             val rows = draftRows(current) ?: return
             val request =
                 GradebookDraftRequest(
@@ -305,6 +360,7 @@ class GradebookViewModel
                                 submitting = false,
                                 gradebookRevision = result.value.revision,
                                 gradebookPublished = result.value.status == GradebookStatus.PUBLISHED,
+                                draftHasUnsavedChanges = false,
                                 successMessage = "Borrador guardado · revisión ${result.value.revision}.",
                             )
                         }
@@ -316,7 +372,11 @@ class GradebookViewModel
         fun publishDraft() {
             val current = _state.value
             val revision = current.gradebookRevision
-            if (current.submitting || revision == null || current.gradebookPublished) return
+            if (current.submitting || current.gradebookLoading || revision == null || current.gradebookPublished) return
+            if (current.draftHasUnsavedChanges) {
+                _state.update { it.copy(errorMessage = "Guarda los cambios del borrador antes de publicar.") }
+                return
+            }
             _state.update { it.copy(submitting = true, errorMessage = null, successMessage = null) }
             viewModelScope.launch {
                 when (val result = repository.publish(GradebookPublishRequest(current.classroomId, current.gradingPeriod, revision))) {
@@ -337,42 +397,70 @@ class GradebookViewModel
         private fun loadGradebook() {
             val current = _state.value
             if (current.classroomId.isBlank() || current.gradingPeriod.isBlank() || current.submitting) return
+            _state.update { it.copy(gradebookLoading = true) }
             viewModelScope.launch {
                 when (val result = repository.gradebook(current.classroomId, current.gradingPeriod)) {
                     is Outcome.Success ->
-                        result.value?.let { snapshot ->
-                            _state.update { state ->
-                                if (state.classroomId != snapshot.classroomId ||
-                                    state.gradingPeriod != snapshot.gradingPeriod
-                                ) {
-                                    return@update state
-                                }
-                                val names = snapshot.categories.associate { it.id to it.name }
-                                state.copy(
-                                    categories = snapshot.categories.map { GradeCategoryDraft(it.name, it.weightPercent) },
-                                    categoryIds = snapshot.categories.map { it.id },
-                                    preview =
-                                        org.companerodeescuela.shared.contracts.GradeImportPreview(
-                                            columns = snapshot.categories.map { it.name },
-                                            rows =
-                                                snapshot.rows.map { row ->
-                                                    org.companerodeescuela.shared.contracts.GradeImportRow(
-                                                        studentId = row.studentId,
-                                                        values =
-                                                            row.scores
-                                                                .mapNotNull { (id, score) ->
-                                                                    names[id]?.let { it to score }
-                                                                }.toMap(),
-                                                    )
-                                                },
-                                        ),
-                                    gradebookRevision = snapshot.revision,
-                                    gradebookPublished = snapshot.status == GradebookStatus.PUBLISHED,
-                                    errorMessage = null,
-                                )
+                        _state.update { state ->
+                            if (state.classroomId != current.classroomId ||
+                                state.gradingPeriod != current.gradingPeriod
+                            ) {
+                                return@update state
+                            }
+                            val snapshot = result.value ?: return@update state.copy(gradebookLoading = false)
+                            if (state.classroomId != snapshot.classroomId || state.gradingPeriod != snapshot.gradingPeriod) {
+                                return@update state.copy(gradebookLoading = false)
+                            }
+                            if (snapshot.revision < (state.gradebookRevision ?: 0L) ||
+                                state.gradebookPublished &&
+                                snapshot.status != GradebookStatus.PUBLISHED
+                            ) {
+                                return@update state.copy(gradebookLoading = false)
+                            }
+                            if (state.draftHasUnsavedChanges && snapshot.status == GradebookStatus.DRAFT) {
+                                return@update state.copy(gradebookLoading = false, gradebookRevision = snapshot.revision)
+                            }
+                            val names = snapshot.categories.associate { it.id to it.name }
+                            state.copy(
+                                categories = snapshot.categories.map { GradeCategoryDraft(it.name, it.weightPercent) },
+                                categoryIds = snapshot.categories.map { it.id },
+                                preview =
+                                    org.companerodeescuela.shared.contracts.GradeImportPreview(
+                                        columns = snapshot.categories.map { it.name },
+                                        rows =
+                                            snapshot.rows.map { row ->
+                                                org.companerodeescuela.shared.contracts.GradeImportRow(
+                                                    studentId = row.studentId,
+                                                    values =
+                                                        row.scores
+                                                            .mapNotNull { (id, score) ->
+                                                                names[id]?.let { it to score }
+                                                            }.toMap(),
+                                                )
+                                            },
+                                    ),
+                                gradebookRevision = snapshot.revision,
+                                gradebookPublished = snapshot.status == GradebookStatus.PUBLISHED,
+                                draftHasUnsavedChanges = false,
+                                gradebookLoading = false,
+                                importedFileName = null,
+                                successMessage = null,
+                                errorMessage =
+                                    if (state.draftHasUnsavedChanges && snapshot.status == GradebookStatus.PUBLISHED) {
+                                        "El periodo ya está publicado. Se muestran las calificaciones guardadas; no se aplicaron las ediciones locales."
+                                    } else {
+                                        null
+                                    },
+                            )
+                        }
+                    is Outcome.Failure ->
+                        _state.update {
+                            if (it.classroomId == current.classroomId && it.gradingPeriod == current.gradingPeriod) {
+                                it.copy(gradebookLoading = false)
+                            } else {
+                                it
                             }
                         }
-                    is Outcome.Failure -> Unit
                 }
             }
         }
@@ -412,7 +500,7 @@ class GradebookViewModel
 
         fun sync() {
             val current = _state.value
-            if (current.submitting || current.loadingClassrooms) return
+            if (current.submitting || current.loadingClassrooms || current.gradebookLoading) return
             if (current.capabilityLoading || !current.institutionalSyncAvailable) {
                 _state.update {
                     it.copy(

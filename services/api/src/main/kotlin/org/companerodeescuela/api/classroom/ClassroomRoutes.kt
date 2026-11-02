@@ -97,9 +97,9 @@ fun Route.classroomRoutes(
                     runCatchingCancellable {
                         call.boundedAuthRequest(AddClassMembersRequest.serializer())
                     }.getOrElse {
-                    if (it is kotlinx.coroutines.CancellationException) throw it
-                    throw ApiException.Validation("Invalid native member import")
-                }
+                        if (it is kotlinx.coroutines.CancellationException) throw it
+                        throw ApiException.Validation("Invalid native member import")
+                    }
                 call.respond(
                     ApiResponse(
                         data = service.addMembers(actor, classroomId, request.identifiers),

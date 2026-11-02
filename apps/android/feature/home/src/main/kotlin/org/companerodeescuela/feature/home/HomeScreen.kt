@@ -77,7 +77,7 @@ fun HomeScreen(
     onOpenSchedule: () -> Unit = {},
     onOpenClassrooms: () -> Unit = {},
     onOpenChannel: () -> Unit = {},
-    onOpenTasks: () -> Unit = onOpenChannel,
+    onOpenTasks: () -> Unit = {},
     onOpenAttendance: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
     displayName: String? = null,

@@ -357,6 +357,13 @@ class MainActivity : AppCompatActivity() {
                                                     }
                                                 },
                                                 onOpenChannel = {
+                                                    channelTabRequest = 0
+                                                    navController.navigate(Destination.Channel.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                                onOpenTasks = {
+                                                    channelTabRequest = 2
                                                     navController.navigate(Destination.Channel.route) {
                                                         launchSingleTop = true
                                                     }

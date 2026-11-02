@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Campaign
@@ -54,6 +55,7 @@ import java.time.LocalDate
 fun TeacherHomeScreen(
     onOpenAttendance: () -> Unit,
     onOpenChannel: () -> Unit,
+    onOpenTasks: () -> Unit = {},
     onOpenClassrooms: () -> Unit = {},
     onOpenGrading: () -> Unit = {},
     onOpenSchedule: () -> Unit = {},
@@ -287,6 +289,9 @@ fun TeacherHomeScreen(
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TeacherToolCard("Canal", "Avisos y archivos", Icons.Filled.Campaign, onOpenChannel, Modifier.weight(1f))
+                    TeacherToolCard("Tareas", "Entregas y revisión", Assignment, onOpenTasks, Modifier.weight(1f))
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TeacherToolCard("Evaluación", "Excel y calificaciones", Icons.Filled.BarChart, onOpenGrading, Modifier.weight(1f))
                 }
 

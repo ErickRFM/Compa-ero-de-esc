@@ -549,10 +549,11 @@ class MainActivity : AppCompatActivity() {
                                             RoleUnavailableScreen(roleConfig.experience, onLogout = sessionViewModel::logout)
                                         }
                                         composable(Destination.Profile.route) {
+                                            val adminExperience =
+                                                roleConfig.experience == AppExperience.ADMIN ||
+                                                    roleConfig.experience == AppExperience.SUPER_ADMIN
                                             val adminProfile =
-                                                appDistribution == AppDistribution.MANAGEMENT &&
-                                                    (roleConfig.experience == AppExperience.ADMIN ||
-                                                        roleConfig.experience == AppExperience.SUPER_ADMIN)
+                                                appDistribution == AppDistribution.MANAGEMENT && adminExperience
                                             ProfileScreen(
                                                 displayName = session.displayName,
                                                 roles = session.roles,

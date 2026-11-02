@@ -12,7 +12,7 @@ class NavigationChromePolicyTest {
         val tabs = config.topLevelDestinations.map { it.destination.route }
         assertFalse(isSecondaryRoute(Destination.Home.route, config.startDestination.route, tabs))
         assertFalse(isSecondaryRoute(Destination.Schedule.route, config.startDestination.route, tabs))
-        assertFalse(isSecondaryRoute(Destination.Profile.route, config.startDestination.route, tabs))
+        assertTrue(isSecondaryRoute(Destination.Profile.route, config.startDestination.route, tabs))
     }
 
     @Test

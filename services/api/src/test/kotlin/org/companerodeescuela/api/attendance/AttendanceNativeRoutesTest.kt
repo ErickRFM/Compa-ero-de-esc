@@ -174,7 +174,13 @@ class AttendanceNativeRoutesTest {
                         f.settings,
                         f.service,
                         AttendanceStudentService(f.repository, AttendanceEnrollmentResolver(MockAcademicProvider())),
-                        AttendanceReviewService(f.repository, f.policy, f.clock, f.accounts, ClassroomService(f.classes, f.groups, f.clock, accounts = f.accounts)),
+                        AttendanceReviewService(
+                            f.repository,
+                            f.policy,
+                            f.clock,
+                            f.accounts,
+                            ClassroomService(f.classes, f.groups, f.clock, accounts = f.accounts),
+                        ),
                         AttendanceQrService(
                             CharArray(32) { 's' },
                             f.repository,
@@ -200,24 +206,28 @@ class AttendanceNativeRoutesTest {
     @Test fun `teacher marks a linked native student manually with revision control`() =
         scenario { f ->
             val token = f.token(f.teacher)
-            val request = """{"studentId":"student-test","disposition":"present","note":"Pase manual revisado por docente","expectedRevision":0}"""
-            val first = client.post("/attendance/sessions/own/manual-record") {
-                bearerAuth(token)
-                contentType(ContentType.Application.Json)
-                setBody(request)
-            }
+            val request = 
+                """{"studentId":"student-test","disposition":"present","note":"Pase manual revisado por docente","expectedRevision":0}"""
+            val first =
+                client.post("/attendance/sessions/own/manual-record") {
+                    bearerAuth(token)
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
             assertEquals(HttpStatusCode.OK, first.status)
-            val retry = client.post("/attendance/sessions/own/manual-record") {
-                bearerAuth(token)
-                contentType(ContentType.Application.Json)
-                setBody(request)
-            }
+            val retry =
+                client.post("/attendance/sessions/own/manual-record") {
+                    bearerAuth(token)
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
             assertEquals(HttpStatusCode.Conflict, retry.status)
-            val anotherClass = client.post("/attendance/sessions/foreign/manual-record") {
-                bearerAuth(token)
-                contentType(ContentType.Application.Json)
-                setBody(request)
-            }
+            val anotherClass =
+                client.post("/attendance/sessions/foreign/manual-record") {
+                    bearerAuth(token)
+                    contentType(ContentType.Application.Json)
+                    setBody(request)
+                }
             assertEquals(HttpStatusCode.Forbidden, anotherClass.status)
         }
 

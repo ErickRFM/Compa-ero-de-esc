@@ -99,6 +99,27 @@ class MongoChannelTaskRepositoryIntegrationTest {
             assertEquals(listOf(1, 2), persisted?.history?.map { it.version })
             assertEquals(setOf("mongo-idempotency-key"), persisted?.idempotencyKeys)
             assertNull(repository.findSubmission("isolated-channel-b", task.id, submission.id))
+            val graded =
+                returned.copy(
+                    status = TaskStatus.REVIEWED,
+                    score = 9.5,
+                    version = 3,
+                    history =
+                        returned.history +
+                            TaskSubmissionVersion(
+                                version = 3,
+                                status = TaskStatus.REVIEWED,
+                                comment = returned.comment,
+                                feedback = "Good work",
+                                changedBy = "teacher-a",
+                                changedAtEpochSeconds = now + 20,
+                                score = 9.5,
+                            ),
+                )
+            assertTrue(repository.replaceSubmission(graded, expectedVersion = 2))
+            val gradedReloaded = repository.findSubmission(task.channelId, task.id, submission.id)
+            assertEquals(9.5, gradedReloaded?.score)
+            assertEquals(9.5, gradedReloaded?.history?.last()?.score)
 
             val file =
                 ChannelPrivateFileMetadata(

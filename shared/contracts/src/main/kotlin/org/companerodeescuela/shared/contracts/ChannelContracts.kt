@@ -218,6 +218,8 @@ data class TaskSubmission(
     val files: List<ChannelPrivateFileMetadata> = emptyList(),
     val fileIds: List<String> = emptyList(),
     @kotlinx.serialization.Transient val idempotencyKeys: Set<String> = emptySet(),
+    /** Private task score (0..10), not an institutional final grade. */
+    val score: Double? = null,
 )
 
 @Serializable
@@ -255,6 +257,7 @@ data class ReviewSubmissionRequest(
     val status: TaskStatus,
     val feedback: String? = null,
     val expectedVersion: Int,
+    val score: Double? = null,
 )
 
 @Serializable
@@ -266,6 +269,7 @@ data class TaskSubmissionVersion(
     val feedback: String? = null,
     val changedBy: String,
     val changedAtEpochSeconds: Long,
+    val score: Double? = null,
 )
 
 @Serializable

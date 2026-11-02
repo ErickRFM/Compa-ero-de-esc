@@ -86,6 +86,10 @@ class CompaneroFirebaseMessagingService : FirebaseMessagingService() {
                     action = CHANNEL_CLICK_ACTION
                     data = Uri.parse("companero://channel")
                     putExtra("destination", "channel")
+                    val taskType = message.data["type"]
+                    if (taskType in setOf("channel_task", "channel_task_submission")) {
+                        putExtra("type", taskType)
+                    }
                 }
             }
         val pending =

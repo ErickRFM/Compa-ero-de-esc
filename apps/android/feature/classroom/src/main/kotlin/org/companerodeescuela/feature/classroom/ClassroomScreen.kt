@@ -602,11 +602,18 @@ private fun TeacherAssignedClassrooms(
                                     OutlinedButton(
                                         onClick = {
                                             pickerClassId = classroom.id
-                                            documentPicker?.launch(arrayOf("application/pdf", "text/csv", "text/plain"))
+                                            documentPicker?.launch(
+                                                arrayOf(
+                                                    "application/pdf",
+                                                    "text/csv",
+                                                    "text/plain",
+                                                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                                ),
+                                            )
                                         },
                                         enabled = !state.submitting && !importLoading && documentPicker != null,
                                         modifier = Modifier.fillMaxWidth(),
-                                    ) { Text("Elegir lista PDF / CSV / TXT") }
+                                    ) { Text("Elegir lista PDF / CSV / TXT / XLSX") }
                                     if (importLoading) {
                                         CircularProgressIndicator()
                                         Text("Leyendo lista de alumnos…", style = MaterialTheme.typography.bodySmall)

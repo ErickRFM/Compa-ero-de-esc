@@ -186,13 +186,13 @@ fun ClassroomScreen(
                         ) {
                             if (isStudent) {
                                 V8RedPrimaryButton(
-                                    text = "Calificaciones",
+                                    text = "Notas",
                                     onClick = onOpenStudentGrades,
                                     modifier = Modifier.weight(1f),
                                 )
                             }
                             OutlinedButton(onClick = { onOpenChannel(null) }, modifier = Modifier.weight(1f)) {
-                                Text("Canal de clase")
+                                Text("Canal")
                             }
                         }
                     }

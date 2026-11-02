@@ -211,14 +211,20 @@ class FcmDeliveryTest {
                         }
                     },
                 )
-            val result = gateway.send(
-                "fcm_test_channel_device_123456789",
-                "Canal",
-                "Nuevo aviso",
-                mapOf("type" to "channel"),
-            )
+            val result =
+                gateway.send(
+                    "fcm_test_channel_device_123456789",
+                    "Canal",
+                    "Nuevo aviso",
+                    mapOf("type" to "channel"),
+                )
             assertEquals(PushDeliveryResult.ACCEPTED, result)
-            val android = payload?.get("android")?.jsonObject?.get("notification")?.jsonObject
+            val android =
+                payload
+                    ?.get("android")
+                    ?.jsonObject
+                    ?.get("notification")
+                    ?.jsonObject
             assertEquals(
                 "org.companerodeescuela.action.OPEN_CHANNEL",
                 android?.get("click_action")?.jsonPrimitive?.content,

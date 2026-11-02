@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -32,6 +33,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,9 +42,14 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
@@ -52,6 +60,7 @@ import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.TeacherClassContext
+import java.io.IOException
 
 private val teacherGradingPeriodPresets = listOf("Parcial 1", "Parcial 2", "Parcial 3", "Final")
 
@@ -67,31 +76,74 @@ fun GradebookScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(requestedClassroom) { requestedClassroom?.let { viewModel.requestClassroom(it.classroomId) } }
-    var confirmSync by remember(state.classroomId, state.preview, state.categories, state.gradingPeriod) { mutableStateOf(false) }
-    var confirmPublish by remember(state.classroomId, state.gradebookRevision, state.gradingPeriod) { mutableStateOf(false) }
+    var weightDrafts by remember(state.classroomId, state.gradingPeriod, state.gradebookPublished) {
+        mutableStateOf(emptyMap<String, String>())
+    }
+    val categoryKeys = state.categories.indices.map { state.categoryIds.getOrElse(it) { "category-$it" } }
+    val weightDraftsValid = categoryWeightDraftsValid(categoryKeys, weightDrafts)
+    var confirmSync by remember(state.classroomId, state.preview, state.categories, state.gradingPeriod, weightDrafts) {
+        mutableStateOf(false)
+    }
+    var confirmPublish by remember(
+        state.classroomId,
+        state.gradebookRevision,
+        state.gradingPeriod,
+        state.draftHasUnsavedChanges,
+        weightDrafts,
+    ) {
+        mutableStateOf(false)
+    }
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    var importInProgress by remember { mutableStateOf(false) }
+    var pendingImportClassroomId by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingImportGradingPeriod by rememberSaveable { mutableStateOf<String?>(null) }
     val fileLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            if (uri != null) {
-                val mime = context.contentResolver.getType(uri).orEmpty()
-                val fallbackName =
-                    runCatching {
-                        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
-                            if (it.moveToFirst()) it.getString(0) else null
+            val sourceClassroomId = pendingImportClassroomId
+            val sourceGradingPeriod = pendingImportGradingPeriod
+            pendingImportClassroomId = null
+            pendingImportGradingPeriod = null
+            if (uri != null && sourceClassroomId != null && sourceGradingPeriod != null && !importInProgress) {
+                importInProgress = true
+                scope.launch {
+                    try {
+                        val (fileName, bytes) =
+                            withContext(Dispatchers.IO) {
+                                val resolver = context.contentResolver
+                                val mime = optionalGradeImportMetadata { resolver.getType(uri) }.orEmpty()
+                                val name =
+                                    optionalGradeImportMetadata {
+                                        resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+                                            if (it.moveToFirst()) it.getString(0) else null
+                                        }
+                                    }?.takeIf(String::isNotBlank) ?: when {
+                                        mime.contains("spreadsheet") || mime.contains("excel") -> "calificaciones.xlsx"
+                                        mime.contains("csv") -> "calificaciones.csv"
+                                        else -> uri.lastPathSegment ?: "calificaciones.xlsx"
+                                    }
+                                val content =
+                                    resolver.openInputStream(uri)?.use(SpreadsheetReader::readBoundedInput)
+                                        ?: throw IOException("No se pudo abrir el archivo.")
+                                name to content
+                            }
+                        withContext(Dispatchers.Default) {
+                            viewModel.importSpreadsheet(fileName, bytes, sourceClassroomId, sourceGradingPeriod)
                         }
-                    }.getOrNull()?.takeIf(String::isNotBlank) ?: when {
-                        mime.contains("spreadsheet") || mime.contains("excel") -> "calificaciones.xlsx"
-                        mime.contains("csv") -> "calificaciones.csv"
-                        else -> uri.lastPathSegment ?: "calificaciones.xlsx"
+                    } catch (error: IOException) {
+                        viewModel.reportImportFailure(
+                            error.message ?: "No se pudo leer el archivo.",
+                            sourceClassroomId,
+                            sourceGradingPeriod,
+                        )
+                    } catch (_: SecurityException) {
+                        viewModel.reportImportFailure("No hay permiso para leer el archivo.", sourceClassroomId, sourceGradingPeriod)
+                    } catch (_: IllegalArgumentException) {
+                        viewModel.reportImportFailure("El archivo seleccionado no es válido.", sourceClassroomId, sourceGradingPeriod)
+                    } finally {
+                        importInProgress = false
                     }
-                runCatching {
-                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                        ?: error("No se pudo abrir el archivo.")
-                }.onSuccess { bytes ->
-                    viewModel.importSpreadsheet(fallbackName, bytes)
-                }.onFailure {
-                    viewModel.importSpreadsheet("archivo-invalido", ByteArray(0))
                 }
             }
         }
@@ -208,7 +260,14 @@ fun GradebookScreen(
                         Text("Ponderación acumulada", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
                             formatWeight(state.totalWeight) + "% de 100%",
-                            color = if (state.schemeComplete) V8RedColors.Success else MaterialTheme.colorScheme.onSurface,
+                            color =
+                                if (state.schemeComplete &&
+                                    weightDraftsValid
+                                ) {
+                                    V8RedColors.Success
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
@@ -226,6 +285,14 @@ fun GradebookScreen(
                         )
                     }
                     state.categories.forEachIndexed { index, category ->
+                        val categoryKey = categoryKeys[index]
+                        val weightText =
+                            weightDrafts[categoryKey]
+                                ?: if (category.weightPercent == 0.0) "" else formatWeight(category.weightPercent)
+                        val onWeightChange: (String) -> Unit = { raw ->
+                            weightDrafts = weightDrafts + (categoryKey to raw)
+                            categoryWeightValue(raw)?.let { viewModel.updateCategory(index, weight = it) }
+                        }
                         V8GlassCard(
                             modifier = Modifier.fillMaxWidth(),
                             contentPadding =
@@ -246,11 +313,14 @@ fun GradebookScreen(
                                                 category.name,
                                                 { viewModel.updateCategory(index, name = it) },
                                                 Modifier.fillMaxWidth(),
-                                                enabled = !state.submitting,
+                                                enabled = !state.submitting && !state.gradebookPublished,
                                             )
-                                            CategoryWeightField(category.weightPercent, {
-                                                viewModel.updateCategory(index, weight = it)
-                                            }, Modifier.fillMaxWidth(), enabled = !state.submitting)
+                                            CategoryWeightField(
+                                                weightText,
+                                                onWeightChange,
+                                                Modifier.fillMaxWidth(),
+                                                enabled = !state.submitting && !state.gradebookPublished,
+                                            )
                                         }
                                     } else {
                                         Row(horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
@@ -258,29 +328,40 @@ fun GradebookScreen(
                                                 category.name,
                                                 { viewModel.updateCategory(index, name = it) },
                                                 Modifier.weight(2f),
-                                                enabled = !state.submitting,
+                                                enabled = !state.submitting && !state.gradebookPublished,
                                             )
-                                            CategoryWeightField(category.weightPercent, {
-                                                viewModel.updateCategory(index, weight = it)
-                                            }, Modifier.weight(1f), enabled = !state.submitting)
+                                            CategoryWeightField(
+                                                weightText,
+                                                onWeightChange,
+                                                Modifier.weight(1f),
+                                                enabled = !state.submitting && !state.gradebookPublished,
+                                            )
                                         }
                                     }
                                 }
-                                OutlinedButton(onClick = { viewModel.removeCategory(index) }, enabled = !state.submitting) {
+                                OutlinedButton(
+                                    onClick = { viewModel.removeCategory(index) },
+                                    enabled =
+                                        !state.submitting && !state.gradebookPublished,
+                                ) {
                                     Text("Quitar actividad")
                                 }
                             }
                         }
                     }
-                    OutlinedButton(onClick = viewModel::addCategory, enabled = !state.submitting, modifier = Modifier.fillMaxWidth()) {
+                    OutlinedButton(
+                        onClick = viewModel::addCategory,
+                        enabled = !state.submitting && !state.gradebookPublished,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
                         Text("+ Agregar actividad")
                     }
-                    if (state.categories.isNotEmpty() && !state.schemeComplete) {
+                    if (state.categories.isNotEmpty() && (!state.schemeComplete || !weightDraftsValid)) {
                         Text(
-                            if (state.totalWeight > 100) {
-                                "La ponderación supera el 100%."
-                            } else {
-                                "Falta " + formatWeight(100.0 - state.totalWeight) + "% para completar el esquema."
+                            when {
+                                !weightDraftsValid -> "Completa los porcentajes con valores de 0 a 100."
+                                state.totalWeight > 100 -> "La ponderación supera el 100%."
+                                else -> "Falta " + formatWeight(100.0 - state.totalWeight) + "% para completar el esquema."
                             },
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
@@ -299,6 +380,8 @@ fun GradebookScreen(
                     )
                     OutlinedButton(
                         onClick = {
+                            pendingImportClassroomId = state.classroomId
+                            pendingImportGradingPeriod = state.gradingPeriod
                             fileLauncher.launch(
                                 arrayOf(
                                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -307,9 +390,17 @@ fun GradebookScreen(
                                 ),
                             )
                         },
-                        enabled = !state.submitting,
+                        enabled = !state.submitting && !state.gradebookPublished && !importInProgress,
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text(if (state.preview == null) "Elegir archivo Excel / CSV" else "Cambiar archivo") }
+                    ) {
+                        Text(
+                            when {
+                                importInProgress -> "Leyendo archivo…"
+                                state.preview == null -> "Elegir archivo Excel / CSV"
+                                else -> "Cambiar archivo"
+                            },
+                        )
+                    }
                     state.preview?.let { preview ->
                         Text(
                             state.importedFileName.orEmpty(),
@@ -364,6 +455,9 @@ fun GradebookScreen(
                 },
                 enabled =
                     !state.submitting &&
+                        !state.gradebookLoading &&
+                        !importInProgress &&
+                        weightDraftsValid &&
                         !state.gradebookPublished &&
                         state.schemeComplete &&
                         state.preview?.rows?.isNotEmpty() == true &&
@@ -382,12 +476,29 @@ fun GradebookScreen(
                     },
                 )
             }
+            if (state.gradebookLoading) {
+                Text("Consultando el borrador guardado…", style = MaterialTheme.typography.bodySmall)
+            }
             V8RedPrimaryButton(
                 text = if (state.gradebookPublished) "Calificaciones publicadas" else "Publicar para estudiantes",
                 onClick = { confirmPublish = true },
-                enabled = !state.submitting && !state.gradebookPublished && state.gradebookRevision != null,
+                enabled =
+                    !state.submitting &&
+                        !state.gradebookLoading &&
+                        !importInProgress &&
+                        weightDraftsValid &&
+                        !state.draftHasUnsavedChanges &&
+                        !state.gradebookPublished &&
+                        state.gradebookRevision != null,
                 modifier = Modifier.fillMaxWidth(),
             )
+            if (state.gradebookRevision != null && state.draftHasUnsavedChanges) {
+                Text(
+                    "Guarda los cambios del borrador antes de publicar.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             if (state.gradebookPublished) {
                 Text(
                     "Esta revisión ya está publicada. Para corregirla se requiere una operación de corrección autorizada.",
@@ -417,6 +528,9 @@ fun GradebookScreen(
                 onClick = { confirmSync = true },
                 enabled =
                     !state.submitting &&
+                        !state.gradebookLoading &&
+                        !importInProgress &&
+                        weightDraftsValid &&
                         !state.loadingClassrooms &&
                         !state.capabilityLoading &&
                         state.institutionalSyncAvailable &&
@@ -503,22 +617,44 @@ private fun CategoryNameField(
 
 @Composable
 private fun CategoryWeightField(
-    value: Double,
-    change: (Double) -> Unit,
+    value: String,
+    change: (String) -> Unit,
     modifier: Modifier,
     enabled: Boolean = true,
 ) {
     OutlinedTextField(
-        value = if (value == 0.0) "" else formatWeight(value),
+        value = value,
         enabled = enabled,
-        onValueChange = { raw -> raw.replace(',', '.').toDoubleOrNull()?.let { change(it.coerceIn(0.0, 100.0)) } },
+        onValueChange = { change(it.take(32)) },
         modifier = modifier,
         singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        isError = value.isNotBlank() && categoryWeightValue(value) == null,
         colors = teacherFieldColors(),
         label = { Text("Porcentaje") },
         placeholder = { Text("20") },
     )
 }
+
+internal fun categoryWeightValue(raw: String): Double? {
+    val normalized = raw.trim().replace(',', '.')
+    if (!normalized.matches(Regex("(?:\\d+(?:\\.\\d*)?|\\.\\d+)"))) return null
+    return normalized.toDoubleOrNull()?.takeIf { it.isFinite() && it in 0.0..100.0 }
+}
+
+internal fun categoryWeightDraftsValid(
+    categoryKeys: List<String>,
+    drafts: Map<String, String>,
+): Boolean = categoryKeys.all { key -> drafts[key]?.let(::categoryWeightValue) != null || key !in drafts }
+
+internal fun <T> optionalGradeImportMetadata(query: () -> T): T? =
+    try {
+        query()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        null
+    }
 
 private fun formatWeight(value: Double): String = if (value % 1.0 == 0.0) value.toInt().toString() else value.toString()
 

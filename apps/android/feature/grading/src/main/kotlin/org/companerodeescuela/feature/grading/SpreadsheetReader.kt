@@ -6,6 +6,8 @@ import org.w3c.dom.Element
 import org.xml.sax.SAXException
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
@@ -24,6 +26,18 @@ object SpreadsheetReader {
     private val idAliases =
         setOf("matricula", "matrícula", "studentid", "student_id", "id", "no.control", "numero de control", "número de control")
     private val nameAliases = setOf("nombre", "alumno", "estudiante", "name")
+
+    internal fun readBoundedInput(input: InputStream): ByteArray {
+        val output = ByteArrayOutputStream()
+        val buffer = ByteArray(8192)
+        while (true) {
+            val count = input.read(buffer, 0, minOf(buffer.size, MAX_INPUT_BYTES + 1 - output.size()))
+            if (count == -1) return output.toByteArray()
+            if (count == 0) continue
+            output.write(buffer, 0, count)
+            if (output.size() > MAX_INPUT_BYTES) throw IOException("El archivo debe tener como máximo 5 MB.")
+        }
+    }
 
     fun read(
         fileName: String,

@@ -48,6 +48,7 @@ data class ChannelUiState(
     val actionInProgress: Boolean = false,
     val channels: List<ClassChannelSummary> = emptyList(),
     val selectedChannelId: String? = null,
+    val resolvedNotificationChannelId: String? = null,
     val posts: List<ChannelPost> = emptyList(),
     val tasks: List<ChannelTask> = emptyList(),
     val submissions: Map<String, List<TaskSubmission>> = emptyMap(),
@@ -71,6 +72,22 @@ class ChannelViewModel
         private val _state = MutableStateFlow(ChannelUiState())
         val state: StateFlow<ChannelUiState> = _state.asStateFlow()
         private var requestedClassroom: TeacherClassContext? = null
+        private var requestedNotificationChannelId: String? = null
+        private var refreshingChannels = false
+
+        /** A push identifier never bypasses the fresh, authenticated list of readable channels. */
+        fun requestChannel(channelId: String) {
+            requestedNotificationChannelId = channelId
+            requestedClassroom = null
+            _state.update { it.copy(resolvedNotificationChannelId = null) }
+            if (_state.value.actionInProgress) return
+            transitionTo(null)
+            refreshChannels()
+        }
+
+        fun consumeRequestedChannel() {
+            _state.update { it.copy(resolvedNotificationChannelId = null) }
+        }
 
         fun requestClassroom(selection: TeacherClassContext) {
             requestedClassroom = selection
@@ -103,10 +120,13 @@ class ChannelViewModel
         }
 
         fun refreshChannels() {
-            if (_state.value.actionInProgress || _state.value.loading && _state.value.channels.isNotEmpty()) return
+            if (_state.value.actionInProgress || refreshingChannels) return
+            refreshingChannels = true
             _state.update { it.copy(loading = true, errorMessage = null) }
             viewModelScope.launch {
-                when (val result = repository.channels()) {
+                val result = repository.channels()
+                refreshingChannels = false
+                when (result) {
                     is Outcome.Success -> {
                         val previous = _state.value.selectedChannelId
                         val selected =
@@ -119,7 +139,20 @@ class ChannelViewModel
                                 errorMessage = null,
                             )
                         }
-                        if (requestedClassroom != null) {
+                        val notifiedChannelId = requestedNotificationChannelId
+                        if (notifiedChannelId != null) {
+                            requestedNotificationChannelId = null
+                            val notifiedChannel = result.value.singleOrNull { it.id == notifiedChannelId }
+                            transitionTo(notifiedChannel?.id)
+                            _state.update { it.copy(resolvedNotificationChannelId = notifiedChannelId) }
+                            if (notifiedChannel != null) {
+                                loadPosts(notifiedChannel.id)
+                            } else {
+                                _state.update {
+                                    it.copy(errorMessage = "El canal de esta notificación ya no está disponible o autorizado.")
+                                }
+                            }
+                        } else if (requestedClassroom != null) {
                             resolveRequestedChannel()?.let(::loadPosts)
                         } else {
                             transitionTo(selected?.id)
@@ -127,12 +160,15 @@ class ChannelViewModel
                         }
                     }
                     is Outcome.Failure -> {
+                        val notifiedChannelId = requestedNotificationChannelId
+                        requestedNotificationChannelId = null
                         transitionTo(null)
                         _state.update {
                             it.copy(
                                 loading = false,
                                 channels = emptyList(),
                                 selectedChannelId = null,
+                                resolvedNotificationChannelId = notifiedChannelId,
                                 posts = emptyList(),
                                 errorMessage = result.error.userMessage,
                             )
@@ -162,6 +198,8 @@ class ChannelViewModel
                     draftBody = "",
                     draftResourceLabel = "",
                     draftResourceUrl = "",
+                    draftTaskTitle = "",
+                    draftTaskInstructions = "",
                     successMessage = null,
                     errorMessage = null,
                 )
@@ -657,6 +695,7 @@ class ChannelViewModel
 
         private fun loadPosts(channelId: String) {
             viewModelScope.launch {
+                if (_state.value.selectedChannelId != channelId) return@launch
                 _state.update { it.copy(loading = true, errorMessage = null) }
                 when (val result = repository.posts(channelId)) {
                     is Outcome.Success ->

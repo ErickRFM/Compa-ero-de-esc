@@ -135,6 +135,8 @@ class GradebookSubmissionTest {
                                         """{"data":[{"id":"A","name":"Matemáticas","teacherId":"T1","teacherDisplayName":"Docente","canManage":true}]}"""
                                     } else if (request.url.encodedPath == "/grading/capability") {
                                         """{"data":{"available":true}}"""
+                                    } else if (request.url.encodedPath == "/grading/classrooms/A") {
+                                        """{"data":null}"""
                                     } else {
                                         response.await()
                                         """{"data":{"status":"unavailable","acceptedStudentIds":[],"rejectedStudentIds":[]}}"""
@@ -160,6 +162,7 @@ class GradebookSubmissionTest {
                 val vm = GradebookViewModel(GradebookRepository(client, tokens), ClassroomRepository(client, tokens), tokens)
                 runCurrent()
                 vm.setGradingPeriod("Parcial 1")
+                runCurrent()
                 vm.addCategory()
                 vm.updateCategory(0, "Examen", 100.0)
                 vm.importSpreadsheet("grades.csv", "Matricula,Examen\nA001,9".toByteArray())

@@ -86,8 +86,7 @@ import org.companerodeescuela.feature.tutoring.TutorHomeScreen
 import org.companerodeescuela.feature.tutoring.TutorRequestsScreen
 import org.companerodeescuela.notifications.PushRegistrationDiagnostics
 import org.companerodeescuela.notifications.PushRegistrationSchedule
-import org.companerodeescuela.notifications.isChannelNotificationIntent
-import org.companerodeescuela.notifications.isTaskNotificationType
+import org.companerodeescuela.notifications.channelNotificationRoute
 import org.companerodeescuela.notifications.parseAttendanceSessionId
 import org.companerodeescuela.shared.contracts.AttendancePushContract
 import org.companerodeescuela.shared.contracts.TeacherClassContext
@@ -99,6 +98,7 @@ class MainActivity : AppCompatActivity() {
     private var pendingAttendanceSessionId by mutableStateOf<String?>(null)
     private var pendingChannelNavigation by mutableStateOf(false)
     private var pendingChannelTasksTab by mutableStateOf(false)
+    private var pendingChannelId by mutableStateOf<String?>(null)
 
     @Inject
     lateinit var attendanceSyncScheduler: AttendanceSyncScheduler
@@ -113,8 +113,7 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         pendingAttendanceSessionId = attendanceSessionId(intent)
-        pendingChannelNavigation = isChannelNotificationIntent(intent?.action, intent?.getStringExtra("destination"))
-        pendingChannelTasksTab = isTaskNotificationType(intent?.getStringExtra("type"))
+        readChannelNotification(intent)
         appearancePreferences.applySavedLanguage()
         val appDistribution = AppDistribution.valueOf(BuildConfig.APP_DISTRIBUTION)
 
@@ -291,7 +290,11 @@ class MainActivity : AppCompatActivity() {
                                             )
                                         }
                                     val navController = key(userId, roleConfig.experience, session.roles) { rememberNavController() }
-                                    var channelTabRequest by rememberSaveable { mutableIntStateOf(-1) }
+                                    var channelTabRequest by rememberSaveable(userId, roleConfig.experience) { mutableIntStateOf(-1) }
+                                    var channelIdRequest by rememberSaveable(
+                                        userId,
+                                        roleConfig.experience,
+                                    ) { mutableStateOf<String?>(null) }
                                     LaunchedEffect(pendingAttendanceSessionId, roleConfig.experience, session.roles) {
                                         val requestedSession = pendingAttendanceSessionId ?: return@LaunchedEffect
                                         if (UserRole.STUDENT !in session.roles || appDistribution != AppDistribution.ACADEMIC) {
@@ -307,7 +310,13 @@ class MainActivity : AppCompatActivity() {
                                             pendingAttendanceSessionId = null
                                         }
                                     }
-                                    LaunchedEffect(pendingChannelNavigation, roleConfig.experience, session.roles) {
+                                    LaunchedEffect(
+                                        pendingChannelNavigation,
+                                        pendingChannelId,
+                                        pendingChannelTasksTab,
+                                        roleConfig.experience,
+                                        session.roles,
+                                    ) {
                                         if (pendingChannelNavigation && userId != null) {
                                             val destinationExperience =
                                                 AcademicRoutePolicy.channelExperience(
@@ -316,13 +325,19 @@ class MainActivity : AppCompatActivity() {
                                                     distribution = appDistribution,
                                                 )
                                             when {
-                                                destinationExperience == null -> pendingChannelNavigation = false
+                                                destinationExperience == null -> {
+                                                    pendingChannelNavigation = false
+                                                    pendingChannelId = null
+                                                    pendingChannelTasksTab = false
+                                                }
                                                 destinationExperience != roleConfig.experience -> {
                                                     preferredExperience = destinationExperience
                                                 }
                                                 else -> {
                                                     pendingChannelNavigation = false
                                                     channelTabRequest = if (pendingChannelTasksTab) 2 else 0
+                                                    channelIdRequest = pendingChannelId
+                                                    pendingChannelId = null
                                                     pendingChannelTasksTab = false
                                                     navController.navigate(Destination.Channel.route) {
                                                         launchSingleTop = true
@@ -547,7 +562,11 @@ class MainActivity : AppCompatActivity() {
                                                 requestedClassroom = selection,
                                                 isAdministrativeSession = isAdministrative,
                                                 requestedTab = channelTabRequest,
-                                                onConsumeRequestedTab = { channelTabRequest = -1 },
+                                                requestedChannelId = channelIdRequest,
+                                                onConsumeRequestedTab = {
+                                                    channelTabRequest = -1
+                                                    channelIdRequest = null
+                                                },
                                             )
                                         }
                                         composable(Destination.Attendance.route) { entry ->
@@ -739,11 +758,20 @@ class MainActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         pendingAttendanceSessionId = attendanceSessionId(intent)
-        if (isChannelNotificationIntent(intent.action, intent.getStringExtra("destination"))) {
-            pendingChannelNavigation = true
-            pendingChannelTasksTab =
-                isTaskNotificationType(intent.getStringExtra("type"))
-        }
+        readChannelNotification(intent)
+    }
+
+    private fun readChannelNotification(intent: Intent?) {
+        val route =
+            channelNotificationRoute(
+                intent?.action,
+                intent?.getStringExtra("destination"),
+                intent?.getStringExtra("type"),
+                intent?.getStringExtra("channelId"),
+            )
+        pendingChannelId = route?.channelId
+        pendingChannelTasksTab = route?.openTasks == true
+        pendingChannelNavigation = route != null
     }
 
     override fun onResume() {

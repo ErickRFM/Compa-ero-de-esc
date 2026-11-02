@@ -125,7 +125,7 @@ fi
 runner_args=()
 if [[ "$variant" == Management ]]; then
   runner_args+=(
-    "-Pandroid.testInstrumentationRunnerArguments.class=org.companerodeescuela.AppDistributionSmokeTest,org.companerodeescuela.DistributionLoginUiTest,org.companerodeescuela.V12AdministrationUiTest,org.companerodeescuela.V14RoleNavigationUiTest,org.companerodeescuela.InstitutionalClassesUiTest,org.companerodeescuela.CoordinationAttendanceIndicatorsUiTest,org.companerodeescuela.NotificationConsentUiTest,org.companerodeescuela.AttendanceTruthUiTest,org.companerodeescuela.ManagementProfileNavigationTest"
+    "-Pandroid.testInstrumentationRunnerArguments.class=org.companerodeescuela.AppDistributionSmokeTest,org.companerodeescuela.DistributionLoginUiTest,org.companerodeescuela.V12AdministrationUiTest,org.companerodeescuela.V14RoleNavigationUiTest,org.companerodeescuela.InstitutionalClassesUiTest,org.companerodeescuela.CoordinationAttendanceIndicatorsUiTest,org.companerodeescuela.NotificationConsentUiTest,org.companerodeescuela.AttendanceTruthUiTest,org.companerodeescuela.ManagementProfileNavigationTest,org.companerodeescuela.ChannelTaskLayoutUiTest"
   )
 fi
 ./gradlew ":apps:android:app:connected${variant}DebugAndroidTest" --max-workers=1 --no-daemon \
@@ -151,6 +151,25 @@ if [[ "$variant" == Academic ]]; then
   python3 infrastructure/scripts/export-v10-evidence.py
 fi
 if [[ "$instrumentation_status" -eq 0 ]]; then
+  task_output="build/channel-task-layout-evidence"
+  mkdir -p "$task_output"
+  for state in teacher-review-200 student-submit-200 task-composer-200; do
+    adb exec-out run-as "$COMPANERO_EVIDENCE_PACKAGE" \
+      cat "files/audit-task-layout/${state}.png" > "${task_output}/${state}.png"
+  done
+  python3 - "$task_output" <<'PY'
+from pathlib import Path
+import struct
+import sys
+
+root = Path(sys.argv[1])
+for state in ('teacher-review-200', 'student-submit-200', 'task-composer-200'):
+    data = (root / f'{state}.png').read_bytes()
+    assert data[:8] == b'\x89PNG\r\n\x1a\n', f'Missing task layout evidence: {state}'
+    width, height = struct.unpack('>II', data[16:24])
+    assert width > 0 and height > 0, f'Invalid task layout dimensions: {state}'
+print('Verified three synthetic task layout screenshots at 200% text')
+PY
   # Both distributions execute the four synthetic institutional catalog cases.
   # Keep these separate from the academic login screenshot collection.
   institutional_output="build/v19-institutional-evidence"

@@ -76,6 +76,7 @@ class GradeCapabilityPreflightTest {
                 vm.updateCategory(0, "Examen", 100.0)
                 vm.importSpreadsheet("grades.csv", "Matricula,Examen\nA001,9".toByteArray())
                 assertTrue(vm.state.value.preview != null)
+                runCurrent()
                 vm.sync()
                 runCurrent()
                 assertTrue(

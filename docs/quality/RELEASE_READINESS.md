@@ -1,5 +1,7 @@
 # Release readiness
 
+> **Current status (2026-11-02):** this file is historical. Consult the [Git consolidation and UI/logic audit](../audits/CONSOLIDACION_UI_LOGICA_20261102.md) for the current implementation, checks and remaining gates. The V5/V10 feature statuses below must not be interpreted as today's inventory.
+
 > El contenido histórico de este documento conserva su corte original. Para el corte V10.1 sobre main `97e68e1` y el PR #123 todavía abierto, consultar [la ejecución F0](../audits/V10_1_F0_QR_EXECUTION_20261008.md). Los contratos V10 no equivalen a funcionalidad implementada.
 
 ## Verdict

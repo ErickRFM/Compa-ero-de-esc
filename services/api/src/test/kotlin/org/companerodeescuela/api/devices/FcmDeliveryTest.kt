@@ -246,7 +246,13 @@ class FcmDeliveryTest {
             assertEquals(reviewData, reviewMessage["data"]?.jsonObject?.mapValues { it.value.jsonPrimitive.content })
             assertEquals(
                 "org.companerodeescuela.action.OPEN_CHANNEL",
-                reviewMessage["android"]?.jsonObject?.get("notification")?.jsonObject?.get("click_action")?.jsonPrimitive?.content,
+                reviewMessage["android"]
+                    ?.jsonObject
+                    ?.get("notification")
+                    ?.jsonObject
+                    ?.get("click_action")
+                    ?.jsonPrimitive
+                    ?.content,
             )
             assertFalse(reviewMessage["data"]?.jsonObject?.containsKey("score") == true)
         }

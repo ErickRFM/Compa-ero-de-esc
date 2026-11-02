@@ -39,7 +39,8 @@ internal class NativeRosterImportReader(
                 mime.equals(
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     ignoreCase = true,
-                ) || uri.lastPathSegment?.endsWith(".xlsx", ignoreCase = true) == true
+                ) ||
+                    uri.lastPathSegment?.endsWith(".xlsx", ignoreCase = true) == true
             val identifiers =
                 if (xlsx) {
                     parseNativeRosterXlsxIdentifiers(bytes)

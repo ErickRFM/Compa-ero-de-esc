@@ -28,8 +28,9 @@ class NativeRosterImportReaderTest {
 
     @Test
     fun `xlsx rejects xml entity definitions instead of expanding untrusted content`() {
-        val payload = """<!DOCTYPE worksheet [<!ENTITY external SYSTEM "file:///etc/passwd">]>""" +
-            """<worksheet><sheetData><row><c t="inlineStr"><is><t>&external;</t></is></c></row></sheetData></worksheet>"""
+        val payload =
+            """<!DOCTYPE worksheet [<!ENTITY external SYSTEM "file:///etc/passwd">]>""" +
+                """<worksheet><sheetData><row><c t="inlineStr"><is><t>&external;</t></is></c></row></sheetData></worksheet>"""
         assertFailsWith<IOException> {
             parseNativeRosterXlsxIdentifiers(xlsx("xl/worksheets/sheet1.xml" to payload))
         }

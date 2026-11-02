@@ -95,10 +95,17 @@ class MongoDeviceTokenRepository(
         ensureIndexes()
         val baseFilter = and(`in`("ownerId", userIds.toList()), gt("expiresAt", Date.from(clock.instant())))
         val filter =
-            if (appDistribution != null) {
-                and(baseFilter, or(eq("appDistribution", appDistribution), eq("appDistribution", null)))
-            } else {
-                baseFilter
+            when (appDistribution) {
+                "MANAGEMENT" ->
+                    and(
+                        baseFilter,
+                        eq("appDistribution", "MANAGEMENT"),
+                        eq("packageName", "org.companerodeescuela.gestion"),
+                    )
+                "ACADEMIC" ->
+                    and(baseFilter, or(eq("appDistribution", "ACADEMIC"), eq("appDistribution", null)))
+                null -> baseFilter
+                else -> and(baseFilter, eq("appDistribution", appDistribution))
             }
         return collection
             .find(filter)
@@ -181,8 +188,16 @@ class InMemoryDeviceTokenRepository : DeviceTokenRepository {
         mutex.withLock {
             devices.values
                 .filter { it.owner in userIds }
-                .filter { appDistribution == null || it.appDistribution == null || it.appDistribution == appDistribution }
-                .map { it.token }
+                .filter {
+                    when (appDistribution) {
+                        "MANAGEMENT" ->
+                            it.appDistribution == "MANAGEMENT" &&
+                                it.packageName == "org.companerodeescuela.gestion"
+                        "ACADEMIC" -> it.appDistribution == "ACADEMIC" || it.appDistribution == null
+                        null -> true
+                        else -> it.appDistribution == appDistribution
+                    }
+                }.map { it.token }
                 .distinct()
         }
 

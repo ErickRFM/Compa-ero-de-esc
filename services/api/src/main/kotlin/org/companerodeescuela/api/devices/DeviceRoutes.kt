@@ -31,6 +31,20 @@ data class DeviceRegistrationRequest(
     val packageName: String? = null,
 )
 
+/** Checks the declared Android app pair. This is not device attestation or a role grant. */
+internal fun DeviceRegistrationRequest.requireConsistentDistribution() {
+    if (appDistribution == null && packageName == null) return
+    val expectedPackage =
+        when (appDistribution) {
+            "ACADEMIC" -> "org.companerodeescuela"
+            "MANAGEMENT" -> "org.companerodeescuela.gestion"
+            else -> throw ApiException.Validation("Unsupported Android distribution")
+        }
+    if (platform != "android" || packageName != expectedPackage) {
+        throw ApiException.Validation("Android app distribution and package do not match")
+    }
+}
+
 interface DeviceTokenRepository {
     suspend fun register(
         userId: String,
@@ -82,6 +96,7 @@ fun Route.deviceRoutes(
             post("/register") {
                 val ownerId = call.deviceOwnerId()
                 val request = call.boundedBody(DeviceRegistrationRequest.serializer())
+                request.requireConsistentDistribution()
                 val sessionId =
                     call
                         .requirePlatformPrincipal()

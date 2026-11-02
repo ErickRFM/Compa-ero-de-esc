@@ -42,6 +42,8 @@ class ChannelTaskService(
         owner: String,
         channelId: String,
         taskId: String,
+        reviewSubmissionId: String? = null,
+        reviewVersion: Int? = null,
     ): Boolean {
         val id = owner.takeIf { it.startsWith("NATIVE:") }?.removePrefix("NATIVE:") ?: return false
         val account = accounts?.findById(id) ?: return false
@@ -60,8 +62,17 @@ class ChannelTaskService(
                 account.toUserSummary(),
                 SessionIdentitySource.NATIVE,
             )
-            val task = repository.findTask(channelId, taskId)
-            task != null && !task.closed
+            val task = repository.findTask(channelId, taskId) ?: return false
+            if (reviewSubmissionId == null) {
+                !task.closed
+            } else {
+                val submission = repository.findSubmissionByStudent(taskId, id)
+                submission != null &&
+                    submission.channelId == channelId &&
+                    submission.id == reviewSubmissionId &&
+                    submission.version == reviewVersion &&
+                    submission.status in setOf(TaskStatus.RETURNED, TaskStatus.REVIEWED)
+            }
         } catch (_: ApiException.Forbidden) {
             false
         } catch (_: ApiException.NotFound) {
@@ -134,6 +145,7 @@ class ChannelTaskService(
         studentIds: List<String>,
         channelId: String,
         taskId: String,
+        review: TaskSubmission? = null,
     ) {
         val service = notifications ?: return
         studentIds.distinct().forEach { id ->
@@ -145,11 +157,19 @@ class ChannelTaskService(
                     body = "Tienes una tarea o revisión en Compañero.",
                     data =
                         mapOf(
-                            "type" to "channel_task",
+                            "type" to if (review == null) "channel_task" else "channel_task_review",
                             "destination" to "channel",
                             "channelId" to channelId,
                             "taskId" to taskId,
-                        ),
+                        ) +
+                            if (review == null) {
+                                emptyMap()
+                            } else {
+                                mapOf(
+                                    "submissionId" to review.id,
+                                    "submissionVersion" to review.version.toString(),
+                                )
+                            },
                     appDistribution = "ACADEMIC",
                 )
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
@@ -497,6 +517,7 @@ class ChannelTaskService(
                 listOf(updated.studentId),
                 channelId,
                 task.id,
+                review = updated,
             )
         }
         return updated.withFiles()

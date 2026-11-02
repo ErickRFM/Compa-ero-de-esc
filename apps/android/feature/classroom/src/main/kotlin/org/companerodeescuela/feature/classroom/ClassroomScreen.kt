@@ -2,8 +2,8 @@
 
 package org.companerodeescuela.feature.classroom
 
-import android.content.ClipboardManager
 import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -11,15 +11,15 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -28,9 +28,9 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,8 +38,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
@@ -61,9 +61,9 @@ import org.companerodeescuela.shared.contracts.ClassInvite
 import org.companerodeescuela.shared.contracts.ClassroomStatus
 import org.companerodeescuela.shared.contracts.ClassroomSummary
 import org.companerodeescuela.shared.contracts.UserRole
-import java.time.format.DateTimeFormatter
 import java.time.Instant
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -387,7 +387,7 @@ private fun TeacherAssignedClassrooms(
                     if (selectedImportClass != expectedClassId) return@launch
                     importLoading = false
                     result.onSuccess { importCandidates = it }
-                        .onFailure { importError = it.message ?: "No se pudo importar la lista" }
+                    result.onFailure { importError = it.message ?: "No se pudo importar la lista" }
                 }
             }
         }
@@ -545,10 +545,9 @@ private fun TeacherAssignedClassrooms(
                                         Text("Aún no hay alumnos vinculados a este Canal.")
                                     }
                                     members.take(6).forEach { student ->
-                                        val joinedAt =
-                                            Instant.ofEpochSecond(student.joinedAtEpochSeconds)
-                                                .atZone(ZoneId.systemDefault())
-                                                .format(DateTimeFormatter.ofPattern("d MMM yyyy"))
+                                        val timestamp = Instant.ofEpochSecond(student.joinedAtEpochSeconds)
+                                        val date = timestamp.atZone(ZoneId.systemDefault())
+                                        val joinedAt = DateTimeFormatter.ofPattern("d MMM yyyy").format(date)
                                         Text(
                                             student.displayName + " · " + joinedAt,
                                             style = MaterialTheme.typography.bodySmall,

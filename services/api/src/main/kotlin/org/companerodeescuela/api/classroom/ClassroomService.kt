@@ -321,7 +321,7 @@ class ClassroomService(
         val unique =
             identifiers.distinctBy { it.lowercase() }
         // Resolve the whole batch before modifying any membership: never persist partial imports.
-        val students =
+        val resolved =
             unique.map { identifier ->
                 val student =
                     directory.findByIdentifier(identifier)
@@ -337,14 +337,15 @@ class ClassroomService(
                 }
                 student
             }
-                .distinctBy { it.id }
+        val students = resolved.distinctBy { it.id }
         val now = clock.instant()
-        return students
-            .map { student ->
+        return students.map { student ->
+            val membership =
                 repository.addMembershipIfAbsent(
                     NativeClassroomMembership(classroomId, student.id, ClassroomMemberRole.STUDENT, now),
-                ).toContract()
-            }
+                )
+            membership.toContract()
+        }
     }
 
     suspend fun revokeInvite(

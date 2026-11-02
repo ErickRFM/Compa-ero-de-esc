@@ -48,7 +48,10 @@ class CompaneroFirebaseMessagingService : FirebaseMessagingService() {
                         .getOrNull()
                         ?.takeIf { it.equals(raw, ignoreCase = true) }
                 }
+        val managementApp = BuildConfig.APP_DISTRIBUTION == "MANAGEMENT"
         val attendanceNotice = message.data["type"] == AttendancePushContract.TYPE && sessionId != null
+        // Management never offers a student classroom attendance action.
+        if (managementApp && attendanceNotice) return
         val academicInstitution =
             message.data[AcademicChangePushContract.INSTITUTION_ID]?.let { raw ->
                 runCatching { UUID.fromString(raw).toString() }.getOrNull()?.takeIf { it.equals(raw, ignoreCase = true) }
@@ -97,13 +100,18 @@ class CompaneroFirebaseMessagingService : FirebaseMessagingService() {
                 attendanceNotice -> "Tu docente abrió el pase de lista. Toca para revisarlo."
                 academicNotice -> "La institución actualizó tu información académica. Consulta tu horario oficial."
                 channelNotice -> "Nuevo aviso en el Canal Institucional. Toca para revisarlo."
-                else -> "Tienes una nueva actualización académica."
+                else ->
+                    if (managementApp) {
+                        "Tienes una nueva actualización de gestión."
+                    } else {
+                        "Tienes una nueva actualización académica."
+                    }
             }
         val notification =
             NotificationCompat
                 .Builder(this, channelId)
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle("Compañero de Clase")
+                .setContentTitle(if (managementApp) "Compañero Gestión" else "Compañero de Clase")
                 .setContentText(contentText)
                 .setAutoCancel(true)
                 .setContentIntent(pending)

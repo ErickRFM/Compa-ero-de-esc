@@ -71,7 +71,7 @@ class DeviceTokenRegistryTest {
                 "dev-2",
                 "s2",
                 "MANAGEMENT",
-                "org.companerodeescuela.management",
+                "org.companerodeescuela.gestion",
             )
             repo.register("NATIVE:user", legacyToken, "android", "OldPhone", "dev-3", "s3", null, null)
 
@@ -82,7 +82,7 @@ class DeviceTokenRegistryTest {
 
             val managementDestinations = repo.listTokens(setOf("NATIVE:user"), "MANAGEMENT")
             assertTrue(managementToken in managementDestinations)
-            assertTrue(legacyToken in managementDestinations)
+            assertFalse(legacyToken in managementDestinations)
             assertFalse(academicToken in managementDestinations)
 
             val allDestinations = repo.listTokens(setOf("NATIVE:user"), null)
@@ -161,7 +161,7 @@ class MongoDeviceTokenRegistryIntegrationTest {
                 "dev-2",
                 "s2",
                 "MANAGEMENT",
-                "org.companerodeescuela.management",
+                "org.companerodeescuela.gestion",
             )
             repo.register("NATIVE:user", legacyToken, "android", "OldPhone", "dev-3", "s3", null, null)
 
@@ -172,7 +172,7 @@ class MongoDeviceTokenRegistryIntegrationTest {
 
             val managementDestinations = repo.listTokens(setOf("NATIVE:user"), "MANAGEMENT")
             assertTrue(managementToken in managementDestinations)
-            assertTrue(legacyToken in managementDestinations)
+            assertFalse(legacyToken in managementDestinations)
             assertFalse(academicToken in managementDestinations)
 
             val allDestinations = repo.listTokens(setOf("NATIVE:user"), null)

@@ -77,6 +77,29 @@ val firebaseSenderId = providers.environmentVariable("COMPANERO_FIREBASE_SENDER_
 val firebaseApiKey = providers.environmentVariable("COMPANERO_FIREBASE_API_KEY").orElse("").get()
 val firebaseValues = listOf(firebaseAppId, firebaseProjectId, firebaseSenderId, firebaseApiKey)
 val firebaseConfigured = firebaseValues.all(String::isNotBlank)
+// Management is a separate Android Firebase app. Never silently reuse the academic
+// Firebase application ID or register its device under the academic package.
+val managementFirebaseAppId = providers.environmentVariable("COMPANERO_MANAGEMENT_FIREBASE_APP_ID").orElse("").get()
+val managementFirebaseProjectId = providers.environmentVariable("COMPANERO_MANAGEMENT_FIREBASE_PROJECT_ID").orElse("").get()
+val managementFirebaseSenderId = providers.environmentVariable("COMPANERO_MANAGEMENT_FIREBASE_SENDER_ID").orElse("").get()
+val managementFirebaseApiKey = providers.environmentVariable("COMPANERO_MANAGEMENT_FIREBASE_API_KEY").orElse("").get()
+val managementFirebaseValues =
+    listOf(managementFirebaseAppId, managementFirebaseProjectId, managementFirebaseSenderId, managementFirebaseApiKey)
+val managementFirebaseConfigured = managementFirebaseValues.all(String::isNotBlank)
+require(managementFirebaseValues.all(String::isBlank) || managementFirebaseConfigured) {
+    "Management Firebase requires all four separate Android application settings"
+}
+if (managementFirebaseConfigured) {
+    require(
+        managementFirebaseAppId.matches(Regex("1:[0-9]{4,25}:android:[A-Za-z0-9]+")) &&
+            managementFirebaseProjectId.matches(Regex("[a-z][a-z0-9-]{3,99}")) &&
+            managementFirebaseSenderId.matches(Regex("[0-9]{4,25}")) &&
+            managementFirebaseApiKey.matches(Regex("[A-Za-z0-9_-]{20,100}")) &&
+            managementFirebaseAppId != firebaseAppId,
+    ) {
+        "Invalid or reused academic Firebase application for management distribution"
+    }
+}
 require(firebaseValues.all(String::isBlank) || firebaseConfigured) {
     "Firebase Android requires all four public project settings"
 }
@@ -139,13 +162,12 @@ android {
             buildConfigField("String", "APP_DISTRIBUTION", "\"MANAGEMENT\"")
             buildConfigField("String", "NOTIFICATION_CHANNEL_ID", "\"org.companerodeescuela.gestion.notification.management\"")
             buildConfigField("String", "NOTIFICATION_CHANNEL_NAME", "\"Avisos de gestión\"")
-            // Never reuse the academic package's Firebase app registration.
-            // Enable management FCM only after provisioning its own credentials.
-            buildConfigField("boolean", "FIREBASE_CONFIGURED", "false")
-            buildConfigField("String", "FIREBASE_APP_ID", "\"\"")
-            buildConfigField("String", "FIREBASE_PROJECT_ID", "\"\"")
-            buildConfigField("String", "FIREBASE_SENDER_ID", "\"\"")
-            buildConfigField("String", "FIREBASE_API_KEY", "\"\"")
+            // Enable only with all four values from the MANAGEMENT Android app.
+            buildConfigField("boolean", "FIREBASE_CONFIGURED", managementFirebaseConfigured.toString())
+            buildConfigField("String", "FIREBASE_APP_ID", "\"$managementFirebaseAppId\"")
+            buildConfigField("String", "FIREBASE_PROJECT_ID", "\"$managementFirebaseProjectId\"")
+            buildConfigField("String", "FIREBASE_SENDER_ID", "\"$managementFirebaseSenderId\"")
+            buildConfigField("String", "FIREBASE_API_KEY", "\"$managementFirebaseApiKey\"")
         }
     }
 

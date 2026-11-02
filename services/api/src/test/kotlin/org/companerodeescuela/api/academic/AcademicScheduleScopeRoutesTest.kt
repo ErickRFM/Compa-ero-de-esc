@@ -137,6 +137,7 @@ class AcademicScheduleScopeRoutesTest {
             val managed = Json.decodeFromString<ApiResponse<ManagedScheduleBlock>>(created.bodyAsText()).data
             assertEquals("Actual Class", managed.block.subjectName)
             assertEquals(1, managed.revision)
+            assertEquals(AcademicDataSource.ADMIN_MANUAL, managed.block.provenance.source)
             assertEquals(HttpStatusCode.Forbidden, post(request.copy(endTime = "08:00")).status)
             assertEquals(
                 HttpStatusCode.OK,

@@ -195,7 +195,7 @@ fun LoginScreen(
                     enabled = !state.submitting,
                     singleLine = true,
                     shape = RoundedCornerShape(16.dp),
-                    label = { Text(stringResource(R.string.auth_identifier)) },
+                    label = { Text(stringResource(R.string.auth_identifier), fontSize = 14.sp, maxLines = 1) },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Filled.Badge,
@@ -236,7 +236,7 @@ fun LoginScreen(
                     enabled = !state.submitting,
                     singleLine = true,
                     shape = RoundedCornerShape(16.dp),
-                    label = { Text(stringResource(R.string.auth_password)) },
+                    label = { Text(stringResource(R.string.auth_password), fontSize = 14.sp, maxLines = 1) },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Filled.Lock,

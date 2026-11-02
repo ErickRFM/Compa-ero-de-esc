@@ -81,6 +81,8 @@ fun buildAttendanceFeatureGraph(
             AttendanceReviewService(
                 repository = repository,
                 accessPolicy = accessPolicy,
+                accounts = accounts,
+                classrooms = classrooms,
             ),
         qrService = qrService,
         campusRoster =

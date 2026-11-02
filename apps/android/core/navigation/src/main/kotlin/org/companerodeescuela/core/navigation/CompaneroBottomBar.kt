@@ -191,6 +191,7 @@ fun CompaneroBottomBar(
                                             TopLevelDestination.AdminHome -> "Admin"
                                             TopLevelDestination.CoordinatorHome -> "Gestión"
                                             TopLevelDestination.Grading -> "Notas"
+                                            TopLevelDestination.Attendance -> "Pase"
                                             else -> topLevel.label
                                         },
                                     fontSize = 12.sp,

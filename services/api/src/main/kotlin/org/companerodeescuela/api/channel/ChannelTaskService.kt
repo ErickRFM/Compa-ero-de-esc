@@ -220,6 +220,7 @@ class ChannelTaskService(
                     fileIds = request.fileIds.distinct(),
                     submittedAtEpochSeconds = now,
                     feedback = null,
+                    score = null,
                     reviewedAtEpochSeconds = null,
                     version = existing.version + 1,
                     history =
@@ -305,6 +306,12 @@ class ChannelTaskService(
         }
         if (request.expectedVersion != current.version) throw ApiException.Conflict("Submission version is stale")
         val feedback = request.feedback?.trim()?.takeIf(String::isNotEmpty)
+        if (request.score != null && (!request.score.isFinite() || request.score !in 0.0..10.0)) {
+            throw ApiException.Validation("Task grade must be between 0 and 10")
+        }
+        if (request.status == TaskStatus.RETURNED && request.score != null) {
+            throw ApiException.Validation("Returned work cannot receive a published score")
+        }
         if (request.status == TaskStatus.RETURNED && feedback == null) {
             throw ApiException.Validation("Feedback is required when returning work")
         }
@@ -313,6 +320,7 @@ class ChannelTaskService(
             current.copy(
                 status = request.status,
                 feedback = feedback,
+                score = request.score,
                 reviewedAtEpochSeconds = now,
                 version = current.version + 1,
                 history =
@@ -325,6 +333,7 @@ class ChannelTaskService(
                             feedback,
                             userId,
                             now,
+                            request.score,
                         ),
             )
         if (!repository.replaceSubmission(updated, current.version)) {
@@ -680,7 +689,8 @@ class ChannelTaskService(
         feedback: String?,
         changedBy: String,
         changedAt: Long,
-    ) = TaskSubmissionVersion(version, status, comment, fileIds, feedback, changedBy, changedAt)
+        score: Double? = null,
+    ) = TaskSubmissionVersion(version, status, comment, fileIds, feedback, changedBy, changedAt, score)
 
     private fun isSameSubmission(
         current: TaskSubmission,

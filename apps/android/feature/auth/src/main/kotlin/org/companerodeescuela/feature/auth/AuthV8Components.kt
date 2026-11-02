@@ -85,12 +85,10 @@ internal fun authMuted(): Color =
     }
 
 @Composable
-internal fun authAccent(): Color {
-    return if (authDark()) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.primary
-    }
+internal fun authAccent(): Color = if (authDark()) {
+    MaterialTheme.colorScheme.primaryContainer
+} else {
+    MaterialTheme.colorScheme.primary
 }
 
 /** Same campus, geometry and tokens; colors come from the existing CompaneroTheme. */

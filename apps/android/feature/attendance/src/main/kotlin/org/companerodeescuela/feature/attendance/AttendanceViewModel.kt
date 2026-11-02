@@ -27,6 +27,9 @@ import org.companerodeescuela.shared.contracts.AttendanceStatus
 import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
 import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
+import org.companerodeescuela.shared.contracts.ManualAttendanceMarkRequest
+import org.companerodeescuela.shared.contracts.AttendanceDisposition
+import org.companerodeescuela.shared.contracts.AttendanceIdentitySource
 import org.companerodeescuela.shared.contracts.SchoolPresenceResponse
 import org.companerodeescuela.shared.contracts.TeacherCampusRosterResponse
 import org.companerodeescuela.shared.contracts.TeacherClassContext
@@ -808,6 +811,49 @@ class AttendanceViewModel
                                         AttendanceDisposition.ABSENT -> "Alumno marcado como ausente."
                                     },
                             )
+                        }
+                    }
+                    is Outcome.Failure -> teacherActionFailed(result.error)
+                }
+            }
+        }
+
+        fun markNativeAttendance(
+            studentId: String,
+            disposition: AttendanceDisposition,
+            note: String,
+        ) {
+            val snapshot = _state.value
+            val session = snapshot.teacherSession ?: return
+            if (snapshot.mode != AttendanceMode.TEACHER || snapshot.actionInProgress ||
+                session.identitySource != AttendanceIdentitySource.NATIVE || session.academicSource != null ||
+                studentId.isBlank() || note.trim().length !in 3..500
+            ) {
+                return
+            }
+            val expectedRevision = snapshot.roster?.records?.firstOrNull { it.studentId == studentId }?.recordRevision ?: 0L
+            launchTeacherRequest {
+                _state.update { it.copy(actionInProgress = true, errorMessage = null) }
+                val result = repository.markNative(
+                    session.id,
+                    ManualAttendanceMarkRequest(studentId.trim(), disposition, note.trim(), expectedRevision),
+                )
+                ensureActive()
+                when (result) {
+                    is Outcome.Success -> {
+                        _state.update { current ->
+                            if (current.teacherSession?.id != session.id) {
+                                current.copy(actionInProgress = false)
+                            } else {
+                                val roster = current.roster
+                                current.copy(
+                                    actionInProgress = false,
+                                    roster = roster?.copy(
+                                        records = roster.records.filterNot { it.studentId == result.value.studentId } + result.value,
+                                    ),
+                                    successMessage = "Decisión manual registrada por el servidor.",
+                                )
+                            }
                         }
                     }
                     is Outcome.Failure -> teacherActionFailed(result.error)

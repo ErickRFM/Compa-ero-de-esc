@@ -20,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.Icons
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -368,6 +369,7 @@ private fun TeacherAssignedClassrooms(
     val scope = rememberCoroutineScope()
     val importReader = remember(context) { NativeRosterImportReader(context) }
     var selectedImportClass by remember { mutableStateOf<String?>(null) }
+    var selectedRosterClass by remember { mutableStateOf<String?>(null) }
     var importCandidates by remember { mutableStateOf<List<String>>(emptyList()) }
     var manualIdentifier by remember { mutableStateOf("") }
     var importError by remember { mutableStateOf<String?>(null) }
@@ -530,7 +532,10 @@ private fun TeacherAssignedClassrooms(
                                     Text("Generar código para compartir")
                                 }
                                 OutlinedButton(
-                                    onClick = { onLoadMembers(classroom.id) },
+                                    onClick = {
+                                        selectedRosterClass = classroom.id
+                                        onLoadMembers(classroom.id)
+                                    },
                                     enabled = !state.submitting,
                                     modifier = Modifier.fillMaxWidth(),
                                 ) { Text("Ver integrantes de la clase") }
@@ -641,6 +646,38 @@ private fun TeacherAssignedClassrooms(
                 }
             }
         }
+    }
+    selectedRosterClass?.let { classroomId ->
+        val selected = assigned.firstOrNull { it.id == classroomId }
+        val members = state.members[classroomId]
+        AlertDialog(
+            onDismissRequest = { selectedRosterClass = null },
+            title = { Text("Lista de ${selected?.name ?: "alumnos"}") },
+            text = {
+                Column(
+                    modifier = Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+                ) {
+                    when {
+                        members == null -> CircularProgressIndicator()
+                        members.isEmpty() -> Text("No hay cuentas vinculadas a esta clase.")
+                        else -> {
+                            Text(
+                                "${members.size} cuentas verificadas · lista interna de Compañero",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            members.forEach { student ->
+                                Text(student.displayName, style = MaterialTheme.typography.bodyLarge)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { selectedRosterClass = null }) { Text("Cerrar") }
+            },
+        )
     }
 }
 

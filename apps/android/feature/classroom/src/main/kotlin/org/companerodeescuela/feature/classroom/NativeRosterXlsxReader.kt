@@ -84,7 +84,7 @@ internal fun parseNativeRosterXlsxIdentifiers(bytes: ByteArray): List<String> {
                     when (cell.getAttribute("t")) {
                         "s" -> {
                             val index = cell.getElementsByTagName("v").firstText()?.toIntOrNull()
-                            index?.let(shared::getOrNull).orEmpty()
+                            if (index == null) "" else shared.getOrNull(index).orEmpty()
                         }
                         "inlineStr" -> cell.getElementsByTagName("t").allText()
                         else -> cell.getElementsByTagName("v").firstText().orEmpty()
@@ -109,6 +109,7 @@ private val XLSX_SHEET = Regex("""xl/worksheets/sheet[1-9][0-9]*\.xml""")
 
 private fun parseSafeXlsxXml(payload: ByteArray): org.w3c.dom.Document {
     // Do not rely on Android's partial JAXP secure-processing implementation.
+    if (payload.any { it == 0.toByte() }) throw IOException("Sólo se admite XML UTF-8 en XLSX")
     val source = payload.toString(Charsets.UTF_8)
     if (Regex("""<!\s*(DOCTYPE|ENTITY)""", RegexOption.IGNORE_CASE).containsMatchIn(source)) {
         throw IOException("El XLSX contiene XML no permitido")

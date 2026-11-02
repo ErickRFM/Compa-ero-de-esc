@@ -21,6 +21,7 @@ import org.companerodeescuela.shared.contracts.ClassCallConfirmationRequest
 import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
 import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
+import org.companerodeescuela.shared.contracts.ManualAttendanceMarkRequest
 import org.companerodeescuela.shared.contracts.SchoolNetworkEvidence
 import org.companerodeescuela.shared.contracts.SchoolPresenceResponse
 import org.companerodeescuela.shared.contracts.StartSchoolPresenceRequest
@@ -296,6 +297,11 @@ class AttendanceRepository(
         recordId: String,
         request: ReviewAttendanceRequest,
     ): Outcome<AttendanceRecordResponse> = withToken { token -> remoteClient.review(token, recordId, request) }
+
+    suspend fun markNative(
+        sessionId: String,
+        request: ManualAttendanceMarkRequest,
+    ): Outcome<AttendanceRecordResponse> = withToken { token -> remoteClient.markNative(token, sessionId, request) }
 
     suspend fun enqueueAttempt(
         sessionId: String,

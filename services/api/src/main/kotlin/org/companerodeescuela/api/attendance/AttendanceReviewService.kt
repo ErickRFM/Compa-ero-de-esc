@@ -1,5 +1,6 @@
 package org.companerodeescuela.api.attendance
 
+import java.time.Clock
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.companerodeescuela.api.auth.PlatformAccountRepository
@@ -12,10 +13,9 @@ import org.companerodeescuela.shared.contracts.AttendanceReviewEntry
 import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
 import org.companerodeescuela.shared.contracts.AttendanceStatus
 import org.companerodeescuela.shared.contracts.ManualAttendanceMarkRequest
+import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
 import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
-import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
-import java.time.Clock
 
 class AttendanceReviewService(
     private val repository: AttendanceRepository,

@@ -229,6 +229,26 @@ class FcmDeliveryTest {
                 "org.companerodeescuela.action.OPEN_CHANNEL",
                 android?.get("click_action")?.jsonPrimitive?.content,
             )
+            val reviewData =
+                mapOf(
+                    "type" to "channel_task_review",
+                    "destination" to "channel",
+                    "channelId" to "test-channel",
+                    "taskId" to "test-task",
+                    "submissionId" to "test-submission",
+                    "submissionVersion" to "2",
+                )
+            assertEquals(
+                PushDeliveryResult.ACCEPTED,
+                gateway.send("fcm_test_channel_device_123456789", "Tareas", "Revisión disponible", reviewData),
+            )
+            val reviewMessage = payload ?: error("Missing FCM review message")
+            assertEquals(reviewData, reviewMessage["data"]?.jsonObject?.mapValues { it.value.jsonPrimitive.content })
+            assertEquals(
+                "org.companerodeescuela.action.OPEN_CHANNEL",
+                reviewMessage["android"]?.jsonObject?.get("notification")?.jsonObject?.get("click_action")?.jsonPrimitive?.content,
+            )
+            assertFalse(reviewMessage["data"]?.jsonObject?.containsKey("score") == true)
         }
 
     @Test fun `FCM invalid registration is distinguished from transient and malformed provider errors`() =

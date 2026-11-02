@@ -91,6 +91,9 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
+internal fun shouldConsumeChannelTabRequest(requestedTab: Int, channelReady: Boolean): Boolean =
+    requestedTab in 0..2 && channelReady
+
 private data class PendingChannelTaskUpload(
     val taskId: String,
     val comment: String? = null,
@@ -176,8 +179,8 @@ fun ChannelScreen(
     LaunchedEffect(state.downloadReady?.requestId) {
         state.downloadReady?.let { downloadPicker.launch(it.fileName) }
     }
-    LaunchedEffect(requestedTab) {
-        if (requestedTab in 0..2) {
+    LaunchedEffect(requestedTab, selected?.id) {
+        if (shouldConsumeChannelTabRequest(requestedTab, selected != null)) {
             selectedTab = requestedTab
             onConsumeRequestedTab()
         }

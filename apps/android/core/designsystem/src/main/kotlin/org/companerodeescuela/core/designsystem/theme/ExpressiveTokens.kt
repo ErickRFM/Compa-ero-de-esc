@@ -43,6 +43,7 @@ object CompaneroSize {
     val brandLogoHeight = 56.dp
     val brandLogoCompactHeight = 36.dp
     val homeContentMaxWidth = 1120.dp
+    val settingsContentMaxWidth = 720.dp
     val agendaRailWidth = 168.dp
     val scannerFrame = 270.dp
     val scannerFrameStroke = 4.dp
@@ -56,27 +57,33 @@ object CompaneroWindowBreakpoints {
 
 object CompaneroExpressive {
     @Composable
-    fun heroBrush(): Brush = Brush.linearGradient(
-        colors = listOf(
-            CompanionColors.graphite,
-            CompanionColors.crimson,
-        ),
-    )
+    fun heroBrush(): Brush =
+        Brush.linearGradient(
+            colors =
+                listOf(
+                    CompanionColors.graphite,
+                    CompanionColors.crimson,
+                ),
+        )
 
     @Composable
-    fun accentBrush(): Brush = Brush.linearGradient(
-        colors = listOf(
-            MaterialTheme.colorScheme.secondary,
-            MaterialTheme.colorScheme.tertiary,
-        ),
-    )
+    fun accentBrush(): Brush =
+        Brush.linearGradient(
+            colors =
+                listOf(
+                    MaterialTheme.colorScheme.secondary,
+                    MaterialTheme.colorScheme.tertiary,
+                ),
+        )
 
     @Composable
-    fun subduedHeroBrush(): Brush = Brush.linearGradient(
-        colors = listOf(
-            CompanionColors.graphite,
-            CompanionColors.graphiteRaised,
-            CompanionColors.crimson,
-        ),
-    )
+    fun subduedHeroBrush(): Brush =
+        Brush.linearGradient(
+            colors =
+                listOf(
+                    CompanionColors.graphite,
+                    CompanionColors.graphiteRaised,
+                    CompanionColors.crimson,
+                ),
+        )
 }

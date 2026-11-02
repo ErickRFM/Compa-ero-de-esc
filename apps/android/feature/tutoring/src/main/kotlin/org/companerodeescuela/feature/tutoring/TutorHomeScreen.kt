@@ -21,6 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.ui.component.StatusNotice
@@ -47,13 +48,8 @@ fun TutorHomeScreen(
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
         V8ScreenHeader {
-            Text("Tutorías", style = MaterialTheme.typography.headlineSmall)
+            V8PageTitle(title = "Tutorías", description = "Acompañamiento académico de tus grupos asignados.")
         }
-        Text(
-            "Acompañamiento académico de tus grupos asignados.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         if (state.loading) CircularProgressIndicator()
         state.error?.let { StatusNotice(title = "No pudimos actualizar", message = it) }
         state.notice?.let { StatusNotice(title = "Tutorías", message = it) }
@@ -62,7 +58,6 @@ fun TutorHomeScreen(
             emphasized = true,
         ) {
             Column(
-                modifier = Modifier.padding(CompaneroSpacing.md),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
                 Text(
@@ -101,7 +96,6 @@ fun TutorHomeScreen(
             state.groups.forEach { group ->
                 V8GlassCard(modifier = Modifier.fillMaxWidth()) {
                     Column(
-                        modifier = Modifier.padding(CompaneroSpacing.md),
                         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
                     ) {
                         Text(group.name, style = MaterialTheme.typography.titleMedium)

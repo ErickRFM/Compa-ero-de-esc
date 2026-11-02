@@ -34,6 +34,7 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroAccentPalette
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 
@@ -61,16 +62,8 @@ fun AppearanceSettingsScreen(
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
         V8ScreenHeader {
-            Text(
-                text = "Apariencia",
-                style = MaterialTheme.typography.headlineSmall,
-            )
+            V8PageTitle(title = "Apariencia", description = "Elige cómo quieres ver y usar Compañero.")
         }
-        Text(
-            text = "Ajusta el producto sin perder la identidad visual de UPTlax.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
 
         LiveAppearancePreviewCard()
 

@@ -31,6 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.ui.component.StatusNotice
@@ -67,13 +68,11 @@ private fun TutorRequestsContent(
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
         V8ScreenHeader {
-            Text("Justificantes", style = MaterialTheme.typography.headlineSmall)
+            V8PageTitle(
+                title = "Justificantes",
+                description = "Revisa las solicitudes de tus grupos. Una justificación no cambia la presencia verificada por QR.",
+            )
         }
-        Text(
-            "Revisa las solicitudes de tus grupos. Una justificación no cambia la presencia verificada por QR.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         if (state.loading) CircularProgressIndicator()
         state.error?.let { StatusNotice(title = "No pudimos cargar solicitudes", message = it) }
         state.notice?.let { StatusNotice(title = "Solicitud", message = it) }

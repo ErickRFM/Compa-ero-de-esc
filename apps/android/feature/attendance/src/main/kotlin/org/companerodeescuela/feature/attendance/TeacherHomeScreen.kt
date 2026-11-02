@@ -41,6 +41,7 @@ import org.companerodeescuela.core.designsystem.v8.V8DashboardStat
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8IconTile
 import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
+import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
@@ -88,22 +89,13 @@ fun TeacherHomeScreen(
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
         ) {
             V8ScreenHeader {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = "Inicio docente",
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    val greeting = displayName?.trim()?.takeIf { it.isNotEmpty() }
-                    Text(
-                        text =
-                            greeting?.let { "Hola, $it · Tus clases asignadas" }
-                                ?: "Consulta tus clases asignadas y organiza la jornada.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                val greeting = displayName?.trim()?.takeIf { it.isNotEmpty() }
+                V8PageTitle(
+                    title = "Inicio docente",
+                    description =
+                        greeting?.let { "Hola, $it · Tus clases asignadas" }
+                            ?: "Consulta tus clases asignadas y organiza la jornada.",
+                )
             }
 
             if (state.mode == AttendanceMode.LOADING || state.loading && state.occurrences.isEmpty()) {

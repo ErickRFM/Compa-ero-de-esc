@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -20,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,6 +32,9 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -40,8 +46,12 @@ import org.companerodeescuela.core.designsystem.theme.LocalCompaneroAccentPalett
 import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
+import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
-import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
+import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
+import org.companerodeescuela.core.navigation.AppDistribution
+import org.companerodeescuela.core.navigation.AppExperience
+import org.companerodeescuela.core.navigation.RoleExperienceResolver
 import org.companerodeescuela.shared.contracts.UserRole
 
 /**
@@ -63,6 +73,7 @@ fun ProfileScreen(
     onTutorRequest: (() -> Unit)? = null,
     /** Callbacks navigate only; backend permissions still control protected operations. */
     managementExperience: Boolean = false,
+    activeExperience: AppExperience? = null,
     onAdminDashboard: (() -> Unit)? = null,
     onAdminSchedule: (() -> Unit)? = null,
     onAdminClassrooms: (() -> Unit)? = null,
@@ -71,8 +82,22 @@ fun ProfileScreen(
     modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
+    val distribution = if (managementExperience) AppDistribution.MANAGEMENT else AppDistribution.ACADEMIC
+    val availableExperiences = RoleExperienceResolver.available(roles, distribution)
+    val experience =
+        if (activeExperience == null) {
+            RoleExperienceResolver.resolve(roles, distribution = distribution).experience
+        } else {
+            activeExperience.takeIf(availableExperiences::contains) ?: AppExperience.UNSUPPORTED
+        }
     val administrativeExperience =
-        managementExperience && roles.any { it == UserRole.ADMIN || it == UserRole.SUPER_ADMIN }
+        managementExperience &&
+            (experience == AppExperience.ADMIN || experience == AppExperience.SUPER_ADMIN)
+    val canRequestTutor =
+        experience == AppExperience.TEACHER &&
+            onTutorRequest != null &&
+            UserRole.TEACHER in roles &&
+            UserRole.TUTOR !in roles
     Box(modifier = modifier.fillMaxSize()) {
         if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current &&
             MaterialTheme.colorScheme.background.luminance() < 0.5f &&
@@ -83,18 +108,20 @@ fun ProfileScreen(
         Column(
             modifier =
                 Modifier
-                    .fillMaxSize()
-                    .widthIn(max = CompaneroSize.homeContentMaxWidth)
+                    .align(Alignment.TopCenter)
+                    .fillMaxHeight()
+                    .widthIn(max = CompaneroSize.settingsContentMaxWidth)
+                    .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
         ) {
-            Text(
-                text = if (administrativeExperience) "Perfil de Gestión" else "Mi perfil",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            V8ScreenHeader {
+                V8PageTitle(
+                    title = if (managementExperience) "Perfil de Gestión" else "Mi perfil",
+                    description = "Tu cuenta, acceso y preferencias en un solo lugar.",
+                )
+            }
 
             V8GlassCard(modifier = Modifier.fillMaxWidth()) {
                 Row(
@@ -130,9 +157,9 @@ fun ProfileScreen(
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            text = roleSummary(roles),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            text = "Perfil activo · ${experienceLabel(experience, roles)}",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
                         )
                         Text(
                             text = "Sesión activa",
@@ -145,24 +172,17 @@ fun ProfileScreen(
 
             ProfileGroup(title = "Cuenta") {
                 ProfileRow(
-                    title = "Cuenta",
-                    detail = if (managementExperience) "Compañero Gestión" else "Compañero de Clase",
-                    trailingLabel = "Activa",
-                )
-                GroupDivider()
-                ProfileRow(
                     title = "Sistema escolar",
                     detail = "Vinculación y sincronización con SIII.",
                     onClick = onIntegrations,
                 )
                 GroupDivider()
-                ProfileRow(
-                    title = "Privacidad",
-                    detail = "Uso y protección de tus datos académicos.",
-                )
+                ProfileRow(title = "Roles de la cuenta", detail = roleSummary(roles))
             }
 
-            if (administrativeExperience) {
+            if (administrativeExperience &&
+                (onAdminDashboard != null || onAdminSchedule != null || onAdminClassrooms != null)
+            ) {
                 ProfileGroup(title = "Administración") {
                     onAdminDashboard?.let { action ->
                         ProfileRow(
@@ -190,9 +210,7 @@ fun ProfileScreen(
                 }
             }
 
-            if (onSecurity != null ||
-                (onTutorRequest != null && UserRole.TEACHER in roles && UserRole.TUTOR !in roles)
-            ) {
+            if (onSecurity != null || canRequestTutor) {
                 ProfileGroup(title = stringResource(R.string.profile_access)) {
                     onSecurity?.let { action ->
                         ProfileRow(
@@ -201,7 +219,7 @@ fun ProfileScreen(
                             onClick = action,
                         )
                     }
-                    if (onTutorRequest != null && UserRole.TEACHER in roles && UserRole.TUTOR !in roles) {
+                    if (canRequestTutor) {
                         if (onSecurity != null) GroupDivider()
                         ProfileRow(
                             title = stringResource(R.string.profile_tutor_request),
@@ -212,7 +230,7 @@ fun ProfileScreen(
                 }
             }
 
-            if (canSwitchExperience) {
+            if (canSwitchExperience && availableExperiences.size > 1) {
                 ProfileGroup(title = "Modo de uso") {
                     ProfileRow(
                         title = "Cambiar perfil activo",
@@ -251,19 +269,18 @@ fun ProfileScreen(
                         } else if (managementExperience) {
                             "Compañero Gestión"
                         } else {
-                            "Compañero de Clase · interfaz V8"
+                            "Compañero de Clase"
                         },
                 )
             }
 
-            V8RedPrimaryButton(
-                text = "Cerrar sesión",
+            OutlinedButton(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     onLogout()
                 },
                 modifier = Modifier.fillMaxWidth(),
-            )
+            ) { Text("Cerrar sesión") }
         }
     }
 }
@@ -279,6 +296,7 @@ private fun ProfileGroup(
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.semantics { heading() },
         )
         V8GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column(content = content)
@@ -290,13 +308,13 @@ private fun ProfileGroup(
 private fun ProfileRow(
     title: String,
     detail: String,
-    trailingLabel: String? = null,
     onClick: (() -> Unit)? = null,
 ) {
     val rowModifier =
         Modifier
             .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .heightIn(min = 48.dp)
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
             .padding(vertical = CompaneroSpacing.sm)
 
     Row(
@@ -318,13 +336,6 @@ private fun ProfileRow(
                 detail,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        trailingLabel?.let {
-            Text(
-                text = it,
-                style = MaterialTheme.typography.labelLarge,
-                color = profileSuccessColor(),
             )
         }
         if (onClick != null) {
@@ -367,6 +378,22 @@ private fun roleSummary(roles: Set<UserRole>): String =
                 UserRole.SUPER_ADMIN -> "Administración general"
             }
         }.ifBlank { "Rol no disponible" }
+
+private fun experienceLabel(
+    experience: AppExperience,
+    roles: Set<UserRole>,
+): String =
+    when (experience) {
+        AppExperience.STUDENT -> "Estudiante"
+        AppExperience.TEACHER -> if (UserRole.TEACHER in roles) "Docente" else "Docente pendiente"
+        AppExperience.TUTOR -> "Tutoría"
+        AppExperience.PRINCIPAL -> "Dirección"
+        AppExperience.COORDINATOR -> "Coordinación"
+        AppExperience.ADMIN -> "Administración"
+        AppExperience.SUPER_ADMIN -> "Administración general"
+        AppExperience.GUEST -> if (UserRole.WORKSHOP_PARTICIPANT in roles) "Participante" else "Invitado"
+        AppExperience.UNSUPPORTED -> "No disponible"
+    }
 
 private fun initials(displayName: String?): String =
     displayName

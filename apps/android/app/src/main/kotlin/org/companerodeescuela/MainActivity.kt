@@ -610,9 +610,11 @@ class MainActivity : AppCompatActivity() {
                                                 appDistribution == AppDistribution.MANAGEMENT && adminExperience
                                             ProfileScreen(
                                                 displayName = session.displayName,
+                                                appVersion = BuildConfig.VERSION_NAME,
                                                 roles = session.roles,
                                                 canSwitchExperience = availableExperiences.size > 1,
                                                 managementExperience = appDistribution == AppDistribution.MANAGEMENT,
+                                                activeExperience = roleConfig.experience,
                                                 onAdminDashboard =
                                                     if (adminProfile) {
                                                         {
@@ -855,86 +857,3 @@ private fun RoleUnavailableScreen(
         }
     }
 }
-
-@androidx.compose.runtime.Composable
-private fun ExperiencePickerScreen(
-    experiences: List<AppExperience>,
-    selectionUnavailable: Boolean = false,
-    onSelect: (AppExperience) -> Unit,
-    onLogout: (() -> Unit)? = null,
-) {
-    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(horizontal = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.page),
-        verticalArrangement = Arrangement.Center,
-    ) {
-        org.companerodeescuela.core.designsystem.v8.V8ScreenHeader {
-            Text(
-                text = stringResource(R.string.login_experience_picker_title),
-                style = MaterialTheme.typography.headlineMedium,
-            )
-        }
-        Text(
-            text =
-                stringResource(
-                    if (selectionUnavailable) R.string.login_experience_unavailable else R.string.login_experience_picker_description,
-                ),
-            modifier =
-                Modifier.padding(
-                    top = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.xs,
-                    bottom = org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.md,
-                ),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        org.companerodeescuela.core.designsystem.v8.V8GlassCard(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                verticalArrangement =
-                    Arrangement.spacedBy(
-                        org.companerodeescuela.core.designsystem.theme.CompaneroSpacing.xs,
-                    ),
-            ) {
-                experiences.forEach { experience ->
-                    org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton(
-                        text = experienceLabel(experience),
-                        onClick = {
-                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                            onSelect(experience)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                onLogout?.let { logout ->
-                    androidx.compose.material3.TextButton(
-                        onClick = {
-                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                            logout()
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.role_unavailable_logout))
-                    }
-                }
-            }
-        }
-    }
-}
-
-@androidx.compose.runtime.Composable
-private fun experienceLabel(experience: AppExperience): String =
-    stringResource(
-        when (experience) {
-            AppExperience.PRINCIPAL -> R.string.login_continue_principal
-            AppExperience.STUDENT -> R.string.login_continue_student
-            AppExperience.TEACHER -> R.string.login_continue_teacher
-            AppExperience.TUTOR -> R.string.login_continue_tutor
-            AppExperience.COORDINATOR -> R.string.login_continue_coordinator
-            AppExperience.ADMIN -> R.string.login_continue_admin
-            AppExperience.SUPER_ADMIN -> R.string.login_continue_super_admin
-            AppExperience.GUEST -> R.string.login_continue_guest
-            AppExperience.UNSUPPORTED -> R.string.login_continue
-        },
-    )

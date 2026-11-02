@@ -149,14 +149,15 @@ class ChannelTaskServiceTest {
                     ReviewSubmissionRequest(TaskStatus.RETURNED, "Corrige", 1, 7.0),
                 )
             }
-            val reviewed = service.review(
-                TEACHER,
-                setOf(UserRole.TEACHER),
-                CHANNEL,
-                task.id,
-                submitted.id,
-                ReviewSubmissionRequest(TaskStatus.REVIEWED, "Muy bien", 1, 9.5),
-            )
+            val reviewed =
+                service.review(
+                    TEACHER,
+                    setOf(UserRole.TEACHER),
+                    CHANNEL,
+                    task.id,
+                    submitted.id,
+                    ReviewSubmissionRequest(TaskStatus.REVIEWED, "Muy bien", 1, 9.5),
+                )
             assertEquals(9.5, reviewed.score)
             assertEquals(9.5, reviewed.history.last().score)
             val own = service.submissionsFor(STUDENT, setOf(UserRole.STUDENT), CHANNEL, task.id)

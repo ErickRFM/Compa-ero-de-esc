@@ -1,5 +1,7 @@
 package org.companerodeescuela.core.attendance
 
+import java.time.Clock
+import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
@@ -20,16 +22,14 @@ import org.companerodeescuela.shared.contracts.AttendanceSessionStatus
 import org.companerodeescuela.shared.contracts.ClassCallConfirmationRequest
 import org.companerodeescuela.shared.contracts.ClassOccurrenceContract
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
-import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
 import org.companerodeescuela.shared.contracts.ManualAttendanceMarkRequest
+import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
 import org.companerodeescuela.shared.contracts.SchoolNetworkEvidence
 import org.companerodeescuela.shared.contracts.SchoolPresenceResponse
 import org.companerodeescuela.shared.contracts.StartSchoolPresenceRequest
 import org.companerodeescuela.shared.contracts.TeacherCampusRosterResponse
 import org.companerodeescuela.shared.contracts.TeacherClassContext
 import org.companerodeescuela.shared.contracts.UserRole
-import java.time.Clock
-import java.util.UUID
 
 data class QrEvidenceCapture(
     val localRecord: LocalAttendanceRecord,

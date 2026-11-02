@@ -5,6 +5,7 @@ import org.companerodeescuela.api.academic.groups.AcademicGroupRepository
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.shared.contracts.ClassInvite
 import org.companerodeescuela.shared.contracts.ClassroomMemberRole
+import org.companerodeescuela.shared.contracts.ClassroomMemberSummary
 import org.companerodeescuela.shared.contracts.ClassroomMembership
 import org.companerodeescuela.shared.contracts.ClassroomStatus
 import org.companerodeescuela.shared.contracts.ClassroomSummary
@@ -267,6 +268,30 @@ class ClassroomService(
                 ),
             membership = membership.toContract(),
         )
+    }
+
+    suspend fun listMembers(
+        actor: UserSummary,
+        classroomId: String,
+    ): List<ClassroomMemberSummary> {
+        val current = policy().live(actor)
+        val classroom = requireCanPublish(actor, classroomId)
+        if (UserRole.TEACHER !in current.roles || classroom.teacherId != current.id) {
+            throw ApiException.Forbidden("Only the assigned teacher can inspect the class roster")
+        }
+        val group = scopedGroupFor(actor, classroomId)
+        val directory = accounts ?: throw ApiException.DependencyUnavailable("Current student identities are unavailable")
+        return repository.listMembershipsForClass(classroomId)
+            .filter { it.role == ClassroomMemberRole.STUDENT }
+            .mapNotNull { member ->
+                val account = directory.findById(member.userId) ?: return@mapNotNull null
+                if (!account.permitsSession || UserRole.STUDENT !in account.roles ||
+                    account.institutionId != group.institutionId || account.emailVerifiedAt == null
+                ) {
+                    return@mapNotNull null
+                }
+                ClassroomMemberSummary(member.userId, account.displayName, member.joinedAt.epochSecond)
+            }.sortedWith(compareBy({ it.displayName.lowercase() }, { it.userId }))
     }
 
     /** Teacher-managed native memberships; does not assert institutional enrollment. */

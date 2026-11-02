@@ -31,6 +31,7 @@ import org.companerodeescuela.shared.contracts.AttendanceSessionResponse
 import org.companerodeescuela.shared.contracts.ClassCallConfirmationRequest
 import org.companerodeescuela.shared.contracts.CreateAttendanceSessionRequest
 import org.companerodeescuela.shared.contracts.ReviewAttendanceRequest
+import org.companerodeescuela.shared.contracts.ManualAttendanceMarkRequest
 import org.companerodeescuela.shared.contracts.SchoolPresenceResponse
 import org.companerodeescuela.shared.contracts.StartSchoolPresenceRequest
 import org.companerodeescuela.shared.contracts.TeacherCampusRosterResponse
@@ -279,6 +280,22 @@ class AttendanceRemoteClient
                 apiCall {
                     client
                         .patch("attendance/records/$recordId/review") {
+                            bearerAuth(accessToken)
+                            contentType(ContentType.Application.Json)
+                            setBody(request)
+                        }.requireBody<ApiResponse<AttendanceRecordResponse>>()
+                }.map { it.data }
+            }
+
+        suspend fun markNative(
+            token: String,
+            sessionId: String,
+            request: ManualAttendanceMarkRequest,
+        ): Outcome<AttendanceRecordResponse> =
+            authorized(token) { accessToken ->
+                apiCall {
+                    client
+                        .post("attendance/sessions/$sessionId/manual-record") {
                             bearerAuth(accessToken)
                             contentType(ContentType.Application.Json)
                             setBody(request)

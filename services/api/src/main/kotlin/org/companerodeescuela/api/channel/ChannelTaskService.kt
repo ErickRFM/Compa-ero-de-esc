@@ -1,6 +1,8 @@
 package org.companerodeescuela.api.channel
 
 import org.companerodeescuela.api.auth.SessionIdentitySource
+import org.companerodeescuela.api.classroom.ClassroomService
+import org.companerodeescuela.api.devices.PushOutboxService
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.shared.contracts.ChannelAttachment
 import org.companerodeescuela.shared.contracts.ChannelFileScope
@@ -25,7 +27,81 @@ class ChannelTaskService(
     private val repository: ChannelTaskRepository,
     private val accessPolicy: ChannelAccessPolicy,
     private val clock: Clock = Clock.systemUTC(),
+    private val classrooms: ClassroomService? = null,
+    private val accounts: org.companerodeescuela.api.auth.PlatformAccountRepository? = null,
 ) {
+    @Volatile
+    private var notifications: PushOutboxService? = null
+
+    fun attachNotifications(service: PushOutboxService) {
+        notifications = service
+    }
+
+    /** Revalidated when retrying delivery, including changed class membership. */
+    suspend fun eligibleTaskNotice(
+        owner: String,
+        channelId: String,
+        taskId: String,
+    ): Boolean {
+        val id = owner.takeIf { it.startsWith("NATIVE:") }?.removePrefix("NATIVE:") ?: return false
+        val account = accounts?.findById(id) ?: return false
+        if (
+            !account.permitsSession ||
+            account.emailVerifiedAt == null ||
+            UserRole.STUDENT !in account.roles
+        ) {
+            return false
+        }
+        return try {
+            accessPolicy.requireCanRead(
+                id,
+                account.roles,
+                channelId,
+                account.toUserSummary(),
+                SessionIdentitySource.NATIVE,
+            )
+            val task = repository.findTask(channelId, taskId)
+            task != null && !task.closed
+        } catch (_: ApiException.Forbidden) {
+            false
+        } catch (_: ApiException.NotFound) {
+            false
+        } catch (_: ApiException.Unauthorized) {
+            false
+        }
+    }
+
+    private suspend fun queueNotice(
+        eventId: String,
+        studentIds: List<String>,
+        channelId: String,
+        taskId: String,
+    ) {
+        val service = notifications ?: return
+        studentIds.distinct().forEach { id ->
+            try {
+                service.enqueueForOwner(
+                    eventId = eventId,
+                    owner = "NATIVE:$id",
+                    title = "Actualización de clase",
+                    body = "Tienes una tarea o revisión en Compañero.",
+                    data =
+                        mapOf(
+                            "type" to "channel_task",
+                            "destination" to "channel",
+                            "channelId" to channelId,
+                            "taskId" to taskId,
+                        ),
+                    appDistribution = "ACADEMIC",
+                )
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // The business write is committed; notification transport is best-effort.
+            }
+        }
+    }
+
     suspend fun listTasks(
         userId: String,
         roles: Set<UserRole>,
@@ -84,6 +160,15 @@ class ChannelTaskService(
             )
         if (!channel.canPublish) throw ApiException.Forbidden()
         if (!repository.createTask(task)) throw ApiException.Conflict("Task could not be created")
+        if (
+            identitySource == SessionIdentitySource.NATIVE &&
+            actor != null &&
+            UserRole.TEACHER in roles &&
+            task.teacherId == actor.id
+        ) {
+            val students = classrooms?.activeStudentIdsForTeacher(actor, channelId).orEmpty()
+            queueNotice("task:${task.id}:published", students, channelId, task.id)
+        }
         return task
     }
 
@@ -338,6 +423,14 @@ class ChannelTaskService(
             )
         if (!repository.replaceSubmission(updated, current.version)) {
             throw ApiException.Conflict("Submission was updated by another request")
+        }
+        if (identitySource == SessionIdentitySource.NATIVE) {
+            queueNotice(
+                "task:${task.id}:review:${updated.id}:${updated.version}",
+                listOf(updated.studentId),
+                channelId,
+                task.id,
+            )
         }
         return updated.withFiles()
     }

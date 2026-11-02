@@ -23,10 +23,13 @@ class AttendancePushEligibility(
     private val tasks: ChannelTaskService? = null,
 ) {
     suspend fun allows(item: PushOutboxItem): Boolean {
-        if (item.data["type"] == "channel_task") {
+        if (item.data["type"] in setOf("channel_task", "channel_task_review")) {
             val channelId = item.data["channelId"] ?: return false
             val taskId = item.data["taskId"] ?: return false
-            return tasks?.eligibleTaskNotice(item.owner, channelId, taskId) ?: false
+            val isReview = item.data["type"] == "channel_task_review"
+            val submissionId = if (isReview) item.data["submissionId"] ?: return false else null
+            val version = if (isReview) item.data["submissionVersion"]?.toIntOrNull() ?: return false else null
+            return tasks?.eligibleTaskNotice(item.owner, channelId, taskId, submissionId, version) ?: false
         }
         if (item.data["type"] == "channel_task_submission") {
             val channelId = item.data["channelId"] ?: return false

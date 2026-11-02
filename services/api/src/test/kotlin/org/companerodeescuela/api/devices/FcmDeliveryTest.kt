@@ -189,6 +189,42 @@ class FcmDeliveryTest {
             )
         }
 
+    @Test
+    fun `background channel notice has an explicit Android click destination`() =
+        runBlocking {
+            val account = credentials()
+            var payload: kotlinx.serialization.json.JsonObject? = null
+            val gateway =
+                FcmHttpV1Gateway(
+                    account,
+                    object : PushHttpTransport {
+                        override suspend fun post(
+                            url: URI,
+                            headers: Map<String, String>,
+                            body: ByteArray,
+                        ): PushHttpResponse {
+                            if (url.host == "oauth2.googleapis.com") {
+                                return PushHttpResponse(200, """{"access_token":"${"a".repeat(80)}","expires_in":3600}""")
+                            }
+                            payload = Json.parseToJsonElement(body.toString(Charsets.UTF_8)).jsonObject["message"]?.jsonObject
+                            return PushHttpResponse(200, "{}")
+                        }
+                    },
+                )
+            val result = gateway.send(
+                "fcm_test_channel_device_123456789",
+                "Canal",
+                "Nuevo aviso",
+                mapOf("type" to "channel"),
+            )
+            assertEquals(PushDeliveryResult.ACCEPTED, result)
+            val android = payload?.get("android")?.jsonObject?.get("notification")?.jsonObject
+            assertEquals(
+                "org.companerodeescuela.action.OPEN_CHANNEL",
+                android?.get("click_action")?.jsonPrimitive?.content,
+            )
+        }
+
     @Test fun `FCM invalid registration is distinguished from transient and malformed provider errors`() =
         runBlocking {
             val account = credentials()

@@ -5,10 +5,10 @@ import android.net.Uri
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.text.PDFTextStripper
-import java.io.ByteArrayOutputStream
-import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
+import java.io.IOException
 
 /** Preview of *account identifiers*, not a list of official school enrollments. */
 internal class NativeRosterImportReader(
@@ -16,9 +16,11 @@ internal class NativeRosterImportReader(
 ) {
     suspend fun read(uri: Uri): List<String> =
         withContext(Dispatchers.IO) {
-            val content = context.contentResolver.openInputStream(uri)
-                ?: throw IOException("No se pudo leer el archivo")
-            val bytes = content.use { stream ->
+            val content =
+                context.contentResolver.openInputStream(uri)
+                    ?: throw IOException("No se pudo leer el archivo")
+            val bytes =
+                content.use { stream ->
                 val output = ByteArrayOutputStream()
                 val buffer = ByteArray(8192)
                 while (true) {
@@ -30,8 +32,9 @@ internal class NativeRosterImportReader(
                 output.toByteArray()
             }
             val mime = context.contentResolver.getType(uri).orEmpty()
-            val pdf = mime.equals("application/pdf", ignoreCase = true) ||
-                uri.lastPathSegment?.endsWith(".pdf", ignoreCase = true) == true
+            val isPdfMime = mime.equals("application/pdf", ignoreCase = true)
+            val isPdfName = uri.lastPathSegment?.endsWith(".pdf", ignoreCase = true) == true
+            val pdf = isPdfMime || isPdfName
             val text =
                 if (pdf) {
                     PDFBoxResourceLoader.init(context.applicationContext)
@@ -65,9 +68,11 @@ internal fun parseNativeRosterIdentifiers(text: String): List<String> {
     for (line in text.lineSequence()) {
         val row = line.trim()
         if (row.isEmpty()) continue
-        val candidate = email.find(row)?.value ?: row.split(',', ';', '\t', ' ')
-            .firstOrNull { id.matches(it.trim()) }
-            ?.trim()
+        val candidate =
+            email.find(row)?.value
+                ?: row.split(',', ';', '\t', ' ')
+                    .firstOrNull { id.matches(it.trim()) }
+                    ?.trim()
         if (candidate != null) {
             identifiers += candidate.lowercase()
             if (identifiers.size > 100) throw IllegalArgumentException("Máximo 100 alumnos por lote")

@@ -22,13 +22,13 @@ class LoginV8SmokeTest {
     fun registrationAccountTypeCanBeSelectedByItsLabel() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { it.appearancePreferences.setLanguage(AppLanguage.SPANISH) }
-            waitForText("universitaria,")
+            waitForText("Bienvenido de nuevo")
             compose.onNodeWithTag("login_registration").performScrollTo().performClick()
             compose.onNodeWithText("Alumno").performScrollTo().assertExists()
             compose.onNodeWithText("Docente").performScrollTo().performClick()
             waitForText("requieren verificación")
             compose.onNodeWithText("Ya tengo cuenta").performScrollTo().performClick()
-            waitForText("universitaria,")
+            waitForText("Bienvenido de nuevo")
         }
     }
 
@@ -36,7 +36,7 @@ class LoginV8SmokeTest {
     fun signedOutUserSeesInstitutionalLogin() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { it.appearancePreferences.setLanguage(AppLanguage.SPANISH) }
-            waitForText("universitaria,")
+            waitForText("Bienvenido de nuevo")
             compose.onNodeWithTag("login_username").performScrollTo().assertExists()
             compose.onNodeWithTag("login_password").performScrollTo().assertExists()
         }
@@ -46,7 +46,7 @@ class LoginV8SmokeTest {
     fun firstAccessOpensInstitutionalIdentityValidation() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { it.appearancePreferences.setLanguage(AppLanguage.SPANISH) }
-            waitForText("universitaria,")
+            waitForText("Bienvenido de nuevo")
             compose.onNodeWithTag("login_registration").performScrollTo().performClick()
             compose.onNodeWithTag("registration_name").performScrollTo().assertExists()
             compose.onNodeWithTag("registration_email").performScrollTo().assertExists()

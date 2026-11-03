@@ -22,13 +22,13 @@ class LoginLocaleActivityTest {
                 it.appearancePreferences.setLanguage(AppLanguage.SPANISH)
                 it.appearancePreferences.setThemeMode(AppThemeMode.DARK)
             }
-            awaitHero("universitaria,")
+            awaitHero("Bienvenido de nuevo")
             scenario.onActivity { it.appearancePreferences.setLanguage(AppLanguage.ENGLISH) }
-            awaitHero("university life,")
+            awaitHero("Welcome back")
             scenario.recreate()
-            awaitHero("university life,")
+            awaitHero("Welcome back")
             scenario.onActivity { it.appearancePreferences.setLanguage(AppLanguage.SPANISH) }
-            awaitHero("universitaria,")
+            awaitHero("Bienvenido de nuevo")
         }
     }
 

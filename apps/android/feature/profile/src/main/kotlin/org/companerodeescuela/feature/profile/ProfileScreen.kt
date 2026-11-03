@@ -52,21 +52,20 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
-import org.companerodeescuela.core.designsystem.theme.LocalCompaneroAccentPalette
-import org.companerodeescuela.core.designsystem.theme.LocalCompaneroDynamicColor
 import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
+import org.companerodeescuela.core.designsystem.theme.companeroAccentSurfaceColors
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
-import org.companerodeescuela.core.designsystem.v8.V8PageTitle
-import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.designsystem.v8.v8PressFeedback
 import org.companerodeescuela.core.navigation.AppDistribution
 import org.companerodeescuela.core.navigation.AppExperience
@@ -135,23 +134,17 @@ fun ProfileScreen(
                     .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
         ) {
-            V8ScreenHeader {
-                V8PageTitle(
-                    title = if (managementExperience) "Perfil de Gestión" else "Mi perfil",
-                    description = "Tu cuenta, acceso y preferencias en un solo lugar.",
-                )
-            }
-
             ProfileIdentityCard(
                 displayName = displayName,
                 activeLabel = "Perfil activo · ${experienceLabel(experience, roles)}",
+                managementExperience = managementExperience,
             )
 
             ProfileGroup(title = "Cuenta") {
                 ProfileRow(
                     title = "Sistema escolar",
                     icon = Icons.Outlined.School,
-                    detail = "Vinculación y sincronización con SIII.",
+                    detail = "Conectar con SIII",
                     onClick = onIntegrations,
                 )
                 GroupDivider()
@@ -166,7 +159,7 @@ fun ProfileScreen(
                         ProfileRow(
                             title = "Panel administrativo",
                             icon = Icons.Outlined.Dashboard,
-                            detail = "Solicitudes, cuentas y herramientas de gestión.",
+                            detail = "",
                             onClick = action,
                         )
                     }
@@ -175,7 +168,7 @@ fun ProfileScreen(
                         ProfileRow(
                             title = "Horarios y grupos",
                             icon = Icons.Outlined.DateRange,
-                            detail = "Edición interna con MFA; publicación oficial desde SIII.",
+                            detail = "Edición interna con MFA; publicación en SIII.",
                             onClick = action,
                         )
                     }
@@ -184,7 +177,7 @@ fun ProfileScreen(
                         ProfileRow(
                             title = "Clases y canales",
                             icon = Icons.Outlined.School,
-                            detail = "Accede a los espacios autorizados de tu institución.",
+                            detail = "",
                             onClick = action,
                         )
                     }
@@ -218,7 +211,7 @@ fun ProfileScreen(
                     ProfileRow(
                         title = "Cambiar perfil activo",
                         icon = Icons.Outlined.SwitchAccount,
-                        detail = "Alterna entre tus roles autorizados sin cerrar sesión.",
+                        detail = "",
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             onSwitchExperience()
@@ -231,7 +224,7 @@ fun ProfileScreen(
                 ProfileRow(
                     title = "Tema y accesibilidad",
                     icon = Icons.Outlined.Palette,
-                    detail = "Tema, texto, contraste y movimiento.",
+                    detail = "",
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onAppearance()
@@ -276,47 +269,52 @@ fun ProfileScreen(
 private fun ProfileIdentityCard(
     displayName: String?,
     activeLabel: String,
+    managementExperience: Boolean,
 ) {
     val highContrast = LocalCompaneroHighContrast.current
-    val dynamicColor = LocalCompaneroDynamicColor.current
-    val ink =
-        when {
-            highContrast -> MaterialTheme.colorScheme.onSurface
-            dynamicColor -> MaterialTheme.colorScheme.onPrimaryContainer
-            else -> Color.White
-        }
-    val background =
-        when {
-            highContrast -> MaterialTheme.colorScheme.surface
-            dynamicColor -> MaterialTheme.colorScheme.primaryContainer
-            else -> LocalCompaneroAccentPalette.current.darkContainer
-        }
+    val accent = companeroAccentSurfaceColors()
+    val ink = accent.foreground
     val largeText = LocalDensity.current.fontScale >= 1.5f
     val name = displayName?.takeIf(String::isNotBlank) ?: "Cuenta de Compañero"
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = background,
-        shape = RoundedCornerShape(28.dp),
+        color = accent.background,
+        shape = RoundedCornerShape(24.dp),
         border = if (highContrast) BorderStroke(2.dp, ink) else null,
     ) {
-        Column(Modifier.padding(CompaneroSpacing.lg), verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md)) {
+        Column(Modifier.padding(CompaneroSpacing.md), verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
+            if (managementExperience) {
+                Text("Perfil de Gestión", color = ink, style = MaterialTheme.typography.labelMedium)
+            }
             if (largeText) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.md)) {
-                    ProfileAvatar(displayName, ink, highContrast)
-                    Text("Sesión activa", color = ink, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
-                }
-                Text(name, color = ink, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                ProfileAvatar(displayName, ink, highContrast)
+                Text(
+                    name,
+                    color = ink,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier =
+                        Modifier
+                            .semantics {
+                                heading()
+                            },
+                )
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.md)) {
                     ProfileAvatar(displayName, ink, highContrast)
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
-                        Text(name, color = ink, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                        Text(
-                            "Sesión activa",
-                            color = ink.copy(alpha = if (highContrast) 1f else 0.85f),
-                            style = MaterialTheme.typography.labelLarge,
-                        )
-                    }
+                    Text(
+                        name,
+                        color = ink,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier =
+                            Modifier
+                                .weight(
+                                    1f,
+                                ).semantics {
+                                    heading()
+                                },
+                    )
                 }
             }
             Surface(
@@ -342,14 +340,14 @@ private fun ProfileAvatar(
     highContrast: Boolean,
 ) {
     Surface(
-        modifier = Modifier.size(64.dp),
+        modifier = Modifier.size(if (LocalDensity.current.fontScale >= 1.5f) 64.dp else 48.dp).clearAndSetSemantics {},
         shape = CircleShape,
         color = if (highContrast) ink else ink.copy(alpha = 0.16f),
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
                 initials(displayName),
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleMedium.copy(lineHeight = 20.sp),
                 fontWeight = FontWeight.Bold,
                 color = if (highContrast) MaterialTheme.colorScheme.surface else ink,
             )
@@ -430,11 +428,9 @@ private fun ProfileRow(
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Medium,
             )
-            Text(
-                detail,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (detail.isNotBlank()) {
+                Text(detail, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         if (onClick != null) {
             Icon(

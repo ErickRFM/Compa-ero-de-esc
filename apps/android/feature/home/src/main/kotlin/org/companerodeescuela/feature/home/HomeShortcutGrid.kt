@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.CheckCircle
@@ -53,10 +52,10 @@ fun HomeShortcutGrid(
 ) {
     val items =
         listOf(
-            HomeShortcut("Horario", "Organiza tu jornada", Icons.Filled.DateRange, onOpenSchedule),
-            HomeShortcut("Asistencia", "Pases y registros", Icons.Filled.CheckCircle, onOpenAttendance),
-            HomeShortcut("Avisos", "Tu canal de clase", Icons.Filled.Campaign, onOpenChannel),
-            HomeShortcut("Tareas", "Entregas y pendientes", Icons.AutoMirrored.Filled.Assignment, onOpenTasks),
+            HomeShortcut("Horario", Icons.Filled.DateRange, onOpenSchedule),
+            HomeShortcut("Asistencia", Icons.Filled.CheckCircle, onOpenAttendance),
+            HomeShortcut("Avisos", Icons.Filled.Campaign, onOpenChannel),
+            HomeShortcut("Tareas", Icons.AutoMirrored.Filled.Assignment, onOpenTasks),
         )
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val columns =
@@ -86,47 +85,28 @@ fun HomeShortcutGrid(
                                         onClickLabel = "Abrir ${item.title}",
                                         onClick = item.onClick,
                                     ),
-                            contentPadding = PaddingValues(CompaneroSpacing.md),
+                            contentPadding = PaddingValues(CompaneroSpacing.sm),
                         ) {
                             Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
-                                Row(
-                                    Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically,
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                                    shape = RoundedCornerShape(12.dp),
                                 ) {
-                                    Surface(
-                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                                        shape = RoundedCornerShape(12.dp),
-                                    ) {
-                                        Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                                            Icon(
-                                                item.icon,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(22.dp),
-                                            )
-                                        }
+                                    Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            item.icon,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp),
+                                        )
                                     }
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.ArrowForward,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(18.dp),
-                                    )
                                 }
-                                Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs)) {
-                                    Text(
-                                        item.title,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                    )
-                                    Text(
-                                        item.description,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
+                                Text(
+                                    item.title,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
                             }
                         }
                     }
@@ -138,7 +118,6 @@ fun HomeShortcutGrid(
 
 private data class HomeShortcut(
     val title: String,
-    val description: String,
     val icon: ImageVector,
     val onClick: () -> Unit,
 )

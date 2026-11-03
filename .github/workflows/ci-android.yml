@@ -303,6 +303,7 @@ jobs:
           require_distinct('org.companerodeescuela.ChannelTaskLayoutUiTest', 4)
           require_distinct('org.companerodeescuela.ProfileConsistencyUiTest', 4)
           require_distinct('org.companerodeescuela.MotionDesignUiTest', 5)
+          require_distinct('org.companerodeescuela.PersonalizationUxUiTest', 8)
           require_distinct('org.companerodeescuela.ManagementProfileNavigationTest', 7)
           if flavor == 'management':
               require_distinct('org.companerodeescuela.DistributionLoginUiTest', 2)
@@ -321,6 +322,7 @@ jobs:
             build/channel-task-layout-evidence/**
             build/profile-ui-evidence/**
             build/design-motion-evidence/**
+            build/personalization-ui-evidence/**
             build/v10-runner-diagnostics/**
             apps/android/app/build/outputs/androidTest-results/connected/**
           retention-days: 7

@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
@@ -137,7 +138,7 @@ fun CompaneroScaffold(
                                         containerColor = Color.Transparent,
                                         scrolledContainerColor = Color.Transparent,
                                     ),
-                                title = { Text(secondaryTitle.orEmpty()) },
+                                title = { Text(secondaryTitle.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                                 navigationIcon = {
                                     IconButton(onClick = { navController.popBackStack() }) {
                                         Icon(

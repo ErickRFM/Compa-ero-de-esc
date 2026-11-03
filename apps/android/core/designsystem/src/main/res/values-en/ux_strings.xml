@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ux_loading_content">Loading content</string>
+    <string name="ux_loading_session">Opening your workspace</string>
+    <string name="ux_loading_agenda">Loading schedule</string>
+</resources>

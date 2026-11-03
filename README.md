@@ -10,6 +10,8 @@ The [UI consistency and profile audit](docs/audits/UI_PERFILES_20261102.md) trac
 
 The [burgundy design and motion audit](docs/audits/DISENO_MOTION_20261102.md) covers the stronger profile identity, responsive shortcuts and reduced-motion behavior.
 
+The [personalization and UX audit](docs/audits/PERSONALIZACION_UX_20261102.md) compares design references and records adaptive settings, accent contrast, compact layouts and state-driven loading.
+
 ---
 
 ## Status

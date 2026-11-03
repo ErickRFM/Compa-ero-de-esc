@@ -115,7 +115,7 @@ fun CompaneroTheme(
                 } else {
                     DarkColors.copy(
                         primary = accentPalette.darkPrimary,
-                        onPrimary = Color.White,
+                        onPrimary = accentForeground(accentPalette.darkPrimary),
                         primaryContainer = accentPalette.darkContainer,
                         onPrimaryContainer = Color.White,
                     )

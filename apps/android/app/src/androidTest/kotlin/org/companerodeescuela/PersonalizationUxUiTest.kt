@@ -7,6 +7,7 @@ import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -375,16 +376,21 @@ class PersonalizationUxUiTest {
         val width = mutableStateOf(840.dp)
         val settings = mutableStateOf(AppearanceSettings())
         var expectedHeaderInk = Color.Unspecified
+        var fixtureDensity = 1f
         setUi {
-            // A logical 840dp layout at 160dpi fits the physical 1080px QA display.
-            CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
-                CompaneroTheme(darkTheme = settings.value.themeMode == AppThemeMode.DARK) {
-                    val ink = MaterialTheme.colorScheme.onSurface
-                    SideEffect { expectedHeaderInk = ink }
-                    Box(Modifier.width(width.value).height(500.dp).testTag("appearance_window")) {
-                        AppearanceSettingsScreen(settings.value, {
-                            settings.value = settings.value.copy(themeMode = it)
-                        }, onTextScale = {}, onReducedMotion = {}, onHighContrast = {})
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val availablePx = with(LocalDensity.current) { maxWidth.toPx() }
+                val density = minOf(1f, availablePx / 860f)
+                SideEffect { fixtureDensity = density }
+                CompositionLocalProvider(LocalDensity provides Density(density, 1f)) {
+                    CompaneroTheme(darkTheme = settings.value.themeMode == AppThemeMode.DARK) {
+                        val ink = MaterialTheme.colorScheme.onSurface
+                        SideEffect { expectedHeaderInk = ink }
+                        Box(Modifier.width(width.value).height(500.dp).testTag("appearance_window")) {
+                            AppearanceSettingsScreen(settings.value, {
+                                settings.value = settings.value.copy(themeMode = it)
+                            }, onTextScale = {}, onReducedMotion = {}, onHighContrast = {})
+                        }
                     }
                 }
             }
@@ -392,8 +398,8 @@ class PersonalizationUxUiTest {
         compose.waitForIdle()
         val wide = compose.onNodeWithTag("appearance_preview").fetchSemanticsNode().boundsInRoot
         val window = compose.onNodeWithTag("appearance_window").fetchSemanticsNode().boundsInRoot
-        assertTrue("Wide settings must honor the 720dp panel cap", wide.width <= 720f)
-        assertTrue("Wide fixture must exercise more than a phone layout", wide.width > 600f)
+        assertTrue("Wide settings must honor the 720dp panel cap", wide.width / fixtureDensity <= 720.5f)
+        assertTrue("Wide fixture must exercise more than a phone layout", wide.width / fixtureDensity > 600f)
         assertEquals(window.center.x, wide.center.x, 0.5f)
         capture("appearance-wide", "appearance_window")
         compose.onNodeWithText("Oscuro").performScrollTo().performClick()
@@ -406,7 +412,7 @@ class PersonalizationUxUiTest {
                 .assertIsDisplayed()
                 .fetchSemanticsNode()
                 .boundsInRoot
-        assertTrue(compact.width > 250f && compact.width <= 320f)
+        assertTrue(compact.width / fixtureDensity > 250f && compact.width / fixtureDensity <= 320.5f)
         val compactWindow = compose.onNodeWithTag("appearance_window").fetchSemanticsNode().boundsInRoot
         assertEquals(compactWindow.center.x, compact.center.x, 0.5f)
         val headingLayout = mutableListOf<TextLayoutResult>()

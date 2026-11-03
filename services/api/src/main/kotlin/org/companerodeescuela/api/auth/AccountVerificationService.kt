@@ -19,9 +19,9 @@ class AccountVerificationService(
     suspend fun issue(userId: String): VerificationDeliveryReceipt =
         authenticationDependency {
             val account = accounts.findById(userId) ?: throw ApiException.Unauthorized()
-            if (account.accountStatus != AccountStatus.PENDING_VERIFICATION ||
+            if (account.accountStatus !in setOf(AccountStatus.PENDING_VERIFICATION, AccountStatus.ACTIVE) ||
                 !account.permitsSession ||
-                account.registrationIntent == null ||
+                (account.accountStatus == AccountStatus.PENDING_VERIFICATION && account.registrationIntent == null) ||
                 account.emailVerifiedAt != null
             ) {
                 throw ApiException.Validation("Email verification is not pending")
@@ -35,7 +35,7 @@ class AccountVerificationService(
                 val latest = accounts.findById(userId) ?: throw ApiException.Unauthorized()
                 if (!latest.permitsSession ||
                     latest.authRevision != account.authRevision ||
-                    latest.accountStatus != AccountStatus.PENDING_VERIFICATION
+                    latest.accountStatus != account.accountStatus
                 ) {
                     throw ApiException.Unauthorized()
                 }

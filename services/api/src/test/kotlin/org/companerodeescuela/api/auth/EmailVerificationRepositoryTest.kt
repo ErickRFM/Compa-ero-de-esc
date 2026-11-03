@@ -15,6 +15,23 @@ class EmailVerificationRepositoryTest {
     private val now = Instant.parse("2026-10-10T04:00:00Z")
     private val hash = "A".repeat(43)
 
+    @Test fun `active legacy account verifies email without changing its identity or student role`() =
+        runTest {
+            val repository = InMemoryPlatformAccountRepository()
+            val original = PlatformAccount("legacy", "Estudiante", "legacy@example.test", "existing-hash", setOf(UserRole.STUDENT))
+            assertTrue(repository.create(original))
+            assertTrue(repository.issueEmailVerification("legacy", 0, hash, now, now.plusSeconds(3600)))
+            val verified = assertNotNull(repository.confirmEmailVerification("legacy", hash, now.plusSeconds(1)))
+            assertEquals(original.id, verified.id)
+            assertEquals(original.passwordHash, verified.passwordHash)
+            assertEquals(original.roles, verified.roles)
+            assertEquals(original.institutionId, verified.institutionId)
+            assertEquals(AccountStatus.ACTIVE, verified.accountStatus)
+            assertEquals(1L, verified.authRevision)
+            assertNotNull(verified.emailVerifiedAt)
+            assertNull(repository.confirmEmailVerification("legacy", hash, now.plusSeconds(2)))
+        }
+
     @Test fun `concurrent confirmation consumes one token and records one authority transition`() =
         runTest {
             repeat(8) {

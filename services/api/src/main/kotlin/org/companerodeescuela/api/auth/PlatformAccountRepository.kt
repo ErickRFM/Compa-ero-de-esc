@@ -178,7 +178,9 @@ class InMemoryPlatformAccountRepository : PlatformAccountRepository {
         mutex.withLock {
             val current = accounts[accountId] ?: return@withLock false
             val challenge = current.emailVerification ?: return@withLock false
-            if (current.accountStatus != AccountStatus.PENDING_VERIFICATION ||
+            if (!current.permitsSession ||
+                current.accountStatus !in setOf(AccountStatus.PENDING_VERIFICATION, AccountStatus.ACTIVE) ||
+                current.emailVerifiedAt != null ||
                 challenge.tokenHash != hash ||
                 challenge.authRevision != current.authRevision
             ) {

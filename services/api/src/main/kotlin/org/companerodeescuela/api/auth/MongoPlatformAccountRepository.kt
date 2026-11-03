@@ -122,9 +122,9 @@ class MongoPlatformAccountRepository(
         return accounts.findOneAndUpdate(
             and(
                 eq("_id", accountId),
-                eq("authRevision", expectedRevision),
+                verificationRevision(expectedRevision),
                 eq("active", true),
-                eq("accountStatus", AccountStatus.PENDING_VERIFICATION.name),
+                verificationStatus(current.accountStatus),
                 eq("emailVerifiedAt", null),
                 eq("emailVerification.tokenHash", current.emailVerification?.tokenHash),
             ),
@@ -144,9 +144,9 @@ class MongoPlatformAccountRepository(
             .findOneAndUpdate(
                 and(
                     eq("_id", accountId),
-                    eq("authRevision", current.authRevision),
+                    verificationRevision(current.authRevision),
                     eq("active", true),
-                    eq("accountStatus", AccountStatus.PENDING_VERIFICATION.name),
+                    verificationStatus(current.accountStatus),
                     eq("emailVerifiedAt", null),
                     eq("emailVerification.tokenHash", hash),
                     eq("emailVerification.authRevision", current.authRevision),
@@ -172,12 +172,20 @@ class MongoPlatformAccountRepository(
         status: VerificationDeliveryStatus,
     ): Boolean {
         val current = findById(accountId) ?: return false
+        if (!current.permitsSession ||
+            current.accountStatus !in setOf(AccountStatus.PENDING_VERIFICATION, AccountStatus.ACTIVE) ||
+            current.emailVerifiedAt != null
+        ) {
+            return false
+        }
         return accounts
             .updateOne(
                 and(
                     eq("_id", accountId),
-                    eq("authRevision", current.authRevision),
-                    eq("accountStatus", AccountStatus.PENDING_VERIFICATION.name),
+                    verificationRevision(current.authRevision),
+                    eq("active", true),
+                    verificationStatus(current.accountStatus),
+                    eq("emailVerifiedAt", null),
                     eq("emailVerification.tokenHash", hash),
                     eq("emailVerification.authRevision", current.authRevision),
                 ),
@@ -227,6 +235,16 @@ class MongoPlatformAccountRepository(
         // A simultaneous exact retry may have committed first; a changed payload is never accepted.
         return findById(accountId)?.takeIf { it.isExactIdentityRetry(expectedRevision, change) }
     }
+
+    private fun verificationRevision(revision: Long): org.bson.conversions.Bson =
+        if (revision == 0L) or(eq("authRevision", 0L), exists("authRevision", false)) else eq("authRevision", revision)
+
+    private fun verificationStatus(status: AccountStatus): org.bson.conversions.Bson =
+        if (status == AccountStatus.ACTIVE) {
+            or(eq("accountStatus", status.name), exists("accountStatus", false))
+        } else {
+            eq("accountStatus", status.name)
+        }
 
     private suspend fun ensureIndexes() {
         if (indexesReady) return

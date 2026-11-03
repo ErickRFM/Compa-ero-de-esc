@@ -122,8 +122,33 @@ fun Application.module(
             }
         }
     }
-    // One-time provisioning is an explicit operator action and blocks startup on mismatch.
-    org.companerodeescuela.api.admin.QaAdminBootstrap.parse(System::getenv)?.let { desired ->
+    // Initial ownership is an explicit MFA-authorized operator command, never a
+    // privilege inferred from an email, login form or invitation. This bootstrap
+    // refuses production and requires an isolated *_qa database.
+    val qaOwnerSpec = org.companerodeescuela.api.admin.OwnerBootstrap.parse(System::getenv)
+    val qaAdminSpec = org.companerodeescuela.api.admin.QaAdminBootstrap.parse(System::getenv)
+    require(qaOwnerSpec == null || qaAdminSpec == null) {
+        "QA initial owner and institutional admin bootstrap cannot run together"
+    }
+    qaOwnerSpec?.let { desired ->
+        require(settings.mongo.isConfigured && settings.hasAuthentication) {
+            "QA owner bootstrap requires persistent authenticated identity"
+        }
+        runBlocking {
+            withTimeout(15_000L) {
+                org.companerodeescuela.api.admin.OwnerBootstrap.provision(
+                    desired,
+                    settings.environment.name.lowercase(),
+                    settings.mongo.databaseName,
+                    identityGraph.accounts,
+                    identityGraph.mfa,
+                    org.companerodeescuela.api.admin.MongoOwnerBootstrapClaims(mongoConnection.database()),
+                )
+            }
+        }
+    }
+    // One-time institution-level provisioning is a separate action and blocks startup on mismatch.
+    qaAdminSpec?.let { desired ->
         require(
             settings.mongo.isConfigured && settings.hasAuthentication,
         ) { "QA admin bootstrap requires persistent authenticated identity" }

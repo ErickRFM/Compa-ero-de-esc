@@ -214,6 +214,10 @@ class MainActivity : AppCompatActivity() {
                                             loginExperienceName = experience.name
                                             sessionViewModel.login(username, password)
                                         },
+                                        onAutomaticLogin = { username, password ->
+                                            loginExperienceName = null
+                                            sessionViewModel.login(username, password)
+                                        },
                                         onCreateAccount = {
                                             loginExperienceName = null
                                             activatingAccess = true

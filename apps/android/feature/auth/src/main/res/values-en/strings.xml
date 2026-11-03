@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+<string name="auth_welcome_title">Welcome back</string>
+<string name="auth_welcome_subtitle">Your profile is identified when you sign in.</string>
 <string name="auth_hero_title">Your university life,</string>
 <string name="auth_hero_accent">made simpler.</string>
 <string name="auth_hero_description">Organize your classes, stay informed and reach your goals. All in one place.</string>

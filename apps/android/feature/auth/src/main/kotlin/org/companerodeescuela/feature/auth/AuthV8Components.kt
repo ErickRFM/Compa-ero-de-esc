@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -55,6 +56,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
@@ -91,6 +93,32 @@ internal fun authAccent(): Color =
     } else {
         MaterialTheme.colorScheme.primary
     }
+
+/** Shared authentication hero; decoration never carries meaning needed to sign in. */
+@Composable
+internal fun AuthWelcomeHero(
+    title: String,
+    subtitle: String? = null,
+) {
+    val accent = authAccent()
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, color = authInk(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Box(Modifier.width(84.dp).height(4.dp).background(accent, RoundedCornerShape(4.dp)))
+            if (subtitle != null) Text(subtitle, color = authMuted(), fontSize = 14.sp, lineHeight = 20.sp)
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(76.dp)) {
+            Icon(Icons.Filled.School, contentDescription = null, tint = accent, modifier = Modifier.size(56.dp))
+            Box(Modifier.width(68.dp).height(10.dp).background(accent.copy(alpha = 0.8f), RoundedCornerShape(4.dp)))
+            Spacer(Modifier.height(3.dp))
+            Box(Modifier.width(62.dp).height(8.dp).background(accent.copy(alpha = 0.24f), RoundedCornerShape(4.dp)))
+        }
+    }
+}
 
 /** Same campus, geometry and tokens; colors come from the existing CompaneroTheme. */
 @Composable

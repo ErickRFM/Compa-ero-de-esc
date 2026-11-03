@@ -65,6 +65,7 @@ fun LoginScreen(
     onCreateAccount: () -> Unit = {},
     modifier: Modifier = Modifier,
     distribution: AppDistribution = AppDistribution.LEGACY,
+    onAutomaticLogin: ((String, String) -> Unit)? = null,
 ) {
     var username by rememberSaveable { mutableStateOf("") }
     // Passwords never enter saved instance state; paging keeps this one form mounted.
@@ -79,7 +80,7 @@ fun LoginScreen(
     val passwordIssue = InstitutionalCredentialValidator.passwordIssue(password)
     val canSubmit =
         !state.submitting &&
-            !pager.isScrollInProgress &&
+            (onAutomaticLogin != null || !pager.isScrollInProgress) &&
             usernameIssue == null &&
             passwordIssue == null
     val ink = authInk()
@@ -90,31 +91,33 @@ fun LoginScreen(
     fun submit() {
         if (!canSubmit) return
         focus.clearFocus()
-        onLogin(username, password, access.experience)
+        if (onAutomaticLogin != null) onAutomaticLogin(username, password) else onLogin(username, password, access.experience)
     }
 
     AuthV8Layout(modifier, themeAware = true) {
         val heroLead = stringResource(R.string.auth_hero_title)
         val heroAccent = stringResource(R.string.auth_hero_accent)
-        Text(
-            text =
-                buildAnnotatedString {
-                    append(heroLead)
-                    append(" ")
-                    withStyle(SpanStyle(color = accent)) { append(heroAccent) }
-                },
-            color = ink,
-            fontSize = 22.sp,
-            lineHeight = 27.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
-        )
+        if (onAutomaticLogin != null) {
+            AuthWelcomeHero(title = stringResource(R.string.auth_welcome_title), subtitle = stringResource(R.string.auth_welcome_subtitle))
+        } else {
+            Text(
+                text =
+                    buildAnnotatedString {
+                        append(heroLead)
+                        append(" ")
+                        withStyle(SpanStyle(color = accent)) { append(heroAccent) }
+                    },
+                color = ink,
+                fontSize = 22.sp,
+                lineHeight = 27.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+            )
+        }
 
-        LoginAccessCarousel(
-            pager = pager,
-            enabled = !state.submitting,
-            accesses = accesses,
-        )
+        if (onAutomaticLogin == null) {
+            LoginAccessCarousel(pager = pager, enabled = !state.submitting, accesses = accesses)
+        }
 
         if (!state.noticeMessage.isNullOrBlank()) {
             V8FrostedGlassPanel(
@@ -341,7 +344,11 @@ fun LoginScreen(
                     submittingText = stringResource(R.string.auth_submitting),
                 )
 
-                if (access.canRegister) {
+                if (onAutomaticLogin != null &&
+                    distribution != AppDistribution.MANAGEMENT ||
+                    onAutomaticLogin == null &&
+                    access.canRegister
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(14.dp),

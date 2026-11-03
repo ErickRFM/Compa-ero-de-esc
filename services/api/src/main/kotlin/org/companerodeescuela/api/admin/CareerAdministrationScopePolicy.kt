@@ -37,7 +37,11 @@ class CareerAdministrationScopePolicy(
 ) {
     private val identity = InstitutionScopePolicy(accounts, clock)
 
-    suspend fun require(actor: UserSummary, institutionId: String, programId: String): PlatformAccount {
+    suspend fun require(
+        actor: UserSummary,
+        institutionId: String,
+        programId: String,
+    ): PlatformAccount {
         // Identity and session revision are checked against Mongo before scope.
         val current = identity.live(actor)
         if (!validIdentifier(institutionId) || !validIdentifier(programId)) {
@@ -50,14 +54,15 @@ class CareerAdministrationScopePolicy(
             throw ApiException.Forbidden("Career administration is not assigned")
         }
         val now = clock.instant()
-        val authorized = careerGrants.grantsFor(current.id).any { grant ->
-            grant.accountId == current.id &&
-                grant.institutionId == institutionId &&
-                grant.programId == programId &&
-                grant.revokedAt == null &&
-                (grant.validUntil == null || grant.validUntil > now) &&
-                grant.authorityFreshUntil > now
-        }
+        val authorized =
+            careerGrants.grantsFor(current.id).any { grant ->
+                grant.accountId == current.id &&
+                    grant.institutionId == institutionId &&
+                    grant.programId == programId &&
+                    grant.revokedAt == null &&
+                    (grant.validUntil == null || grant.validUntil > now) &&
+                    grant.authorityFreshUntil > now
+            }
         if (!authorized) throw ApiException.Forbidden("Career authority is absent, expired, revoked or stale")
         return current
     }

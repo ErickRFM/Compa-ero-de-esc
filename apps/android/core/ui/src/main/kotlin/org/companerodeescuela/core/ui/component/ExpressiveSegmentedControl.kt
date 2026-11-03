@@ -1,6 +1,9 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.core.ui.component
 
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -56,7 +59,7 @@ fun ExpressiveSegmentedControl(
             targetValue = targetOffset,
             animationSpec =
                 if (reducedMotion) {
-                    CompaneroMotion.fast()
+                    snap()
                 } else {
                     CompaneroMotion.snappySpring()
                 },

@@ -8,6 +8,8 @@ Android now includes Academic and Management distributions, role-based access, *
 
 The [UI consistency and profile audit](docs/audits/UI_PERFILES_20261102.md) tracks active-role presentation, shared page headings, compact layouts and synthetic screenshot evidence.
 
+The [burgundy design and motion audit](docs/audits/DISENO_MOTION_20261102.md) covers the stronger profile identity, responsive shortcuts and reduced-motion behavior.
+
 ---
 
 ## Status

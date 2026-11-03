@@ -11,15 +11,19 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -203,13 +207,19 @@ class ProfileConsistencyUiTest {
         }
         compose.waitForIdle()
         compose.runOnIdle { requireNotNull(profileNav).navigate(Destination.Profile.route) }
+        compose.waitUntil(8_000) {
+            profileNav?.currentBackStackEntry?.let {
+                it.destination.route == Destination.Profile.route && it.lifecycle.currentState == Lifecycle.State.RESUMED
+            } == true
+        }
         compose.waitForIdle()
         return actions
     }
 
     private fun capture(name: String) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val image = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
+        compose.waitForIdle()
+        val image = compose.onRoot().captureToImage().asAndroidBitmap()
         try {
             val directory = File(instrumentation.targetContext.filesDir, "audit-profiles").apply { mkdirs() }
             File(directory, "$name.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }

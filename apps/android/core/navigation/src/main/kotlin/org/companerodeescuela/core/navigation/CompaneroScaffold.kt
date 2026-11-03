@@ -2,6 +2,12 @@
 
 package org.companerodeescuela.core.navigation
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
@@ -39,6 +46,8 @@ import org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled
 import org.companerodeescuela.core.designsystem.v8.LocalV8HeaderAction
 import org.companerodeescuela.core.designsystem.v8.V8CampusBackdrop
 import org.companerodeescuela.core.designsystem.v8.v8ResolvedColorScheme
+import org.companerodeescuela.core.motion.CompaneroMotionDuration
+import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,6 +61,8 @@ fun CompaneroScaffold(
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
+    val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
+    val enterOffset = with(LocalDensity.current) { 6.dp.roundToPx() }
     val onSecondaryScreen =
         isSecondaryRoute(
             currentRoute = currentDestination?.route,
@@ -164,6 +175,33 @@ fun CompaneroScaffold(
                             navController = navController,
                             startDestination = startDestination.route,
                             modifier = Modifier.fillMaxSize(),
+                            enterTransition = {
+                                if (reducedMotion) {
+                                    EnterTransition.None
+                                } else {
+                                    fadeIn(tween(CompaneroMotionDuration.STANDARD)) +
+                                        slideInVertically(tween(CompaneroMotionDuration.STANDARD)) { enterOffset }
+                                }
+                            },
+                            exitTransition = { if (reducedMotion) ExitTransition.None else fadeOut(tween(CompaneroMotionDuration.FAST)) },
+                            popEnterTransition = {
+                                if (reducedMotion) {
+                                    EnterTransition.None
+                                } else {
+                                    fadeIn(
+                                        tween(CompaneroMotionDuration.STANDARD),
+                                    )
+                                }
+                            },
+                            popExitTransition = {
+                                if (reducedMotion) {
+                                    ExitTransition.None
+                                } else {
+                                    fadeOut(
+                                        tween(CompaneroMotionDuration.FAST),
+                                    )
+                                }
+                            },
                         ) {
                             destinations()
                         }

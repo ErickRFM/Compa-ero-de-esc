@@ -34,8 +34,7 @@ class CareerAdministrationScopePolicyTest {
         validUntil: Instant? = null,
         revokedAt: Instant? = null,
         authorityFreshUntil: Instant = now.plusSeconds(180),
-    ) =
-        VerifiedCareerGrant(
+    ) = VerifiedCareerGrant(
             accountId,
             institutionId,
             programId,
@@ -66,14 +65,15 @@ class CareerAdministrationScopePolicyTest {
             val accounts = InMemoryPlatformAccountRepository()
             val manager = account()
             accounts.create(manager)
-            val rejected = listOf(
-                grant(accountId = "someone-else"),
-                grant(institutionId = "other-university"),
-                grant(programId = "business"),
-                grant(validUntil = now),
-                grant(revokedAt = now),
-                grant(authorityFreshUntil = now),
-            )
+            val rejected =
+                listOf(
+                    grant(accountId = "someone-else"),
+                    grant(institutionId = "other-university"),
+                    grant(programId = "business"),
+                    grant(validUntil = now),
+                    grant(revokedAt = now),
+                    grant(authorityFreshUntil = now),
+                )
             val policy = CareerAdministrationScopePolicy(accounts, CareerGrantReader { rejected }, clock)
             assertFailsWith<ApiException.Forbidden> { policy.require(manager.toUserSummary(), "uptlax", "technology") }
         }

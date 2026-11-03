@@ -55,6 +55,7 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8GlassFilterChip
 import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
+import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
@@ -163,19 +164,10 @@ fun GradebookScreen(
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md),
         ) {
             V8ScreenHeader {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        "Evaluación",
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        "Organiza las actividades de tus materias y revisa las calificaciones antes de enviarlas.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
+                V8PageTitle(
+                    title = "Evaluación",
+                    description = "Organiza las actividades de tus materias y revisa las calificaciones antes de enviarlas.",
+                )
             }
 
             V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {

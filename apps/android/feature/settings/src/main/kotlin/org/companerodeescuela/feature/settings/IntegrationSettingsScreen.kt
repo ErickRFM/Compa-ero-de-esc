@@ -22,6 +22,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
@@ -49,18 +50,13 @@ fun IntegrationSettingsScreen(
         horizontalAlignment = Alignment.Start,
     ) {
         V8ScreenHeader {
-            Text(
-                text = "Sistema escolar",
-                style = MaterialTheme.typography.headlineSmall,
+            V8PageTitle(
+                title = "Sistema escolar",
+                description =
+                    "Consulta tu conexión institucional. " +
+                        "Tu agenda importada o manual sigue disponible si el sistema escolar no responde.",
             )
         }
-        Text(
-            text =
-                "La integración es opcional. Compañero puede funcionar con horario importado o " +
-                    "manual aunque el sistema escolar no esté disponible.",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
 
         StatusNotice(
             title =

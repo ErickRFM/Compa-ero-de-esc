@@ -56,6 +56,7 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8IconTile
 import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
+import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.ui.component.StatusNotice
@@ -145,22 +146,9 @@ fun ClassroomScreen(
                         ),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
             ) {
-                V8ScreenHeader {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = "Mis clases",
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        TextButton(onClick = model::refresh, enabled = !state.loading) {
-                            Text(if (state.loading) "Actualizando…" else "Actualizar clases")
-                        }
-                    }
+                V8ScreenHeader { V8PageTitle(title = "Mis clases") }
+                TextButton(onClick = model::refresh, enabled = !state.loading, modifier = Modifier.align(Alignment.End)) {
+                    Text(if (state.loading) "Actualizando…" else "Actualizar clases")
                 }
                 V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = isStudent) {
                     Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
@@ -424,14 +412,7 @@ private fun TeacherAssignedClassrooms(
                         .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
             ) {
-                V8ScreenHeader {
-                    Text(
-                        text = "Mis clases",
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
+                V8ScreenHeader { V8PageTitle(title = "Mis clases") }
                 InstitutionalSections(state)
                 Text(
                     text =

@@ -6,6 +6,8 @@ realities of a public school rather than for a campus with fibre.
 
 Android now includes Academic and Management distributions, role-based access, **Hoy**, **Agenda**, classrooms, attendance, private class tasks, native gradebook and tutoring. Ktor provides scoped authorization and Mongo persistence. Institutional adapters and projections are present, but official SIII grade publishing and schedule proposals remain incomplete. See the [current consolidation and UI/logic audit (2026-11-02)](docs/audits/CONSOLIDACION_UI_LOGICA_20261102.md) for evidence, remaining work and the emulator acceptance matrix. Older roadmap and release documents retain their historical cutoffs.
 
+The [UI consistency and profile audit](docs/audits/UI_PERFILES_20261102.md) tracks active-role presentation, shared page headings, compact layouts and synthetic screenshot evidence.
+
 ---
 
 ## Status

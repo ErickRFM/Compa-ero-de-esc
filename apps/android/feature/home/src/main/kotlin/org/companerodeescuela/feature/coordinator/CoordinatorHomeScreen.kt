@@ -22,6 +22,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.ui.component.StatusNotice
@@ -48,20 +49,14 @@ fun coordinatorHomeScreen(
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
         V8ScreenHeader {
-            Text(
-                text = if (directionExperience) "Dirección" else "Coordinación Académica",
-                style = MaterialTheme.typography.headlineSmall,
+            V8PageTitle(
+                title = if (directionExperience) "Dirección" else "Coordinación Académica",
+                description = "Supervisión de grupos y seguimiento institucional de asistencia.",
             )
         }
-        Text(
-            text = "Supervisión de grupos y seguimiento institucional de asistencia.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
 
         V8GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column(
-                modifier = Modifier.padding(CompaneroSpacing.md),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
                 Text(
@@ -117,7 +112,6 @@ fun coordinatorHomeScreen(
 
         V8GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column(
-                modifier = Modifier.padding(CompaneroSpacing.md),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
                 Text(
@@ -136,7 +130,6 @@ fun coordinatorHomeScreen(
 
         V8GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column(
-                modifier = Modifier.padding(CompaneroSpacing.md),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
                 Text("Agenda personal", style = MaterialTheme.typography.titleSmall)
@@ -153,16 +146,14 @@ fun coordinatorHomeScreen(
                 StatusNotice(
                     title = "Gestión institucional de horarios",
                     message =
-                        "Las modificaciones y asignaciones oficiales de horarios a grupos y aulas requieren permiso " +
-                            "explícito (MANAGE_ACADEMICS) y confirmación con segundo factor (MFA Step-Up). " +
-                            "Para consultar horarios oficiales, utiliza la vista de grupos.",
+                        "Los cambios institucionales requieren autorización y confirmación con segundo factor. " +
+                            "Consulta los horarios oficiales en la vista de grupos.",
                 )
             }
         }
 
         V8GlassCard(modifier = Modifier.fillMaxWidth()) {
             Column(
-                modifier = Modifier.padding(CompaneroSpacing.md),
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
                 Text("Canal de avisos generales", style = MaterialTheme.typography.titleSmall)
@@ -174,8 +165,7 @@ fun coordinatorHomeScreen(
                 StatusNotice(
                     title = "Publicación institucional pendiente",
                     message =
-                        "No se abrirá el canal de clase de otro perfil. " +
-                            "La función se habilitará cuando el servidor verifique destinatarios y permisos.",
+                        "Los avisos generales estarán disponibles cuando tu institución habilite un canal autorizado.",
                 )
             }
         }

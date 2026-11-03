@@ -48,6 +48,7 @@ import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.feature.home.R
@@ -123,33 +124,16 @@ fun adminHomeScreenContent(
         verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
     ) {
         V8ScreenHeader {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
-                    Text(
-                        stringResource(R.string.admin_title),
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        stringResource(R.string.admin_description),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                OutlinedButton(
-                    onClick = onRefresh,
-                    enabled = !state.working,
-                    modifier = Modifier.testTag("admin_refresh"),
-                ) {
-                    Text(stringResource(R.string.admin_refresh))
-                }
-            }
+            V8PageTitle(
+                title = stringResource(R.string.admin_title),
+                description = stringResource(R.string.admin_description),
+            )
         }
+        OutlinedButton(
+            onClick = onRefresh,
+            enabled = !state.working,
+            modifier = Modifier.testTag("admin_refresh"),
+        ) { Text(stringResource(R.string.admin_refresh)) }
         if (state.loading) CircularProgressIndicator(Modifier.testTag("admin_loading"))
         state.failure?.let { adminFailure(it) }
         if (state.completedOperationId != null) Text(stringResource(R.string.admin_done), modifier = Modifier.testTag("admin_done"))

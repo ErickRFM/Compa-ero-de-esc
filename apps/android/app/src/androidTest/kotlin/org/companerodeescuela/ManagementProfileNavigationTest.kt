@@ -5,6 +5,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
+import org.companerodeescuela.core.navigation.AppExperience
 import org.companerodeescuela.feature.profile.ProfileScreen
 import org.companerodeescuela.shared.contracts.UserRole
 import org.junit.Assert.assertEquals
@@ -14,6 +15,91 @@ import org.junit.Test
 /** Screens are presentation-only; a server role/capability check remains mandatory. */
 class ManagementProfileNavigationTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test
+    fun mixedStudentAccountDoesNotOfferTeacherRequestInStudentMode() {
+        compose.setContent {
+            AuthTestLocale {
+                CompaneroTheme {
+                    ProfileScreen(
+                        displayName = "QA cuenta mixta",
+                        roles = setOf(UserRole.STUDENT, UserRole.TEACHER),
+                        activeExperience = AppExperience.STUDENT,
+                        onTutorRequest = {},
+                        onAppearance = {},
+                        onLogout = {},
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText("Solicitar acceso de tutor").assertDoesNotExist()
+    }
+
+    @Test
+    fun coordinatorModeDoesNotExposeEmptyAdministrationGroupForAnotherRole() {
+        compose.setContent {
+            CompaneroTheme {
+                ProfileScreen(
+                    displayName = "QA coordinación",
+                    roles = setOf(UserRole.COORDINATOR, UserRole.ADMIN),
+                    activeExperience = AppExperience.COORDINATOR,
+                    managementExperience = true,
+                    onAdminDashboard = {},
+                    onAdminSchedule = {},
+                    onAdminClassrooms = {},
+                    onAppearance = {},
+                    onLogout = {},
+                )
+            }
+        }
+        compose.onNodeWithText("Administración").assertDoesNotExist()
+        compose.onNodeWithText("Panel administrativo").assertDoesNotExist()
+    }
+
+    @Test
+    fun explicitTeacherModeRetainsTutorRequestForMixedAccount() {
+        var requests = 0
+        compose.setContent {
+            AuthTestLocale {
+                CompaneroTheme {
+                    ProfileScreen(
+                        displayName = "QA docente",
+                        roles = setOf(UserRole.STUDENT, UserRole.TEACHER),
+                        activeExperience = AppExperience.TEACHER,
+                        onTutorRequest = { requests++ },
+                        onAppearance = {},
+                        onLogout = {},
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText("Perfil activo · Docente").assertExists()
+        compose.onNodeWithText("Solicitar acceso de tutor").performScrollTo().performClick()
+        assertEquals(1, requests)
+    }
+
+    @Test
+    fun revokedActiveAdminCannotRetainManagementShortcuts() {
+        compose.setContent {
+            CompaneroTheme {
+                ProfileScreen(
+                    displayName = "QA rol retirado",
+                    roles = setOf(UserRole.COORDINATOR),
+                    activeExperience = AppExperience.ADMIN,
+                    managementExperience = true,
+                    onAdminDashboard = {},
+                    onAdminSchedule = {},
+                    onAdminClassrooms = {},
+                    onAppearance = {},
+                    onLogout = {},
+                )
+            }
+        }
+        compose.onNodeWithText("Perfil activo · No disponible").assertExists()
+        compose.onNodeWithText("Panel administrativo").assertDoesNotExist()
+        compose.onNodeWithText("Horarios y grupos").assertDoesNotExist()
+        compose.onNodeWithText("Clases y canales").assertDoesNotExist()
+    }
 
     @Test
     fun managementAdminOpensExistingScopedDestinations() {

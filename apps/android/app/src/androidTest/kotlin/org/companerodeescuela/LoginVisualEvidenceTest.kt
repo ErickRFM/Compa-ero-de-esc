@@ -40,7 +40,7 @@ class LoginVisualEvidenceTest {
                         it.appearancePreferences.setThemeMode(AppThemeMode.DARK)
                         it.appearancePreferences.setHighContrast(false)
                     }
-                    waitForHero("universitaria,")
+                    waitForHero("Bienvenido de nuevo")
                     device.waitForIdle()
                     assertTrue(device.takeScreenshot(File(directory, "dark-" + width + "-top.png")))
                     showForm()
@@ -56,7 +56,7 @@ class LoginVisualEvidenceTest {
                     it.appearancePreferences.setHighContrast(true)
                     it.appearancePreferences.setLanguage(AppLanguage.ENGLISH)
                 }
-                waitForHero("university life,")
+                waitForHero("Welcome back")
                 device.waitForIdle()
                 assertTrue(device.takeScreenshot(File(directory, "light-contrast-390-top.png")))
                 showForm()
@@ -159,8 +159,8 @@ class LoginVisualEvidenceTest {
 
     private fun openRegistration() {
         compose.waitUntil(timeoutMillis = 10_000) {
-            compose.onAllNodesWithText("universitaria,", substring = true).fetchSemanticsNodes().isNotEmpty() ||
-                compose.onAllNodesWithText("university life,", substring = true).fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText("Bienvenido de nuevo", substring = true).fetchSemanticsNodes().isNotEmpty() ||
+                compose.onAllNodesWithText("Welcome back", substring = true).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("login_registration").performScrollTo().performClick()
         compose.waitUntil(timeoutMillis = 10_000) {

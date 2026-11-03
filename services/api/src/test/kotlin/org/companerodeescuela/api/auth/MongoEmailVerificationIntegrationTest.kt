@@ -17,6 +17,41 @@ class MongoEmailVerificationIntegrationTest {
     private val now = Instant.parse("2026-10-10T00:00:00Z")
     private val hash = "A".repeat(43)
 
+    @Test fun `legacy Mongo account without lifecycle fields verifies once and keeps its authority`() =
+        database { db ->
+            val raw = db.getCollection<org.bson.Document>("platform_accounts")
+            raw.insertOne(
+                org.bson
+                    .Document("_id", "legacy")
+                    .append("displayName", "Student")
+                    .append("email", "legacy@example.test")
+                    .append("emailNormalized", "legacy@example.test")
+                    .append("passwordHash", "original-hash")
+                    .append("roles", listOf("STUDENT"))
+                    .append("active", true)
+                    .append("createdAt", java.util.Date.from(now)),
+            )
+            val first = MongoPlatformAccountRepository(db)
+            assertTrue(first.issueEmailVerification("legacy", 0, hash, now, now.plusSeconds(3600)))
+            val results =
+                coroutineScope {
+                    (1..12)
+                        .map {
+                            async {
+                                MongoPlatformAccountRepository(
+                                    db,
+                                ).confirmEmailVerification("legacy", hash, now.plusSeconds(1))
+                            }
+                        }.awaitAll()
+                }
+            assertEquals(1, results.count { it != null })
+            val verified = assertNotNull(first.findById("legacy"))
+            assertEquals(setOf(UserRole.STUDENT), verified.roles)
+            assertEquals("original-hash", verified.passwordHash)
+            assertEquals(1L, verified.authRevision)
+            assertNotNull(verified.emailVerifiedAt)
+        }
+
     private suspend fun pending(repo: PlatformAccountRepository) {
         assertTrue(
             repo.create(

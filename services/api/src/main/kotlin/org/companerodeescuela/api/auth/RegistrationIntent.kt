@@ -34,10 +34,10 @@ internal fun PlatformAccount.withEmailChallenge(
     now: Instant,
     expiresAt: Instant,
 ): PlatformAccount? {
-    if (!active ||
-        accountStatus != AccountStatus.PENDING_VERIFICATION ||
+    if (!permitsSession ||
+        accountStatus !in setOf(AccountStatus.PENDING_VERIFICATION, AccountStatus.ACTIVE) ||
         emailVerifiedAt != null ||
-        registrationIntent == null ||
+        (accountStatus == AccountStatus.PENDING_VERIFICATION && registrationIntent == null) ||
         authRevision != expectedRevision ||
         expectedRevision < 0 ||
         !Regex("[A-Za-z0-9_-]{43}").matches(hash) ||
@@ -56,9 +56,10 @@ internal fun PlatformAccount.withVerifiedEmail(
     now: Instant,
 ): PlatformAccount? {
     val challenge = emailVerification ?: return null
-    val intent = registrationIntent ?: return null
-    if (!active ||
-        accountStatus != AccountStatus.PENDING_VERIFICATION ||
+    val intent = registrationIntent
+    if (!permitsSession ||
+        accountStatus !in setOf(AccountStatus.PENDING_VERIFICATION, AccountStatus.ACTIVE) ||
+        (accountStatus == AccountStatus.PENDING_VERIFICATION && intent == null) ||
         emailVerifiedAt != null ||
         challenge.authRevision != authRevision ||
         challenge.expiresAt <= now ||
@@ -68,13 +69,19 @@ internal fun PlatformAccount.withVerifiedEmail(
         return null
     }
     val roles =
-        when (intent.profile) {
-            RegistrationAccountType.STUDENT -> setOf(UserRole.STUDENT)
-            RegistrationAccountType.PARTICIPANT -> setOf(UserRole.WORKSHOP_PARTICIPANT)
-            RegistrationAccountType.TEACHER, RegistrationAccountType.TUTOR -> emptySet()
+        if (accountStatus == AccountStatus.ACTIVE) {
+            roles
+        } else {
+            when (requireNotNull(intent).profile) {
+                RegistrationAccountType.STUDENT -> setOf(UserRole.STUDENT)
+                RegistrationAccountType.PARTICIPANT -> setOf(UserRole.WORKSHOP_PARTICIPANT)
+                RegistrationAccountType.TEACHER, RegistrationAccountType.TUTOR -> emptySet()
+            }
         }
     val status =
-        if (intent.profile in setOf(RegistrationAccountType.STUDENT, RegistrationAccountType.PARTICIPANT)) {
+        if (accountStatus == AccountStatus.ACTIVE ||
+            requireNotNull(intent).profile in setOf(RegistrationAccountType.STUDENT, RegistrationAccountType.PARTICIPANT)
+        ) {
             AccountStatus.ACTIVE
         } else {
             AccountStatus.PENDING_APPROVAL

@@ -24,6 +24,36 @@ import kotlin.test.*
 class UniversalRegistrationRoutesTest {
     private val json = Json
 
+    @Test fun `signed in legacy student verifies mailbox without losing roles and old sessions are revoked`() =
+        scenario { f ->
+            assertTrue(
+                f.accounts.create(
+                    PlatformAccount(
+                        "legacy",
+                        "Student",
+                        "legacy@example.test",
+                        PasswordHasher().hash("test-password"),
+                        setOf(UserRole.STUDENT),
+                    ),
+                ),
+            )
+            val login = post("/auth/login", """{"username":"legacy@example.test","password":"test-password"}""")
+            assertEquals(HttpStatusCode.OK, login.status)
+            val previous = json.decodeFromString<ApiResponse<LoginResponse>>(login.bodyAsText()).data
+            assertEquals(HttpStatusCode.OK, post("/auth/verification/resend", "{}", previous).status)
+            val verified = confirm(previous, assertNotNull(f.mail.tokens["legacy@example.test"]))
+            assertEquals("legacy", verified.user.id)
+            assertEquals(setOf(UserRole.STUDENT), verified.user.roles)
+            assertTrue(verified.user.emailVerified)
+            assertEquals(1L, verified.user.authRevision)
+            assertEquals(HttpStatusCode.Unauthorized, get("/auth/me", previous).status)
+            assertEquals(HttpStatusCode.OK, get("/auth/me", verified).status)
+            assertEquals(
+                HttpStatusCode.Unauthorized,
+                post("/auth/refresh", """{"sessionId":"${previous.sessionId}","refreshToken":"${previous.refreshToken}"}""").status,
+            )
+        }
+
     @Test fun `registration yields pending verification without academic authority or public token`() =
         scenario { f ->
             val created = register("student@example.test")
@@ -46,6 +76,9 @@ class UniversalRegistrationRoutesTest {
             assertEquals(1L, verified.user.authRevision)
             assertEquals(HttpStatusCode.Unauthorized, get("/auth/me", pending).status)
             assertEquals(HttpStatusCode.OK, get("/auth/me", verified).status)
+            val restored = json.decodeFromString<ApiResponse<UserSummary>>(get("/auth/me", verified).bodyAsText()).data
+            assertTrue(restored.emailVerified, "Restoring the native session must retain the verified email state")
+            assertEquals(RegistrationAccountType.STUDENT, restored.registrationAccountType)
             assertEquals(
                 HttpStatusCode.Unauthorized,
                 post("/auth/refresh", """{"sessionId":"${pending.sessionId}","refreshToken":"${pending.refreshToken}"}""").status,

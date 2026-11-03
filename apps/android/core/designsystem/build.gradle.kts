@@ -6,10 +6,16 @@ plugins {
 
 android {
     namespace = "org.companerodeescuela.core.designsystem"
-    compileSdk = libs.versions.compileSdk.get().toInt()
+    compileSdk =
+        libs.versions.compileSdk
+            .get()
+            .toInt()
 
     defaultConfig {
-        minSdk = libs.versions.minSdk.get().toInt()
+        minSdk =
+            libs.versions.minSdk
+                .get()
+                .toInt()
     }
 
     compileOptions {
@@ -29,6 +35,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":apps:android:core:motion"))
     val composeBom = platform(libs.androidx.compose.bom)
     api(composeBom)
     api(libs.androidx.compose.ui)

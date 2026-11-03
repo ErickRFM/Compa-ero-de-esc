@@ -2,10 +2,14 @@
 
 package org.companerodeescuela.feature.profile
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,9 +20,20 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Badge
+import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.DateRange
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.PersonAdd
+import androidx.compose.material.icons.outlined.School
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.SwitchAccount
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -26,10 +41,14 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -41,14 +60,14 @@ import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
-import org.companerodeescuela.core.designsystem.theme.CompanionColors
 import org.companerodeescuela.core.designsystem.theme.LocalCompaneroAccentPalette
+import org.companerodeescuela.core.designsystem.theme.LocalCompaneroDynamicColor
 import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8PageTitle
-import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
+import org.companerodeescuela.core.designsystem.v8.v8PressFeedback
 import org.companerodeescuela.core.navigation.AppDistribution
 import org.companerodeescuela.core.navigation.AppExperience
 import org.companerodeescuela.core.navigation.RoleExperienceResolver
@@ -123,61 +142,20 @@ fun ProfileScreen(
                 )
             }
 
-            V8GlassCard(modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
-                ) {
-                    val avatarBg = LocalCompaneroAccentPalette.current.darkContainer
-                    Surface(
-                        modifier = Modifier.size(CompaneroSize.avatar),
-                        shape = CircleShape,
-                        color = avatarBg,
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                text = initials(displayName),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = androidx.compose.ui.graphics.Color.White,
-                            )
-                        }
-                    }
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(3.dp),
-                    ) {
-                        Text(
-                            text =
-                                displayName?.takeIf(String::isNotBlank)
-                                    ?: "Cuenta de Compañero",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            text = "Perfil activo · ${experienceLabel(experience, roles)}",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Text(
-                            text = "Sesión activa",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = profileSuccessColor(),
-                        )
-                    }
-                }
-            }
+            ProfileIdentityCard(
+                displayName = displayName,
+                activeLabel = "Perfil activo · ${experienceLabel(experience, roles)}",
+            )
 
             ProfileGroup(title = "Cuenta") {
                 ProfileRow(
                     title = "Sistema escolar",
+                    icon = Icons.Outlined.School,
                     detail = "Vinculación y sincronización con SIII.",
                     onClick = onIntegrations,
                 )
                 GroupDivider()
-                ProfileRow(title = "Roles de la cuenta", detail = roleSummary(roles))
+                ProfileRow(title = "Roles de la cuenta", detail = roleSummary(roles), icon = Icons.Outlined.Badge)
             }
 
             if (administrativeExperience &&
@@ -187,6 +165,7 @@ fun ProfileScreen(
                     onAdminDashboard?.let { action ->
                         ProfileRow(
                             title = "Panel administrativo",
+                            icon = Icons.Outlined.Dashboard,
                             detail = "Solicitudes, cuentas y herramientas de gestión.",
                             onClick = action,
                         )
@@ -195,6 +174,7 @@ fun ProfileScreen(
                         if (onAdminDashboard != null) GroupDivider()
                         ProfileRow(
                             title = "Horarios y grupos",
+                            icon = Icons.Outlined.DateRange,
                             detail = "Edición interna con MFA; publicación oficial desde SIII.",
                             onClick = action,
                         )
@@ -203,6 +183,7 @@ fun ProfileScreen(
                         if (onAdminDashboard != null || onAdminSchedule != null) GroupDivider()
                         ProfileRow(
                             title = "Clases y canales",
+                            icon = Icons.Outlined.School,
                             detail = "Accede a los espacios autorizados de tu institución.",
                             onClick = action,
                         )
@@ -215,6 +196,7 @@ fun ProfileScreen(
                     onSecurity?.let { action ->
                         ProfileRow(
                             title = stringResource(R.string.profile_security),
+                            icon = Icons.Outlined.Shield,
                             detail = stringResource(R.string.profile_security_description),
                             onClick = action,
                         )
@@ -223,6 +205,7 @@ fun ProfileScreen(
                         if (onSecurity != null) GroupDivider()
                         ProfileRow(
                             title = stringResource(R.string.profile_tutor_request),
+                            icon = Icons.Outlined.PersonAdd,
                             detail = stringResource(R.string.profile_tutor_description),
                             onClick = onTutorRequest,
                         )
@@ -234,6 +217,7 @@ fun ProfileScreen(
                 ProfileGroup(title = "Modo de uso") {
                     ProfileRow(
                         title = "Cambiar perfil activo",
+                        icon = Icons.Outlined.SwitchAccount,
                         detail = "Alterna entre tus roles autorizados sin cerrar sesión.",
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -246,6 +230,7 @@ fun ProfileScreen(
             ProfileGroup(title = "Aplicación") {
                 ProfileRow(
                     title = "Tema y accesibilidad",
+                    icon = Icons.Outlined.Palette,
                     detail = "Tema, texto, contraste y movimiento.",
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -256,6 +241,7 @@ fun ProfileScreen(
                     GroupDivider()
                     ProfileRow(
                         title = "Notificaciones",
+                        icon = Icons.Outlined.Notifications,
                         detail = notificationsStatus ?: "Activar avisos académicos en este dispositivo.",
                         onClick = action,
                     )
@@ -263,6 +249,7 @@ fun ProfileScreen(
                 GroupDivider()
                 ProfileRow(
                     title = "Acerca de Compañero",
+                    icon = Icons.Outlined.Info,
                     detail =
                         if (appVersion != null) {
                             "v$appVersion · " + if (managementExperience) "Compañero Gestión" else "Compañero de Clase"
@@ -286,6 +273,91 @@ fun ProfileScreen(
 }
 
 @Composable
+private fun ProfileIdentityCard(
+    displayName: String?,
+    activeLabel: String,
+) {
+    val highContrast = LocalCompaneroHighContrast.current
+    val dynamicColor = LocalCompaneroDynamicColor.current
+    val ink =
+        when {
+            highContrast -> MaterialTheme.colorScheme.onSurface
+            dynamicColor -> MaterialTheme.colorScheme.onPrimaryContainer
+            else -> Color.White
+        }
+    val background =
+        when {
+            highContrast -> MaterialTheme.colorScheme.surface
+            dynamicColor -> MaterialTheme.colorScheme.primaryContainer
+            else -> LocalCompaneroAccentPalette.current.darkContainer
+        }
+    val largeText = LocalDensity.current.fontScale >= 1.5f
+    val name = displayName?.takeIf(String::isNotBlank) ?: "Cuenta de Compañero"
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = background,
+        shape = RoundedCornerShape(28.dp),
+        border = if (highContrast) BorderStroke(2.dp, ink) else null,
+    ) {
+        Column(Modifier.padding(CompaneroSpacing.lg), verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.md)) {
+            if (largeText) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.md)) {
+                    ProfileAvatar(displayName, ink, highContrast)
+                    Text("Sesión activa", color = ink, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+                }
+                Text(name, color = ink, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.md)) {
+                    ProfileAvatar(displayName, ink, highContrast)
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
+                        Text(name, color = ink, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Sesión activa",
+                            color = ink.copy(alpha = if (highContrast) 1f else 0.85f),
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
+                }
+            }
+            Surface(
+                color = if (highContrast) Color.Transparent else ink.copy(alpha = 0.12f),
+                shape = MaterialTheme.shapes.large,
+                border = BorderStroke(1.dp, ink.copy(alpha = if (highContrast) 1f else 0.25f)),
+            ) {
+                Text(
+                    activeLabel,
+                    color = ink,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(horizontal = CompaneroSpacing.sm, vertical = CompaneroSpacing.xs),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileAvatar(
+    displayName: String?,
+    ink: Color,
+    highContrast: Boolean,
+) {
+    Surface(
+        modifier = Modifier.size(64.dp),
+        shape = CircleShape,
+        color = if (highContrast) ink else ink.copy(alpha = 0.16f),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                initials(displayName),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (highContrast) MaterialTheme.colorScheme.surface else ink,
+            )
+        }
+    }
+}
+
+@Composable
 private fun ProfileGroup(
     title: String,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
@@ -293,12 +365,15 @@ private fun ProfileGroup(
     Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.semantics { heading() },
         )
-        V8GlassCard(modifier = Modifier.fillMaxWidth()) {
+        V8GlassCard(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = CompaneroSpacing.md, vertical = CompaneroSpacing.xxs),
+        ) {
             Column(content = content)
         }
     }
@@ -308,20 +383,43 @@ private fun ProfileGroup(
 private fun ProfileRow(
     title: String,
     detail: String,
+    icon: ImageVector,
     onClick: (() -> Unit)? = null,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
     val rowModifier =
         Modifier
             .fillMaxWidth()
             .heightIn(min = 48.dp)
-            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
-            .padding(vertical = CompaneroSpacing.sm)
+            .then(
+                if (onClick != null) {
+                    Modifier.v8PressFeedback(interactionSource).clickable(
+                        interactionSource = interactionSource,
+                        indication = LocalIndication.current,
+                        role = Role.Button,
+                        onClick = onClick,
+                    )
+                } else {
+                    Modifier
+                },
+            ).padding(vertical = CompaneroSpacing.sm)
 
     Row(
         modifier = rowModifier,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
     ) {
+        if (LocalDensity.current.fontScale < 1.5f) {
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
@@ -350,16 +448,11 @@ private fun ProfileRow(
 
 @Composable
 private fun GroupDivider() {
-    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    HorizontalDivider(
+        modifier = Modifier.padding(start = if (LocalDensity.current.fontScale >= 1.5f) 0.dp else 52.dp),
+        color = MaterialTheme.colorScheme.outlineVariant,
+    )
 }
-
-@Composable
-private fun profileSuccessColor(): androidx.compose.ui.graphics.Color =
-    if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-        CompanionColors.semanticGreen
-    } else {
-        V8RedColors.Success
-    }
 
 private fun roleSummary(roles: Set<UserRole>): String =
     roles

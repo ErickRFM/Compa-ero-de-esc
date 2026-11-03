@@ -78,7 +78,11 @@ fun Modifier.v8GlassSurface(
         ambientColor = Color.Black,
         spotColor = Color.Black,
     ).clip(shape).background(fill).then(
-        if (highContrast) Modifier.border(2.dp, edge, shape) else Modifier,
+        when {
+            highContrast -> Modifier.border(2.dp, edge, shape)
+            emphasized -> Modifier.border(1.dp, scheme.primary.copy(alpha = 0.28f), shape)
+            else -> Modifier
+        },
     )
 }
 

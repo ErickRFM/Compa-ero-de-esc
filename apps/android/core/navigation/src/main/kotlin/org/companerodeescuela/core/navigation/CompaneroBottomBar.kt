@@ -4,6 +4,7 @@ package org.companerodeescuela.core.navigation
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -37,6 +38,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -102,7 +104,7 @@ fun CompaneroBottomBar(
                     targetValue = targetOffset,
                     animationSpec =
                         if (reducedMotion) {
-                            CompaneroMotion.fast()
+                            snap()
                         } else {
                             CompaneroMotion.snappySpring()
                         },
@@ -115,6 +117,7 @@ fun CompaneroBottomBar(
                             .offset(x = pillOffset)
                             .width(itemWidth)
                             .height(itemHeight - 8.dp)
+                            .testTag("navigation_selection")
                             .clip(CircleShape)
                             .background(Color.White),
                 )
@@ -128,7 +131,7 @@ fun CompaneroBottomBar(
                     val isSelected = index == selectedIndex
                     val scale by animateFloatAsState(
                         targetValue = if (isSelected && !reducedMotion) 1.05f else 1f,
-                        animationSpec = CompaneroMotion.fast(),
+                        animationSpec = if (reducedMotion) snap() else CompaneroMotion.fast(),
                         label = "navItemScale",
                     )
 

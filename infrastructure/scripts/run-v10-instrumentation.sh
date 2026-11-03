@@ -125,7 +125,7 @@ fi
 runner_args=()
 if [[ "$variant" == Management ]]; then
   runner_args+=(
-    "-Pandroid.testInstrumentationRunnerArguments.class=org.companerodeescuela.AppDistributionSmokeTest,org.companerodeescuela.DistributionLoginUiTest,org.companerodeescuela.V12AdministrationUiTest,org.companerodeescuela.V14RoleNavigationUiTest,org.companerodeescuela.InstitutionalClassesUiTest,org.companerodeescuela.CoordinationAttendanceIndicatorsUiTest,org.companerodeescuela.NotificationConsentUiTest,org.companerodeescuela.AttendanceTruthUiTest,org.companerodeescuela.ManagementProfileNavigationTest,org.companerodeescuela.ChannelTaskLayoutUiTest,org.companerodeescuela.ProfileConsistencyUiTest"
+    "-Pandroid.testInstrumentationRunnerArguments.class=org.companerodeescuela.AppDistributionSmokeTest,org.companerodeescuela.DistributionLoginUiTest,org.companerodeescuela.V12AdministrationUiTest,org.companerodeescuela.V14RoleNavigationUiTest,org.companerodeescuela.InstitutionalClassesUiTest,org.companerodeescuela.CoordinationAttendanceIndicatorsUiTest,org.companerodeescuela.NotificationConsentUiTest,org.companerodeescuela.AttendanceTruthUiTest,org.companerodeescuela.ManagementProfileNavigationTest,org.companerodeescuela.ChannelTaskLayoutUiTest,org.companerodeescuela.ProfileConsistencyUiTest,org.companerodeescuela.MotionDesignUiTest"
   )
 fi
 ./gradlew ":apps:android:app:connected${variant}DebugAndroidTest" --max-workers=1 --no-daemon \
@@ -151,6 +151,25 @@ if [[ "$variant" == Academic ]]; then
   python3 infrastructure/scripts/export-v10-evidence.py
 fi
 if [[ "$instrumentation_status" -eq 0 ]]; then
+  design_output="build/design-motion-evidence"
+  mkdir -p "$design_output"
+  for state in shortcuts-normal shortcuts-large-200 button-resting button-pressed; do
+    adb exec-out run-as "$COMPANERO_EVIDENCE_PACKAGE" \
+      cat "files/audit-design-motion/${state}.png" > "${design_output}/${state}.png"
+  done
+  python3 - "$design_output" <<'PY'
+from pathlib import Path
+import struct
+import sys
+
+root = Path(sys.argv[1])
+for state in ('shortcuts-normal', 'shortcuts-large-200', 'button-resting', 'button-pressed'):
+    data = (root / f'{state}.png').read_bytes()
+    assert data[:8] == b'\x89PNG\r\n\x1a\n', f'Missing design evidence: {state}'
+    width, height = struct.unpack('>II', data[16:24])
+    assert width > 0 and height > 0, f'Invalid design dimensions: {state}'
+print('Verified four synthetic design/motion screenshots for this distribution')
+PY
   profile_output="build/profile-ui-evidence"
   mkdir -p "$profile_output"
   for state in picker-bottom-200 profile-student-dark profile-teacher-light-200 profile-coordinator-dark-200; do

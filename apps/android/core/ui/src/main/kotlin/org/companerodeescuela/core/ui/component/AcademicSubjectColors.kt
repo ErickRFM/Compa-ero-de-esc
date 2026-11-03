@@ -9,6 +9,19 @@ import androidx.compose.ui.graphics.luminance
  * never encode success, warning, attendance or other semantic states.
  */
 object AcademicSubjectColors {
+    /** Imported personal entries share a placeholder code; their names identify the subject. */
+    fun subjectKey(
+        code: String,
+        name: String,
+    ): String {
+        val normalizedCode = code.trim()
+        return if (normalizedCode.isEmpty() || normalizedCode.equals("PERSONAL", ignoreCase = true)) {
+            name.trim().lowercase(java.util.Locale.ROOT)
+        } else {
+            normalizedCode.uppercase(java.util.Locale.ROOT)
+        }
+    }
+
     private val light =
         listOf(
             Color(0xFF3F51B5),

@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -22,7 +23,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 import org.companerodeescuela.core.designsystem.v8.*
+import org.companerodeescuela.core.ui.component.AcademicSubjectColors
 import org.companerodeescuela.shared.contracts.ScheduleEntry
 import org.companerodeescuela.shared.contracts.ScheduleSource
 
@@ -53,6 +56,7 @@ internal fun WeeklyAgendaGrid(
     val gridScroll = rememberScrollState()
     var showAllDetails by remember { mutableStateOf(false) }
     val colors = MaterialTheme.colorScheme
+    val highContrast = LocalCompaneroHighContrast.current
     val gridLineColor = colors.outline.copy(alpha = 0.4f)
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -125,6 +129,11 @@ internal fun WeeklyAgendaGrid(
                                     layout.forEach { placement ->
                                         val laneWidth = widths[dayIndex] / placement.laneCount
                                         val entry = placement.entry
+                                        val subjectColor =
+                                            AcademicSubjectColors.accent(
+                                                key = AcademicSubjectColors.subjectKey(entry.subjectCode, entry.subjectName),
+                                                surface = colors.surface,
+                                            )
                                         var dragOffset by remember(entry) { mutableStateOf(Offset.Zero) }
                                         val dragModifier =
                                             if (entry.source == ScheduleSource.INSTITUTIONAL) {
@@ -185,7 +194,10 @@ internal fun WeeklyAgendaGrid(
                                                 .then(dragModifier)
                                                 .padding(2.dp)
                                                 .v8GlassSurface(cornerRadius = 10.dp, emphasized = true, elevation = 0.dp)
-                                                .clickable { detail = entry }
+                                                .drawBehind {
+                                                    if (!highContrast) drawRect(subjectColor.copy(alpha = 0.08f))
+                                                    drawRect(subjectColor, size = Size(4.dp.toPx(), size.height))
+                                                }.clickable { detail = entry }
                                                 .padding(5.dp),
                                         ) {
                                             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {

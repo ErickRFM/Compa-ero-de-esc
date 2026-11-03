@@ -56,6 +56,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -72,6 +73,7 @@ import kotlinx.coroutines.launch
 import org.companerodeescuela.core.academic.PersonalScheduleDraft
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
+import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 import org.companerodeescuela.core.designsystem.v8.V8DaySelector
 import org.companerodeescuela.core.designsystem.v8.V8GlassFilterChip
 import org.companerodeescuela.core.designsystem.v8.V8HeroTitle
@@ -80,6 +82,7 @@ import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.motion.CompaneroMotionDuration
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
+import org.companerodeescuela.core.ui.component.AcademicSubjectColors
 import org.companerodeescuela.core.ui.component.AcademicSyncStatusCard
 import org.companerodeescuela.core.ui.component.AcademicTimelineItem
 import org.companerodeescuela.core.ui.component.CompaneroSurface
@@ -595,6 +598,7 @@ private fun DayTimeGrid(
     val lineColor = MaterialTheme.colorScheme.outlineVariant
     val density = LocalDensity.current
     val haptics = LocalHapticFeedback.current
+    val highContrast = LocalCompaneroHighContrast.current
     val quarterHourPx = with(density) { hourHeight.toPx() / 4f }
     val horizontalThresholdPx = with(density) { 72.dp.toPx() }
 
@@ -657,6 +661,11 @@ private fun DayTimeGrid(
         }
 
         entries.forEachIndexed { index, entry ->
+            val subjectColor =
+                AcademicSubjectColors.accent(
+                    key = AcademicSubjectColors.subjectKey(entry.subjectCode, entry.subjectName),
+                    surface = MaterialTheme.colorScheme.surface,
+                )
             val start =
                 runCatching { LocalTime.parse(entry.startsAt) }.getOrNull()
                     ?: return@forEachIndexed
@@ -753,7 +762,12 @@ private fun DayTimeGrid(
                 tonalElevation = if (isDragging) 8.dp else 1.dp,
             ) {
                 Column(
-                    modifier = Modifier.padding(if (durationMinutes < 45) 4.dp else CompaneroSpacing.sm),
+                    modifier =
+                        Modifier
+                            .drawBehind {
+                                if (!highContrast && !isDragging) drawRect(subjectColor.copy(alpha = 0.08f))
+                                drawRect(subjectColor, size = Size(4.dp.toPx(), size.height))
+                            }.padding(if (durationMinutes < 45) 4.dp else CompaneroSpacing.sm),
                     verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
                 ) {
                     if (isDragging && shiftedStart != null) {
@@ -934,7 +948,7 @@ private fun AgendaTimelineEntry(
                     ScheduleSource.MANUAL -> "Horario personal"
                     ScheduleSource.OCR_IMPORT -> "Importado · revisado"
                 },
-            subjectKey = entry.subjectCode.ifBlank { entry.subjectName },
+            subjectKey = AcademicSubjectColors.subjectKey(entry.subjectCode, entry.subjectName),
             continuousRail = true,
             modifier = Modifier.fillMaxWidth(),
         )

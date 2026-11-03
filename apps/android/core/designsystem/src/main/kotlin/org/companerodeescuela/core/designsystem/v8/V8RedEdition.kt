@@ -14,11 +14,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import org.companerodeescuela.core.designsystem.theme.LocalCompaneroAccentPalette
+import org.companerodeescuela.core.designsystem.theme.companeroPrimaryActionColors
 
 /** V8 Red Edition — fixed visual baseline for the five approved student mockups.
  *  The mockups are references, not runtime screen backgrounds.
@@ -70,9 +69,7 @@ fun V8RedPrimaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    val light = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    val palette = LocalCompaneroAccentPalette.current
-    val solidAccent = if (light) MaterialTheme.colorScheme.primary else palette.darkContainer
+    val accent = companeroPrimaryActionColors()
     val interactionSource = remember { MutableInteractionSource() }
     Button(
         onClick = onClick,
@@ -82,8 +79,8 @@ fun V8RedPrimaryButton(
         shape = RoundedCornerShape(V8RedDimensions.ControlCorner),
         colors =
             ButtonDefaults.buttonColors(
-                containerColor = solidAccent,
-                contentColor = Color.White,
+                containerColor = accent.background,
+                contentColor = accent.foreground,
                 disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             ),
         contentPadding = PaddingValues(horizontal = 22.dp, vertical = 16.dp),

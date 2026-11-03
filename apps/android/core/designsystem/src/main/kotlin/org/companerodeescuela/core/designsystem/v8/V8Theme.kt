@@ -6,6 +6,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import org.companerodeescuela.core.designsystem.theme.CompaneroAccentPalette
+import org.companerodeescuela.core.designsystem.theme.accentForeground
 
 /** Enables the V8 finish for shared surfaces inside the student scaffold. */
 val LocalV8GlassEnabled = staticCompositionLocalOf { false }
@@ -14,7 +15,7 @@ val LocalV8GlassEnabled = staticCompositionLocalOf { false }
 val V8ColorScheme =
     darkColorScheme(
         primary = V8RedColors.Crimson,
-        onPrimary = V8RedColors.TextPrimary,
+        onPrimary = accentForeground(V8RedColors.Crimson),
         primaryContainer = V8RedColors.DeepCrimson,
         onPrimaryContainer = V8RedColors.TextPrimary,
         background = V8RedColors.Background,
@@ -41,7 +42,9 @@ fun v8EffectiveColorScheme(
         } else {
             V8ColorScheme.copy(
                 primary = accentPalette.darkPrimary,
+                onPrimary = accentForeground(accentPalette.darkPrimary),
                 primaryContainer = accentPalette.darkContainer,
+                onPrimaryContainer = accentForeground(accentPalette.darkContainer),
             )
         }
     return if (!highContrast) {
@@ -78,9 +81,9 @@ fun v8ResolvedColorScheme(
         val resolvedContainer = if (preserveDynamicPrimary) parent.primaryContainer else accentPalette.lightContainer
         parent.copy(
             primary = resolvedPrimary,
-            onPrimary = Color.White,
+            onPrimary = if (preserveDynamicPrimary) parent.onPrimary else accentForeground(resolvedPrimary),
             primaryContainer = resolvedContainer,
-            onPrimaryContainer = resolvedPrimary,
+            onPrimaryContainer = if (preserveDynamicPrimary) parent.onPrimaryContainer else resolvedPrimary,
             background = Color.White,
             onBackground = Color(0xFF141720),
             surface = Color.White,
@@ -100,7 +103,9 @@ fun v8ResolvedColorScheme(
         if (preserveDynamicPrimary) {
             darkResolved.copy(
                 primary = parent.primary,
+                onPrimary = parent.onPrimary,
                 primaryContainer = parent.primaryContainer,
+                onPrimaryContainer = parent.onPrimaryContainer,
             )
         } else {
             darkResolved

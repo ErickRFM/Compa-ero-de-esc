@@ -1,0 +1,128 @@
+{
+  "base": "56411d0a",
+  "api": 30,
+  "package": "org.companerodeescuela",
+  "note": "Synthetic identities/callbacks. 840dp uses Density1 logical harness; physical tablet and TalkBack not certified. Dynamic samples require API31+.",
+  "captures": [
+    {
+      "name": "profile-contrast-light",
+      "width": 990,
+      "height": 1760
+    },
+    {
+      "name": "profile-contrast-dark",
+      "width": 990,
+      "height": 1760
+    },
+    {
+      "name": "appearance-normal",
+      "width": 1080,
+      "height": 2063
+    },
+    {
+      "name": "appearance-accessibility",
+      "width": 1080,
+      "height": 2063
+    },
+    {
+      "name": "appearance-320-240",
+      "width": 1080,
+      "height": 2063
+    },
+    {
+      "name": "appearance-wide",
+      "width": 840,
+      "height": 500
+    },
+    {
+      "name": "appearance-compact",
+      "width": 320,
+      "height": 500
+    },
+    {
+      "name": "profile-large-240",
+      "width": 1080,
+      "height": 2063
+    },
+    {
+      "name": "startup-normal",
+      "width": 1080,
+      "height": 2063
+    },
+    {
+      "name": "startup-reduced",
+      "width": 1080,
+      "height": 2063
+    },
+    {
+      "name": "home-loading",
+      "width": 1080,
+      "height": 308
+    },
+    {
+      "name": "home-cached-refresh",
+      "width": 1080,
+      "height": 588
+    },
+    {
+      "name": "profile-crimson-light",
+      "width": 990,
+      "height": 1760
+    },
+    {
+      "name": "profile-crimson-dark",
+      "width": 990,
+      "height": 1760
+    },
+    {
+      "name": "profile-cobalt-light",
+      "width": 990,
+      "height": 1760
+    },
+    {
+      "name": "profile-cobalt-dark",
+      "width": 990,
+      "height": 1760
+    },
+    {
+      "name": "profile-emerald-light",
+      "width": 990,
+      "height": 1760
+    },
+    {
+      "name": "profile-emerald-dark",
+      "width": 990,
+      "height": 1760
+    },
+    {
+      "name": "profile-violet-light",
+      "width": 990,
+      "height": 1760
+    },
+    {
+      "name": "profile-violet-dark",
+      "width": 990,
+      "height": 1760
+    },
+    {
+      "name": "profile-amber-light",
+      "width": 990,
+      "height": 1760
+    },
+    {
+      "name": "profile-amber-dark",
+      "width": 990,
+      "height": 1760
+    },
+    {
+      "name": "profile-rose-light",
+      "width": 990,
+      "height": 1760
+    },
+    {
+      "name": "profile-rose-dark",
+      "width": 990,
+      "height": 1760
+    }
+  ]
+}

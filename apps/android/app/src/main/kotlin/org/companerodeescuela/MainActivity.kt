@@ -16,13 +16,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -35,7 +34,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.core.app.ActivityCompat
@@ -47,6 +45,7 @@ import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 import org.companerodeescuela.core.attendance.AttendanceSyncScheduler
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
+import org.companerodeescuela.core.designsystem.v8.V8LoadingState
 import org.companerodeescuela.core.motion.ProvideCompaneroMotionPreferences
 import org.companerodeescuela.core.navigation.AcademicRoutePolicy
 import org.companerodeescuela.core.navigation.AppDistribution
@@ -193,12 +192,11 @@ class MainActivity : AppCompatActivity() {
 
                         when {
                             session.checking -> {
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    CircularProgressIndicator()
-                                }
+                                V8LoadingState(
+                                    modifier = Modifier.safeDrawingPadding(),
+                                    title = stringResource(org.companerodeescuela.core.designsystem.R.string.ux_loading_session),
+                                    branded = true,
+                                )
                             }
                             !session.authenticated -> {
                                 if (activatingAccess) {

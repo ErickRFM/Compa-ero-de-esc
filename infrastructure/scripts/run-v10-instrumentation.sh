@@ -125,7 +125,7 @@ fi
 runner_args=()
 if [[ "$variant" == Management ]]; then
   runner_args+=(
-    "-Pandroid.testInstrumentationRunnerArguments.class=org.companerodeescuela.AppDistributionSmokeTest,org.companerodeescuela.DistributionLoginUiTest,org.companerodeescuela.V12AdministrationUiTest,org.companerodeescuela.V14RoleNavigationUiTest,org.companerodeescuela.InstitutionalClassesUiTest,org.companerodeescuela.CoordinationAttendanceIndicatorsUiTest,org.companerodeescuela.NotificationConsentUiTest,org.companerodeescuela.AttendanceTruthUiTest,org.companerodeescuela.ManagementProfileNavigationTest,org.companerodeescuela.ChannelTaskLayoutUiTest,org.companerodeescuela.ProfileConsistencyUiTest,org.companerodeescuela.MotionDesignUiTest"
+    "-Pandroid.testInstrumentationRunnerArguments.class=org.companerodeescuela.AppDistributionSmokeTest,org.companerodeescuela.DistributionLoginUiTest,org.companerodeescuela.V12AdministrationUiTest,org.companerodeescuela.V14RoleNavigationUiTest,org.companerodeescuela.InstitutionalClassesUiTest,org.companerodeescuela.CoordinationAttendanceIndicatorsUiTest,org.companerodeescuela.NotificationConsentUiTest,org.companerodeescuela.AttendanceTruthUiTest,org.companerodeescuela.ManagementProfileNavigationTest,org.companerodeescuela.ChannelTaskLayoutUiTest,org.companerodeescuela.ProfileConsistencyUiTest,org.companerodeescuela.MotionDesignUiTest,org.companerodeescuela.PersonalizationUxUiTest"
   )
 fi
 ./gradlew ":apps:android:app:connected${variant}DebugAndroidTest" --max-workers=1 --no-daemon \
@@ -151,6 +151,38 @@ if [[ "$variant" == Academic ]]; then
   python3 infrastructure/scripts/export-v10-evidence.py
 fi
 if [[ "$instrumentation_status" -eq 0 ]]; then
+  personalization_output="build/personalization-ui-evidence"
+  mkdir -p "$personalization_output"
+  personalization_states=(
+    profile-contrast-light profile-contrast-dark profile-dynamic-light profile-dynamic-dark
+    appearance-normal appearance-accessibility appearance-320-240 profile-large-240
+    startup-normal startup-reduced home-loading home-cached-refresh
+    appearance-wide appearance-compact
+  )
+  for palette in crimson cobalt emerald violet amber rose; do
+    for mode in light dark; do
+      personalization_states+=("profile-${palette}-${mode}")
+    done
+  done
+  for state in "${personalization_states[@]}"; do
+    adb exec-out run-as "$COMPANERO_EVIDENCE_PACKAGE" \
+      cat "files/audit-personalization/${state}.png" > "${personalization_output}/${state}.png"
+  done
+  python3 - "$personalization_output" "${personalization_states[@]}" <<'PY'
+from pathlib import Path
+import struct
+import sys
+
+root = Path(sys.argv[1])
+states = sys.argv[2:]
+assert len(states) == len(set(states)) == 26
+for state in states:
+    data = (root / f'{state}.png').read_bytes()
+    assert data[:8] == b'\x89PNG\r\n\x1a\n', f'Missing personalization evidence: {state}'
+    width, height = struct.unpack('>II', data[16:24])
+    assert width > 0 and height > 0, f'Invalid personalization dimensions: {state}'
+print('Verified 26 synthetic personalization/loading screenshots for this distribution')
+PY
   design_output="build/design-motion-evidence"
   mkdir -p "$design_output"
   for state in shortcuts-normal shortcuts-large-200 button-resting button-pressed; do

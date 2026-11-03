@@ -15,14 +15,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -30,8 +25,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -46,7 +39,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.CompaneroWindowBreakpoints
-import org.companerodeescuela.core.designsystem.theme.LocalCompaneroAccentPalette
 import org.companerodeescuela.core.designsystem.v8.V8ClassSummary
 import org.companerodeescuela.core.designsystem.v8.V8DailyClassRow
 import org.companerodeescuela.core.designsystem.v8.V8DashboardStat
@@ -96,8 +88,8 @@ fun HomeScreen(
             Column(
                 modifier =
                     Modifier
-                        .fillMaxSize()
                         .widthIn(max = CompaneroSize.homeContentMaxWidth)
+                        .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                         .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm)
                         .align(Alignment.TopCenter),
@@ -132,83 +124,7 @@ fun HomeScreen(
                     }
                 }
 
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    color =
-                        if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            LocalCompaneroAccentPalette.current.darkContainer
-                        },
-                    shadowElevation = 2.dp,
-                ) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        val activeOrNext = featuredHomeClass(overview)
-                        val institutionalReady =
-                            !state.personalOnly &&
-                                !state.institutionalAccessDenied &&
-                                !state.fromCache &&
-                                state.errorMessage == null
-
-                        Text(
-                            text =
-                                when {
-                                    activeOrNext == null -> "MI AGENDA"
-                                    overview?.current != null -> "CLASE EN CURSO"
-                                    else -> "PRÓXIMA CLASE"
-                                },
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White.copy(alpha = 0.88f),
-                        )
-                        Text(
-                            text = activeOrNext?.subjectName ?: "Sin clases próximas",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                        )
-                        if (activeOrNext != null) {
-                            activeOrNext.teacherName?.takeIf { it.isNotBlank() }?.let { teacher ->
-                                Text(
-                                    text = "Docente · $teacher",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Color.White.copy(alpha = 0.92f),
-                                )
-                            }
-                            HorizontalDivider(color = Color.White.copy(alpha = 0.24f))
-                            val dayPrefix =
-                                if (overview?.current == null && overview?.next == null) {
-                                    upcomingDayLabel(overview?.nextScheduledDaysAway) + " · "
-                                } else {
-                                    ""
-                                }
-                            Text(
-                                text = dayPrefix + "${activeOrNext.startsAt} – ${activeOrNext.endsAt} · ${locationLabel(activeOrNext)}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color.White,
-                            )
-                        }
-                        TextButton(
-                            onClick =
-                                if (canOpenAttendanceFromHome(overview, institutionalReady)) {
-                                    onOpenAttendance
-                                } else {
-                                    onOpenSchedule
-                                },
-                            modifier = Modifier.align(Alignment.End),
-                            colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
-                        ) {
-                            Text(
-                                if (canOpenAttendanceFromHome(overview, institutionalReady)) "Pasar lista" else "Ver mi horario",
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
-                    }
-                }
+                HomeAgendaCard(state, onOpenSchedule, onOpenAttendance)
 
                 HomeShortcutGrid(
                     onOpenSchedule = onOpenSchedule,
@@ -217,7 +133,6 @@ fun HomeScreen(
                     onOpenTasks = onOpenTasks,
                 )
 
-                if (state.loading && overview == null) CircularProgressIndicator()
                 if (state.fromCache || state.personalOnly || state.errorMessage != null) {
                     AcademicSyncStatusCard(
                         title =
@@ -459,12 +374,12 @@ internal fun cacheStatusLabel(
         lastUpdated.format(DateTimeFormatter.ofPattern(pattern, Locale("es", "MX")))
 }
 
-private fun locationLabel(entry: ScheduleEntry): String =
+internal fun locationLabel(entry: ScheduleEntry): String =
     listOfNotNull(entry.classroomName, entry.buildingName)
         .joinToString(" · ")
         .ifBlank { "Aula por confirmar" }
 
-private fun upcomingDayLabel(daysAway: Int?): String {
+internal fun upcomingDayLabel(daysAway: Int?): String {
     if (daysAway == null) return "Próximamente"
     if (daysAway == 0) return "Hoy"
     if (daysAway == 1) return "Mañana"

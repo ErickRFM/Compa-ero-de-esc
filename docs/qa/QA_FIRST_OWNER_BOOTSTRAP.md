@@ -2,6 +2,8 @@
 
 **Borrador de diseño: no ejecutar.** La lógica todavía no está conectada al arranque ni lista para despliegue. Quedan pendientes una recuperación segura tras la caducidad de una reserva incompleta y evidencia de aislamiento de credenciales y base. El código experimental rechaza producción y cualquier base cuyo nombre no termine en `_qa`; ese nombre por sí solo no acredita aislamiento. No crea cuentas ni reemplaza contraseñas. El rol `SUPER_ADMIN` se añade a los roles existentes; la institución académica se conserva. No activa registro de la institución.
 
+La revisión independiente identificó requisitos concretos para recuperar una reserva inconclusa: una prueba MFA nueva ligada específicamente a la recuperación, una autorización vigente y revocable del operador, un límite de antigüedad y un evento de auditoría identificable. Reusar una prueba anterior o simplemente declarar un operador no demuestra esa autorización. El intento experimental que solo añadía un indicador de recuperación fue descartado. También debe coordinarse cualquier futura ruta de concesión de `SUPER_ADMIN` con la misma reserva global.
+
 ## Antes de ejecutar
 
 - Verificar servicio `staging`, base aislada, compilación y pruebas; no utilizar el servicio compartido.

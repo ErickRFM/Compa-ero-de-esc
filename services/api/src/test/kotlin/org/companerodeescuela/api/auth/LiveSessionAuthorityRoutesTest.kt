@@ -31,6 +31,71 @@ class LiveSessionAuthorityRoutesTest {
     private val json = Json
 
     @Test
+    fun `institutional session never receives metadata from native account with same id`() =
+        testApplication {
+            val sessions = InMemoryRefreshSessionRepository()
+            val accounts = InMemoryPlatformAccountRepository()
+            val provider = MockIdentityProvider()
+            application {
+                configurePlugins(settings, refreshSessions = sessions, sessionAuthority = PlatformSessionAuthority(accounts, provider))
+                routing { authRoutes(settings, provider, sessions = sessions, accounts = accounts) }
+            }
+            val initial = login()
+            assertEquals(
+                true,
+                accounts.create(
+                    PlatformAccount(
+                        initial.user.id,
+                        "Different local identity",
+                        "local@example.test",
+                        "hash",
+                        setOf(UserRole.STUDENT),
+                        emailVerifiedAt = java.time.Instant.now(),
+                    ),
+                ),
+            )
+            val response = client.get("/auth/me") { header(HttpHeaders.Authorization, "Bearer " + initial.accessToken) }
+            assertEquals(HttpStatusCode.OK, response.status)
+            val restored =
+                json
+                    .decodeFromString<ApiResponse<org.companerodeescuela.shared.contracts.UserSummary>>(
+                        response.bodyAsText(),
+                    ).data
+            assertEquals(initial.user.email, restored.email)
+            assertEquals(false, restored.emailVerified)
+        }
+
+    @Test
+    fun `existing native session without email claim can restore current native identity`() =
+        testApplication {
+            val sessions = InMemoryRefreshSessionRepository()
+            val accounts = MutableAccounts()
+            val provider = MockIdentityProvider()
+            application {
+                configurePlugins(settings, refreshSessions = sessions, sessionAuthority = PlatformSessionAuthority(accounts, provider))
+                routing { authRoutes(settings, provider, sessions = sessions, accounts = accounts) }
+            }
+            val initial = register()
+            val oldToken =
+                JWT
+                    .create()
+                    .withIssuer(settings.jwtIssuer)
+                    .withAudience(settings.jwtAudience)
+                    .withSubject(initial.user.id)
+                    .withIssuedAt(Date())
+                    .withExpiresAt(Date(System.currentTimeMillis() + 60_000))
+                    .withClaim("session_id", initial.sessionId)
+                    .withClaim("session_generation", 0L)
+                    .withClaim("display_name", initial.user.displayName)
+                    .withClaim("roles", initial.user.roles.map { it.name })
+                    .withClaim("active", true)
+                    .withClaim("account_status", initial.user.accountStatus.name)
+                    .withClaim("auth_revision", initial.user.authRevision)
+                    .sign(Algorithm.HMAC256(settings.jwtSecret!!.concatToString()))
+            assertEquals(HttpStatusCode.OK, me(oldToken))
+        }
+
+    @Test
     fun `signed claims cannot elevate role cross owner omit generation or omit active state`() =
         testApplication {
             val sessions = InMemoryRefreshSessionRepository()

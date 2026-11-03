@@ -76,6 +76,9 @@ class UniversalRegistrationRoutesTest {
             assertEquals(1L, verified.user.authRevision)
             assertEquals(HttpStatusCode.Unauthorized, get("/auth/me", pending).status)
             assertEquals(HttpStatusCode.OK, get("/auth/me", verified).status)
+            val restored = json.decodeFromString<ApiResponse<UserSummary>>(get("/auth/me", verified).bodyAsText()).data
+            assertTrue(restored.emailVerified, "Restoring the native session must retain the verified email state")
+            assertEquals(RegistrationAccountType.STUDENT, restored.registrationAccountType)
             assertEquals(
                 HttpStatusCode.Unauthorized,
                 post("/auth/refresh", """{"sessionId":"${pending.sessionId}","refreshToken":"${pending.refreshToken}"}""").status,

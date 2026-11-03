@@ -252,10 +252,26 @@ fun Route.authRoutes(
                 }
                 get("/me") {
                     val payload = call.principal<JWTPrincipal>()?.payload ?: throw ApiException.Unauthorized()
-                    // The JWT provider has already resolved and compared live authority for this request.
-                    // Re-resolving here would make institutional providers pay for a duplicate upstream read.
                     val claimed = tokenService.userFrom(payload)
-                    call.respond(ApiResponse(claimed, call.requestId()))
+                    val user =
+                        if (call.verifiedSessionSource() == SessionIdentitySource.NATIVE) {
+                            val account = authenticationDependency { accounts.findById(claimed.id) } ?: throw ApiException.Unauthorized()
+                            val live = account.toUserSummary()
+                            if (!live.active ||
+                                live.authRevision != claimed.authRevision ||
+                                live.accountStatus != claimed.accountStatus ||
+                                live.roles != claimed.roles ||
+                                live.institutionId != claimed.institutionId ||
+                                (claimed.email != null && live.email != claimed.email)
+                            ) {
+                                throw ApiException.Unauthorized()
+                            }
+                            live
+                        } else {
+                            // Institutional identity remains bound to the verified upstream session.
+                            claimed
+                        }
+                    call.respond(ApiResponse(user, call.requestId()))
                 }
             }
         }

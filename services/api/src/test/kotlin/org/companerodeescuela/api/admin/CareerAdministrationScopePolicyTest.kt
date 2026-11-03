@@ -35,13 +35,13 @@ class CareerAdministrationScopePolicyTest {
         revokedAt: Instant? = null,
         authorityFreshUntil: Instant = now.plusSeconds(180),
     ) = VerifiedCareerGrant(
-            accountId,
-            institutionId,
-            programId,
-            validUntil,
-            revokedAt,
-            authorityFreshUntil,
-        )
+        accountId,
+        institutionId,
+        programId,
+        validUntil,
+        revokedAt,
+        authorityFreshUntil,
+    )
 
     @Test
     fun `scoped administrator is limited to verified live careers in same institution`() =

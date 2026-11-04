@@ -62,4 +62,31 @@ class InvitationDispatchServiceTest {
             assertEquals(command.digest(owner.id), prepared.payloadDigest)
             assertEquals(InvitationDispatchService.RESOURCE_ID, prepared.resourceId)
         }
+
+    @Test
+    fun `sending without scoped MFA proof cannot dispatch email`() =
+        runTest {
+            val accounts = InMemoryPlatformAccountRepository()
+            val owner =
+                PlatformAccount(
+                    "owner", "Owner", "owner@example.test", "hash",
+                    setOf(UserRole.SUPER_ADMIN), emailVerifiedAt = now.minusSeconds(60),
+                )
+            accounts.create(owner)
+            var sent = false
+            val service =
+                InvitationDispatchService(
+                    accounts,
+                    MfaService(accounts, InMemoryMfaRepository(), null, clock),
+                    InMemoryInvitationRepository(),
+                    InvitationEmailGateway { _, _, _, _ ->
+                        sent = true
+                        org.companerodeescuela.shared.contracts.VerificationDeliveryStatus.ACCEPTED
+                    },
+                    InMemoryInstitutionRepository(listOf(InstitutionSummary("UPTLAX", "UPTLAX"))),
+                    clock,
+                )
+            assertFailsWith<ApiException.Forbidden> { service.dispatch(owner, command, "invalid") }
+            assertTrue(!sent)
+        }
 }

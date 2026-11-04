@@ -399,7 +399,7 @@ fun Application.module(
             UnavailableInvitationEmailGateway
         }
     val invitationDispatcher =
-        InvitationDispatchService(identityGraph.accounts, identityGraph.mfa, invitationRepository, invitationEmail)
+        InvitationDispatchService(identityGraph.accounts, identityGraph.mfa, invitationRepository, invitationEmail, identityGraph.institutions)
 
     routing {
         healthRoutes(settings = settings, healthService = healthService)

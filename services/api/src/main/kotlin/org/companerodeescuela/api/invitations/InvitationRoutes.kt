@@ -42,7 +42,11 @@ internal data class InvitationCreateBody(
 )
 
 @Serializable
-internal data class InvitationPrepareResponse(val operationId: String, val resourceId: String, val payloadDigest: String)
+internal data class InvitationPrepareResponse(
+    val operationId: String,
+    val resourceId: String,
+    val payloadDigest: String,
+)
 
 @Serializable
 internal data class InvitationSendResponse(
@@ -52,10 +56,17 @@ internal data class InvitationSendResponse(
 )
 
 @Serializable
-internal data class InvitationAcceptBody(val invitationId: String, val code: String, val operationId: String)
+internal data class InvitationAcceptBody(
+    val invitationId: String,
+    val code: String,
+    val operationId: String,
+)
 
 @Serializable
-internal data class InvitationAcceptResponse(val invitationId: String, val status: String)
+internal data class InvitationAcceptResponse(
+    val invitationId: String,
+    val status: String,
+)
 
 internal fun Route.invitationRoutes(
     settings: ApiSettings,
@@ -72,12 +83,14 @@ internal fun Route.invitationRoutes(
     val issuerLimiter = LoginAttemptLimiter(maxAttempts = 5)
     val acceptanceLimiter = LoginAttemptLimiter(maxAttempts = 10)
 
-    suspend fun ApplicationCall.nativeActor() =
-        resolver.resolve(principal<JWTPrincipal>()?.payload ?: throw ApiException.Unauthorized())
+    suspend fun ApplicationCall.nativeActor() = resolver.resolve(
+        principal<JWTPrincipal>()?.payload ?: throw ApiException.Unauthorized(),
+    )
 
     fun toCommand(body: InvitationCreateBody): InvitationDispatchCommand {
-        val profile = InvitationProfile.entries.firstOrNull { it.name == body.profile }
-            ?: throw ApiException.Validation("Invalid invitation profile")
+        val profile =
+            InvitationProfile.entries.firstOrNull { it.name == body.profile }
+                ?: throw ApiException.Validation("Invalid invitation profile")
         return InvitationDispatchCommand(body.recipient, body.institutionId, profile, body.operationId)
     }
 
@@ -138,11 +151,13 @@ internal fun Route.invitationRoutes(
             val now = clock.instant()
             if (!actor.permitsSession ||
                 actor.accountStatus !in setOf(AccountStatus.ACTIVE, AccountStatus.PENDING_APPROVAL) ||
-                actor.emailVerifiedAt == null || actor.emailVerifiedAt > now
+                actor.emailVerifiedAt == null ||
+                actor.emailVerifiedAt > now
             ) {
                 throw ApiException.Forbidden("Verified native account is required")
             }
-            val accepted = invitations.accept(
+            val accepted =
+                invitations.accept(
                 body.invitationId,
                 InvitationToken.hash(body.code),
                 actor.email,

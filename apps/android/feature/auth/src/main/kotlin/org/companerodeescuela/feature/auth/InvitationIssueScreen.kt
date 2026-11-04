@@ -6,11 +6,11 @@ import android.content.ContextWrapper
 import android.view.WindowManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -112,8 +112,11 @@ fun InvitationIssueScreen(
                         otp = ""
                         viewModel.send(recipient, institutionId, profile, passwordInput, otpInput)
                     },
-                    !state.working && recipient.contains("@") &&
-                        institutionId.isNotBlank() && password.length >= 8 && otp.length == 6,
+                    !state.working &&
+                        recipient.contains("@") &&
+                        institutionId.isNotBlank() &&
+                        password.length >= 8 &&
+                        otp.length == 6,
                     state.working,
                     Modifier.testTag("invite_send"),
                     "Validando...",
@@ -125,6 +128,7 @@ fun InvitationIssueScreen(
                     Text(
                         when (it) {
                             VerificationDeliveryStatus.ACCEPTED -> "Proveedor aceptó el correo; la entrega final debe verificarse."
+                            VerificationDeliveryStatus.DELIVERED -> "Correo entregado (confirmado por webhook firmado)."
                             VerificationDeliveryStatus.UNCONFIRMED -> "No se confirmó la entrega del correo."
                             VerificationDeliveryStatus.FAILED -> "Falló el envío."
                             VerificationDeliveryStatus.UNAVAILABLE -> "El correo no está configurado."

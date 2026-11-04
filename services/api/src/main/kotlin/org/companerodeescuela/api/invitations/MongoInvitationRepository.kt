@@ -4,6 +4,7 @@ import com.mongodb.MongoWriteException
 import com.mongodb.client.model.Filters.and
 import com.mongodb.client.model.Filters.eq
 import com.mongodb.client.model.Filters.gt
+import com.mongodb.client.model.Filters.`in`
 import com.mongodb.client.model.Filters.lte
 import com.mongodb.client.model.Filters.nin
 import com.mongodb.client.model.FindOneAndUpdateOptions
@@ -35,6 +36,33 @@ internal class MongoInvitationRepository(
             if (error.error.code == 11000) false else throw error
         }
     }
+
+    override suspend fun find(id: String): InvitationRecord? = records.find(eq("_id", id)).firstOrNull()?.toInvitation()
+
+    override suspend fun markSent(
+        id: String,
+        now: Instant,
+    ): Boolean =
+        records
+            .updateOne(
+                and(
+                    eq("_id", id),
+                    lte("createdAt", Date.from(now)),
+                    eq("status", InvitationStatus.CREATED.name),
+                ),
+                Updates.set("status", InvitationStatus.SENT.name),
+            ).matchedCount == 1L
+
+    override suspend fun expireDue(now: Instant): Int =
+        records
+            .updateMany(
+                and(
+                    lte("expiresAt", Date.from(now)),
+                    `in`("status", InvitationStatus.CREATED.name, InvitationStatus.SENT.name),
+                ),
+                Updates.set("status", InvitationStatus.EXPIRED.name),
+            ).modifiedCount
+            .toInt()
 
     override suspend fun accept(
         id: String,

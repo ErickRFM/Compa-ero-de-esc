@@ -99,6 +99,13 @@ internal fun validAcceptanceInput(
 internal interface InvitationRepository {
     suspend fun create(record: InvitationRecord): Boolean
 
+    suspend fun find(id: String): InvitationRecord? = null
+
+    suspend fun markSent(
+        id: String,
+        now: Instant,
+    ): Boolean = false
+
     suspend fun accept(
         id: String,
         tokenHash: String,
@@ -113,6 +120,9 @@ internal interface InvitationRepository {
         id: String,
         now: Instant,
     ): Boolean
+
+    /** Marks every still-pending invitation past its expiry. Returns the number of rows changed. */
+    suspend fun expireDue(now: Instant): Int = 0
 }
 
 internal class InMemoryInvitationRepository : InvitationRepository {
@@ -127,6 +137,39 @@ internal class InMemoryInvitationRepository : InvitationRepository {
             }
             records[canonical.id] = canonical
             true
+        }
+
+    override suspend fun find(id: String): InvitationRecord? =
+        mutex.withLock { records[id] }
+
+    override suspend fun markSent(
+        id: String,
+        now: Instant,
+    ): Boolean =
+        mutex.withLock {
+            val current = records[id] ?: return@withLock false
+            val timestamp = now.truncatedTo(ChronoUnit.MILLIS)
+            if (timestamp < current.createdAt || current.status != InvitationStatus.CREATED) {
+                return@withLock false
+            }
+            records[id] = current.copy(status = InvitationStatus.SENT)
+            true
+        }
+
+    override suspend fun expireDue(now: Instant): Int =
+        mutex.withLock {
+            val timestamp = now.truncatedTo(ChronoUnit.MILLIS)
+            var changed = 0
+            for (id in records.keys.toList()) {
+                val record = records[id] ?: continue
+                if (record.status in setOf(InvitationStatus.CREATED, InvitationStatus.SENT) &&
+                    timestamp >= record.expiresAt
+                ) {
+                    records[id] = record.copy(status = InvitationStatus.EXPIRED)
+                    changed += 1
+                }
+            }
+            changed
         }
 
     override suspend fun accept(

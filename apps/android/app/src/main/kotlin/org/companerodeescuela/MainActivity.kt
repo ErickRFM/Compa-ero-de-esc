@@ -60,6 +60,7 @@ import org.companerodeescuela.feature.attendance.attendanceScreen
 import org.companerodeescuela.feature.auth.AccountOnboardingScreen
 import org.companerodeescuela.feature.auth.AuthDraftViewModel
 import org.companerodeescuela.feature.auth.InvitationAcceptanceScreen
+import org.companerodeescuela.feature.auth.InvitationIssueScreen
 import org.companerodeescuela.feature.auth.LoginScreen
 import org.companerodeescuela.feature.auth.MfaScreen
 import org.companerodeescuela.feature.auth.RegistrationScreen
@@ -665,6 +666,15 @@ class MainActivity : AppCompatActivity() {
                                                 },
                                                 onSecurity = { navController.navigate(Destination.Mfa.route) },
                                                 onInvitation = { navController.navigate(Destination.InvitationAcceptance.route) },
+                                                onInvitationIssue =
+                                                    if (appDistribution == AppDistribution.MANAGEMENT &&
+                                                        roleConfig.experience == AppExperience.SUPER_ADMIN &&
+                                                        org.companerodeescuela.shared.contracts.UserRole.SUPER_ADMIN in session.roles
+                                                    ) {
+                                                        { navController.navigate(Destination.InvitationIssue.route) }
+                                                    } else {
+                                                        null
+                                                    },
                                                 notificationsStatus = pushRegistration.userMessage,
                                                 onNotifications =
                                                     if (BuildConfig.FIREBASE_CONFIGURED) {
@@ -706,6 +716,16 @@ class MainActivity : AppCompatActivity() {
                                                     sessionViewModel.logout()
                                                 },
                                             )
+                                        }
+                                        composable(Destination.InvitationIssue.route) {
+                                            if (appDistribution == AppDistribution.MANAGEMENT &&
+                                                roleConfig.experience == AppExperience.SUPER_ADMIN &&
+                                                org.companerodeescuela.shared.contracts.UserRole.SUPER_ADMIN in session.roles
+                                            ) {
+                                                InvitationIssueScreen(onBack = { navController.popBackStack() })
+                                            } else {
+                                                RoleUnavailableScreen(roleConfig.experience, onLogout = sessionViewModel::logout)
+                                            }
                                         }
                                         composable(Destination.InvitationAcceptance.route) {
                                             InvitationAcceptanceScreen(

@@ -59,6 +59,7 @@ import org.companerodeescuela.feature.attendance.TeacherHomeScreen
 import org.companerodeescuela.feature.attendance.attendanceScreen
 import org.companerodeescuela.feature.auth.AccountOnboardingScreen
 import org.companerodeescuela.feature.auth.AuthDraftViewModel
+import org.companerodeescuela.feature.auth.InvitationAcceptanceScreen
 import org.companerodeescuela.feature.auth.LoginScreen
 import org.companerodeescuela.feature.auth.MfaScreen
 import org.companerodeescuela.feature.auth.RegistrationScreen
@@ -663,6 +664,7 @@ class MainActivity : AppCompatActivity() {
                                                     )
                                                 },
                                                 onSecurity = { navController.navigate(Destination.Mfa.route) },
+                                                onInvitation = { navController.navigate(Destination.InvitationAcceptance.route) },
                                                 notificationsStatus = pushRegistration.userMessage,
                                                 onNotifications =
                                                     if (BuildConfig.FIREBASE_CONFIGURED) {
@@ -703,6 +705,13 @@ class MainActivity : AppCompatActivity() {
                                                     loginExperienceName = null
                                                     sessionViewModel.logout()
                                                 },
+                                            )
+                                        }
+                                        composable(Destination.InvitationAcceptance.route) {
+                                            InvitationAcceptanceScreen(
+                                                state = session,
+                                                onAccept = sessionViewModel::acceptRegistrationInvitation,
+                                                onBack = { navController.popBackStack() },
                                             )
                                         }
                                         composable(Destination.Mfa.route) {

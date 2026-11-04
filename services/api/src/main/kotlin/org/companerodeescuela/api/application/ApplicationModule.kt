@@ -4,21 +4,21 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.application.log
 import io.ktor.server.routing.routing
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.withTimeout
 import org.companerodeescuela.api.academic.academicRoutes
 import org.companerodeescuela.api.academic.groups.academicGroupRoutes
-import org.companerodeescuela.api.admin.AccountAdministrationService
 import org.companerodeescuela.api.admin.accountAdministrationRoutes
+import org.companerodeescuela.api.admin.AccountAdministrationService
 import org.companerodeescuela.api.attendance.attendanceRoutes
-import org.companerodeescuela.api.auth.PlatformSessionAuthority
 import org.companerodeescuela.api.auth.authRoutes
+import org.companerodeescuela.api.auth.PlatformSessionAuthority
 import org.companerodeescuela.api.channel.channelRoutes
 import org.companerodeescuela.api.classroom.classroomRoutes
 import org.companerodeescuela.api.config.ApiSettings
@@ -28,34 +28,34 @@ import org.companerodeescuela.api.devices.deviceRoutes
 import org.companerodeescuela.api.events.academicEventRoutes
 import org.companerodeescuela.api.excuses.excuseRoutes
 import org.companerodeescuela.api.grading.ClassroomGradeSyncAuthorization
-import org.companerodeescuela.api.grading.UnavailableGradeSyncGateway
 import org.companerodeescuela.api.grading.gradingRoutes
-import org.companerodeescuela.api.health.HealthService
+import org.companerodeescuela.api.grading.UnavailableGradeSyncGateway
 import org.companerodeescuela.api.health.healthRoutes
-import org.companerodeescuela.api.institutions.SiiiPilotInstitutionBootstrap
+import org.companerodeescuela.api.health.HealthService
 import org.companerodeescuela.api.institutions.institutionRoutes
-import org.companerodeescuela.api.invitations.InMemoryInvitationRepository
-import org.companerodeescuela.api.invitations.InvitationDispatchService
-import org.companerodeescuela.api.invitations.MongoInvitationRepository
-import org.companerodeescuela.api.invitations.UnavailableInvitationEmailGateway
-import org.companerodeescuela.api.invitations.invitationRoutes
-import org.companerodeescuela.api.mail.ResendInvitationEmailGateway
-import org.companerodeescuela.api.integrations.ProviderRegistry
+import org.companerodeescuela.api.institutions.SiiiPilotInstitutionBootstrap
 import org.companerodeescuela.api.integrations.academic.siii.SiiiSectionProjectionFeature
+import org.companerodeescuela.api.integrations.ProviderRegistry
 import org.companerodeescuela.api.integrations.push.InMemoryInstitutionalIdentityLinkRepository
+import org.companerodeescuela.api.integrations.push.institutionalAttendanceHistoryRoutes
 import org.companerodeescuela.api.integrations.push.InstitutionalAttendanceHistoryService
 import org.companerodeescuela.api.integrations.push.InstitutionalEventProjectionWorker
+import org.companerodeescuela.api.integrations.push.institutionalIdentityLinkRoutes
 import org.companerodeescuela.api.integrations.push.InstitutionalIdentityLinkService
 import org.companerodeescuela.api.integrations.push.InstitutionalProjectionIdentityResolver
 import org.companerodeescuela.api.integrations.push.InstitutionalPushAuthenticator
+import org.companerodeescuela.api.integrations.push.institutionalPushRoutes
 import org.companerodeescuela.api.integrations.push.InstitutionalPushService
 import org.companerodeescuela.api.integrations.push.InstitutionalSecretProtector
 import org.companerodeescuela.api.integrations.push.MongoInstitutionalIdentityLinkRepository
 import org.companerodeescuela.api.integrations.push.MongoInstitutionalPushRepository
 import org.companerodeescuela.api.integrations.push.SiiiPilotCredentialBootstrap
-import org.companerodeescuela.api.integrations.push.institutionalAttendanceHistoryRoutes
-import org.companerodeescuela.api.integrations.push.institutionalIdentityLinkRoutes
-import org.companerodeescuela.api.integrations.push.institutionalPushRoutes
+import org.companerodeescuela.api.invitations.InMemoryInvitationRepository
+import org.companerodeescuela.api.invitations.InvitationDispatchService
+import org.companerodeescuela.api.invitations.invitationRoutes
+import org.companerodeescuela.api.invitations.MongoInvitationRepository
+import org.companerodeescuela.api.invitations.UnavailableInvitationEmailGateway
+import org.companerodeescuela.api.mail.ResendInvitationEmailGateway
 import org.companerodeescuela.api.plugins.configurePlugins
 import org.companerodeescuela.api.presence.schoolPresenceRoutes
 import org.companerodeescuela.api.representatives.groupRepresentativeRoutes
@@ -399,7 +399,13 @@ fun Application.module(
             UnavailableInvitationEmailGateway
         }
     val invitationDispatcher =
-        InvitationDispatchService(identityGraph.accounts, identityGraph.mfa, invitationRepository, invitationEmail, identityGraph.institutions)
+        InvitationDispatchService(
+            identityGraph.accounts,
+            identityGraph.mfa,
+            invitationRepository,
+            invitationEmail,
+            identityGraph.institutions,
+        )
 
     routing {
         healthRoutes(settings = settings, healthService = healthService)

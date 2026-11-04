@@ -165,4 +165,46 @@ class AuthRepository(
             kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { tokenStore.clear() }
         }
     }
+
+    suspend fun prepareRegistrationInvitation(
+        command: org.companerodeescuela.shared.contracts.PrepareRegistrationInvitationRequest,
+    ): Outcome<org.companerodeescuela.shared.contracts.RegistrationInvitationPreparation> =
+        protectedCall { access ->
+            apiCall {
+                client.post("admin/invitations/prepare") {
+                    header(HttpHeaders.Authorization, "Bearer " + access)
+                    header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    setBody(command)
+                }.requireBody<ApiResponse<org.companerodeescuela.shared.contracts.RegistrationInvitationPreparation>>()
+            }.map { it.data }
+        }
+
+    suspend fun sendRegistrationInvitation(
+        command: org.companerodeescuela.shared.contracts.PrepareRegistrationInvitationRequest,
+    ): Outcome<org.companerodeescuela.shared.contracts.RegistrationInvitationDispatchReceipt> =
+        protectedCall { access ->
+            apiCall {
+                client.post("admin/invitations") {
+                    header(HttpHeaders.Authorization, "Bearer " + access)
+                    header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    setBody(command)
+                }.requireBody<ApiResponse<org.companerodeescuela.shared.contracts.RegistrationInvitationDispatchReceipt>>()
+            }.map { it.data }
+        }
+
+    suspend fun acceptRegistrationInvitation(
+        invitationId: String,
+        code: String,
+        operationId: String,
+    ): Outcome<org.companerodeescuela.shared.contracts.RegistrationInvitationReceipt> =
+        protectedCall { access ->
+            apiCall {
+                client.post("auth/invitations/accept") {
+                    header(HttpHeaders.Authorization, "Bearer " + access)
+                    header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    setBody(org.companerodeescuela.shared.contracts.AcceptRegistrationInvitationRequest(invitationId, code, operationId))
+                }.requireBody<ApiResponse<org.companerodeescuela.shared.contracts.RegistrationInvitationReceipt>>()
+            }.map { it.data }
+        }
+
 }

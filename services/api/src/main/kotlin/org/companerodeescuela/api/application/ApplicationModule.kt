@@ -53,6 +53,12 @@ import org.companerodeescuela.api.integrations.push.SiiiPilotCredentialBootstrap
 import org.companerodeescuela.api.integrations.push.institutionalAttendanceHistoryRoutes
 import org.companerodeescuela.api.integrations.push.institutionalIdentityLinkRoutes
 import org.companerodeescuela.api.integrations.push.institutionalPushRoutes
+import org.companerodeescuela.api.invitations.InMemoryInvitationRepository
+import org.companerodeescuela.api.invitations.InvitationDispatchService
+import org.companerodeescuela.api.invitations.MongoInvitationRepository
+import org.companerodeescuela.api.invitations.UnavailableInvitationEmailGateway
+import org.companerodeescuela.api.invitations.invitationRoutes
+import org.companerodeescuela.api.mail.ResendInvitationEmailGateway
 import org.companerodeescuela.api.plugins.configurePlugins
 import org.companerodeescuela.api.presence.schoolPresenceRoutes
 import org.companerodeescuela.api.representatives.groupRepresentativeRoutes
@@ -405,6 +411,30 @@ fun Application.module(
         mongoConnection.close()
     }
 
+    val invitationRepository =
+        if (settings.hasAuthentication && settings.mongo.isConfigured) {
+            MongoInvitationRepository(mongoConnection.database())
+        } else {
+            InMemoryInvitationRepository()
+        }
+    val invitationEmail =
+        if (settings.hasVerificationEmail) {
+            ResendInvitationEmailGateway(
+                requireNotNull(settings.verificationEmailApiKey),
+                requireNotNull(settings.verificationEmailSender),
+            )
+        } else {
+            UnavailableInvitationEmailGateway
+        }
+    val invitationDispatcher =
+        InvitationDispatchService(
+            identityGraph.accounts,
+            identityGraph.mfa,
+            invitationRepository,
+            invitationEmail,
+            identityGraph.institutions,
+        )
+
     routing {
         healthRoutes(settings = settings, healthService = healthService)
         authRoutes(
@@ -430,6 +460,14 @@ fun Application.module(
             identityGraph.refreshSessions,
             identityGraph.accounts,
             institutionalIdentityLinkService,
+        )
+        invitationRoutes(
+            settings,
+            providerRegistry.identity,
+            identityGraph.refreshSessions,
+            identityGraph.accounts,
+            invitationDispatcher,
+            invitationRepository,
         )
         institutionRoutes(identityGraph.institutions)
         institutionalPushRoutes(

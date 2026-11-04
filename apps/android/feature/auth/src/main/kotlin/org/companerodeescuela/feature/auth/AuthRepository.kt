@@ -15,9 +15,7 @@ import org.companerodeescuela.core.network.requireUnit
 import org.companerodeescuela.core.network.SessionRefreshCoordinator
 import org.companerodeescuela.core.security.SessionTokenInspector
 import org.companerodeescuela.core.security.SessionTokenStore
-import org.companerodeescuela.shared.contracts.AcceptRegistrationInvitationRequest
 import org.companerodeescuela.shared.contracts.ApiResponse
-import org.companerodeescuela.shared.contracts.RegistrationInvitationReceipt
 import org.companerodeescuela.shared.contracts.LoginRequest
 import org.companerodeescuela.shared.contracts.LoginResponse
 import org.companerodeescuela.shared.contracts.RegisterRequest
@@ -108,47 +106,6 @@ class AuthRepository(
         }.map { it.data }
     }
 
-    suspend fun prepareRegistrationInvitation(
-        command: org.companerodeescuela.shared.contracts.PrepareRegistrationInvitationRequest,
-    ): Outcome<org.companerodeescuela.shared.contracts.RegistrationInvitationPreparation> =
-        protectedCall { access ->
-            apiCall {
-                client.post("admin/invitations/prepare") {
-                    header(HttpHeaders.Authorization, "Bearer " + access)
-                    header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-                    setBody(command)
-                }.requireBody<ApiResponse<org.companerodeescuela.shared.contracts.RegistrationInvitationPreparation>>()
-            }.map { it.data }
-        }
-
-    suspend fun sendRegistrationInvitation(
-        command: org.companerodeescuela.shared.contracts.PrepareRegistrationInvitationRequest,
-    ): Outcome<org.companerodeescuela.shared.contracts.RegistrationInvitationDispatchReceipt> =
-        protectedCall { access ->
-            apiCall {
-                client.post("admin/invitations") {
-                    header(HttpHeaders.Authorization, "Bearer " + access)
-                    header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-                    setBody(command)
-                }.requireBody<ApiResponse<org.companerodeescuela.shared.contracts.RegistrationInvitationDispatchReceipt>>()
-            }.map { it.data }
-        }
-
-    suspend fun acceptRegistrationInvitation(
-        invitationId: String,
-        code: String,
-        operationId: String,
-    ): Outcome<RegistrationInvitationReceipt> =
-        protectedCall { access ->
-            apiCall {
-                client.post("auth/invitations/accept") {
-                    header(HttpHeaders.Authorization, "Bearer " + access)
-                    header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-                    setBody(AcceptRegistrationInvitationRequest(invitationId, code, operationId))
-                }.requireBody<ApiResponse<RegistrationInvitationReceipt>>()
-            }.map { it.data }
-        }
-
     private suspend fun <T> protectedCall(action: suspend (String) -> Outcome<T>): Outcome<T> {
         return when (val current = refreshCoordinator.currentAccessToken()) {
             is Outcome.Failure -> current
@@ -208,4 +165,46 @@ class AuthRepository(
             kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { tokenStore.clear() }
         }
     }
+
+    suspend fun prepareRegistrationInvitation(
+        command: org.companerodeescuela.shared.contracts.PrepareRegistrationInvitationRequest,
+    ): Outcome<org.companerodeescuela.shared.contracts.org.companerodeescuela.shared.contracts.RegistrationInvitationPreparation> =
+        protectedCall { access ->
+            apiCall {
+                client.post("admin/invitations/prepare") {
+                    header(HttpHeaders.Authorization, "Bearer " + access)
+                    header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    setBody(command)
+                }.requireBody<ApiResponse<org.companerodeescuela.shared.contracts.org.companerodeescuela.shared.contracts.RegistrationInvitationPreparation>>()
+            }.map { it.data }
+        }
+
+    suspend fun sendRegistrationInvitation(
+        command: org.companerodeescuela.shared.contracts.PrepareRegistrationInvitationRequest,
+    ): Outcome<org.companerodeescuela.shared.contracts.org.companerodeescuela.shared.contracts.RegistrationInvitationDispatchReceipt> =
+        protectedCall { access ->
+            apiCall {
+                client.post("admin/invitations") {
+                    header(HttpHeaders.Authorization, "Bearer " + access)
+                    header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    setBody(command)
+                }.requireBody<ApiResponse<org.companerodeescuela.shared.contracts.org.companerodeescuela.shared.contracts.RegistrationInvitationDispatchReceipt>>()
+            }.map { it.data }
+        }
+
+    suspend fun acceptRegistrationInvitation(
+        invitationId: String,
+        code: String,
+        operationId: String,
+    ): Outcome<org.companerodeescuela.shared.contracts.RegistrationInvitationReceipt> =
+        protectedCall { access ->
+            apiCall {
+                client.post("auth/invitations/accept") {
+                    header(HttpHeaders.Authorization, "Bearer " + access)
+                    header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    setBody(org.companerodeescuela.shared.contracts.AcceptRegistrationInvitationRequest(invitationId, code, operationId))
+                }.requireBody<ApiResponse<org.companerodeescuela.shared.contracts.RegistrationInvitationReceipt>>()
+            }.map { it.data }
+        }
+
 }

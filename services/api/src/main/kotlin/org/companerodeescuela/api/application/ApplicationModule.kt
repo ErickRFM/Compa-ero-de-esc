@@ -15,6 +15,9 @@ import kotlinx.coroutines.withTimeout
 import org.companerodeescuela.api.academic.academicRoutes
 import org.companerodeescuela.api.academic.groups.academicGroupRoutes
 import org.companerodeescuela.api.admin.AccountAdministrationService
+import org.companerodeescuela.api.admin.OwnerBootstrap
+import org.companerodeescuela.api.admin.QaAdminBootstrap
+import org.companerodeescuela.api.admin.MongoOwnerBootstrapClaims
 import org.companerodeescuela.api.admin.accountAdministrationRoutes
 import org.companerodeescuela.api.attendance.attendanceRoutes
 import org.companerodeescuela.api.auth.PlatformSessionAuthority
@@ -125,8 +128,8 @@ fun Application.module(
     // Initial ownership is an explicit MFA-authorized operator command, never a
     // privilege inferred from an email, login form or invitation. This bootstrap
     // refuses production and requires an isolated *_qa database.
-    val qaOwnerSpec = org.companerodeescuela.api.admin.OwnerBootstrap.parse(System::getenv)
-    val qaAdminSpec = org.companerodeescuela.api.admin.QaAdminBootstrap.parse(System::getenv)
+    val qaOwnerSpec = OwnerBootstrap.parse(System::getenv)
+    val qaAdminSpec = QaAdminBootstrap.parse(System::getenv)
     require(qaOwnerSpec == null || qaAdminSpec == null) {
         "QA initial owner and institutional admin bootstrap cannot run together"
     }
@@ -136,13 +139,13 @@ fun Application.module(
         }
         runBlocking {
             withTimeout(15_000L) {
-                org.companerodeescuela.api.admin.OwnerBootstrap.provision(
+                OwnerBootstrap.provision(
                     desired,
                     settings.environment.name.lowercase(),
                     settings.mongo.databaseName,
                     identityGraph.accounts,
                     identityGraph.mfa,
-                    org.companerodeescuela.api.admin.MongoOwnerBootstrapClaims(mongoConnection.database()),
+                    MongoOwnerBootstrapClaims(mongoConnection.database()),
                 )
             }
         }

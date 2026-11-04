@@ -68,7 +68,10 @@ class LoginAttemptLimiter(
     }
 
     @Synchronized
-    private fun acquireLocal(safeKey: String, now: Instant): Long? {
+    private fun acquireLocal(
+        safeKey: String,
+        now: Instant,
+    ): Long? {
         maintain(now)
         val existing = buckets[safeKey]
 
@@ -87,7 +90,10 @@ class LoginAttemptLimiter(
         return null
     }
 
-    private suspend fun acquireDistributed(safeKey: String, now: Instant): Long? {
+    private suspend fun acquireDistributed(
+        safeKey: String,
+        now: Instant,
+    ): Long? {
         val entry = store!!.increment(safeKey, window, now)
         if (entry.attempts > maxAttempts) {
             val elapsed = Duration.between(entry.windowStartedAt, now)
@@ -156,7 +162,10 @@ class LoginAttemptLimiter(
     }
 
     @Synchronized
-    private fun recordLocalAccountFailure(accountKey: String, now: Instant): Int {
+    private fun recordLocalAccountFailure(
+        accountKey: String,
+        now: Instant,
+    ): Int {
         maintain(now)
         val current = accountFailures[accountKey]
         val expired = current == null || Duration.between(current.startedAt, now) >= window

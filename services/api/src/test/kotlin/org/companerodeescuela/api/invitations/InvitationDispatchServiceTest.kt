@@ -54,6 +54,7 @@ class InvitationDispatchServiceTest {
                     InMemoryInvitationRepository(),
                     UnavailableInvitationEmailGateway,
                     InMemoryInstitutionRepository(listOf(InstitutionSummary("UPTLAX", "Universidad Politécnica"))),
+                    null,
                     clock,
                 )
             assertFailsWith<ApiException.Forbidden> { service.prepare(student, command) }
@@ -88,6 +89,7 @@ class InvitationDispatchServiceTest {
                         org.companerodeescuela.shared.contracts.VerificationDeliveryStatus.ACCEPTED
                     },
                     InMemoryInstitutionRepository(listOf(InstitutionSummary("UPTLAX", "UPTLAX"))),
+                    null,
                     clock,
                 )
             assertFailsWith<ApiException.Forbidden> { service.dispatch(owner, command, "invalid") }

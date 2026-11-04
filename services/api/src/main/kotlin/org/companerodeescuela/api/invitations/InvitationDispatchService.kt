@@ -174,8 +174,9 @@ internal class InvitationDispatchService(
         val current = authorizedIssuer(actor)
         if (!Regex("[A-Za-z0-9_-]{43}").matches(invitationId)) throw ApiException.Validation("Invitation is invalid")
         if (!Regex("[A-Za-z0-9_-]{43}").matches(scopedProof)) throw ApiException.Forbidden("MFA proof is required")
-        val existing = authenticationDependency { repository.find(invitationId) }
-            ?: throw ApiException.Validation("Invitation is invalid or unavailable")
+        val existing =
+            authenticationDependency { repository.find(invitationId) }
+                ?: throw ApiException.Validation("Invitation is invalid or unavailable")
         if (existing.issuerId != current.id) throw ApiException.Forbidden("Only the original issuer can retry")
         val retryOperationId = "${existing.id}-retry-${clock.instant().epochSecond}"
         val digest =

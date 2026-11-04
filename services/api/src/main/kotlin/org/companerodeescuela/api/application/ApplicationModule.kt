@@ -20,11 +20,11 @@ import org.companerodeescuela.api.admin.OwnerBootstrap
 import org.companerodeescuela.api.admin.QaAdminBootstrap
 import org.companerodeescuela.api.admin.accountAdministrationRoutes
 import org.companerodeescuela.api.attendance.attendanceRoutes
-import org.companerodeescuela.api.auth.PlatformSessionAuthority
-import org.companerodeescuela.api.auth.authRoutes
 import org.companerodeescuela.api.auth.InMemoryRateLimitStore
 import org.companerodeescuela.api.auth.LoginAttemptLimiter
 import org.companerodeescuela.api.auth.MongoRateLimitStore
+import org.companerodeescuela.api.auth.PlatformSessionAuthority
+import org.companerodeescuela.api.auth.authRoutes
 import org.companerodeescuela.api.channel.channelRoutes
 import org.companerodeescuela.api.classroom.classroomRoutes
 import org.companerodeescuela.api.config.ApiSettings

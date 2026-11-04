@@ -150,8 +150,7 @@ internal class InMemoryInvitationRepository : InvitationRepository {
             true
         }
 
-    override suspend fun find(id: String): InvitationRecord? =
-        mutex.withLock { records[id] }
+    override suspend fun find(id: String): InvitationRecord? = mutex.withLock { records[id] }
 
     override suspend fun markSent(
         id: String,

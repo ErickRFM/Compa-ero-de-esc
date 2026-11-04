@@ -1,5 +1,6 @@
 package org.companerodeescuela.api.auth
 
+import kotlinx.coroutines.test.runTest
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -8,56 +9,59 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class RateLimitStoreTest {
     @Test
-    fun `in-memory store increments and resets`() {
-        val clock = MutableClock(Instant.parse("2026-11-03T12:00:00Z"))
-        val store = InMemoryRateLimitStore(clock)
+    fun `in-memory store increments and resets`() =
+        runTest {
+            val clock = MutableClock(Instant.parse("2026-11-03T12:00:00Z"))
+            val store = InMemoryRateLimitStore(clock)
 
-        val entry1 = store.increment("key1", Duration.ofMinutes(5), clock.instant())
-        assertEquals(1, entry1.attempts)
+            val entry1 = store.increment("key1", Duration.ofMinutes(5), clock.instant())
+            assertEquals(1, entry1.attempts)
 
-        val entry2 = store.increment("key1", Duration.ofMinutes(5), clock.instant())
-        assertEquals(2, entry2.attempts)
+            val entry2 = store.increment("key1", Duration.ofMinutes(5), clock.instant())
+            assertEquals(2, entry2.attempts)
 
-        store.reset("key1")
-        val entry3 = store.increment("key1", Duration.ofMinutes(5), clock.instant())
-        assertEquals(1, entry3.attempts)
-    }
-
-    @Test
-    fun `in-memory store starts fresh window after expiry`() {
-        val clock = MutableClock(Instant.parse("2026-11-03T12:00:00Z"))
-        val store = InMemoryRateLimitStore(clock)
-        val window = Duration.ofSeconds(10)
-
-        store.increment("key1", window, clock.instant())
-        store.increment("key1", window, clock.instant())
-        clock.advance(Duration.ofSeconds(10))
-
-        val entry = store.increment("key1", window, clock.instant())
-        assertEquals(1, entry.attempts)
-    }
+            store.reset("key1")
+            val entry3 = store.increment("key1", Duration.ofMinutes(5), clock.instant())
+            assertEquals(1, entry3.attempts)
+        }
 
     @Test
-    fun `in-memory store current returns null for unknown key`() {
-        val store = InMemoryRateLimitStore()
-        assertNull(store.current("unknown"))
-    }
+    fun `in-memory store starts fresh window after expiry`() =
+        runTest {
+            val clock = MutableClock(Instant.parse("2026-11-03T12:00:00Z"))
+            val store = InMemoryRateLimitStore(clock)
+            val window = Duration.ofSeconds(10)
+
+            store.increment("key1", window, clock.instant())
+            store.increment("key1", window, clock.instant())
+            clock.advance(Duration.ofSeconds(10))
+
+            val entry = store.increment("key1", window, clock.instant())
+            assertEquals(1, entry.attempts)
+        }
 
     @Test
-    fun `in-memory store pruneExpired removes stale entries`() {
-        val clock = MutableClock(Instant.parse("2026-11-03T12:00:00Z"))
-        val store = InMemoryRateLimitStore(clock)
+    fun `in-memory store current returns null for unknown key`() =
+        runTest {
+            val store = InMemoryRateLimitStore()
+            assertNull(store.current("unknown"))
+        }
 
-        store.increment("old", Duration.ofMinutes(5), clock.instant())
-        clock.advance(Duration.ofHours(2))
-        store.pruneExpired(clock.instant())
+    @Test
+    fun `in-memory store pruneExpired removes stale entries`() =
+        runTest {
+            val clock = MutableClock(Instant.parse("2026-11-03T12:00:00Z"))
+            val store = InMemoryRateLimitStore(clock)
 
-        assertNull(store.current("old"))
-    }
+            store.increment("old", Duration.ofMinutes(5), clock.instant())
+            clock.advance(Duration.ofHours(2))
+            store.pruneExpired(clock.instant())
+
+            assertNull(store.current("old"))
+        }
 
     @Test
     fun `distributed limiter blocks after max attempts via store`() {
@@ -89,6 +93,7 @@ class RateLimitStoreTest {
                 store = store,
             )
 
+        assertNull(limiter.acquire("user", "10.0.0.1"))
         assertNull(limiter.acquire("user", "10.0.0.1"))
         assertNotNull(limiter.acquire("user", "10.0.0.1"))
         limiter.reset("user", "10.0.0.1")

@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap
  * for concurrent access across processes. [MongoRateLimitStore] persists to a
  * shared MongoDB collection so every replica observes the same counters.
  */
-internal interface RateLimitStore {
+interface RateLimitStore {
     /**
      * Atomically increments the counter for [key] and returns the number of
      * attempts within the current window. If the window has elapsed since the
@@ -53,7 +53,7 @@ internal interface RateLimitStore {
     suspend fun pruneExpired(now: Instant)
 }
 
-internal data class RateLimitEntry(
+data class RateLimitEntry(
     val key: String,
     val attempts: Int,
     val windowStartedAt: Instant,
@@ -113,15 +113,12 @@ internal class MongoRateLimitStore(
 ) : RateLimitStore {
     private val collection = database.getCollection<Document>("platform_rate_limits")
 
-    init {
+    private suspend fun ensureIndexes() {
         collection.createIndex(
             Indexes.ascending("expireAt"),
-            IndexOptions().expireAfterSeconds(0L),
+            IndexOptions().expireAfter(0L, java.util.concurrent.TimeUnit.SECONDS),
         )
-        collection.createIndex(
-            Indexes.ascending("_id"),
-            IndexOptions().unique(true),
-        )
+        collection.createIndex(Indexes.ascending("_id"), IndexOptions().unique(true))
     }
 
     override suspend fun increment(
@@ -129,10 +126,12 @@ internal class MongoRateLimitStore(
         window: Duration,
         now: Instant,
     ): RateLimitEntry {
+        ensureIndexes()
         val expireAt = now.plus(window).plusSeconds(60)
         val doc =
             collection.findOneAndUpdate(
-                com.mongodb.client.model.Filters.eq("_id", key),
+                com.mongodb.client.model.Filters
+                    .eq("_id", key),
                 Updates.combine(
                     Updates.setOnInsert("windowStartedAt", java.util.Date.from(now)),
                     Updates.setOnInsert("expireAt", java.util.Date.from(expireAt)),
@@ -150,7 +149,8 @@ internal class MongoRateLimitStore(
         if (Duration.between(startedAt, now) >= window) {
             val reset =
                 collection.findOneAndUpdate(
-                    com.mongodb.client.model.Filters.eq("_id", key),
+                    com.mongodb.client.model.Filters
+                        .eq("_id", key),
                     Updates.combine(
                         Updates.set("windowStartedAt", java.util.Date.from(now)),
                         Updates.set("attempts", 1),
@@ -168,7 +168,12 @@ internal class MongoRateLimitStore(
     }
 
     override suspend fun current(key: String): RateLimitEntry? {
-        val doc = collection.find(com.mongodb.client.model.Filters.eq("_id", key)).firstOrNull() ?: return null
+        val doc =
+            collection
+                .find(
+                    com.mongodb.client.model.Filters
+                        .eq("_id", key),
+                ).firstOrNull() ?: return null
         return RateLimitEntry(
             key,
             doc.getInteger("attempts", 0),
@@ -177,13 +182,17 @@ internal class MongoRateLimitStore(
     }
 
     override suspend fun reset(key: String) {
-        collection.deleteOne(com.mongodb.client.model.Filters.eq("_id", key))
+        collection.deleteOne(
+            com.mongodb.client.model.Filters
+                .eq("_id", key),
+        )
     }
 
     override suspend fun pruneExpired(now: Instant) {
         // TTL index handles automatic expiration; this is a safety net
         collection.deleteMany(
-            com.mongodb.client.model.Filters.lt("expireAt", java.util.Date.from(now)),
+            com.mongodb.client.model.Filters
+                .lt("expireAt", java.util.Date.from(now)),
         )
     }
 }

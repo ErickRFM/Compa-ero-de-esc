@@ -76,8 +76,10 @@ internal class MongoInvitationRepository(
                     `in`("status", InvitationStatus.FAILED.name, InvitationStatus.SENT.name),
                     gt("expiresAt", Date.from(now)),
                 ),
-                Updates.set("status", InvitationStatus.SENT.name),
-                Updates.set("tokenHash", newTokenHash),
+                Updates.combine(
+                    Updates.set("status", InvitationStatus.SENT.name),
+                    Updates.set("tokenHash", newTokenHash),
+                ),
             ).matchedCount == 1L
 
     override suspend fun accept(

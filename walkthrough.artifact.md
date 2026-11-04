@@ -1,7 +1,8 @@
 # Compañero de Clase — Walkthrough de ejecución V21/V23
 
 - **Fecha de este corte:** 2026-10-30
-- **Rama:** `feat/v23-fcm-dual-apk-isolation-and-siii-e2e-integration`
+- **Última consolidación:** 2026-11-03 — `main` = `43b16c22`, PR #239 y PR #278 ya fusionados
+- **Rama:** `feat/v23-fcm-dual-apk-isolation-and-siii-e2e-integration` (fusionada)
 - **PR:** [#239](https://github.com/ErickRFM/Compa-ero-de-esc/pull/239)
 - **Alcance:** correcciones D1–D10 sobre Compañero (`C:\proyectos\esc`), RBAC, pruebas, CI y entrega. SIII no se modificó en esta fase.
 
@@ -160,10 +161,11 @@ Ejecutado localmente el 2026-10-30 sobre `070932b5`:
 
 ## 8. Estado del PR #239
 
-- Estado: **OPEN**
-- `mergeable`: **MERGEABLE**
-- `mergeStateStatus`: **CLEAN**
+- Estado: **MERGED** el 2026-10-31T04:16:42Z
+- Merge commit: `6dc31dc9b28b6aa19d28e75dbfc8f9a2dca58971`
+- `mergeable`: **MERGEABLE** y `mergeStateStatus`: **CLEAN** antes de fusionar
 - Checks: **13/13 en verde** (ver §16)
+- La rama `feat/v23-fcm-dual-apk-isolation-and-siii-e2e-integration` quedó contenida en `main`; no hay commits suyos pendientes.
 
 ---
 
@@ -214,9 +216,15 @@ Flujo implementado en código:
 
 ## 12. PR fusionados en `main`
 
-- **Ninguno todavía.** Todo el trabajo vive en la rama del PR #239, con 13/13 checks en verde y `mergeStateStatus: CLEAN`.
-- No se hizo merge forzado ni se alteró `main`.
-- La fusión queda lista para ejecutarse; al hacerse, este documento debe actualizarse con el SHA de fusión y la validación sobre `main`.
+| PR | Rama | Merge commit | Fecha |
+|---|---|---|---|
+| [#239](https://github.com/ErickRFM/Compa-ero-de-esc/pull/239) | `feat/v23-fcm-dual-apk-isolation-and-siii-e2e-integration` | `6dc31dc9b28b6aa19d28e75dbfc8f9a2dca58971` | 2026-10-31 |
+| [#278](https://github.com/ErickRFM/Compa-ero-de-esc/pull/278) | `codex/estado-identidad-verificado` | `03c718fd8ffe7f26956001e112304124d31f20e4` | 2026-11-03 |
+
+- `main` consolidado en `43b16c22adc8aed66123f854f37f707fb7918203`, idéntico a `origin/main`; árbol de trabajo limpio.
+- No se hizo merge forzado ni se reescribió `main`.
+- **PRs abiertos que no se fusionaron** porque siguen en borrador o son dependencias: #277 «Borrador: validar destinatario de invitaciones» (draft), #282 «feat(security): política de autorización por carrera» (draft) y los PR de Dependabot.
+- Cualquier trabajo futuro debe partir de `main` en `43b16c22` o posterior.
 
 ---
 
@@ -275,3 +283,42 @@ Ambas compilaciones incluyen `ktlintCheck` limpio y las pruebas unitarias de cad
 | iOS simulator compile, test and launch | **pass** (12m33s) |
 
 Incluye: whitespace de cambios confirmados, regresión del exportador de evidencias, validación del helper de Firebase local, compilación, unit tests, verificación de que las pruebas se ejecutaron, lint sin errores, APK debug y release minificada, y ausencia de secretos confirmados.
+
+---
+
+## 17. Consolidación del 2026-11-03
+
+Comandos ejecutados sobre `C:\proyectos\esc`:
+
+```
+git fetch --all --prune
+git checkout main
+git pull --ff-only
+git worktree prune
+```
+
+Estado resultante, verificado:
+
+| Comprobación | Resultado |
+|---|---|
+| `git rev-parse HEAD` | `43b16c22adc8aed66123f854f37f707fb7918203` |
+| `git rev-parse origin/main` | `43b16c22adc8aed66123f854f37f707fb7918203` |
+| `git status` | `On branch main`, árbol limpio, sin cambios pendientes |
+| `git rev-list --left-right --count origin/main...main` | `0 0` |
+| Rama `codex/estado-identidad-verificado` | contenida en `main` (`git merge-base --is-ancestor` = sí); 0 commits pendientes |
+| Worktrees | se eliminó el registro *prunable* de `C:\proyectos\esc-hmac-20261101-120758`; queda el worktree activo de `mongo-tls-recovery` |
+| PR #239 | `MERGED` (merge commit `6dc31dc9`) |
+| PR #278 | `MERGED` (merge commit `03c718fd`) |
+
+Checks de GitHub Actions sobre `43b16c22` (consulta `commits/{sha}/check-runs`):
+
+| Check | Resultado |
+|---|---|
+| Backend compile, test and smoke | **success** |
+| Android compile, test, lint and package | **success** |
+| Android academic instrumentation API 31 | **success** |
+| Android academic instrumentation API 35 | **success** |
+| Android management instrumentation API 31 | **success** |
+| Android management instrumentation API 35 | **success** (una ejecución duplicada quedó `cancelled` al ser reemplazada) |
+
+**Pendiente por decisión de producto, no por integración:** los PR #277 y #282 siguen en borrador y no se fusionaron; los PR de Dependabot tampoco. Los bloqueos externos de §15 (Firebase, Mongo, contratos vivos SIII, D2/D4/D8/D9) siguen igual.

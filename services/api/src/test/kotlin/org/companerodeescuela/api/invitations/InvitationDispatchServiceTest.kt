@@ -69,8 +69,12 @@ class InvitationDispatchServiceTest {
             val accounts = InMemoryPlatformAccountRepository()
             val owner =
                 PlatformAccount(
-                    "owner", "Owner", "owner@example.test", "hash",
-                    setOf(UserRole.SUPER_ADMIN), emailVerifiedAt = now.minusSeconds(60),
+                    "owner",
+                    "Owner",
+                    "owner@example.test",
+                    "hash",
+                    setOf(UserRole.SUPER_ADMIN),
+                    emailVerifiedAt = now.minusSeconds(60),
                 )
             accounts.create(owner)
             var sent = false

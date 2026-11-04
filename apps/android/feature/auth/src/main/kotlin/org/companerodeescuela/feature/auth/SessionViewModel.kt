@@ -3,8 +3,6 @@ package org.companerodeescuela.feature.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.time.Clock
-import javax.inject.Inject
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -17,6 +15,8 @@ import org.companerodeescuela.shared.contracts.RegisterRequest
 import org.companerodeescuela.shared.contracts.RegistrationAccountType
 import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
+import java.time.Clock
+import javax.inject.Inject
 
 enum class SessionNotice { EXPIRED, CONNECTION }
 
@@ -309,7 +309,10 @@ class SessionViewModel
                 it.copy(invitationWorking = true, invitationAccepted = false, invitationFailure = null)
             }
             viewModelScope.launch {
-                val operationId = java.util.UUID.randomUUID().toString()
+                val operationId =
+                    java.util.UUID
+                        .randomUUID()
+                        .toString()
                 when (val result = repository.acceptRegistrationInvitation(invitationId, code, operationId)) {
                     is Outcome.Success ->
                         _state.update {

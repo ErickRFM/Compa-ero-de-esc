@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.feature.auth
 
 import android.app.Activity

@@ -1,0 +1,34 @@
+name: invitation-pr-kotlin-formatter
+on:
+  push:
+    branches: [feat/secure-invitation-email-flow-20261103]
+permissions:
+  contents: write
+concurrency:
+  group: invitation-pr-formatter
+  cancel-in-progress: true
+jobs:
+  format:
+    if: ${{ !contains(github.event.head_commit.message, 'style(invites): autoformat') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: true
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a
+      - name: Format Kotlin on isolated PR branch
+        run: ./gradlew :services:api:ktlintFormat --console=plain
+      - name: Commit only Kotlin formatting
+        run: |
+          git add services/api/src/main/kotlin services/api/src/test/kotlin
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "style(invites): autoformat Kotlin sources"
+            git push origin HEAD:refs/heads/feat/secure-invitation-email-flow-20261103
+          fi

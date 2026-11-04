@@ -32,6 +32,6 @@ Para completar la funcionalidad:
 6. Registrar `UD4-Alumno` como SSID sujeto a aprobación de la institución.
    **No deducir contraseña, proximidad ni autenticación de IP/MAC/SSID**,
    y no reutilizar el QR Wi-Fi para acreditar asistencia.
-7. El Súper Admin `erik55509@gmail.com` debe ser provisionado por
+7. Para Compañero la identidad propuesta de Súper Admin es `erik55509@hotmail.com` y debe ser provisionada por
    flujo protegido, con correo verificado, MFA y auditoría independiente
    en QA y producción. El bootstrap existente es deliberadamente solo QA.

@@ -83,9 +83,10 @@ internal fun Route.invitationRoutes(
     val issuerLimiter = LoginAttemptLimiter(maxAttempts = 5)
     val acceptanceLimiter = LoginAttemptLimiter(maxAttempts = 10)
 
-    suspend fun ApplicationCall.nativeActor() = resolver.resolve(
-        principal<JWTPrincipal>()?.payload ?: throw ApiException.Unauthorized(),
-    )
+    suspend fun ApplicationCall.nativeActor() =
+        resolver.resolve(
+            principal<JWTPrincipal>()?.payload ?: throw ApiException.Unauthorized(),
+        )
 
     fun toCommand(body: InvitationCreateBody): InvitationDispatchCommand {
         val profile =
@@ -158,14 +159,14 @@ internal fun Route.invitationRoutes(
             }
             val accepted =
                 invitations.accept(
-                body.invitationId,
-                InvitationToken.hash(body.code),
-                actor.email,
-                true,
-                actor.id,
-                body.operationId,
-                now,
-            ) ?: throw ApiException.Validation("Invitation is invalid or unavailable")
+                    body.invitationId,
+                    InvitationToken.hash(body.code),
+                    actor.email,
+                    true,
+                    actor.id,
+                    body.operationId,
+                    now,
+                ) ?: throw ApiException.Validation("Invitation is invalid or unavailable")
             call.respond(ApiResponse(InvitationAcceptResponse(accepted.id, accepted.status.name), call.requestId()))
         }
     }

@@ -40,6 +40,9 @@ data class SessionUiState(
     val institutionsLoading: Boolean = false,
     val institutionsFailure: AppError? = null,
     val verificationFailure: AppError? = null,
+    val invitationWorking: Boolean = false,
+    val invitationAccepted: Boolean = false,
+    val invitationFailure: AppError? = null,
 )
 
 @HiltViewModel
@@ -142,6 +145,9 @@ class SessionViewModel
                     emailVerified = user.emailVerified,
                     verificationDelivery = user.verificationDelivery,
                     verificationFailure = null,
+                    invitationWorking = false,
+                    invitationAccepted = false,
+                    invitationFailure = null,
                     failure = null,
                     noticeReason = null,
                 )
@@ -171,6 +177,9 @@ class SessionViewModel
                     emailVerified = false,
                     verificationDelivery = null,
                     verificationFailure = null,
+                    invitationWorking = false,
+                    invitationAccepted = false,
+                    invitationFailure = null,
                     failure = null,
                     noticeReason = notice,
                 )
@@ -284,6 +293,34 @@ class SessionViewModel
                             }
                     }
                 }
+        }
+
+        fun acceptRegistrationInvitation(
+            invitationId: String,
+            code: String,
+        ) {
+            if (!_state.value.authenticated || !_state.value.emailVerified || _state.value.invitationWorking) return
+            if (!Regex("[A-Za-z0-9_-]{43}").matches(invitationId) ||
+                !Regex("[A-Za-z0-9_-]{43}").matches(code)
+            ) {
+                return
+            }
+            _state.update {
+                it.copy(invitationWorking = true, invitationAccepted = false, invitationFailure = null)
+            }
+            viewModelScope.launch {
+                val operationId = java.util.UUID.randomUUID().toString()
+                when (val result = repository.acceptRegistrationInvitation(invitationId, code, operationId)) {
+                    is Outcome.Success ->
+                        _state.update {
+                            it.copy(invitationWorking = false, invitationAccepted = result.value.status == "ACCEPTED")
+                        }
+                    is Outcome.Failure ->
+                        _state.update {
+                            it.copy(invitationWorking = false, invitationFailure = result.error)
+                        }
+                }
+            }
         }
 
         fun refreshIdentity() {

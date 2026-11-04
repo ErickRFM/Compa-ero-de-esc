@@ -87,6 +87,7 @@ fun ProfileScreen(
     onLogout: () -> Unit,
     onSecurity: (() -> Unit)? = null,
     onInvitation: (() -> Unit)? = null,
+    onInvitationIssue: (() -> Unit)? = null,
     onNotifications: (() -> Unit)? = null,
     notificationsStatus: String? = null,
     onTutorRequest: (() -> Unit)? = null,
@@ -185,7 +186,7 @@ fun ProfileScreen(
                 }
             }
 
-            if (onSecurity != null || onInvitation != null || canRequestTutor) {
+            if (onSecurity != null || onInvitation != null || onInvitationIssue != null || canRequestTutor) {
                 ProfileGroup(title = stringResource(R.string.profile_access)) {
                     onSecurity?.let { action ->
                         ProfileRow(
@@ -201,6 +202,15 @@ fun ProfileScreen(
                             title = "Aceptar invitación",
                             icon = Icons.Outlined.PersonAdd,
                             detail = "Introduce el código recibido en tu correo",
+                            onClick = action,
+                        )
+                    }
+                    onInvitationIssue?.let { action ->
+                        if (onSecurity != null || onInvitation != null) GroupDivider()
+                        ProfileRow(
+                            title = "Enviar invitación",
+                            icon = Icons.Outlined.PersonAdd,
+                            detail = "Requiere Súper Admin y autenticación en dos pasos",
                             onClick = action,
                         )
                     }

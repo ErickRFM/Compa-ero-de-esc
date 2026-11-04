@@ -27,8 +27,14 @@ internal class ResendInvitationEmailGateway(
     init {
         require(
             endpoint == URI("https://api.resend.com/emails") ||
-                (endpoint.scheme == "http" && endpoint.host == "127.0.0.1" && endpoint.path == "/emails" &&
-                    endpoint.rawUserInfo == null && endpoint.rawQuery == null && endpoint.rawFragment == null),
+                (
+                    endpoint.scheme == "http" &&
+                        endpoint.host == "127.0.0.1" &&
+                        endpoint.path == "/emails" &&
+                        endpoint.rawUserInfo == null &&
+                        endpoint.rawQuery == null &&
+                        endpoint.rawFragment == null
+                ),
         )
     }
 
@@ -65,7 +71,11 @@ internal class ResendInvitationEmailGateway(
         return withContext(Dispatchers.IO) { attempt(body, invitationId) }
     }
 
-    private fun html(code: String, id: String, expiresAt: Instant): String =
+    private fun html(
+        code: String,
+        id: String,
+        expiresAt: Instant,
+    ): String =
         """
         <!doctype html><html lang="es"><head><meta charset="utf-8"></head>
         <body style="background:#f5f5f7;margin:0;padding:32px 12px;font-family:Arial,sans-serif;color:#202024">
@@ -86,7 +96,10 @@ internal class ResendInvitationEmailGateway(
         </body></html>
         """.trimIndent()
 
-    private fun attempt(payload: ByteArray, id: String): VerificationDeliveryStatus {
+    private fun attempt(
+        payload: ByteArray,
+        id: String,
+    ): VerificationDeliveryStatus {
         val connection = endpoint.toURL().openConnection() as HttpURLConnection
         return try {
             connection.connectTimeout = 5_000
@@ -120,8 +133,12 @@ internal class ResendInvitationEmailGateway(
                     output.toString(Charsets.UTF_8)
                 }
             val mailId =
-                runCatching { Json.parseToJsonElement(response).jsonObject["id"]?.jsonPrimitive?.contentOrNull }
-                    .getOrNull()
+                runCatching {
+                    Json.parseToJsonElement(response)
+                        .jsonObject["id"]
+                        ?.jsonPrimitive
+                        ?.contentOrNull
+                }.getOrNull()
             if (mailId.isNullOrBlank() || mailId.length > 128) {
                 VerificationDeliveryStatus.UNCONFIRMED
             } else {

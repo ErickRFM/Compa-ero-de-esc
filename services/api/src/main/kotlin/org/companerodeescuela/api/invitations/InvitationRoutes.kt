@@ -20,6 +20,7 @@ import org.companerodeescuela.api.auth.PlatformAccountRepository
 import org.companerodeescuela.api.auth.RefreshSessionRepository
 import org.companerodeescuela.api.auth.boundedBody
 import org.companerodeescuela.api.config.ApiSettings
+import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.integrations.identity.IdentityProvider
 import org.companerodeescuela.api.plugins.clientAddress
@@ -65,7 +66,8 @@ internal fun Route.invitationRoutes(
     invitations: InvitationRepository,
     clock: Clock = Clock.systemUTC(),
 ) {
-    if (!settings.hasAuthentication) return
+    // Fail closed in production until real QA delivery, Android acceptance and recovery gates are certified.
+    if (!settings.hasAuthentication || settings.environment == Environment.PRODUCTION) return
     val resolver = NativeActorResolver(accounts, sessions, AuthTokenService(settings), identity)
     val issuerLimiter = LoginAttemptLimiter(maxAttempts = 5)
     val acceptanceLimiter = LoginAttemptLimiter(maxAttempts = 10)

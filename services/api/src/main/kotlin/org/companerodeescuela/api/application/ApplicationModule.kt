@@ -15,6 +15,9 @@ import kotlinx.coroutines.withTimeout
 import org.companerodeescuela.api.academic.academicRoutes
 import org.companerodeescuela.api.academic.groups.academicGroupRoutes
 import org.companerodeescuela.api.admin.AccountAdministrationService
+import org.companerodeescuela.api.admin.MongoOwnerBootstrapClaims
+import org.companerodeescuela.api.admin.OwnerBootstrap
+import org.companerodeescuela.api.admin.QaAdminBootstrap
 import org.companerodeescuela.api.admin.accountAdministrationRoutes
 import org.companerodeescuela.api.attendance.attendanceRoutes
 import org.companerodeescuela.api.auth.PlatformSessionAuthority
@@ -122,8 +125,33 @@ fun Application.module(
             }
         }
     }
-    // One-time provisioning is an explicit operator action and blocks startup on mismatch.
-    org.companerodeescuela.api.admin.QaAdminBootstrap.parse(System::getenv)?.let { desired ->
+    // Initial ownership is an explicit MFA-authorized operator command, never a
+    // privilege inferred from an email, login form or invitation. This bootstrap
+    // refuses production and requires an isolated *_qa database.
+    val qaOwnerSpec = OwnerBootstrap.parse(System::getenv)
+    val qaAdminSpec = QaAdminBootstrap.parse(System::getenv)
+    require(qaOwnerSpec == null || qaAdminSpec == null) {
+        "QA initial owner and institutional admin bootstrap cannot run together"
+    }
+    qaOwnerSpec?.let { desired ->
+        require(settings.mongo.isConfigured && settings.hasAuthentication) {
+            "QA owner bootstrap requires persistent authenticated identity"
+        }
+        runBlocking {
+            withTimeout(15_000L) {
+                OwnerBootstrap.provision(
+                    desired,
+                    settings.environment.name.lowercase(),
+                    settings.mongo.databaseName,
+                    identityGraph.accounts,
+                    identityGraph.mfa,
+                    MongoOwnerBootstrapClaims(mongoConnection.database()),
+                )
+            }
+        }
+    }
+    // One-time institution-level provisioning is a separate action and blocks startup on mismatch.
+    qaAdminSpec?.let { desired ->
         require(
             settings.mongo.isConfigured && settings.hasAuthentication,
         ) { "QA admin bootstrap requires persistent authenticated identity" }

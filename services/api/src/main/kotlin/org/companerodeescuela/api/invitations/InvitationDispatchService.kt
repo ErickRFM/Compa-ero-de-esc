@@ -80,6 +80,7 @@ internal class InvitationDispatchService(
     private val repository: InvitationRepository,
     private val email: InvitationEmailGateway,
     private val institutions: InstitutionRepository,
+    private val outbox: InvitationOutbox? = null,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     suspend fun prepare(
@@ -142,8 +143,74 @@ internal class InvitationDispatchService(
             }
         if (delivery == VerificationDeliveryStatus.FAILED || delivery == VerificationDeliveryStatus.UNAVAILABLE) {
             authenticationDependency { repository.revoke(id, clock.instant()) }
+        } else if (delivery == VerificationDeliveryStatus.UNCONFIRMED && outbox != null) {
+            // Enqueue for asynchronous retry instead of leaving the invitation in limbo.
+            authenticationDependency {
+                outbox.enqueue(
+                    OutboxEntry(
+                        invitationId = id,
+                        recipient = command.recipient,
+                        tokenValue = token.value,
+                        expiresAt = expiresAt,
+                        nextAttemptAt = now.plusSeconds(60),
+                        createdAt = now,
+                    ),
+                )
+            }
         }
         return InvitationDispatchResult(id, delivery, expiresAt.epochSecond)
+    }
+
+    /**
+     * Retries delivery of an existing invitation that was sent but delivery
+     * was UNCONFIRMED. Generates a fresh token for replay protection, requires
+     * a new MFA proof bound to the retry operation, and re-sends the email.
+     */
+    suspend fun retry(
+        actor: PlatformAccount,
+        invitationId: String,
+        scopedProof: String,
+    ): InvitationDispatchResult {
+        val current = authorizedIssuer(actor)
+        if (!Regex("[A-Za-z0-9_-]{43}").matches(invitationId)) throw ApiException.Validation("Invitation is invalid")
+        if (!Regex("[A-Za-z0-9_-]{43}").matches(scopedProof)) throw ApiException.Forbidden("MFA proof is required")
+        val existing = authenticationDependency { repository.find(invitationId) }
+            ?: throw ApiException.Validation("Invitation is invalid or unavailable")
+        if (existing.issuerId != current.id) throw ApiException.Forbidden("Only the original issuer can retry")
+        val retryOperationId = "${existing.id}-retry-${clock.instant().epochSecond}"
+        val digest =
+            MessageDigest
+                .getInstance("SHA-256")
+                .digest("companero.invitation.retry.v1\n${current.id}\n${existing.id}".toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+        authenticationDependency {
+            mfa.requireStepUp(
+                current,
+                scopedProof,
+                StepUpAction.ADMIN_INVITE,
+                RESOURCE_ID,
+                retryOperationId,
+                digest,
+            )
+        }
+        val now = clock.instant()
+        if (now >= existing.expiresAt) throw ApiException.Validation("Invitation has expired")
+        val newToken = InvitationToken.generate()
+        if (!authenticationDependency { repository.retry(invitationId, newToken.hash, now) }) {
+            throw ApiException.Conflict("Invitation cannot be retried in its current state")
+        }
+        val delivery =
+            try {
+                email.send(existing.recipient, newToken.value, invitationId, existing.expiresAt)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                VerificationDeliveryStatus.UNCONFIRMED
+            }
+        if (delivery == VerificationDeliveryStatus.FAILED || delivery == VerificationDeliveryStatus.UNAVAILABLE) {
+            authenticationDependency { repository.revoke(invitationId, clock.instant()) }
+        }
+        return InvitationDispatchResult(invitationId, delivery, existing.expiresAt.epochSecond)
     }
 
     private suspend fun requireInstitution(command: InvitationDispatchCommand) {

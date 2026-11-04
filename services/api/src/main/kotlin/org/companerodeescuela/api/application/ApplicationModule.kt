@@ -22,6 +22,9 @@ import org.companerodeescuela.api.admin.accountAdministrationRoutes
 import org.companerodeescuela.api.attendance.attendanceRoutes
 import org.companerodeescuela.api.auth.PlatformSessionAuthority
 import org.companerodeescuela.api.auth.authRoutes
+import org.companerodeescuela.api.auth.InMemoryRateLimitStore
+import org.companerodeescuela.api.auth.LoginAttemptLimiter
+import org.companerodeescuela.api.auth.MongoRateLimitStore
 import org.companerodeescuela.api.channel.channelRoutes
 import org.companerodeescuela.api.classroom.classroomRoutes
 import org.companerodeescuela.api.config.ApiSettings
@@ -53,8 +56,10 @@ import org.companerodeescuela.api.integrations.push.SiiiPilotCredentialBootstrap
 import org.companerodeescuela.api.integrations.push.institutionalAttendanceHistoryRoutes
 import org.companerodeescuela.api.integrations.push.institutionalIdentityLinkRoutes
 import org.companerodeescuela.api.integrations.push.institutionalPushRoutes
+import org.companerodeescuela.api.invitations.InMemoryInvitationOutbox
 import org.companerodeescuela.api.invitations.InMemoryInvitationRepository
 import org.companerodeescuela.api.invitations.InvitationDispatchService
+import org.companerodeescuela.api.invitations.MongoInvitationOutbox
 import org.companerodeescuela.api.invitations.MongoInvitationRepository
 import org.companerodeescuela.api.invitations.UnavailableInvitationEmailGateway
 import org.companerodeescuela.api.invitations.invitationRoutes
@@ -411,11 +416,29 @@ fun Application.module(
         mongoConnection.close()
     }
 
+    val rateLimitStore =
+        if (settings.hasAuthentication && settings.mongo.isConfigured) {
+            MongoRateLimitStore(mongoConnection.database())
+        } else {
+            InMemoryRateLimitStore()
+        }
+    val loginAttemptLimiter =
+        LoginAttemptLimiter(
+            progressiveDelayBase = java.time.Duration.ofSeconds(settings.loginProgressiveDelayBaseSeconds),
+            progressiveDelayMaximum = java.time.Duration.ofSeconds(settings.loginProgressiveDelayMaxSeconds),
+            store = rateLimitStore,
+        )
     val invitationRepository =
         if (settings.hasAuthentication && settings.mongo.isConfigured) {
             MongoInvitationRepository(mongoConnection.database())
         } else {
             InMemoryInvitationRepository()
+        }
+    val invitationOutbox =
+        if (settings.hasAuthentication && settings.mongo.isConfigured) {
+            MongoInvitationOutbox(mongoConnection.database())
+        } else {
+            InMemoryInvitationOutbox()
         }
     val invitationEmail =
         if (settings.hasVerificationEmail) {
@@ -433,6 +456,7 @@ fun Application.module(
             invitationRepository,
             invitationEmail,
             identityGraph.institutions,
+            invitationOutbox,
         )
 
     routing {
@@ -440,6 +464,7 @@ fun Application.module(
         authRoutes(
             settings = settings,
             identityProvider = providerRegistry.identity,
+            loginAttemptLimiter = loginAttemptLimiter,
             sessions = identityGraph.refreshSessions,
             accounts = identityGraph.accounts,
             institutions = identityGraph.institutions,
@@ -468,6 +493,7 @@ fun Application.module(
             identityGraph.accounts,
             invitationDispatcher,
             invitationRepository,
+            rateLimitStore = rateLimitStore,
         )
         institutionRoutes(identityGraph.institutions)
         institutionalPushRoutes(

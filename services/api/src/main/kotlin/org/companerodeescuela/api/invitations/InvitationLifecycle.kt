@@ -123,6 +123,17 @@ internal interface InvitationRepository {
 
     /** Marks every still-pending invitation past its expiry. Returns the number of rows changed. */
     suspend fun expireDue(now: Instant): Int = 0
+
+    /**
+     * Resets a FAILED or UNCONFIRMED invitation back to SENT so it can be
+     * retried. Generates a new token hash for replay protection. Returns the
+     * new token hash, or null if the invitation cannot be retried.
+     */
+    suspend fun retry(
+        id: String,
+        newTokenHash: String,
+        now: Instant,
+    ): Boolean = false
 }
 
 internal class InMemoryInvitationRepository : InvitationRepository {
@@ -170,6 +181,24 @@ internal class InMemoryInvitationRepository : InvitationRepository {
                 }
             }
             changed
+        }
+
+    override suspend fun retry(
+        id: String,
+        newTokenHash: String,
+        now: Instant,
+    ): Boolean =
+        mutex.withLock {
+            val current = records[id] ?: return@withLock false
+            val timestamp = now.truncatedTo(ChronoUnit.MILLIS)
+            if (timestamp < current.createdAt ||
+                current.status !in setOf(InvitationStatus.FAILED, InvitationStatus.SENT) ||
+                timestamp >= current.expiresAt
+            ) {
+                return@withLock false
+            }
+            records[id] = current.copy(status = InvitationStatus.SENT, tokenHash = newTokenHash)
+            true
         }
 
     override suspend fun accept(

@@ -64,6 +64,22 @@ internal class MongoInvitationRepository(
             ).modifiedCount
             .toInt()
 
+    override suspend fun retry(
+        id: String,
+        newTokenHash: String,
+        now: Instant,
+    ): Boolean =
+        records
+            .updateOne(
+                and(
+                    eq("_id", id),
+                    `in`("status", InvitationStatus.FAILED.name, InvitationStatus.SENT.name),
+                    gt("expiresAt", Date.from(now)),
+                ),
+                Updates.set("status", InvitationStatus.SENT.name),
+                Updates.set("tokenHash", newTokenHash),
+            ).matchedCount == 1L
+
     override suspend fun accept(
         id: String,
         tokenHash: String,

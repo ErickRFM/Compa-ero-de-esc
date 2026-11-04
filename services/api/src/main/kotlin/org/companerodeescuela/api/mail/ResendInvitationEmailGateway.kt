@@ -134,7 +134,8 @@ internal class ResendInvitationEmailGateway(
                 }
             val mailId =
                 runCatching {
-                    Json.parseToJsonElement(response)
+                    Json
+                        .parseToJsonElement(response)
                         .jsonObject["id"]
                         ?.jsonPrimitive
                         ?.contentOrNull

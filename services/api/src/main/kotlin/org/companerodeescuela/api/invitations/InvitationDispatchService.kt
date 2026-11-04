@@ -4,6 +4,7 @@ import org.companerodeescuela.api.auth.PlatformAccount
 import org.companerodeescuela.api.auth.PlatformAccountRepository
 import org.companerodeescuela.api.auth.authenticationDependency
 import org.companerodeescuela.api.errors.ApiException
+import org.companerodeescuela.api.institutions.InstitutionRepository
 import org.companerodeescuela.api.security.MfaService
 import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.StepUpAction
@@ -63,12 +64,14 @@ internal class InvitationDispatchService(
     private val mfa: MfaService,
     private val repository: InvitationRepository,
     private val email: InvitationEmailGateway,
+    private val institutions: InstitutionRepository,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     suspend fun prepare(actor: PlatformAccount, proposed: InvitationDispatchCommand): InvitationPreparation {
         val command = proposed.canonical()
         if (!command.valid()) throw ApiException.Validation("Invitation details are invalid")
         val current = authorizedIssuer(actor)
+        requireInstitution(command)
         return InvitationPreparation(command.operationId, RESOURCE_ID, command.digest(current.id))
     }
 
@@ -80,6 +83,7 @@ internal class InvitationDispatchService(
         val command = proposed.canonical()
         if (!command.valid()) throw ApiException.Validation("Invitation details are invalid")
         val current = authorizedIssuer(actor)
+        requireInstitution(command)
         if (!Regex("[A-Za-z0-9_-]{43}").matches(scopedProof)) throw ApiException.Forbidden("MFA proof is required")
         authenticationDependency {
             mfa.requireStepUp(
@@ -115,6 +119,12 @@ internal class InvitationDispatchService(
             authenticationDependency { repository.revoke(id, clock.instant()) }
         }
         return InvitationDispatchResult(id, delivery, expiresAt.epochSecond)
+    }
+
+    private suspend fun requireInstitution(command: InvitationDispatchCommand) {
+        if (authenticationDependency { institutions.findEnabled(command.institutionId) } == null) {
+            throw ApiException.Validation("Institution does not accept new registrations")
+        }
     }
 
     private suspend fun authorizedIssuer(actor: PlatformAccount): PlatformAccount {

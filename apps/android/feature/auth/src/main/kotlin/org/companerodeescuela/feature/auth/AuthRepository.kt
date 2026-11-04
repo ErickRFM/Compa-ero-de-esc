@@ -168,27 +168,27 @@ class AuthRepository(
 
     suspend fun prepareRegistrationInvitation(
         command: org.companerodeescuela.shared.contracts.PrepareRegistrationInvitationRequest,
-    ): Outcome<org.companerodeescuela.shared.contracts.org.companerodeescuela.shared.contracts.RegistrationInvitationPreparation> =
+    ): Outcome<org.companerodeescuela.shared.contracts.RegistrationInvitationPreparation> =
         protectedCall { access ->
             apiCall {
                 client.post("admin/invitations/prepare") {
                     header(HttpHeaders.Authorization, "Bearer " + access)
                     header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                     setBody(command)
-                }.requireBody<ApiResponse<org.companerodeescuela.shared.contracts.org.companerodeescuela.shared.contracts.RegistrationInvitationPreparation>>()
+                }.requireBody<ApiResponse<org.companerodeescuela.shared.contracts.RegistrationInvitationPreparation>>()
             }.map { it.data }
         }
 
     suspend fun sendRegistrationInvitation(
         command: org.companerodeescuela.shared.contracts.PrepareRegistrationInvitationRequest,
-    ): Outcome<org.companerodeescuela.shared.contracts.org.companerodeescuela.shared.contracts.RegistrationInvitationDispatchReceipt> =
+    ): Outcome<org.companerodeescuela.shared.contracts.RegistrationInvitationDispatchReceipt> =
         protectedCall { access ->
             apiCall {
                 client.post("admin/invitations") {
                     header(HttpHeaders.Authorization, "Bearer " + access)
                     header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                     setBody(command)
-                }.requireBody<ApiResponse<org.companerodeescuela.shared.contracts.org.companerodeescuela.shared.contracts.RegistrationInvitationDispatchReceipt>>()
+                }.requireBody<ApiResponse<org.companerodeescuela.shared.contracts.RegistrationInvitationDispatchReceipt>>()
             }.map { it.data }
         }
 

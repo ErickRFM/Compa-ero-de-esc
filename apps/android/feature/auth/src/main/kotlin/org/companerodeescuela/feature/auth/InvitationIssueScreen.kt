@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -75,14 +77,14 @@ fun InvitationIssueScreen(
                     enabled = !state.working,
                 )
                 Text("Perfil solicitado", color = authInk())
-                androidx.compose.material3.SingleChoiceSegmentedButtonRow {
-                    listOf("STUDENT", "TEACHER", "TUTOR").forEachIndexed { index, option ->
-                        androidx.compose.material3.SegmentedButton(
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("STUDENT", "TEACHER", "TUTOR").forEach { option ->
+                        FilterChip(
                             selected = profile == option,
                             onClick = { profile = option },
-                            shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(index, 3),
+                            label = { Text(option.lowercase().replaceFirstChar { it.uppercase() }) },
                             enabled = !state.working,
-                        ) { Text(option.lowercase().replaceFirstChar { it.uppercase() }) }
+                        )
                     }
                 }
                 SecurityMemoryField(
@@ -126,6 +128,7 @@ fun InvitationIssueScreen(
                             VerificationDeliveryStatus.UNCONFIRMED -> "No se confirmó la entrega del correo."
                             VerificationDeliveryStatus.FAILED -> "Falló el envío."
                             VerificationDeliveryStatus.UNAVAILABLE -> "El correo no está configurado."
+                            VerificationDeliveryStatus.PENDING -> "Entrega en proceso."
                         },
                         color = authMuted(),
                         modifier = Modifier.testTag("invite_delivery"),

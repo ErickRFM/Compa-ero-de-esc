@@ -35,23 +35,38 @@ internal data class InvitationDispatchCommand(
     }
 
     fun digest(actorId: String): String =
-        MessageDigest.getInstance("SHA-256")
+        MessageDigest
+            .getInstance("SHA-256")
             .digest(
                 listOf("companero.invitation.send.v1", actorId, recipient, institutionId, profile.name, operationId)
-                    .joinToString("\n").toByteArray(Charsets.UTF_8),
+                    .joinToString("\n")
+                    .toByteArray(Charsets.UTF_8),
             ).joinToString("") { "%02x".format(it) }
 }
 
 internal fun interface InvitationEmailGateway {
-    suspend fun send(recipient: String, code: String, invitationId: String, expiresAt: Instant): VerificationDeliveryStatus
+    suspend fun send(
+        recipient: String,
+        code: String,
+        invitationId: String,
+        expiresAt: Instant,
+    ): VerificationDeliveryStatus
 }
 
 internal object UnavailableInvitationEmailGateway : InvitationEmailGateway {
-    override suspend fun send(recipient: String, code: String, invitationId: String, expiresAt: Instant) =
-        VerificationDeliveryStatus.UNAVAILABLE
+    override suspend fun send(
+        recipient: String,
+        code: String,
+        invitationId: String,
+        expiresAt: Instant,
+    ) = VerificationDeliveryStatus.UNAVAILABLE
 }
 
-internal data class InvitationPreparation(val operationId: String, val resourceId: String, val payloadDigest: String)
+internal data class InvitationPreparation(
+    val operationId: String,
+    val resourceId: String,
+    val payloadDigest: String,
+)
 
 internal data class InvitationDispatchResult(
     val invitationId: String,
@@ -67,7 +82,10 @@ internal class InvitationDispatchService(
     private val institutions: InstitutionRepository,
     private val clock: Clock = Clock.systemUTC(),
 ) {
-    suspend fun prepare(actor: PlatformAccount, proposed: InvitationDispatchCommand): InvitationPreparation {
+    suspend fun prepare(
+        actor: PlatformAccount,
+        proposed: InvitationDispatchCommand,
+    ): InvitationPreparation {
         val command = proposed.canonical()
         if (!command.valid()) throw ApiException.Validation("Invitation details are invalid")
         val current = authorizedIssuer(actor)
@@ -101,8 +119,15 @@ internal class InvitationDispatchService(
         val id = invitationId(current.id, command.operationId)
         val record =
             InvitationRecord(
-                id, command.recipient, command.institutionId, command.profile, current.id,
-                now, expiresAt, InvitationStatus.SENT, token.hash,
+                id,
+                command.recipient,
+                command.institutionId,
+                command.profile,
+                current.id,
+                now,
+                expiresAt,
+                InvitationStatus.SENT,
+                token.hash,
             )
         if (!authenticationDependency { repository.create(record) }) {
             throw ApiException.Conflict("This invitation operation was already processed")
@@ -147,9 +172,13 @@ internal class InvitationDispatchService(
         return current
     }
 
-    private fun invitationId(actorId: String, operationId: String): String =
+    private fun invitationId(
+        actorId: String,
+        operationId: String,
+    ): String =
         Base64.getUrlEncoder().withoutPadding().encodeToString(
-            MessageDigest.getInstance("SHA-256")
+            MessageDigest
+                .getInstance("SHA-256")
                 .digest("companero.invitation.id.v1\n$actorId\n$operationId".toByteArray(Charsets.UTF_8)),
         )
 

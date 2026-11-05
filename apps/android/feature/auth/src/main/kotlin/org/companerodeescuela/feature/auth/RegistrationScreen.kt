@@ -103,7 +103,7 @@ fun RegistrationScreen(
             ) {
                 Text(stringResource(R.string.registration_type), color = authInk(), fontWeight = FontWeight.SemiBold)
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
-                    val columns = if (maxWidth >= 280.dp * LocalDensity.current.fontScale) 2 else 1
+                    val columns = if (maxWidth >= 250.dp * LocalDensity.current.fontScale) 2 else 1
                     Column(
                         Modifier.fillMaxWidth().selectableGroup(),
                         verticalArrangement = Arrangement.spacedBy(10.dp),

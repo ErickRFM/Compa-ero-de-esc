@@ -63,8 +63,8 @@ fun AppearanceSettingsScreen(
         Box(
             modifier =
                 Modifier
-                    .fillMaxWidth()
                     .widthIn(max = CompaneroSize.settingsContentMaxWidth)
+                    .fillMaxWidth()
                     .align(Alignment.TopCenter)
                     .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
         ) {

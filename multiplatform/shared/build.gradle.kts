@@ -15,10 +15,57 @@ kotlin {
     sourceSets {
         commonMain {
             // These are the SAME source files compiled by Android and the JVM API.
-            // Do not expand this list without compiling the Apple targets.
+            // Files that use java.time, java.security, or java.io.Serializable are
+            // excluded from iOS targets and replaced by multiplatform adapters
+            // under org/companerodeescuela/mobile/ (e.g. OperationalContracts.kt).
             kotlin.srcDir("../../shared/contracts/src/main/kotlin")
             kotlin.include("org/companerodeescuela/mobile/**")
-            listOf("AuthContracts", "ApiResponse", "ApiError", "UserSummary", "UserRole", "AccountStatus", "RegistrationContracts").forEach {
+            listOf(
+                // Original 7 contracts — pure Kotlin, no java.time.
+                "AuthContracts",
+                "ApiResponse",
+                "ApiError",
+                "UserSummary",
+                "UserRole",
+                "AccountStatus",
+                "RegistrationContracts",
+                // Academic domain contracts — pure Kotlin serializable types.
+                "AcademicContracts",
+                "AcademicEventContracts",
+                "AcademicGroupContracts",
+                "AcademicProvenanceContracts",
+                "AcademicReconciliationContracts",
+                "AcademicScheduleContracts",
+                "AcademicScheduleManagementContracts",
+                "AcademicScheduleV2Contracts",
+                "AcademicChangePushContract",
+                // Attendance and presence contracts.
+                "AttendanceContracts",
+                "SchoolEntryQrContracts",
+                "SchoolPresenceContracts",
+                // Channel and classroom contracts.
+                "ChannelContracts",
+                "ClassroomContracts",
+                // Coordination and tutoring contracts.
+                "CoordinationOverview",
+                "TutorCaseContracts",
+                "TutoringContracts",
+                // Grading and excuse contracts.
+                "GradingContracts",
+                "ExcuseContracts",
+                // Group and representative contracts.
+                "GroupRepresentativeContracts",
+                "TeacherCampusRosterContracts",
+                // Institution-related contracts.
+                "InstitutionalAttendanceHistoryContracts",
+                "InstitutionalIdentityLinkContracts",
+                "InstitutionalPushContracts",
+                // Account administration and privilege security.
+                "AccountAdministrationContracts",
+                "PrivilegeSecurityContracts",
+                // Invitation contracts — needed for iOS invitation acceptance flow.
+                "RegistrationInvitationContracts",
+            ).forEach {
                 kotlin.include("org/companerodeescuela/shared/contracts/$it.kt")
             }
             dependencies {

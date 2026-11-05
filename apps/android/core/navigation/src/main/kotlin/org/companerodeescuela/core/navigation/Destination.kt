@@ -36,6 +36,10 @@ sealed class Destination(
 
     data object Profile : Destination("profile")
 
+    data object InvitationAcceptance : Destination("invitation-acceptance")
+
+    data object InvitationIssue : Destination("invitation-issue")
+
     data object Mfa : Destination("account-mfa")
 
     data object StaffApplication : Destination("staff-application")

@@ -106,6 +106,6 @@ object ScheduleShiftRules {
         if (parts.size < 2) return raw.trim()
         val hour = parts[0].toIntOrNull() ?: return raw.trim()
         val minute = parts[1].toIntOrNull() ?: return raw.trim()
-        return "%02d:%02d".format(hour, minute)
+        return "${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}"
     }
 }

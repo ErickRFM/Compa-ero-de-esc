@@ -5,7 +5,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 class InstitutionalCredentialValidatorTest {
-
     @Test
     fun `identifier sanitizer removes whitespace and caps length`() {
         assertEquals(

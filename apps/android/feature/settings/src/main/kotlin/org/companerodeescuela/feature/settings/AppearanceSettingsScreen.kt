@@ -59,172 +59,179 @@ fun AppearanceSettingsScreen(
     onOpenDebugCatalog: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.TopCenter) {
-        Column(
+    Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Box(
             modifier =
                 Modifier
-                    .fillMaxHeight()
-                    .widthIn(max = CompaneroSize.settingsContentMaxWidth)
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
+                    .widthIn(max = CompaneroSize.settingsContentMaxWidth)
+                    .align(Alignment.TopCenter)
                     .padding(horizontal = CompaneroSpacing.page, vertical = CompaneroSpacing.sm),
-            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
         ) {
-            LiveAppearancePreviewCard()
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.section),
+            ) {
+                LiveAppearancePreviewCard()
 
-            SettingsGroup(title = "Visualización") {
-                SettingsContentRow(
-                    title = "Tema",
-                ) {
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
-                        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
+                SettingsGroup(title = "Visualización") {
+                    SettingsContentRow(
+                        title = "Tema",
                     ) {
-                        listOf(
-                            AppThemeMode.SYSTEM to "Sistema",
-                            AppThemeMode.LIGHT to "Claro",
-                            AppThemeMode.DARK to "Oscuro",
-                        ).forEach { (mode, label) ->
-                            FilterChip(
-                                selected = settings.themeMode == mode,
-                                onClick = { onThemeMode(mode) },
-                                label = { Text(label) },
-                            )
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
+                        ) {
+                            listOf(
+                                AppThemeMode.SYSTEM to "Sistema",
+                                AppThemeMode.LIGHT to "Claro",
+                                AppThemeMode.DARK to "Oscuro",
+                            ).forEach { (mode, label) ->
+                                FilterChip(
+                                    selected = settings.themeMode == mode,
+                                    onClick = { onThemeMode(mode) },
+                                    label = { Text(label) },
+                                )
+                            }
+                        }
+                    }
+
+                    GroupDivider()
+
+                    SettingsContentRow(
+                        title = "Idioma",
+                    ) {
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
+                        ) {
+                            listOf(
+                                AppLanguage.SYSTEM to "Sistema",
+                                AppLanguage.SPANISH to "Español",
+                                AppLanguage.ENGLISH to "English",
+                            ).forEach { (lang, label) ->
+                                FilterChip(
+                                    selected = settings.language == lang,
+                                    onClick = { onLanguage(lang) },
+                                    label = { Text(label) },
+                                )
+                            }
+                        }
+                    }
+
+                    GroupDivider()
+
+                    SettingsContentRow(
+                        title = "Tamaño de texto",
+                        supporting = "Se combina con el tamaño de Android.",
+                    ) {
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
+                        ) {
+                            listOf(
+                                0.9f to "Compacto",
+                                1f to "Normal",
+                                1.2f to "Grande",
+                            ).forEach { (scale, label) ->
+                                FilterChip(
+                                    selected = kotlin.math.abs(settings.textScale - scale) < 0.01f,
+                                    onClick = { onTextScale(scale) },
+                                    label = { Text(label) },
+                                )
+                            }
                         }
                     }
                 }
 
-                GroupDivider()
-
-                SettingsContentRow(
-                    title = "Idioma",
-                ) {
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
-                        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
+                SettingsGroup(title = "Color y fondo") {
+                    SettingsContentRow(
+                        title = "Color de acento",
                     ) {
-                        listOf(
-                            AppLanguage.SYSTEM to "Sistema",
-                            AppLanguage.SPANISH to "Español",
-                            AppLanguage.ENGLISH to "English",
-                        ).forEach { (lang, label) ->
-                            FilterChip(
-                                selected = settings.language == lang,
-                                onClick = { onLanguage(lang) },
-                                label = { Text(label) },
-                            )
+                        FlowRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+                            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
+                        ) {
+                            CompaneroAccentPalette.entries.forEach { palette ->
+                                FilterChip(
+                                    selected = !settings.dynamicColor && settings.accentPalette == palette,
+                                    onClick = {
+                                        onDynamicColor(false)
+                                        onAccentPalette(palette)
+                                    },
+                                    leadingIcon = {
+                                        Box(
+                                            modifier =
+                                                Modifier
+                                                    .size(16.dp)
+                                                    .clip(CircleShape)
+                                                    .background(palette.previewColor),
+                                        )
+                                    },
+                                    label = { Text(palette.displayName) },
+                                )
+                            }
                         }
                     }
-                }
 
-                GroupDivider()
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        GroupDivider()
 
-                SettingsContentRow(
-                    title = "Tamaño de texto",
-                    supporting = "Se combina con el tamaño de Android.",
-                ) {
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
-                        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
-                    ) {
-                        listOf(
-                            0.9f to "Compacto",
-                            1f to "Normal",
-                            1.2f to "Grande",
-                        ).forEach { (scale, label) ->
-                            FilterChip(
-                                selected = kotlin.math.abs(settings.textScale - scale) < 0.01f,
-                                onClick = { onTextScale(scale) },
-                                label = { Text(label) },
-                            )
-                        }
+                        ToggleRow(
+                            title = "Color del dispositivo",
+                            supporting = "Usar los colores de tu fondo de pantalla.",
+                            checked = settings.dynamicColor,
+                            onCheckedChange = onDynamicColor,
+                        )
                     }
-                }
-            }
 
-            SettingsGroup(title = "Color y fondo") {
-                SettingsContentRow(
-                    title = "Color de acento",
-                ) {
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
-                        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xxs),
-                    ) {
-                        CompaneroAccentPalette.entries.forEach { palette ->
-                            FilterChip(
-                                selected = !settings.dynamicColor && settings.accentPalette == palette,
-                                onClick = {
-                                    onDynamicColor(false)
-                                    onAccentPalette(palette)
-                                },
-                                leadingIcon = {
-                                    Box(
-                                        modifier =
-                                            Modifier
-                                                .size(16.dp)
-                                                .clip(CircleShape)
-                                                .background(palette.previewColor),
-                                    )
-                                },
-                                label = { Text(palette.displayName) },
-                            )
-                        }
-                    }
-                }
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     GroupDivider()
 
                     ToggleRow(
-                        title = "Color del dispositivo",
-                        supporting = "Usar los colores de tu fondo de pantalla.",
-                        checked = settings.dynamicColor,
-                        onCheckedChange = onDynamicColor,
+                        title = "Fondo de campus",
+                        supporting = "Fotografía institucional en Inicio.",
+                        checked = settings.campusBackdropEnabled,
+                        onCheckedChange = onCampusBackdrop,
                     )
                 }
 
-                GroupDivider()
+                SettingsGroup(title = "Accesibilidad") {
+                    ToggleRow(
+                        title = "Reducir animaciones",
+                        supporting = "Sin desplazamientos ni efectos de escala.",
+                        checked = settings.reducedMotion,
+                        onCheckedChange = onReducedMotion,
+                    )
 
-                ToggleRow(
-                    title = "Fondo de campus",
-                    supporting = "Fotografía institucional en Inicio.",
-                    checked = settings.campusBackdropEnabled,
-                    onCheckedChange = onCampusBackdrop,
-                )
-            }
+                    GroupDivider()
 
-            SettingsGroup(title = "Accesibilidad") {
-                ToggleRow(
-                    title = "Reducir animaciones",
-                    supporting = "Sin desplazamientos ni efectos de escala.",
-                    checked = settings.reducedMotion,
-                    onCheckedChange = onReducedMotion,
-                )
+                    ToggleRow(
+                        title = "Mayor contraste",
+                        checked = settings.highContrast,
+                        onCheckedChange = onHighContrast,
+                    )
+                }
 
-                GroupDivider()
-
-                ToggleRow(
-                    title = "Mayor contraste",
-                    checked = settings.highContrast,
-                    onCheckedChange = onHighContrast,
-                )
-            }
-
-            onOpenDebugCatalog?.let { openCatalog ->
-                SettingsGroup(title = "Desarrollo") {
-                    SettingsContentRow(
-                        title = "Sistema visual",
-                        supporting = "Catálogo disponible únicamente en builds DEBUG.",
-                    ) {
-                        OutlinedButton(
-                            onClick = openCatalog,
-                            modifier = Modifier.fillMaxWidth(),
+                onOpenDebugCatalog?.let { openCatalog ->
+                    SettingsGroup(title = "Desarrollo") {
+                        SettingsContentRow(
+                            title = "Sistema visual",
+                            supporting = "Catálogo disponible únicamente en builds DEBUG.",
                         ) {
-                            Text("Abrir catálogo")
+                            OutlinedButton(
+                                onClick = openCatalog,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("Abrir catálogo")
+                            }
                         }
                     }
                 }

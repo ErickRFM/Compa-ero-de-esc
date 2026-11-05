@@ -17,8 +17,7 @@ enum V8 {
     static let crimson = Color(hex: 0xFF8A1538)
     static let crimsonLight = Color(hex: 0xFFB31328)
 
-    // Semantic text colors resolved at runtime
-    @Environment(\.colorScheme) static var resolvedScheme
+    // Semantic colors are resolved by each View's @Environment colorScheme.
 
     static func background(for scheme: ColorScheme) -> Color {
         scheme == .dark ? darkBackground : lightBackground
@@ -74,6 +73,7 @@ private extension Color {
 // MARK: - Reusable components
 
 struct V8Card<Content: View>: View {
+    @Environment(\.colorScheme) private var colorScheme
     let content: Content
     init(@ViewBuilder content: () -> Content) { self.content = content() }
     var body: some View {
@@ -81,18 +81,12 @@ struct V8Card<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(V8Spacing.lg)
             .background(
-                Group {
-                    if V8.resolvedScheme == .dark {
-                        V8.darkCard.opacity(0.85)
-                    } else {
-                        V8.lightCard
-                    }
-                },
+                V8.card(for: colorScheme).opacity(colorScheme == .dark ? 0.85 : 1),
                 in: RoundedRectangle(cornerRadius: V8Radius.card)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: V8Radius.card)
-                    .stroke(V8.stroke(for: V8.resolvedScheme))
+                    .stroke(V8.stroke(for: colorScheme))
             )
             .accessibilityElement(children: .contain)
     }
@@ -116,6 +110,7 @@ struct V8Button: ButtonStyle {
 // MARK: - Error banner
 
 struct V8ErrorBanner: View {
+    @Environment(\.colorScheme) private var colorScheme
     let title: String
     let message: String
     let onRetry: (() -> Void)?
@@ -128,7 +123,7 @@ struct V8ErrorBanner: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(.headline)
                 Text(message).font(.subheadline)
-                    .foregroundStyle(V8.secondaryText(for: V8.resolvedScheme))
+                    .foregroundStyle(V8.secondaryText(for: colorScheme))
                 if let onRetry {
                     Button("Reintentar", action: onRetry)
                         .buttonStyle(V8Button())

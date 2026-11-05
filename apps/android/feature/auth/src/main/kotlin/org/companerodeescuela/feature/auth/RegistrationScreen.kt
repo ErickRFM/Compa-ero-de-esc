@@ -40,8 +40,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8FrostedGlassPanel
 import org.companerodeescuela.core.designsystem.v8.V8RedDimensions
-import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.core.ui.component.NoticeTone
+import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.*
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -98,7 +98,10 @@ fun RegistrationScreen(
     AuthV8Layout(modifier, themeAware = true) {
         AuthWelcomeHero(title = stringResource(R.string.auth_create_account))
         V8FrostedGlassPanel(Modifier.fillMaxWidth(), emphasized = true, themeAware = true) {
-            Column(Modifier.padding(horizontal = V8RedDimensions.ScreenHorizontal, vertical = CompaneroSpacing.lg), verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
+            Column(
+                Modifier.padding(horizontal = V8RedDimensions.ScreenHorizontal, vertical = CompaneroSpacing.lg),
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
+            ) {
                 Text(stringResource(R.string.registration_type), color = authInk(), fontWeight = FontWeight.SemiBold)
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val columns = if (maxWidth >= 280.dp * LocalDensity.current.fontScale) 2 else 1

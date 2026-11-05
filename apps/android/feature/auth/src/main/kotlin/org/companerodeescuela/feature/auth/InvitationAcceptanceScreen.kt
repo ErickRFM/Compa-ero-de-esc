@@ -17,12 +17,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8FrostedGlassPanel
 import org.companerodeescuela.core.designsystem.v8.V8RedDimensions
-import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.core.ui.component.NoticeTone
+import org.companerodeescuela.core.ui.component.StatusNotice
 
 /** No code is persisted in saved state, logs or an intent. Redemption never grants a role. */
 @Composable

@@ -8,7 +8,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
@@ -46,7 +45,11 @@ fun StaffApplicationScreen(
     }
     AuthV8Layout(modifier, themeAware = true) {
         Text(stringResource(R.string.staff_request_title), style = MaterialTheme.typography.headlineMedium)
-        Text(stringResource(R.string.staff_request_description), modifier = Modifier.padding(vertical = CompaneroSpacing.sm), color = authMuted())
+        Text(
+            stringResource(R.string.staff_request_description),
+            modifier = Modifier.padding(vertical = CompaneroSpacing.sm),
+            color = authMuted(),
+        )
         V8FrostedGlassPanel(Modifier.fillMaxWidth(), themeAware = true) {
             Column(Modifier.padding(V8RedDimensions.ScreenHorizontal), verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
                 if (state.loading) CircularProgressIndicator(Modifier.testTag("staff_loading"))

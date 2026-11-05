@@ -25,10 +25,20 @@ internal class MongoInvitationRepository(
 ) : InvitationRepository {
     private val records = database.getCollection<Document>("platform_invitations")
 
+    @Volatile
+    private var tokenHashIndexReady = false
+
     override suspend fun create(record: InvitationRecord): Boolean {
         val canonical = record.canonicalForStorage()
         if (!canonical.validForCreation()) return false
-        records.createIndex(Indexes.ascending("tokenHash"), IndexOptions().unique(true))
+        if (!tokenHashIndexReady) {
+            try {
+                records.createIndex(Indexes.ascending("tokenHash"), IndexOptions().name("invitation_tokenHash_unique").unique(true))
+            } catch (_: com.mongodb.MongoCommandException) {
+                // Index already exists; safe to ignore
+            }
+            tokenHashIndexReady = true
+        }
         return try {
             records.insertOne(canonical.toDocument())
             true

@@ -113,12 +113,26 @@ internal class MongoRateLimitStore(
 ) : RateLimitStore {
     private val collection = database.getCollection<Document>("platform_rate_limits")
 
+    // Index creation is idempotent: MongoDB ignores duplicate index names with
+    // identical definitions. We guard with a volatile flag so concurrent calls
+    // do not replay the command unnecessarily. The _id index is created
+    // automatically by MongoDB and must not be recreated here.
+    @Volatile
+    private var indexesReady = false
+
     private suspend fun ensureIndexes() {
-        collection.createIndex(
-            Indexes.ascending("expireAt"),
-            IndexOptions().expireAfter(0L, java.util.concurrent.TimeUnit.SECONDS),
-        )
-        collection.createIndex(Indexes.ascending("_id"), IndexOptions().unique(true))
+        if (indexesReady) return
+        try {
+            collection.createIndex(
+                Indexes.ascending("expireAt"),
+                IndexOptions()
+                    .name("rate_limit_expireAt_ttl")
+                    .expireAfter(0L, java.util.concurrent.TimeUnit.SECONDS),
+            )
+        } catch (_: com.mongodb.MongoCommandException) {
+            // Index already exists with a different name or definition; safe to ignore
+        }
+        indexesReady = true
     }
 
     override suspend fun increment(

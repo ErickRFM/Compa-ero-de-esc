@@ -130,9 +130,17 @@ internal class MongoInvitationOutbox(
 ) : InvitationOutbox {
     private val collection = database.getCollection<Document>("platform_invitation_outbox")
 
+    @Volatile
+    private var indexesReady = false
+
     private suspend fun ensureIndexes() {
-        collection.createIndex(Indexes.ascending("nextAttemptAt"), IndexOptions().name("outbox_retry_idx"))
-        collection.createIndex(Indexes.ascending("_id"), IndexOptions().unique(true))
+        if (indexesReady) return
+        try {
+            collection.createIndex(Indexes.ascending("nextAttemptAt"), IndexOptions().name("outbox_retry_idx"))
+        } catch (_: com.mongodb.MongoCommandException) {
+            // Index already exists; safe to ignore
+        }
+        indexesReady = true
     }
 
     override suspend fun enqueue(entry: OutboxEntry): Boolean {

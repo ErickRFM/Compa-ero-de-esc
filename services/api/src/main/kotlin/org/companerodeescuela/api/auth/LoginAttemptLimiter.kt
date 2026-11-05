@@ -61,7 +61,14 @@ class LoginAttemptLimiter(
         val now = clock.instant()
 
         if (store != null) {
-            return runBlocking { acquireDistributed(safeKey, now) }
+            return try {
+                runBlocking { acquireDistributed(safeKey, now) }
+            } catch (_: Exception) {
+                // Degrade to local limiter if the distributed store is unavailable.
+                // Abuse control is preserved locally; cross-replica visibility is lost
+                // but the request still receives correct 401 responses.
+                acquireLocal(safeKey, now)
+            }
         }
 
         return acquireLocal(safeKey, now)
@@ -108,7 +115,11 @@ class LoginAttemptLimiter(
     ) {
         val safeKey = storageKey(key(username, clientAddress))
         if (store != null) {
-            runBlocking { store.reset(safeKey) }
+            try {
+                runBlocking { store.reset(safeKey) }
+            } catch (_: Exception) {
+                // Best-effort reset; local state may be stale but auth is unaffected
+            }
             return
         }
         maintain(clock.instant())
@@ -118,7 +129,11 @@ class LoginAttemptLimiter(
     fun resetAddress(clientAddress: String) {
         val safeKey = storageKey("ip|$clientAddress")
         if (store != null) {
-            runBlocking { store.reset(safeKey) }
+            try {
+                runBlocking { store.reset(safeKey) }
+            } catch (_: Exception) {
+                // Best-effort reset; local state may be stale but auth is unaffected
+            }
             return
         }
         maintain(clock.instant())
@@ -137,8 +152,13 @@ class LoginAttemptLimiter(
         val attempts: Int
 
         if (store != null) {
-            val entry = runBlocking { store.increment(accountKey, window, now) }
-            attempts = entry.attempts
+            val entry =
+                try {
+                    runBlocking { store.increment(accountKey, window, now) }
+                } catch (_: Exception) {
+                    null
+                }
+            attempts = entry?.attempts ?: recordLocalAccountFailure(accountKey, now)
         } else {
             attempts = recordLocalAccountFailure(accountKey, now)
         }
@@ -187,7 +207,11 @@ class LoginAttemptLimiter(
         reset(username, clientAddress)
         val accountKey = storageKey("account|${username.trim().lowercase()}")
         if (store != null) {
-            runBlocking { store.reset(accountKey) }
+            try {
+                runBlocking { store.reset(accountKey) }
+            } catch (_: Exception) {
+                // Best-effort reset; local state may be stale but auth is unaffected
+            }
             return
         }
         maintain(clock.instant())

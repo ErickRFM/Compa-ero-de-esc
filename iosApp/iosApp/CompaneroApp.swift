@@ -7,7 +7,6 @@ struct CompaneroApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(model)
-                .preferredColorScheme(.dark)
                 .tint(V8.crimson)
         }
     }

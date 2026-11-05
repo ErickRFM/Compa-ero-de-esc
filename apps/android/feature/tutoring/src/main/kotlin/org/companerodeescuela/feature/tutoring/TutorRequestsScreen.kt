@@ -7,13 +7,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -26,11 +26,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8LoadingCard
 import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
@@ -73,7 +75,7 @@ private fun TutorRequestsContent(
                 description = "Revisa las solicitudes de tus grupos. Una justificación no cambia la presencia verificada por QR.",
             )
         }
-        if (state.loading) CircularProgressIndicator()
+        if (state.loading) V8LoadingCard(title = "Cargando solicitudes…")
         state.error?.let { StatusNotice(title = "No pudimos cargar solicitudes", message = it) }
         state.notice?.let { StatusNotice(title = "Solicitud", message = it) }
         if (!state.loading && state.error == null && state.requests.isEmpty()) {
@@ -130,7 +132,7 @@ private fun TutorRequestsContent(
                 }
             }
         }
-        OutlinedButton(onClick = viewModel::refresh, enabled = !state.submitting && !state.loading) {
+        OutlinedButton(onClick = viewModel::refresh, enabled = !state.submitting && !state.loading, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
             Text("Actualizar")
         }
     }

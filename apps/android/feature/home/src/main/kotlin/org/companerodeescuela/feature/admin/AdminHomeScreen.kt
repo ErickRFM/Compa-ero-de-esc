@@ -48,6 +48,8 @@ import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.ui.component.StatusNotice
+import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
@@ -594,7 +596,12 @@ private fun adminUserDirectory(
                 }
             else -> R.string.admin_error_generic
         }
-    Text(stringResource(resource), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("admin_error"))
+    StatusNotice(
+        title = stringResource(resource),
+        message = error.userMessage,
+        tone = NoticeTone.ERROR,
+        modifier = Modifier.testTag("admin_error"),
+    )
 }
 
 private fun statusResource(status: AccountStatus) =

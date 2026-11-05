@@ -37,7 +37,11 @@ import androidx.compose.ui.text.input.*
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8FrostedGlassPanel
+import org.companerodeescuela.core.designsystem.v8.V8RedDimensions
+import org.companerodeescuela.core.ui.component.StatusNotice
+import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.shared.contracts.*
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -94,7 +98,7 @@ fun RegistrationScreen(
     AuthV8Layout(modifier, themeAware = true) {
         AuthWelcomeHero(title = stringResource(R.string.auth_create_account))
         V8FrostedGlassPanel(Modifier.fillMaxWidth(), emphasized = true, themeAware = true) {
-            Column(Modifier.padding(horizontal = 18.dp, vertical = 22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.padding(horizontal = V8RedDimensions.ScreenHorizontal, vertical = CompaneroSpacing.lg), verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
                 Text(stringResource(R.string.registration_type), color = authInk(), fontWeight = FontWeight.SemiBold)
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val columns = if (maxWidth >= 280.dp * LocalDensity.current.fontScale) 2 else 1
@@ -170,11 +174,19 @@ fun RegistrationScreen(
                             Text(stringResource(R.string.registration_loading), color = authMuted())
                         }
                         state.institutionsFailure != null -> {
-                            Text(stringResource(R.string.registration_directory_error), color = MaterialTheme.colorScheme.error)
+                            StatusNotice(
+                                title = stringResource(R.string.registration_directory_error),
+                                message = state.institutionsFailure.userMessage,
+                                tone = NoticeTone.ERROR,
+                            )
                             AuthV8SecondaryAction(stringResource(R.string.registration_retry), onReloadInstitutions, !state.submitting)
                         }
                         state.institutions.isEmpty() -> {
-                            Text(stringResource(R.string.registration_directory_empty), color = authMuted())
+                            StatusNotice(
+                                title = stringResource(R.string.registration_directory_empty),
+                                message = stringResource(R.string.registration_retry),
+                                tone = NoticeTone.WARNING,
+                            )
                             AuthV8SecondaryAction(stringResource(R.string.registration_retry), onReloadInstitutions, !state.submitting)
                         }
                         else ->
@@ -223,7 +235,11 @@ fun RegistrationScreen(
                 if (state.failure !=
                     null
                 ) {
-                    Text(stringResource(registrationErrorResource(state.failure)), color = MaterialTheme.colorScheme.error)
+                    StatusNotice(
+                        title = stringResource(registrationErrorResource(state.failure)),
+                        message = stringResource(R.string.auth_error_generic),
+                        tone = NoticeTone.ERROR,
+                    )
                 }
                 AuthV8PrimaryAction(
                     stringResource(R.string.auth_create_account),
@@ -263,7 +279,7 @@ private fun RegistrationField(
         Modifier.fillMaxWidth().testTag(tag),
         enabled = enabled,
         singleLine = true,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(V8RedDimensions.FieldCorner),
         colors = institutionalFieldColors(),
         label = { Text(stringResource(label)) },
         leadingIcon = {
@@ -315,7 +331,7 @@ private fun AccountTypeOption(
     enabled: Boolean,
     modifier: Modifier,
 ) {
-    val shape = RoundedCornerShape(18.dp)
+    val shape = RoundedCornerShape(V8RedDimensions.FieldCorner)
     Row(
         modifier
             .clip(shape)

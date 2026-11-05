@@ -18,7 +18,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8FrostedGlassPanel
+import org.companerodeescuela.core.designsystem.v8.V8RedDimensions
+import org.companerodeescuela.core.ui.component.StatusNotice
+import org.companerodeescuela.core.ui.component.NoticeTone
 
 /** No code is persisted in saved state, logs or an intent. Redemption never grants a role. */
 @Composable
@@ -43,8 +47,8 @@ fun InvitationAcceptanceScreen(
         )
         V8FrostedGlassPanel(Modifier.fillMaxWidth(), emphasized = true, themeAware = true) {
             Column(
-                modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(V8RedDimensions.ScreenHorizontal),
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
                 Text(
                     "Usa el ID y código que recibiste por correo. Debes haber verificado tu dirección.",
@@ -85,9 +89,10 @@ fun InvitationAcceptanceScreen(
                     )
                 }
                 state.invitationFailure?.let {
-                    Text(
-                        it.userMessage,
-                        color = MaterialTheme.colorScheme.error,
+                    StatusNotice(
+                        title = "Invitación no aceptada",
+                        message = it.userMessage,
+                        tone = NoticeTone.ERROR,
                         modifier = Modifier.testTag("invitation_error"),
                     )
                 }

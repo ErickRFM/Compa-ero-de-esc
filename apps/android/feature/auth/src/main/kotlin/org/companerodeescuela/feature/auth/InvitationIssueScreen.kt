@@ -27,7 +27,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8FrostedGlassPanel
+import org.companerodeescuela.core.designsystem.v8.V8RedDimensions
+import org.companerodeescuela.core.ui.component.NoticeTone
+import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.VerificationDeliveryStatus
 
 @Composable
@@ -59,8 +63,8 @@ fun InvitationIssueScreen(
         )
         V8FrostedGlassPanel(Modifier.fillMaxWidth(), themeAware = true) {
             Column(
-                modifier = Modifier.padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(V8RedDimensions.ScreenHorizontal),
+                verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
                 OutlinedTextField(
                     value = recipient,
@@ -124,7 +128,11 @@ fun InvitationIssueScreen(
                     "Validando...",
                 )
                 state.failure?.let {
-                    Text(it.userMessage, color = MaterialTheme.colorScheme.error)
+                    StatusNotice(
+                        title = "No se pudo enviar",
+                        message = it.userMessage,
+                        tone = NoticeTone.ERROR,
+                    )
                 }
                 state.delivery?.let {
                     Text(

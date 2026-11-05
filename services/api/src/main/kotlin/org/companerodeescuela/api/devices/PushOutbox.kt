@@ -36,6 +36,7 @@ data class PushOutboxItem(
     val attempts: Int = 0,
     val leaseId: String? = null,
     val data: Map<String, String> = emptyMap(),
+    val appDistribution: String? = null,
 )
 
 interface PushOutboxRepository {
@@ -97,6 +98,7 @@ class MongoPushOutboxRepository(
                 .append("title", item.title)
                 .append("body", item.body)
                 .append("data", Document(item.data))
+                .append("appDistribution", item.appDistribution)
                 .append("status", "PENDING")
                 .append("attempts", 0)
                 .append("nextAttemptAt", Date.from(now))
@@ -147,6 +149,7 @@ class MongoPushOutboxRepository(
                     ?.entries
                     ?.associate { (key, value) -> key to value.toString() }
                     .orEmpty(),
+            appDistribution = updated.getString("appDistribution"),
         )
     }
 
@@ -283,7 +286,7 @@ class PushOutboxService(
         var created = 0
         for (token in devices.listTokens(setOf(owner), appDistribution)) {
             val id = digest("$eventId\u0000$owner\u0000$token")
-            if (outbox.enqueue(PushOutboxItem(id, owner, token, title, body, data = data))) created++
+            if (outbox.enqueue(PushOutboxItem(id, owner, token, title, body, data = data, appDistribution = appDistribution))) created++
         }
         return created
     }
@@ -301,7 +304,7 @@ class PushOutboxService(
                 val ack = outbox.finish(item, PushDeliveryResult.RETRYABLE, clock.instant())
                 return ack
             }
-        val current = devices.listTokens(setOf(item.owner))
+        val current = devices.listTokens(setOf(item.owner), item.appDistribution)
         val result =
             if (!permitted) {
                 PushDeliveryResult.REJECTED

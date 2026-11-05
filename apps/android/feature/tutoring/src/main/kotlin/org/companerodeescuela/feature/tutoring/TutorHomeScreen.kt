@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,6 +20,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8LoadingCard
 import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
@@ -50,7 +50,7 @@ fun TutorHomeScreen(
         V8ScreenHeader {
             V8PageTitle(title = "Tutorías", description = "Acompañamiento académico de tus grupos asignados.")
         }
-        if (state.loading) CircularProgressIndicator()
+        if (state.loading) V8LoadingCard(title = "Cargando tutorías…")
         state.error?.let { StatusNotice(title = "No pudimos actualizar", message = it) }
         state.notice?.let { StatusNotice(title = "Tutorías", message = it) }
         V8GlassCard(

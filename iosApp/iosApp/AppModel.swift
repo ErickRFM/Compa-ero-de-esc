@@ -25,6 +25,18 @@ final class AppModel: ObservableObject {
 
     var signedIn: Bool { !userID.isEmpty }
 
+    var hasError: Bool {
+        let lower = message.lowercased()
+        return !busy && (
+            lower.contains("error") ||
+            lower.contains("inválid") ||
+            lower.contains("falló") ||
+            lower.contains("rechazad") ||
+            lower.contains("no se pudo") ||
+            lower.contains("incorrect")
+        )
+    }
+
     func configure() {
         cancelAndClearSession()
         bridge?.close()

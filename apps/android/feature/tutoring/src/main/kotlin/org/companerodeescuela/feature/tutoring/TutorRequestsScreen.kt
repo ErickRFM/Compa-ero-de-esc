@@ -132,7 +132,11 @@ private fun TutorRequestsContent(
                 }
             }
         }
-        OutlinedButton(onClick = viewModel::refresh, enabled = !state.submitting && !state.loading, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+        OutlinedButton(
+            onClick = viewModel::refresh,
+            enabled = !state.submitting && !state.loading,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        ) {
             Text("Actualizar")
         }
     }

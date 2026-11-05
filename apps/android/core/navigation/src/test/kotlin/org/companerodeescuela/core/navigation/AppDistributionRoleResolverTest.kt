@@ -13,15 +13,17 @@ class AppDistributionRoleResolverTest {
     }
 
     @Test
-    fun `direction is available only in management and never grants another experience`() {
+    fun `direction is available in management and legacy single-apk builds`() {
         val roles = setOf(UserRole.PRINCIPAL)
         assertEquals(emptyList(), RoleExperienceResolver.available(roles, AppDistribution.ACADEMIC))
-        assertEquals(emptyList(), RoleExperienceResolver.available(roles, AppDistribution.LEGACY))
+        assertEquals(listOf(AppExperience.PRINCIPAL), RoleExperienceResolver.available(roles, AppDistribution.LEGACY))
         assertEquals(listOf(AppExperience.PRINCIPAL), RoleExperienceResolver.available(roles, AppDistribution.MANAGEMENT))
         val config = RoleExperienceResolver.resolve(roles, distribution = AppDistribution.MANAGEMENT)
         assertEquals(AppExperience.PRINCIPAL, config.experience)
         assertEquals(Destination.CoordinatorHome, config.startDestination)
         assertEquals(listOf(TopLevelDestination.CoordinatorHome, TopLevelDestination.Schedule), config.topLevelDestinations)
+        val legacyConfig = RoleExperienceResolver.resolve(roles, distribution = AppDistribution.LEGACY)
+        assertEquals(AppExperience.PRINCIPAL, legacyConfig.experience)
     }
 
     @Test

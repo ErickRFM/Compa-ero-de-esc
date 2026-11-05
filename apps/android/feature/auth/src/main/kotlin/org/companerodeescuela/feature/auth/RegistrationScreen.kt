@@ -44,7 +44,6 @@ import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.*
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun RegistrationScreen(
     state: SessionUiState,
@@ -105,21 +104,26 @@ fun RegistrationScreen(
                 Text(stringResource(R.string.registration_type), color = authInk(), fontWeight = FontWeight.SemiBold)
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val columns = if (maxWidth >= 280.dp * LocalDensity.current.fontScale) 2 else 1
-                    FlowRow(
+                    Column(
                         Modifier.fillMaxWidth().selectableGroup(),
-                        maxItemsInEachRow = columns,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        RegistrationAccountType.entries.forEach { type ->
-                            AccountTypeOption(
-                                type,
-                                stringResource(type.labelResource),
-                                accountType == type,
-                                { accountType = type },
-                                !state.submitting,
-                                Modifier.weight(1f).testTag("registration_type_" + type.name),
-                            )
+                        RegistrationAccountType.entries.chunked(columns).forEach { rowTypes ->
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                rowTypes.forEach { type ->
+                                    AccountTypeOption(
+                                        type,
+                                        stringResource(type.labelResource),
+                                        accountType == type,
+                                        { accountType = type },
+                                        !state.submitting,
+                                        Modifier.weight(1f).testTag("registration_type_" + type.name),
+                                    )
+                                }
+                            }
                         }
                     }
                 }

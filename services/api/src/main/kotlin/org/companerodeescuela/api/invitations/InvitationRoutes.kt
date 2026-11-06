@@ -17,6 +17,7 @@ import org.companerodeescuela.api.auth.AUTH_BODY_MAX_BYTES
 import org.companerodeescuela.api.auth.AuthTokenService
 import org.companerodeescuela.api.auth.LoginAttemptLimiter
 import org.companerodeescuela.api.auth.PlatformAccountRepository
+import org.companerodeescuela.api.auth.RateLimitStore
 import org.companerodeescuela.api.auth.RefreshSessionRepository
 import org.companerodeescuela.api.auth.boundedBody
 import org.companerodeescuela.api.config.ApiSettings
@@ -63,6 +64,17 @@ internal data class InvitationAcceptBody(
 )
 
 @Serializable
+internal data class InvitationRetryBody(
+    val invitationId: String,
+    val proof: String,
+)
+
+@Serializable
+internal data class InvitationRevokeBody(
+    val invitationId: String,
+)
+
+@Serializable
 internal data class InvitationAcceptResponse(
     val invitationId: String,
     val status: String,
@@ -76,12 +88,13 @@ internal fun Route.invitationRoutes(
     service: InvitationDispatchService,
     invitations: InvitationRepository,
     clock: Clock = Clock.systemUTC(),
+    rateLimitStore: RateLimitStore? = null,
 ) {
     // Fail closed in production until real QA delivery, Android acceptance and recovery gates are certified.
     if (!settings.hasAuthentication || settings.environment == Environment.PRODUCTION) return
     val resolver = NativeActorResolver(accounts, sessions, AuthTokenService(settings), identity)
-    val issuerLimiter = LoginAttemptLimiter(maxAttempts = 5)
-    val acceptanceLimiter = LoginAttemptLimiter(maxAttempts = 10)
+    val issuerLimiter = LoginAttemptLimiter(maxAttempts = 5, store = rateLimitStore)
+    val acceptanceLimiter = LoginAttemptLimiter(maxAttempts = 10, store = rateLimitStore)
 
     suspend fun ApplicationCall.nativeActor() =
         resolver.resolve(
@@ -125,6 +138,45 @@ internal fun Route.invitationRoutes(
                     HttpStatusCode.Created,
                     ApiResponse(
                         InvitationSendResponse(result.invitationId, result.delivery, result.expiresAtEpochSeconds),
+                        call.requestId(),
+                    ),
+                )
+            }
+            post("/retry") {
+                val actor = call.nativeActor()
+                issuerLimiter.acquire(actor.id, call.clientAddress())?.let {
+                    call.response.header(HttpHeaders.RetryAfter, it.toString())
+                    throw ApiException.RateLimited()
+                }
+                val body = call.boundedBody(InvitationRetryBody.serializer(), AUTH_BODY_MAX_BYTES)
+                if (!Regex("[A-Za-z0-9_-]{43}").matches(body.invitationId) ||
+                    !Regex("[A-Za-z0-9_-]{43}").matches(body.proof)
+                ) {
+                    throw ApiException.Validation("Invitation or proof is invalid")
+                }
+                val result = service.retry(actor, body.invitationId, body.proof)
+                call.respond(
+                    ApiResponse(
+                        InvitationSendResponse(result.invitationId, result.delivery, result.expiresAtEpochSeconds),
+                        call.requestId(),
+                    ),
+                )
+            }
+            post("/revoke") {
+                val actor = call.nativeActor()
+                issuerLimiter.acquire(actor.id, call.clientAddress())?.let {
+                    call.response.header(HttpHeaders.RetryAfter, it.toString())
+                    throw ApiException.RateLimited()
+                }
+                val body = call.boundedBody(InvitationRevokeBody.serializer(), AUTH_BODY_MAX_BYTES)
+                if (!Regex("[A-Za-z0-9_-]{1,128}").matches(body.invitationId)) {
+                    throw ApiException.Validation("Invitation is invalid")
+                }
+                val revoked = invitations.revoke(body.invitationId, clock.instant())
+                if (!revoked) throw ApiException.Validation("Invitation cannot be revoked")
+                call.respond(
+                    ApiResponse(
+                        InvitationAcceptResponse(body.invitationId, "REVOKED"),
                         call.requestId(),
                     ),
                 )

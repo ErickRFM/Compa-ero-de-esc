@@ -34,7 +34,7 @@ import org.companerodeescuela.core.navigation.AppExperience
 
 /** The caller supplies only server-authorized experiences for this distribution. */
 @Composable
-internal fun ExperiencePickerScreen(
+fun ExperiencePickerScreen(
     experiences: List<AppExperience>,
     selectionUnavailable: Boolean = false,
     onSelect: (AppExperience) -> Unit,

@@ -163,7 +163,12 @@ fun StudentGradesScreen(viewModel: StudentGradesViewModel = hiltViewModel()) {
 
                 state.gradesError?.let { StatusNotice(title = "No se pudieron consultar", message = it) }
                 state.snapshot?.let { PublishedGradesCard(it) }
-                if (state.snapshot == null && state.hasQueried && state.gradesError == null) {
+                if (
+                    state.snapshot == null &&
+                    state.hasQueried &&
+                    !state.loadingGrades &&
+                    state.gradesError == null
+                ) {
                     StatusNotice(title = "Aún no publicado", message = "No hay calificaciones publicadas para este periodo.")
                 }
             }

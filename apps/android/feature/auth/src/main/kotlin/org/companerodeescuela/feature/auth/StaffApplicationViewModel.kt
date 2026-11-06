@@ -62,9 +62,7 @@ class StaffApplicationViewModel
                             failure = if (next == null) AppError.Http(401) else null,
                             ownerKey = next,
                         )
-                    if (next != null) {
-                        refresh()
-                    }
+                    if (next != null) refresh()
                 }
             }
         }

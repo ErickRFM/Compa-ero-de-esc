@@ -14,6 +14,7 @@ import androidx.test.uiautomator.UiDevice
 import org.companerodeescuela.feature.settings.AppLanguage
 import org.companerodeescuela.feature.settings.AppThemeMode
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -89,6 +90,10 @@ class LoginVisualEvidenceTest {
     }
 
     @Test fun actualRegistrationUsesCampusOnPhoneTabletLightAndLargeText() {
+        assumeTrue(
+            "Registration is available only in the academic distribution",
+            InstrumentationRegistry.getInstrumentation().targetContext.packageName == "org.companerodeescuela",
+        )
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val device = UiDevice.getInstance(instrumentation)
         val directory = File(instrumentation.targetContext.filesDir, "v10-evidence").also { it.mkdirs() }
@@ -184,7 +189,9 @@ class LoginVisualEvidenceTest {
     private fun showForm() {
         // Scroll the real Compose parent through semantics; stale display bounds can
         // make UiScrollable swipe once and incorrectly report the end after wm resize.
-        compose.onNodeWithTag("login_registration").performScrollTo().assertIsDisplayed()
+        if (InstrumentationRegistry.getInstrumentation().targetContext.packageName == "org.companerodeescuela") {
+            compose.onNodeWithTag("login_registration").performScrollTo().assertIsDisplayed()
+        }
         compose.onNodeWithTag("login_username").assertIsDisplayed()
         compose.onNodeWithTag("login_password").assertIsDisplayed()
         compose.onNodeWithTag("login_submit").assertIsDisplayed()

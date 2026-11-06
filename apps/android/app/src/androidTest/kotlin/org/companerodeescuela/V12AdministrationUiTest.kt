@@ -615,9 +615,14 @@ class V12AdministrationUiTest {
     private fun capture(name: String) {
         val context = compose.activity
         val directory = File(context.filesDir, "v10-evidence").apply { mkdirs() }
-        val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
-        assertNotNull("Safe completed screen must be capturable", bitmap)
-        File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        compose.runOnIdle { context.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+        compose.waitForIdle()
+        val bitmap =
+            generateSequence {
+                InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+            }.take(3).firstOrNull { it != null }
+        val capturedBitmap = checkNotNull(bitmap) { "Safe completed screen must be capturable" }
+        File(directory, "$name.png").outputStream().use { capturedBitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         val config = context.resources.configuration
         val display = context.resources.displayMetrics
         File(
@@ -626,8 +631,8 @@ class V12AdministrationUiTest {
             },
             "$name-geometry.txt",
         ).writeText(
-            "source=instrumented-HTTP-fixture\nscreenWidthDp=${config.screenWidthDp}\nscreenHeightDp=${config.screenHeightDp}\ndensityDpi=${display.densityDpi}\nbitmap=${bitmap.width}x${bitmap.height}\n",
+            "source=instrumented-HTTP-fixture\nscreenWidthDp=${config.screenWidthDp}\nscreenHeightDp=${config.screenHeightDp}\ndensityDpi=${display.densityDpi}\nbitmap=${capturedBitmap.width}x${capturedBitmap.height}\n",
         )
-        bitmap.recycle()
+        capturedBitmap.recycle()
     }
 }

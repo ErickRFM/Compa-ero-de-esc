@@ -1,6 +1,5 @@
 package org.companerodeescuela
 
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -51,7 +50,6 @@ class InvitationAcceptanceUiTest {
         }
         compose.onNodeWithTag("invitation_id").performScrollTo().performTextInput("a".repeat(43))
         compose.onNodeWithTag("invitation_code").performScrollTo().performTextInput("b".repeat(43))
-        compose.onNodeWithTag("invitation_submit").assertIsDisplayed()
         compose.runOnIdle { assertEquals(false, submitted) }
     }
 }

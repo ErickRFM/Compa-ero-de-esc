@@ -283,23 +283,24 @@ fun ChannelScreen(
                 }
                 if (selected == null) {
                     item {
-                        if (state.loading) CircularProgressIndicator()
-                        StatusNotice(
-                            title =
-                                if (state.loading) {
-                                    "Cargando tus canales…"
-                                } else if (isAdministrativeSession) {
-                                    "Canal de clase no disponible"
-                                } else {
-                                    "Todavía no hay canales"
-                                },
-                            message =
-                                if (isAdministrativeSession) {
-                                    "Los canales de clase están reservados para perfiles académicos (docentes y alumnos). Las cuentas administrativas institucionales operan mediante avisos institucionales."
-                                } else {
-                                    "Cuando tengas materias asignadas, sus avisos aparecerán aquí."
-                                },
-                        )
+                        if (state.loading) {
+                            CircularProgressIndicator()
+                        } else {
+                            StatusNotice(
+                                title =
+                                    if (isAdministrativeSession) {
+                                        "Canal de clase no disponible"
+                                    } else {
+                                        "Todavía no hay canales"
+                                    },
+                                message =
+                                    if (isAdministrativeSession) {
+                                        "Los canales de clase están reservados para perfiles académicos (docentes y alumnos). Las cuentas administrativas institucionales operan mediante avisos institucionales."
+                                    } else {
+                                        "Cuando tengas materias asignadas, sus avisos aparecerán aquí."
+                                    },
+                            )
+                        }
                     }
                 } else {
                     item { ChannelIdentity(selected) }

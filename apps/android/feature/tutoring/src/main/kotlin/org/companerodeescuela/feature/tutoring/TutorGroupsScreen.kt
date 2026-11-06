@@ -7,12 +7,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -26,11 +26,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8LoadingCard
 import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
@@ -91,7 +93,7 @@ private fun TutorGroupsContent(
                 description = "Alumnos asignados, nombramiento de representantes y seguimiento académico.",
             )
         }
-        if (state.loading) CircularProgressIndicator()
+        if (state.loading) V8LoadingCard(title = "Cargando grupos…")
         state.error?.let { StatusNotice(title = "No pudimos actualizar", message = it) }
         state.notice?.let { StatusNotice(title = "Tutorías", message = it) }
         if (!state.loading && state.groups.isEmpty()) {
@@ -101,7 +103,7 @@ private fun TutorGroupsContent(
             OutlinedButton(
                 onClick = { groupId = group.id },
                 enabled = !state.loading,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
             ) {
                 Text((if (group.id == groupId) "● " else "") + group.name)
             }
@@ -154,7 +156,7 @@ private fun TutorGroupsContent(
             }
         }
 
-        if (state.rosterLoading) CircularProgressIndicator()
+        if (state.rosterLoading) V8LoadingCard(title = "Cargando alumnos…")
         if (groupId != null && !state.rosterLoading && state.roster.isEmpty()) {
             StatusNotice(title = "Sin alumnos registrados", message = "No hay miembros disponibles para este grupo.")
         }

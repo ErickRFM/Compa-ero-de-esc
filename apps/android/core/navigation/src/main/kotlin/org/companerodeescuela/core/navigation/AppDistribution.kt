@@ -16,7 +16,7 @@ enum class AppDistribution {
 
     fun allows(experience: AppExperience): Boolean =
         when (this) {
-            LEGACY -> experience != AppExperience.UNSUPPORTED && experience != AppExperience.PRINCIPAL
+            LEGACY -> experience != AppExperience.UNSUPPORTED
             ACADEMIC ->
                 experience == AppExperience.STUDENT ||
                     experience == AppExperience.TEACHER ||

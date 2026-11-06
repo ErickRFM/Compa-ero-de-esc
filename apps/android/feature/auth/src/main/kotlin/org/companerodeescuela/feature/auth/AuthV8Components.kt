@@ -58,11 +58,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
+import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 import org.companerodeescuela.core.designsystem.v8.V8BrandHeader
 import org.companerodeescuela.core.designsystem.v8.V8ColorScheme
 import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
+import org.companerodeescuela.core.designsystem.v8.V8RedDimensions
 import org.companerodeescuela.core.motion.CompaneroMotionPolicy
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 import org.companerodeescuela.core.motion.MotionRole
@@ -102,11 +104,11 @@ internal fun AuthWelcomeHero(
 ) {
     val accent = authAccent()
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = CompaneroSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
     ) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs)) {
             Text(title, color = authInk(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Box(Modifier.width(84.dp).height(4.dp).background(accent, RoundedCornerShape(4.dp)))
             if (subtitle != null) Text(subtitle, color = authMuted(), fontSize = 14.sp, lineHeight = 20.sp)
@@ -163,14 +165,14 @@ private fun AuthV8Frame(
                         .navigationBarsPadding()
                         .imePadding()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                        .padding(horizontal = V8RedDimensions.ScreenHorizontal, vertical = CompaneroSpacing.xs),
             ) {
                 V8BrandHeader(
                     contentColor = authInk(),
                     secondaryColor = authMuted(),
                     tagline = stringResource(R.string.auth_tagline),
                 )
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(CompaneroSpacing.lg))
                 content()
             }
         }
@@ -227,8 +229,8 @@ internal fun AuthV8PrimaryAction(
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.fillMaxWidth().heightIn(min = 56.dp),
-        shape = RoundedCornerShape(18.dp),
+        modifier = modifier.fillMaxWidth().heightIn(min = CompaneroSize.avatar),
+        shape = RoundedCornerShape(V8RedDimensions.FieldCorner),
         colors =
             ButtonDefaults.buttonColors(
                 containerColor = accent,
@@ -247,7 +249,7 @@ internal fun AuthV8PrimaryAction(
             if (busy) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
                 ) {
                     AuthLoadingGraduationCap(reducedMotion)
                     submittingText?.let {
@@ -297,8 +299,8 @@ internal fun AuthV8SecondaryAction(
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.fillMaxWidth().heightIn(min = 54.dp),
-        shape = RoundedCornerShape(18.dp),
+        modifier = modifier.fillMaxWidth().heightIn(min = CompaneroSize.avatar),
+        shape = RoundedCornerShape(V8RedDimensions.FieldCorner),
         border = BorderStroke(1.dp, authAccent().copy(alpha = 0.53f)),
         colors =
             ButtonDefaults.outlinedButtonColors(

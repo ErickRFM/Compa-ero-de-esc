@@ -15,8 +15,14 @@ import kotlinx.coroutines.withTimeout
 import org.companerodeescuela.api.academic.academicRoutes
 import org.companerodeescuela.api.academic.groups.academicGroupRoutes
 import org.companerodeescuela.api.admin.AccountAdministrationService
+import org.companerodeescuela.api.admin.MongoOwnerBootstrapClaims
+import org.companerodeescuela.api.admin.OwnerBootstrap
+import org.companerodeescuela.api.admin.QaAdminBootstrap
 import org.companerodeescuela.api.admin.accountAdministrationRoutes
 import org.companerodeescuela.api.attendance.attendanceRoutes
+import org.companerodeescuela.api.auth.InMemoryRateLimitStore
+import org.companerodeescuela.api.auth.LoginAttemptLimiter
+import org.companerodeescuela.api.auth.MongoRateLimitStore
 import org.companerodeescuela.api.auth.PlatformSessionAuthority
 import org.companerodeescuela.api.auth.authRoutes
 import org.companerodeescuela.api.channel.channelRoutes
@@ -50,8 +56,10 @@ import org.companerodeescuela.api.integrations.push.SiiiPilotCredentialBootstrap
 import org.companerodeescuela.api.integrations.push.institutionalAttendanceHistoryRoutes
 import org.companerodeescuela.api.integrations.push.institutionalIdentityLinkRoutes
 import org.companerodeescuela.api.integrations.push.institutionalPushRoutes
+import org.companerodeescuela.api.invitations.InMemoryInvitationOutbox
 import org.companerodeescuela.api.invitations.InMemoryInvitationRepository
 import org.companerodeescuela.api.invitations.InvitationDispatchService
+import org.companerodeescuela.api.invitations.MongoInvitationOutbox
 import org.companerodeescuela.api.invitations.MongoInvitationRepository
 import org.companerodeescuela.api.invitations.UnavailableInvitationEmailGateway
 import org.companerodeescuela.api.invitations.invitationRoutes
@@ -128,8 +136,33 @@ fun Application.module(
             }
         }
     }
-    // One-time provisioning is an explicit operator action and blocks startup on mismatch.
-    org.companerodeescuela.api.admin.QaAdminBootstrap.parse(System::getenv)?.let { desired ->
+    // Initial ownership is an explicit MFA-authorized operator command, never a
+    // privilege inferred from an email, login form or invitation. This bootstrap
+    // refuses production and requires an isolated *_qa database.
+    val qaOwnerSpec = OwnerBootstrap.parse(System::getenv)
+    val qaAdminSpec = QaAdminBootstrap.parse(System::getenv)
+    require(qaOwnerSpec == null || qaAdminSpec == null) {
+        "QA initial owner and institutional admin bootstrap cannot run together"
+    }
+    qaOwnerSpec?.let { desired ->
+        require(settings.mongo.isConfigured && settings.hasAuthentication) {
+            "QA owner bootstrap requires persistent authenticated identity"
+        }
+        runBlocking {
+            withTimeout(15_000L) {
+                OwnerBootstrap.provision(
+                    desired,
+                    settings.environment.name.lowercase(),
+                    settings.mongo.databaseName,
+                    identityGraph.accounts,
+                    identityGraph.mfa,
+                    MongoOwnerBootstrapClaims(mongoConnection.database()),
+                )
+            }
+        }
+    }
+    // One-time institution-level provisioning is a separate action and blocks startup on mismatch.
+    qaAdminSpec?.let { desired ->
         require(
             settings.mongo.isConfigured && settings.hasAuthentication,
         ) { "QA admin bootstrap requires persistent authenticated identity" }
@@ -383,11 +416,29 @@ fun Application.module(
         mongoConnection.close()
     }
 
+    val rateLimitStore =
+        if (settings.hasAuthentication && settings.mongo.isConfigured) {
+            MongoRateLimitStore(mongoConnection.database())
+        } else {
+            InMemoryRateLimitStore()
+        }
+    val loginAttemptLimiter =
+        LoginAttemptLimiter(
+            progressiveDelayBase = java.time.Duration.ofSeconds(settings.loginProgressiveDelayBaseSeconds),
+            progressiveDelayMaximum = java.time.Duration.ofSeconds(settings.loginProgressiveDelayMaxSeconds),
+            store = rateLimitStore,
+        )
     val invitationRepository =
         if (settings.hasAuthentication && settings.mongo.isConfigured) {
             MongoInvitationRepository(mongoConnection.database())
         } else {
             InMemoryInvitationRepository()
+        }
+    val invitationOutbox =
+        if (settings.hasAuthentication && settings.mongo.isConfigured) {
+            MongoInvitationOutbox(mongoConnection.database())
+        } else {
+            InMemoryInvitationOutbox()
         }
     val invitationEmail =
         if (settings.hasVerificationEmail) {
@@ -405,6 +456,7 @@ fun Application.module(
             invitationRepository,
             invitationEmail,
             identityGraph.institutions,
+            invitationOutbox,
         )
 
     routing {
@@ -412,6 +464,7 @@ fun Application.module(
         authRoutes(
             settings = settings,
             identityProvider = providerRegistry.identity,
+            loginAttemptLimiter = loginAttemptLimiter,
             sessions = identityGraph.refreshSessions,
             accounts = identityGraph.accounts,
             institutions = identityGraph.institutions,
@@ -440,6 +493,7 @@ fun Application.module(
             identityGraph.accounts,
             invitationDispatcher,
             invitationRepository,
+            rateLimitStore = rateLimitStore,
         )
         institutionRoutes(identityGraph.institutions)
         institutionalPushRoutes(

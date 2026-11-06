@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.feature.auth
 
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,9 +33,7 @@ import org.companerodeescuela.core.common.result.AppError
     Text(stringResource(resource), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("security_error"))
 }
 
-@Composable
-@Suppress("ktlint:standard:function-naming")
-internal fun SecurityMemoryField(
+@Composable internal fun SecurityMemoryField(
     value: String,
     onChange: (String) -> Unit,
     label: Int,

@@ -54,7 +54,9 @@ class MfaViewModelTest {
                         val body =
                             when (request.url.encodedPath) {
                                 "/auth/mfa/status" -> """{"enabled":false,"available":true}"""
-                                "/auth/mfa/enrollment" -> """{"enrollmentId":"enrollment","secret":"TESTONLY","provisioningUri":"otpauth://totp/QA","expiresAtEpochSeconds":4102444800}"""
+                                "/auth/mfa/enrollment" ->
+                                    """{"enrollmentId":"enrollment","secret":"TESTONLY",""" +
+                                        """"provisioningUri":"otpauth://totp/QA","expiresAtEpochSeconds":4102444800}"""
                                 "/auth/mfa/confirmation" -> """{"enabled":true,"available":true}"""
                                 else -> error("Unexpected endpoint")
                             }

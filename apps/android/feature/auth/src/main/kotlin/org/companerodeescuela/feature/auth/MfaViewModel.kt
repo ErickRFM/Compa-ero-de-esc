@@ -42,11 +42,7 @@ class MfaViewModel
                     statusJob?.cancel()
                     operationJob?.cancel()
                     mutable.value =
-                        MfaUiState(
-                            loading = next != null,
-                            failure = if (next == null) AppError.Http(401) else null,
-                            ownerKey = next,
-                        )
+                        MfaUiState(loading = next != null, failure = if (next == null) AppError.Http(401) else null, ownerKey = next)
                     if (next != null) refresh()
                 }
             }
@@ -55,10 +51,7 @@ class MfaViewModel
         private fun current(
             captured: Long,
             capturedOwner: String?,
-        ): Boolean =
-            captured == generation &&
-                capturedOwner != null &&
-                capturedOwner == owner
+        ) = captured == generation && capturedOwner != null && capturedOwner == owner
 
         fun refresh() {
             val captured = generation

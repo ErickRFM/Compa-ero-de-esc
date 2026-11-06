@@ -4,6 +4,7 @@ import com.mongodb.MongoWriteException
 import com.mongodb.client.model.Filters.and
 import com.mongodb.client.model.Filters.eq
 import com.mongodb.client.model.Filters.gt
+import com.mongodb.client.model.Filters.`in`
 import com.mongodb.client.model.Filters.lte
 import com.mongodb.client.model.Filters.nin
 import com.mongodb.client.model.FindOneAndUpdateOptions
@@ -24,10 +25,20 @@ internal class MongoInvitationRepository(
 ) : InvitationRepository {
     private val records = database.getCollection<Document>("platform_invitations")
 
+    @Volatile
+    private var tokenHashIndexReady = false
+
     override suspend fun create(record: InvitationRecord): Boolean {
         val canonical = record.canonicalForStorage()
         if (!canonical.validForCreation()) return false
-        records.createIndex(Indexes.ascending("tokenHash"), IndexOptions().unique(true))
+        if (!tokenHashIndexReady) {
+            try {
+                records.createIndex(Indexes.ascending("tokenHash"), IndexOptions().name("invitation_tokenHash_unique").unique(true))
+            } catch (_: com.mongodb.MongoCommandException) {
+                // Index already exists; safe to ignore
+            }
+            tokenHashIndexReady = true
+        }
         return try {
             records.insertOne(canonical.toDocument())
             true
@@ -35,6 +46,51 @@ internal class MongoInvitationRepository(
             if (error.error.code == 11000) false else throw error
         }
     }
+
+    override suspend fun find(id: String): InvitationRecord? = records.find(eq("_id", id)).firstOrNull()?.toInvitation()
+
+    override suspend fun markSent(
+        id: String,
+        now: Instant,
+    ): Boolean =
+        records
+            .updateOne(
+                and(
+                    eq("_id", id),
+                    lte("createdAt", Date.from(now)),
+                    eq("status", InvitationStatus.CREATED.name),
+                ),
+                Updates.set("status", InvitationStatus.SENT.name),
+            ).matchedCount == 1L
+
+    override suspend fun expireDue(now: Instant): Int =
+        records
+            .updateMany(
+                and(
+                    lte("expiresAt", Date.from(now)),
+                    `in`("status", InvitationStatus.CREATED.name, InvitationStatus.SENT.name),
+                ),
+                Updates.set("status", InvitationStatus.EXPIRED.name),
+            ).modifiedCount
+            .toInt()
+
+    override suspend fun retry(
+        id: String,
+        newTokenHash: String,
+        now: Instant,
+    ): Boolean =
+        records
+            .updateOne(
+                and(
+                    eq("_id", id),
+                    `in`("status", InvitationStatus.FAILED.name, InvitationStatus.SENT.name),
+                    gt("expiresAt", Date.from(now)),
+                ),
+                Updates.combine(
+                    Updates.set("status", InvitationStatus.SENT.name),
+                    Updates.set("tokenHash", newTokenHash),
+                ),
+            ).matchedCount == 1L
 
     override suspend fun accept(
         id: String,

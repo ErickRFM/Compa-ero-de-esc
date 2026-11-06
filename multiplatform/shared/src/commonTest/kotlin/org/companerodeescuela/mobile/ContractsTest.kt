@@ -28,4 +28,30 @@ class ContractsTest {
             """{"code":"dependency_unavailable","message":"Unavailable","requestId":"r2"}""")
         assertEquals(ApiErrorCode.DEPENDENCY_UNAVAILABLE, error.code)
     }
+    @Test fun invitationContractsAreAvailableOnAllTargets() {
+        val request = json.encodeToString(
+            AcceptRegistrationInvitationRequest("inv-123", "code-456", "op-789"))
+        assertTrue(request.contains("\"invitationId\":\"inv-123\""))
+        assertTrue(request.contains("\"code\":\"code-456\""))
+    }
+    @Test fun academicContractsAreAvailableOnAllTargets() {
+        val profile = AcademicProfile("s1", "Student Name")
+        val payload = json.encodeToString(profile)
+        assertTrue(payload.contains("\"id\":\"s1\""))
+        assertTrue(payload.contains("\"displayName\":\"Student Name\""))
+    }
+    @Test fun attendanceContractsAreAvailableOnAllTargets() {
+        val payload = json.encodeToString(AttendanceStatus.VERIFIED)
+        assertTrue(payload.contains("\"verified\""))
+    }
+    @Test fun privilegeSecurityContractsAreAvailableOnAllTargets() {
+        val status = MfaStatus(enabled = true, available = true)
+        val payload = json.encodeToString(status)
+        assertTrue(payload.contains("\"enabled\":true"))
+        assertTrue(payload.contains("\"available\":true"))
+    }
+    @Test fun stepUpActionsAreAvailableOnAllTargets() {
+        val payload = json.encodeToString(StepUpAction.ADMIN_INVITE)
+        assertTrue(payload.contains("\"ADMIN_INVITE\""))
+    }
 }

@@ -302,7 +302,7 @@ jobs:
           require_distinct('org.companerodeescuela.AttendanceTruthUiTest', 8)
           require_distinct('org.companerodeescuela.ChannelTaskLayoutUiTest', 4)
           require_distinct('org.companerodeescuela.ProfileConsistencyUiTest', 4)
-          require_distinct('org.companerodeescuela.MotionDesignUiTest', 5)
+          require_distinct('org.companerodeescuela.MotionDesignUiTest', 6)
           require_distinct('org.companerodeescuela.PersonalizationUxUiTest', 8)
           require_distinct('org.companerodeescuela.ManagementProfileNavigationTest', 7)
           if flavor == 'management':

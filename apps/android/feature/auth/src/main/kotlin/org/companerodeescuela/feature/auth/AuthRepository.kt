@@ -79,10 +79,7 @@ class AuthRepository(
             apiCall {
                 client
                     .post("auth/login") {
-                        header(
-                            HttpHeaders.ContentType,
-                            ContentType.Application.Json.toString(),
-                        )
+                        header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                         setBody(LoginRequest(username = username, password = password))
                     }.requireBody<ApiResponse<LoginResponse>>()
             }.map { it.data }
@@ -101,10 +98,7 @@ class AuthRepository(
             apiCall {
                 client
                     .post("auth/register") {
-                        header(
-                            HttpHeaders.ContentType,
-                            ContentType.Application.Json.toString(),
-                        )
+                        header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                         setBody(request)
                     }.requireBody<ApiResponse<LoginResponse>>()
             }.map { it.data },
@@ -122,10 +116,7 @@ class AuthRepository(
                     client
                         .post("auth/verification/confirm") {
                             header(HttpHeaders.Authorization, "Bearer " + access)
-                            header(
-                                HttpHeaders.ContentType,
-                                ContentType.Application.Json.toString(),
-                            )
+                            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                             setBody(
                                 org.companerodeescuela.shared.contracts
                                     .VerifyEmailRequest(token),
@@ -244,11 +235,8 @@ class AuthRepository(
                         header(HttpHeaders.Authorization, "Bearer " + access)
                         header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                         setBody(
-                            org.companerodeescuela.shared.contracts.AcceptRegistrationInvitationRequest(
-                                invitationId,
-                                code,
-                                operationId,
-                            ),
+                            org.companerodeescuela.shared.contracts
+                                .AcceptRegistrationInvitationRequest(invitationId, code, operationId),
                         )
                     }.requireBody<ApiResponse<org.companerodeescuela.shared.contracts.RegistrationInvitationReceipt>>()
             }.map { it.data }

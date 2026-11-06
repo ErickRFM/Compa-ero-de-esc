@@ -71,9 +71,33 @@ class InvitationEmailTransportTest {
                 val rotatedCode = "c".repeat(43)
                 val expires = Instant.parse("2026-11-10T20:00:00Z")
 
-                assertEquals(VerificationDeliveryStatus.ACCEPTED, adapter.send("recipient@example.test", firstCode, invitationId, expires))
-                assertEquals(VerificationDeliveryStatus.ACCEPTED, adapter.send("recipient@example.test", firstCode, invitationId, expires))
-                assertEquals(VerificationDeliveryStatus.ACCEPTED, adapter.send("recipient@example.test", rotatedCode, invitationId, expires))
+                assertEquals(
+                    VerificationDeliveryStatus.ACCEPTED,
+                    adapter.send(
+                        "recipient@example.test",
+                        firstCode,
+                        invitationId,
+                        expires,
+                    ),
+                )
+                assertEquals(
+                    VerificationDeliveryStatus.ACCEPTED,
+                    adapter.send(
+                        "recipient@example.test",
+                        firstCode,
+                        invitationId,
+                        expires,
+                    ),
+                )
+                assertEquals(
+                    VerificationDeliveryStatus.ACCEPTED,
+                    adapter.send(
+                        "recipient@example.test",
+                        rotatedCode,
+                        invitationId,
+                        expires,
+                    ),
+                )
 
                 assertEquals(3, observedKeys.size)
                 assertEquals(observedKeys[0], observedKeys[1])

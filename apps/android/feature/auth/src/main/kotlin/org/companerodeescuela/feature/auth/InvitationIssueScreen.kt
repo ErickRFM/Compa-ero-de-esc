@@ -6,11 +6,11 @@ import android.content.ContextWrapper
 import android.view.WindowManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,6 +28,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.v8.V8FrostedGlassPanel
 import org.companerodeescuela.shared.contracts.VerificationDeliveryStatus
 
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun InvitationIssueScreen(
     onBack: () -> Unit,
@@ -112,8 +113,11 @@ fun InvitationIssueScreen(
                         otp = ""
                         viewModel.send(recipient, institutionId, profile, passwordInput, otpInput)
                     },
-                    !state.working && recipient.contains("@") &&
-                        institutionId.isNotBlank() && password.length >= 8 && otp.length == 6,
+                    !state.working &&
+                        recipient.contains("@") &&
+                        institutionId.isNotBlank() &&
+                        password.length >= 8 &&
+                        otp.length == 6,
                     state.working,
                     Modifier.testTag("invite_send"),
                     "Validando...",

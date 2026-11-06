@@ -13,14 +13,26 @@ class AuthDraftViewModel : ViewModel() {
     private var verificationAccountId: String? = null
 
     fun clearRegistration() {
-        password.value = ""; confirmation.value = ""; identityReference.value = ""
+        password.value = ""
+        confirmation.value = ""
+        identityReference.value = ""
     }
-    fun bindVerificationAccount(userId: String?, status: AccountStatus) {
+
+    fun bindVerificationAccount(
+        userId: String?,
+        status: AccountStatus,
+    ) {
         if (verificationAccountId != userId || status != AccountStatus.PENDING_VERIFICATION) verificationCode.value = ""
         verificationAccountId = userId
     }
+
     fun clearAll() {
-        clearRegistration(); verificationCode.value = ""; verificationAccountId = null
+        clearRegistration()
+        verificationCode.value = ""
+        verificationAccountId = null
     }
-    override fun onCleared() { clearAll() }
+
+    override fun onCleared() {
+        clearAll()
+    }
 }

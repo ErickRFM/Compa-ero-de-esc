@@ -74,6 +74,9 @@ jobs:
       - name: Whitespace errors in committed changes
         run: bash infrastructure/scripts/check-whitespace.sh
 
+      - name: Production Mongo isolation preflight regression tests (no secrets)
+        run: python3 -m unittest discover -s infrastructure/scripts/tests -p test_verify_production_mongo_isolation.py -v
+
       - name: Kotlin style check
         run: ./gradlew ktlintCheck --console=plain
 

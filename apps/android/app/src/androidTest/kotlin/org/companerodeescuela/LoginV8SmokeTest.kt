@@ -10,9 +10,9 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.companerodeescuela.feature.settings.AppLanguage
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
-import org.junit.Assume.assumeTrue
 import org.junit.runner.RunWith
 
 /** Real MainActivity login: Compose semantics are authoritative for Compose UI. */

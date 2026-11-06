@@ -16,7 +16,6 @@ import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -517,7 +516,8 @@ class V12AdministrationUiTest {
             }
             compose.waitForIdle()
             compose.waitUntil(10_000) {
-                compose.onAllNodesWithTag("staff_submit")
+                compose
+                    .onAllNodesWithTag("staff_submit")
                     .fetchSemanticsNodes()
                     .firstOrNull()
                     ?.boundsInRoot

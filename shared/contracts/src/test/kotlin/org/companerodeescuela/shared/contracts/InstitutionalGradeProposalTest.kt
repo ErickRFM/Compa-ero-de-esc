@@ -87,12 +87,12 @@ class InstitutionalGradeProposalTest {
             original.copy(
             rows =
                 List(501) {
-                InstitutionalGradeProposalRow(
-                    nativeStudentId = "native-student-$it",
-                    studentSourceId = id(),
-                    gradeHundredths = 700,
-                )
-            },
+                    InstitutionalGradeProposalRow(
+                        nativeStudentId = "native-student-$it",
+                        studentSourceId = id(),
+                        gradeHundredths = 700,
+                    )
+                },
         )
         assertTrue("BATCH_SIZE" in InstitutionalGradeProposalValidation.problems(tooLarge))
     }

@@ -512,12 +512,13 @@ class V12AdministrationUiTest {
             compose.onNodeWithTag("staff_identity").performScrollTo().performTextInput("TEST-REFERENCE")
             compose.onNodeWithTag("staff_preference").performScrollTo().performTextInput("QA Group preference")
             dismissKeyboardBeforeSubmit()
-            val submit =
-                compose
-                    .onNodeWithTag("staff_submit")
-                    .performScrollTo()
-            compose.waitUntil(10000) { submit.isDisplayed() }
-            submit
+            compose.waitUntil(10000) {
+                compose.onAllNodesWithTag("staff_submit").fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.waitForIdle()
+            compose
+                .onNodeWithTag("staff_submit")
+                .performScrollTo()
                 .assertIsDisplayed()
                 .assertIsEnabled()
                 // Exercise the exposed accessibility action once. Native IME animations on API35

@@ -432,6 +432,10 @@ class V12AdministrationUiTest {
                 .assertIsDisplayed()
                 .assertIsEnabled()
                 .performClick()
+            compose.waitForIdle()
+            if (f.confirmationRequests.get() == 0 && f.mfa.state.value.failure == null) {
+                compose.onNodeWithTag("mfa_confirm").performScrollTo().performClick()
+            }
             waitForMfaTransition(f, "confirmation") {
                 val state = f.mfa.state.value
                 (state.status?.enabled == true && state.enrollment == null && !state.working) || state.failure != null

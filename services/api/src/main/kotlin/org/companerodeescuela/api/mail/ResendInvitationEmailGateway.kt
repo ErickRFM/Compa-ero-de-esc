@@ -69,7 +69,7 @@ internal class ResendInvitationEmailGateway(
                 )
                 put("html", html(code, invitationId, expiresAt))
             }.toString().toByteArray(Charsets.UTF_8)
-        return withContext(Dispatchers.IO) { attempt(body, invitationId) }
+        return withContext(Dispatchers.IO) { attempt(body) }
     }
 
     private fun html(
@@ -97,10 +97,7 @@ internal class ResendInvitationEmailGateway(
         </body></html>
         """.trimIndent()
 
-    private fun attempt(
-        payload: ByteArray,
-        id: String,
-    ): VerificationDeliveryStatus {
+    private fun attempt(payload: ByteArray): VerificationDeliveryStatus {
         val connection = endpoint.toURL().openConnection() as HttpURLConnection
         return try {
             connection.connectTimeout = 5_000

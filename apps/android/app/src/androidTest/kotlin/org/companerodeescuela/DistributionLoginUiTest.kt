@@ -39,7 +39,8 @@ class DistributionLoginUiTest {
         compose.onNodeWithTag("login_username").performScrollTo().performTextInput("qa.docente")
         compose.onNodeWithTag("login_password").performScrollTo().performTextInput("test-password")
         compose.onNodeWithTag("login_submit").performScrollTo().performClick()
-        compose.runOnIdle { assertEquals("qa.docente" to "test-password", submitted) }
+        compose.waitUntil(10_000) { submitted != null }
+        assertEquals("qa.docente" to "test-password", submitted)
         if (distribution == AppDistribution.ACADEMIC) {
             compose.onNodeWithTag("login_registration").assertExists()
         } else {

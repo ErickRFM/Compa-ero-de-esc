@@ -516,6 +516,13 @@ class V12AdministrationUiTest {
                 compose.onAllNodesWithTag("staff_submit").fetchSemanticsNodes().isNotEmpty()
             }
             compose.waitForIdle()
+            compose.waitUntil(10_000) {
+                compose.onAllNodesWithTag("staff_submit")
+                    .fetchSemanticsNodes()
+                    .firstOrNull()
+                    ?.boundsInRoot
+                    ?.let { it.bottom > 0f && it.top < 2400f } == true
+            }
             compose
                 .onNodeWithTag("staff_submit")
                 .performScrollTo()

@@ -53,6 +53,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -359,8 +360,15 @@ private fun ProfileAvatar(
     ink: Color,
     highContrast: Boolean,
 ) {
+    val avatarDescription =
+        displayName?.trim()?.takeIf(String::isNotBlank) ?: "Cuenta de Compañero"
     Surface(
-        modifier = Modifier.size(if (LocalDensity.current.fontScale >= 1.5f) 64.dp else 48.dp).clearAndSetSemantics {},
+        modifier =
+            Modifier
+                .size(if (LocalDensity.current.fontScale >= 1.5f) 64.dp else 48.dp)
+                .clearAndSetSemantics {
+                    contentDescription = avatarDescription
+                },
         shape = CircleShape,
         color = if (highContrast) ink else ink.copy(alpha = 0.16f),
     ) {

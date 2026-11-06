@@ -242,7 +242,7 @@ fun ScheduleScreen(
                 InstitutionSyncCard(state, viewModel::load)
             }
 
-            if (state.entries.isEmpty()) {
+            if (state.entries.isEmpty() && state.errorMessage == null && !state.loading && !state.actionInProgress) {
                 EmptyScheduleActions(
                     loading = state.loading || state.actionInProgress || importBusy,
                     onSync = viewModel::load,

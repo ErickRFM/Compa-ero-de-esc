@@ -21,6 +21,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
@@ -49,6 +50,7 @@ import org.companerodeescuela.core.navigation.CompaneroScaffold
 import org.companerodeescuela.core.navigation.Destination
 import org.companerodeescuela.core.navigation.TopLevelDestination
 import org.companerodeescuela.core.navigation.navigateToTopLevel
+import org.companerodeescuela.core.ui.component.ExpressiveSegmentedControl
 import org.companerodeescuela.feature.home.HomeShortcutGrid
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -58,6 +60,26 @@ import java.io.File
 
 class MotionDesignUiTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+
+    @Test
+    fun expressiveSegmentedControlExposesTabsAndSelection() {
+        val selected = mutableStateOf(0)
+        compose.setContent {
+            CompaneroTheme {
+                ExpressiveSegmentedControl(
+                    options = listOf("Semana", "Día"),
+                    selectedIndex = selected.value,
+                    onSelected = { selected.value = it },
+                )
+            }
+        }
+
+        val week = compose.onNodeWithContentDescription("Semana")
+        week.assertIsSelected()
+        assertEquals(Role.Tab, week.fetchSemanticsNode().config[SemanticsProperties.Role])
+        compose.onNodeWithContentDescription("Día").performClick()
+        compose.onNodeWithContentDescription("Día").assertIsSelected()
+    }
 
     @Test
     fun largeTextShortcutsKeepFourDistinctDestinationsReachable() {

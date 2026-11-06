@@ -45,15 +45,15 @@ class InstitutionalGradeProposalTest {
         for (score in listOf(0, 1000)) {
             val candidate =
                 proposal().copy(
-                rows = listOf(InstitutionalGradeProposalRow("native-student-001", id(), score)),
-            )
+                    rows = listOf(InstitutionalGradeProposalRow("native-student-001", id(), score)),
+                )
             assertTrue(InstitutionalGradeProposalValidation.problems(candidate).isEmpty())
         }
         for (score in listOf(-1, 1001)) {
             val candidate =
                 proposal().copy(
-                rows = listOf(InstitutionalGradeProposalRow("native-student-001", id(), score)),
-            )
+                    rows = listOf(InstitutionalGradeProposalRow("native-student-001", id(), score)),
+                )
             assertTrue("INVALID_GRADE" in InstitutionalGradeProposalValidation.problems(candidate))
         }
     }
@@ -66,8 +66,8 @@ class InstitutionalGradeProposalTest {
         assertTrue("DUPLICATE_STUDENT" in InstitutionalGradeProposalValidation.problems(duplicateOfficial))
         val duplicateNative =
             proposal().copy(
-            rows = listOf(first, second.copy(studentSourceId = id(), nativeStudentId = first.nativeStudentId)),
-        )
+                rows = listOf(first, second.copy(studentSourceId = id(), nativeStudentId = first.nativeStudentId)),
+            )
         assertTrue("DUPLICATE_STUDENT" in InstitutionalGradeProposalValidation.problems(duplicateNative))
     }
 
@@ -76,24 +76,24 @@ class InstitutionalGradeProposalTest {
         val original = proposal()
         val incorrect =
             original.copy(
-            sourceVersion = 0,
-            sourceDigest = "none",
-            contract = "unknown",
-            rows = emptyList(),
-        )
+                sourceVersion = 0,
+                sourceDigest = "none",
+                contract = "unknown",
+                rows = emptyList(),
+            )
         val found = InstitutionalGradeProposalValidation.problems(incorrect)
         assertTrue(found.containsAll(setOf("INVALID_VERSION", "UNSUPPORTED_CONTRACT", "BATCH_SIZE")))
         val tooLarge =
             original.copy(
-            rows =
-                List(501) {
-                    InstitutionalGradeProposalRow(
-                        nativeStudentId = "native-student-$it",
-                        studentSourceId = id(),
-                        gradeHundredths = 700,
-                    )
-                },
-        )
+                rows =
+                    List(501) {
+                        InstitutionalGradeProposalRow(
+                            nativeStudentId = "native-student-$it",
+                            studentSourceId = id(),
+                            gradeHundredths = 700,
+                        )
+                    },
+            )
         assertTrue("BATCH_SIZE" in InstitutionalGradeProposalValidation.problems(tooLarge))
     }
 

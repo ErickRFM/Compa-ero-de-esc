@@ -16,6 +16,7 @@ import org.companerodeescuela.shared.contracts.VerificationDeliveryStatus
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URI
+import java.security.MessageDigest
 import java.time.Instant
 
 /** Provider acceptance is not proof of mailbox delivery. No token or key is logged. */
@@ -68,7 +69,7 @@ internal class ResendInvitationEmailGateway(
                 )
                 put("html", html(code, invitationId, expiresAt))
             }.toString().toByteArray(Charsets.UTF_8)
-        return withContext(Dispatchers.IO) { attempt(body, invitationId) }
+        return withContext(Dispatchers.IO) { attempt(body) }
     }
 
     private fun html(
@@ -96,10 +97,7 @@ internal class ResendInvitationEmailGateway(
         </body></html>
         """.trimIndent()
 
-    private fun attempt(
-        payload: ByteArray,
-        id: String,
-    ): VerificationDeliveryStatus {
+    private fun attempt(payload: ByteArray): VerificationDeliveryStatus {
         val connection = endpoint.toURL().openConnection() as HttpURLConnection
         return try {
             connection.connectTimeout = 5_000
@@ -109,7 +107,12 @@ internal class ResendInvitationEmailGateway(
             connection.doOutput = true
             connection.setRequestProperty("Authorization", "Bearer " + apiKey.concatToString())
             connection.setRequestProperty("Content-Type", "application/json")
-            connection.setRequestProperty("Idempotency-Key", "invite-$id")
+            // A rotated invitation code changes the message payload. Reusing the invitation ID
+            // as the idempotency key would cause Resend to replay the *old* delivery,
+            // making a newly issued code undeliverable. Equal payloads remain deduplicated.
+            val payloadDigest =
+                MessageDigest.getInstance("SHA-256").digest(payload).joinToString("") { "%02x".format(it) }
+            connection.setRequestProperty("Idempotency-Key", "invite-v2-$payloadDigest")
             connection.setFixedLengthStreamingMode(payload.size)
             connection.outputStream.use { it.write(payload) }
             val code = connection.responseCode

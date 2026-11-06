@@ -24,6 +24,7 @@ import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 
 /** No code is persisted in saved state, logs or an intent. Redemption never grants a role. */
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun InvitationAcceptanceScreen(
     state: SessionUiState,

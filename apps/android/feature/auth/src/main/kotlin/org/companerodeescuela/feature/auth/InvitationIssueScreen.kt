@@ -34,6 +34,7 @@ import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.VerificationDeliveryStatus
 
+@Suppress("ktlint:standard:function-naming")
 @Composable
 fun InvitationIssueScreen(
     onBack: () -> Unit,

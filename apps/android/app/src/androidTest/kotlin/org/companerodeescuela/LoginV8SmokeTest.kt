@@ -8,7 +8,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import org.companerodeescuela.feature.settings.AppLanguage
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -20,6 +22,7 @@ class LoginV8SmokeTest {
 
     @Test
     fun registrationAccountTypeCanBeSelectedByItsLabel() {
+        assumeAcademicDistribution()
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { it.appearancePreferences.setLanguage(AppLanguage.SPANISH) }
             waitForText("Bienvenido de nuevo")
@@ -44,6 +47,7 @@ class LoginV8SmokeTest {
 
     @Test
     fun firstAccessOpensInstitutionalIdentityValidation() {
+        assumeAcademicDistribution()
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { it.appearancePreferences.setLanguage(AppLanguage.SPANISH) }
             waitForText("Bienvenido de nuevo")
@@ -58,5 +62,10 @@ class LoginV8SmokeTest {
             compose.onAllNodesWithText(text, substring = true).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithText(text, substring = true).assertExists()
+    }
+
+    private fun assumeAcademicDistribution() {
+        val packageName = InstrumentationRegistry.getInstrumentation().targetContext.packageName
+        assumeTrue("Registration is available only in the academic distribution", packageName == "org.companerodeescuela")
     }
 }

@@ -16,7 +16,6 @@ import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.isDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -433,6 +432,10 @@ class V12AdministrationUiTest {
                 .assertIsDisplayed()
                 .assertIsEnabled()
                 .performClick()
+            compose.waitForIdle()
+            if (f.confirmationRequests.get() == 0 && f.mfa.state.value.failure == null) {
+                compose.onNodeWithTag("mfa_confirm").performScrollTo().performClick()
+            }
             waitForMfaTransition(f, "confirmation") {
                 val state = f.mfa.state.value
                 (state.status?.enabled == true && state.enrollment == null && !state.working) || state.failure != null
@@ -512,12 +515,21 @@ class V12AdministrationUiTest {
             compose.onNodeWithTag("staff_identity").performScrollTo().performTextInput("TEST-REFERENCE")
             compose.onNodeWithTag("staff_preference").performScrollTo().performTextInput("QA Group preference")
             dismissKeyboardBeforeSubmit()
-            val submit =
+            compose.waitUntil(10000) {
+                compose.onAllNodesWithTag("staff_submit").fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.waitForIdle()
+            compose.waitUntil(10_000) {
                 compose
-                    .onNodeWithTag("staff_submit")
-                    .performScrollTo()
-            compose.waitUntil(10000) { submit.isDisplayed() }
-            submit
+                    .onAllNodesWithTag("staff_submit")
+                    .fetchSemanticsNodes()
+                    .firstOrNull()
+                    ?.boundsInRoot
+                    ?.let { it.bottom > 0f && it.top < 2400f } == true
+            }
+            compose
+                .onNodeWithTag("staff_submit")
+                .performScrollTo()
                 .assertIsDisplayed()
                 .assertIsEnabled()
                 // Exercise the exposed accessibility action once. Native IME animations on API35

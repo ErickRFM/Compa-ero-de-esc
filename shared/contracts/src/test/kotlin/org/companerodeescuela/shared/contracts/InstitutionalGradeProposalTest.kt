@@ -13,6 +13,8 @@ class InstitutionalGradeProposalTest {
 
     private fun proposal(): InstitutionalGradeProposal =
         InstitutionalGradeProposal(
+            contract = InstitutionalGradeProposal.CONTRACT,
+            gradeScale = InstitutionalGradeProposal.GRADE_SCALE,
             operationId = id(),
             sourceVersion = 1,
             sourceDigest = "a".repeat(64),
@@ -32,6 +34,8 @@ class InstitutionalGradeProposalTest {
         val decoded = Json.decodeFromString<InstitutionalGradeProposal>(wire)
         assertEquals(value, decoded)
         assertTrue(wire.contains("\"gradeHundredths\":875"))
+        assertTrue(wire.contains("\"contract\":\"companero.grade_proposal.v1\""))
+        assertTrue(wire.contains("\"gradeScale\":\"MX_0_TO_10_HUNDREDTHS\""))
         assertFalse(wire.contains("finalGrade"))
         assertTrue(InstitutionalGradeProposalValidation.problems(decoded).isEmpty())
     }

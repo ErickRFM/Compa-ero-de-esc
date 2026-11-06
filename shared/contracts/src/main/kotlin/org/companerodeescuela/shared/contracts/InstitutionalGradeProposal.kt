@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 /** Shared wire shape only. Sending this envelope never publishes a grade in SIII. */
 @Serializable
 data class InstitutionalGradeProposal(
-    val contract: String = CONTRACT,
+    val contract: String,
     val operationId: String,
     val sourceVersion: Long,
     val sourceDigest: String,
@@ -15,7 +15,7 @@ data class InstitutionalGradeProposal(
     val academicPeriodId: String,
     val teacherExternalId: String,
     val gradingPeriod: String,
-    val gradeScale: String = GRADE_SCALE,
+    val gradeScale: String,
     val rows: List<InstitutionalGradeProposalRow>,
 ) {
     companion object {

@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import org.companerodeescuela.core.designsystem.theme.CompaneroAccentPalette
 import org.companerodeescuela.core.designsystem.theme.CompaneroTheme
 import org.companerodeescuela.feature.designsystem.DesignSystemCatalogScreen
@@ -29,7 +30,7 @@ class DesignSystemCatalogAccessibilityTest {
 
         CompaneroAccentPalette.entries.forEach { palette ->
             val labelledNode = compose.onNodeWithContentDescription(accentPaletteAccessibilityLabel(palette))
-            labelledNode.assertIsDisplayed()
+            labelledNode.performScrollTo().assertIsDisplayed()
             labelledNode.assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton))
             val density = compose.density.density
             val bounds = labelledNode.fetchSemanticsNode().boundsInRoot

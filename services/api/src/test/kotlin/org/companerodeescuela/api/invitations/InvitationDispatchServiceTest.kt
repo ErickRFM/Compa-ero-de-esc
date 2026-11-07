@@ -65,6 +65,66 @@ class InvitationDispatchServiceTest {
         }
 
     @Test
+    fun `durable retry replays only the bound invitation token and retires it on provider acceptance`() =
+        runTest {
+            val accounts = InMemoryPlatformAccountRepository()
+            val repository = InMemoryInvitationRepository()
+            val outbox = InMemoryInvitationOutbox(clock)
+            val token = InvitationToken.generate()
+            val invitationId = InvitationToken.generate().value
+            val createdAt = now.minusSeconds(3600)
+            val expiry = now.plusSeconds(3600)
+            assertTrue(
+                repository.create(
+                    InvitationRecord(
+                        invitationId,
+                        "student@example.test",
+                        "UPTLAX",
+                        InvitationProfile.STUDENT,
+                        "owner",
+                        createdAt,
+                        expiry,
+                        InvitationStatus.SENT,
+                        token.hash,
+                    ),
+                ),
+            )
+            assertTrue(
+                outbox.enqueue(
+                    OutboxEntry(
+                        invitationId,
+                        "student@example.test",
+                        token.value,
+                        expiry,
+                        nextAttemptAt = now.minusSeconds(60),
+                        createdAt = createdAt,
+                    ),
+                ),
+            )
+            var sends = 0
+            val service =
+                InvitationDispatchService(
+                    accounts,
+                    MfaService(accounts, InMemoryMfaRepository(), null, clock),
+                    repository,
+                    InvitationEmailGateway { recipient, code, id, _ ->
+                        assertEquals("student@example.test", recipient)
+                        assertEquals(token.value, code)
+                        assertEquals(invitationId, id)
+                        sends++
+                        org.companerodeescuela.shared.contracts.VerificationDeliveryStatus.ACCEPTED
+                    },
+                    InMemoryInstitutionRepository(),
+                    outbox,
+                    clock,
+                )
+            assertEquals(1, service.retryPendingOutbox())
+            assertEquals(0, service.retryPendingOutbox())
+            assertEquals(1, sends)
+            assertTrue(outbox.pending(now).isEmpty())
+        }
+
+    @Test
     fun `sending without scoped MFA proof cannot dispatch email`() =
         runTest {
             val accounts = InMemoryPlatformAccountRepository()

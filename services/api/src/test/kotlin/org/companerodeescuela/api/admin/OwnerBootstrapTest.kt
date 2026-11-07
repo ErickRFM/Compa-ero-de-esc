@@ -3,9 +3,9 @@ package org.companerodeescuela.api.admin
 import kotlinx.coroutines.test.runTest
 import org.companerodeescuela.api.auth.AccountIdentityChange
 import org.companerodeescuela.api.auth.InMemoryPlatformAccountRepository
-import org.companerodeescuela.api.auth.RegistrationIntent
 import org.companerodeescuela.api.auth.PasswordHasher
 import org.companerodeescuela.api.auth.PlatformAccount
+import org.companerodeescuela.api.auth.RegistrationIntent
 import org.companerodeescuela.api.security.InMemoryMfaRepository
 import org.companerodeescuela.api.security.MfaSecretCipher
 import org.companerodeescuela.api.security.MfaService

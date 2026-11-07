@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.bson.Document
+import org.companerodeescuela.api.security.MfaSecretCipher
 import org.companerodeescuela.shared.contracts.VerificationDeliveryStatus
 import java.time.Clock
 import java.time.Instant
@@ -126,6 +127,7 @@ internal class InMemoryInvitationOutbox(
 
 internal class MongoInvitationOutbox(
     database: MongoDatabase,
+    private val cipher: MfaSecretCipher,
     private val clock: Clock = Clock.systemUTC(),
 ) : InvitationOutbox {
     private val collection = database.getCollection<Document>("platform_invitation_outbox")
@@ -156,8 +158,14 @@ internal class MongoInvitationOutbox(
     override suspend fun pending(now: Instant): List<OutboxEntry> {
         val result = mutableListOf<OutboxEntry>()
         collection
-            .find(Filters.lte("nextAttemptAt", Date.from(now)))
-            .collect { doc -> doc.toOutboxEntry()?.let(result::add) }
+            .find(
+                Filters.and(
+                    Filters.lte("nextAttemptAt", Date.from(now)),
+                    Filters.gt("expiresAt", Date.from(now)),
+                    Filters.nin("lastStatus", VerificationDeliveryStatus.DELIVERED.name, VerificationDeliveryStatus.FAILED.name),
+                ),
+            ).limit(50)
+            .collect { doc -> doc.toOutboxEntry()?.takeIf { it.tokenValue.isNotEmpty() }?.let(result::add) }
         return result
     }
 
@@ -170,7 +178,7 @@ internal class MongoInvitationOutbox(
                 Filters.eq("_id", id),
                 Updates.combine(
                     Updates.set("lastStatus", VerificationDeliveryStatus.DELIVERED.name),
-                    Updates.set("tokenValue", ""),
+                    Updates.set("tokenCiphertext", ""),
                     Updates.set("deliveredAt", Date.from(now)),
                     Updates.inc("attempts", 1),
                 ),
@@ -185,7 +193,7 @@ internal class MongoInvitationOutbox(
                 Filters.eq("_id", id),
                 Updates.combine(
                     Updates.set("lastStatus", VerificationDeliveryStatus.FAILED.name),
-                    Updates.set("tokenValue", ""),
+                    Updates.set("tokenCiphertext", ""),
                 ),
             ).matchedCount == 1L
 
@@ -207,13 +215,17 @@ internal class MongoInvitationOutbox(
         collection
             .updateOne(
                 Filters.eq("_id", id),
-                Updates.set("tokenValue", ""),
+                Updates.set("tokenCiphertext", ""),
             ).matchedCount == 1L
 
     private fun OutboxEntry.toDocument(): Document =
         Document("_id", invitationId)
             .append("recipient", recipient)
-            .append("tokenValue", tokenValue)
+            // Encrypt retry capability with authenticated, per-invitation binding.
+            .append(
+                "tokenCiphertext",
+                if (tokenValue.isEmpty()) "" else cipher.encrypt(invitationId, "platform-invitation-outbox", tokenValue.toByteArray(Charsets.UTF_8)),
+            )
             .append("expiresAt", Date.from(expiresAt))
             .append("attempts", attempts)
             .append("nextAttemptAt", Date.from(nextAttemptAt))
@@ -225,7 +237,14 @@ internal class MongoInvitationOutbox(
             OutboxEntry(
                 invitationId = getString("_id"),
                 recipient = getString("recipient"),
-                tokenValue = getString("tokenValue"),
+                tokenValue =
+                    getString("tokenCiphertext")?.let { encrypted ->
+                        if (encrypted.isEmpty()) "" else cipher.decrypt(
+                            getString("_id"),
+                            "platform-invitation-outbox",
+                            encrypted,
+                        ).toString(Charsets.UTF_8)
+                    } ?: return null,
                 expiresAt = getDate("expiresAt").toInstant(),
                 attempts = getInteger("attempts", 0),
                 nextAttemptAt = getDate("nextAttemptAt").toInstant(),

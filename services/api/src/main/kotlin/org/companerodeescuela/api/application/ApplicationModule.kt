@@ -479,10 +479,14 @@ fun Application.module(
             identityGraph.institutions,
             invitationOutbox,
         )
+    val invitationWorkerConfigured =
+        settings.hasAuthentication &&
+            settings.mongo.isConfigured &&
+            settings.hasVerificationEmail &&
+            settings.mfaEncryptionKey != null
+    val invitationWorkerAllowed = !settings.environment.isProduction || settings.productionInvitationsEnabled
     launchManagedWorker(
-        enabled = settings.hasAuthentication && settings.mongo.isConfigured &&
-            settings.hasVerificationEmail && settings.mfaEncryptionKey != null &&
-            (!settings.environment.isProduction || settings.productionInvitationsEnabled),
+        enabled = invitationWorkerConfigured && invitationWorkerAllowed,
         context = Dispatchers.IO,
     ) {
         while (kotlin.coroutines.coroutineContext[kotlinx.coroutines.Job]?.isActive == true) {

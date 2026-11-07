@@ -3,29 +3,35 @@
 package org.companerodeescuela.feature.home
 
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 import org.companerodeescuela.core.designsystem.theme.companeroAccentSurfaceColors
 import org.companerodeescuela.core.designsystem.v8.V8LoadingCard
+import org.companerodeescuela.core.motion.CompaneroMotion
 import org.companerodeescuela.core.motion.CompaneroMotionDuration
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 
@@ -61,6 +67,7 @@ private fun HomeAgendaContent(
     // Crossfade's outgoing branch receives the latest state during an error retry.
     // Stop presenting an empty agenda before the incoming loading branch takes over.
     if (state.loading && state.overview == null) return
+    val reduced = LocalCompaneroMotionPreferences.current.reducedMotion
     val overview = state.overview
     val accent = companeroAccentSurfaceColors()
     Surface(
@@ -104,6 +111,26 @@ private fun HomeAgendaContent(
                         text = "Docente · $teacher",
                         style = MaterialTheme.typography.bodyMedium,
                         color = accent.foreground.copy(alpha = 0.92f),
+                    )
+                }
+                val currentClass = overview?.current
+                if (currentClass != null) {
+                    val rawProgress = classProgress(currentClass)
+                    val animatedProgress by animateFloatAsState(
+                        targetValue = rawProgress,
+                        animationSpec = if (reduced) snap() else CompaneroMotion.standard(),
+                        label = "homeClassProgress",
+                    )
+                    LinearProgressIndicator(
+                        progress = { animatedProgress },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(percent = 50)),
+                        color = accent.foreground,
+                        trackColor = accent.foreground.copy(alpha = 0.24f),
                     )
                 }
                 HorizontalDivider(color = accent.foreground.copy(alpha = 0.24f))

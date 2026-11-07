@@ -2,6 +2,16 @@
 
 package org.companerodeescuela.feature.attendance
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,6 +19,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -21,6 +32,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,6 +57,8 @@ import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
+import org.companerodeescuela.core.motion.CompaneroMotion
+import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 import org.companerodeescuela.core.ui.component.StatusNotice
 import java.time.LocalDate
 
@@ -107,8 +121,27 @@ fun TeacherHomeScreen(
                         "Tu cuenta todavía no tiene autorización docente activa. Solicita a control escolar la validación de tu perfil.",
                 )
             } else {
-                state.errorMessage?.let {
-                    StatusNotice(title = "Datos académicos no actualizados", message = it)
+                val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
+                AnimatedVisibility(
+                    visible = state.errorMessage != null,
+                    enter =
+                        if (reducedMotion) {
+                            EnterTransition.None
+                        } else {
+                            fadeIn(animationSpec = CompaneroMotion.standard()) +
+                                expandVertically(animationSpec = CompaneroMotion.standard())
+                        },
+                    exit =
+                        if (reducedMotion) {
+                            ExitTransition.None
+                        } else {
+                            fadeOut(animationSpec = CompaneroMotion.standard()) +
+                                shrinkVertically(animationSpec = CompaneroMotion.standard())
+                        },
+                ) {
+                    state.errorMessage?.let {
+                        StatusNotice(title = "Datos académicos no actualizados", message = it)
+                    }
                 }
 
                 val today = LocalDate.now().toString()
@@ -122,6 +155,12 @@ fun TeacherHomeScreen(
                     }
                 val campus = state.campusRoster
 
+                val liveBadgeColor by animateColorAsState(
+                    targetValue = if (active != null) V8RedColors.Success else MaterialTheme.colorScheme.onSurfaceVariant,
+                    animationSpec = if (reducedMotion) snap() else CompaneroMotion.standard(),
+                    label = "TeacherLiveBadgeColor",
+                )
+
                 V8GlassCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
@@ -133,8 +172,25 @@ fun TeacherHomeScreen(
                         Text(
                             text = if (active != null) "EN VIVO · ${active.groupName}" else "Sin pase abierto",
                             style = MaterialTheme.typography.labelLarge,
-                            color = if (active != null) V8RedColors.Success else MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = liveBadgeColor,
                         )
+                        if (active != null) {
+                            val totalSeconds = (active.closesAtEpochSeconds - active.openedAtEpochSeconds).coerceAtLeast(1)
+                            val elapsedSeconds =
+                                ((System.currentTimeMillis() / 1000) - active.openedAtEpochSeconds).coerceIn(0, totalSeconds)
+                            val rawProgress = elapsedSeconds.toFloat() / totalSeconds.toFloat()
+                            val progress by animateFloatAsState(
+                                targetValue = rawProgress,
+                                animationSpec = if (reducedMotion) snap() else CompaneroMotion.standard(),
+                                label = "TeacherSessionProgress",
+                            )
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier.fillMaxWidth().height(4.dp),
+                                color = V8RedColors.Success,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                            )
+                        }
                         Text(
                             text =
                                 if (active != null) {

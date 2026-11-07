@@ -443,7 +443,11 @@ class MainActivity : AppCompatActivity() {
                                             if (AcademicRoutePolicy.studentActions(roleConfig.experience, session.roles)) {
                                                 StudentRepresentativesScreen()
                                             } else {
-                                                RoleUnavailableScreen(AppExperience.UNSUPPORTED, onLogout = sessionViewModel::logout)
+                                                RoleUnavailableScreen(
+                                                    AppExperience.UNSUPPORTED,
+                                                    onLogout = sessionViewModel::logout,
+                                                    onBack = { navController.popBackStack() },
+                                                )
                                             }
                                         }
                                         composable(Destination.CoordinatorHome.route) {
@@ -547,7 +551,12 @@ class MainActivity : AppCompatActivity() {
                                                     StudentGradesScreen()
                                                 AcademicRoutePolicy.teacherActions(roleConfig.experience, session.roles) ->
                                                     GradebookScreen(requestedClassroom = selection)
-                                                else -> RoleUnavailableScreen(roleConfig.experience, onLogout = sessionViewModel::logout)
+                                                else ->
+                                                    RoleUnavailableScreen(
+                                                        roleConfig.experience,
+                                                        onLogout = sessionViewModel::logout,
+                                                        onBack = { navController.popBackStack() },
+                                                    )
                                             }
                                         }
                                         composable(Destination.Channel.route) { entry ->
@@ -600,11 +609,19 @@ class MainActivity : AppCompatActivity() {
                                                         },
                                                 )
                                             } else {
-                                                RoleUnavailableScreen(roleConfig.experience, onLogout = sessionViewModel::logout)
+                                                RoleUnavailableScreen(
+                                                    roleConfig.experience,
+                                                    onLogout = sessionViewModel::logout,
+                                                    onBack = { navController.popBackStack() },
+                                                )
                                             }
                                         }
                                         composable(Destination.RoleUnavailable.route) {
-                                            RoleUnavailableScreen(roleConfig.experience, onLogout = sessionViewModel::logout)
+                                            RoleUnavailableScreen(
+                                                roleConfig.experience,
+                                                onLogout = sessionViewModel::logout,
+                                                onBack = { navController.popBackStack() },
+                                            )
                                         }
                                         composable(Destination.Profile.route) {
                                             val adminExperience =
@@ -724,7 +741,11 @@ class MainActivity : AppCompatActivity() {
                                             ) {
                                                 InvitationIssueScreen(onBack = { navController.popBackStack() })
                                             } else {
-                                                RoleUnavailableScreen(roleConfig.experience, onLogout = sessionViewModel::logout)
+                                                RoleUnavailableScreen(
+                                                    roleConfig.experience,
+                                                    onLogout = sessionViewModel::logout,
+                                                    onBack = { navController.popBackStack() },
+                                                )
                                             }
                                         }
                                         composable(Destination.InvitationAcceptance.route) {
@@ -828,6 +849,7 @@ class MainActivity : AppCompatActivity() {
 private fun RoleUnavailableScreen(
     experience: AppExperience,
     onLogout: () -> Unit,
+    onBack: (() -> Unit)? = null,
 ) {
     val title =
         when (experience) {
@@ -877,6 +899,21 @@ private fun RoleUnavailableScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (experience == AppExperience.UNSUPPORTED) {
+                    Button(
+                        onClick = onLogout,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.role_unavailable_logout))
+                    }
+                } else {
+                    if (onBack != null) {
+                        Button(
+                            onClick = onBack,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Volver")
+                        }
+                    }
                     Button(
                         onClick = onLogout,
                         modifier = Modifier.fillMaxWidth(),

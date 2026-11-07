@@ -7,6 +7,13 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -81,6 +88,8 @@ import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.designsystem.v8.v8GlassSurface
+import org.companerodeescuela.core.motion.CompaneroMotion
+import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ChannelPost
@@ -322,7 +331,24 @@ fun ChannelScreen(
                                         onClick = { composerOpen = !composerOpen },
                                         modifier = Modifier.fillMaxWidth(),
                                     )
-                                    if (composerOpen) {
+                                    val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
+                                    AnimatedVisibility(
+                                        visible = composerOpen,
+                                        enter =
+                                            if (reducedMotion) {
+                                                EnterTransition.None
+                                            } else {
+                                                fadeIn(animationSpec = CompaneroMotion.standard()) +
+                                                    expandVertically(animationSpec = CompaneroMotion.standard())
+                                            },
+                                        exit =
+                                            if (reducedMotion) {
+                                                ExitTransition.None
+                                            } else {
+                                                fadeOut(animationSpec = CompaneroMotion.standard()) +
+                                                    shrinkVertically(animationSpec = CompaneroMotion.standard())
+                                            },
+                                    ) {
                                         TeacherComposer(
                                             state.draftBody,
                                             state.draftResourceLabel,

@@ -6,9 +6,9 @@ import com.mongodb.client.model.Filters.eq
 import com.mongodb.client.model.Sorts.ascending
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.flow.toList
 import org.bson.Document
 import org.companerodeescuela.shared.contracts.InstitutionSummary
 import java.time.Instant
@@ -40,8 +40,7 @@ class InMemoryInstitutionRepository(
 
     override suspend fun findEnabled(id: String): InstitutionSummary? = mutex.withLock { directory[id] }
 
-    override suspend fun listEnabled(): List<InstitutionSummary> =
-        mutex.withLock { directory.values.sortedBy { it.id }.take(100) }
+    override suspend fun listEnabled(): List<InstitutionSummary> = mutex.withLock { directory.values.sortedBy { it.id }.take(100) }
 
     override suspend fun createEnabled(
         institution: InstitutionSummary,

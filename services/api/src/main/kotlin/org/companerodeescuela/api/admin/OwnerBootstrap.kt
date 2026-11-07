@@ -10,6 +10,7 @@ import org.bson.Document
 import org.companerodeescuela.api.auth.AccountIdentityChange
 import org.companerodeescuela.api.auth.PlatformAccountRepository
 import org.companerodeescuela.api.security.MfaService
+import org.companerodeescuela.shared.contracts.RegistrationAccountType
 import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.StepUpAction
 import org.companerodeescuela.shared.contracts.UserRole
@@ -248,7 +249,11 @@ object OwnerBootstrap {
                     spec.operationId,
                     declaredOperator,
                     AccountStatus.ACTIVE,
-                    account.roles + UserRole.SUPER_ADMIN,
+                    if (spec.scope == "prod" && account.registrationIntent?.profile == RegistrationAccountType.OWNER_INVITED) {
+                        setOf(UserRole.SUPER_ADMIN)
+                    } else {
+                        account.roles + UserRole.SUPER_ADMIN
+                    },
                     account.institutionId,
                     now,
                     scopeDigest = digest,

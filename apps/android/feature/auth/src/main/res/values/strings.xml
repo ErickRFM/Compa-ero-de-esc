@@ -135,4 +135,6 @@
 <string name="auth_role_principal">Dirección</string>
 <string name="auth_principal_description">Consulta los indicadores autorizados de tu institución con permisos de supervisión.</string>
 <string name="auth_coordinator_description">Consulta y coordina los grupos autorizados de tu institución.</string>
+    <string name="registration_owner_invited">Propietario invitado</string>
+    <string name="registration_owner_invitation_code">Código de invitación de propietario</string>
 </resources>

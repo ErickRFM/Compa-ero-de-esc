@@ -514,5 +514,4 @@ class EnvironmentTest {
         assertFalse(Environment.STAGING.isProduction)
         assertFalse(Environment.LOCAL.isProduction)
     }
-
 }

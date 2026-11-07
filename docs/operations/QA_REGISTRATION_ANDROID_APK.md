@@ -1,6 +1,6 @@
 # Compañero — APK Académica de registro QA
 
-El workflow **qa-registration-android** crea una APK *debug* conectada únicamente a https://companero-qa-univ-v25.onrender.com/ para registrar y verificar una identidad nativa en la base QA. No utiliza la API productiva, no lleva claves Firebase, no está firmada con certificado de distribución ni concede roles administrativos.
+El workflow **qa-registration-android** crea una APK *debug* conectada únicamente a https://companero-qa-univ-v25.onrender.com/ para registrar y verificar una identidad nativa en la base QA. No utiliza la API productiva, no lleva claves Firebase, no está firmada con certificado de distribución ni concede roles administrativos. Usa el paquete independiente `org.companerodeescuela.qa`, de modo que no reemplaza los datos de la instalación académica de producción.
 
 ## Entrega
 
@@ -8,7 +8,7 @@ Al ejecutarse el workflow se verifican paquete Android, firma y presencia del or
 
 ## Pasos del titular (no automatizables)
 
-1. Abrir GitHub Actions, elegir **qa-registration-android**, abrir una ejecución verde y descargar su artifact QA. Validar el archivo SHA256SUMS. **No usar el paquete como actualización de una app productiva instalada**; tiene el mismo package ID que la académica y firma de depuración, y podría reemplazar datos de prueba. Si hay una app con otra firma, instalar en un dispositivo o perfil de pruebas independiente.
+1. Abrir GitHub Actions, elegir **qa-registration-android**, abrir una ejecución verde y descargar su artifact QA. Validar el archivo SHA256SUMS. **No es una actualización de la app productiva.** Esta APK utiliza `org.companerodeescuela.qa`, distinto de `org.companerodeescuela`, y puede instalarse sin sustituir los datos de producción. Confirma en Ajustes → Aplicaciones que abres la instalación de QA. La interfaz puede mostrar el mismo nombre; valida el paquete antes de registrar cuentas.
 2. En la APK de QA, elegir **Crear cuenta**, utilizar el correo exclusivo autorizado para la cuenta propietaria, completar verificación del buzón y configurar MFA desde Perfil → Seguridad. **No escribir contraseñas, OTP ni claves TOTP en GitHub o ChatGPT**.
 3. Confirmar que el registro aparece en la base `companero_qa` con email verificado y ningún permiso administrativo. Registrar evidencia de la sesión QA.
 4. El bootstrap de primer propietario continúa expresamente **deshabilitado** hasta certificar recuperación de reserva interrumpida y autorización del operador. Esta APK solo facilita el paso legítimo de registro.

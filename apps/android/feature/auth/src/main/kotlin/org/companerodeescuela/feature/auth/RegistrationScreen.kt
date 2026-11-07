@@ -61,6 +61,7 @@ fun RegistrationScreen(
     var institutionId by rememberSaveable { mutableStateOf<String?>(null) }
     var identityReference by draft.identityReference
     var preferredGroup by rememberSaveable { mutableStateOf("") }
+    var ownerInvitationCode by remember { mutableStateOf("") }
     var institutionMenu by remember { mutableStateOf(false) }
     val focus = LocalFocusManager.current
     val academicRequest = accountType == RegistrationAccountType.TEACHER || accountType == RegistrationAccountType.TUTOR
@@ -77,7 +78,8 @@ fun RegistrationScreen(
             password.length in 8..256 &&
             !passwordInvalid &&
             confirmation == password &&
-            (!academicRequest || (validInstitution && identityReference.isNotBlank()))
+            (!academicRequest || (validInstitution && identityReference.isNotBlank())) &&
+            (accountType != RegistrationAccountType.OWNER_INVITED || ownerInvitationCode.matches(Regex("[A-Za-z0-9_-]{43}")))
 
     fun submit() {
         if (!canSubmit) return
@@ -91,6 +93,7 @@ fun RegistrationScreen(
                 requestedInstitutionId = institutionId.takeIf { academicRequest && validInstitution },
                 identityReference = identityReference.trim().takeIf { academicRequest },
                 preferredGroup = preferredGroup.trim().takeIf { accountType == RegistrationAccountType.TUTOR && it.isNotEmpty() },
+                ownerInvitationCode = ownerInvitationCode.takeIf { accountType == RegistrationAccountType.OWNER_INVITED },
             ),
         )
     }
@@ -173,6 +176,15 @@ fun RegistrationScreen(
                     stringResource(R.string.registration_confirmation_error),
                     ::submit,
                 )
+                if (accountType == RegistrationAccountType.OWNER_INVITED) {
+                    RegistrationField(
+                        ownerInvitationCode,
+                        { ownerInvitationCode = it.trim().take(43) },
+                        R.string.registration_owner_invitation_code,
+                        !state.submitting,
+                        "registration_owner_invitation_code",
+                    )
+                }
                 if (academicRequest) {
                     Text(stringResource(R.string.registration_institution), color = authInk(), fontWeight = FontWeight.SemiBold)
                     when {
@@ -356,6 +368,7 @@ private fun AccountTypeOption(
                 RegistrationAccountType.TEACHER -> Icons.Filled.MenuBook
                 RegistrationAccountType.TUTOR -> Icons.Filled.Group
                 RegistrationAccountType.PARTICIPANT -> Icons.Filled.Person
+                RegistrationAccountType.OWNER_INVITED -> Icons.Filled.Lock
             },
             contentDescription = null,
             tint = if (selected) authAccent() else authInk(),
@@ -376,6 +389,7 @@ private val RegistrationAccountType.labelResource: Int get() =
         RegistrationAccountType.TEACHER -> R.string.auth_role_teacher
         RegistrationAccountType.TUTOR -> R.string.auth_role_tutor
         RegistrationAccountType.PARTICIPANT -> R.string.registration_participant
+        RegistrationAccountType.OWNER_INVITED -> R.string.registration_owner_invited
     }
 
 internal fun registrationErrorResource(error: org.companerodeescuela.core.common.result.AppError?): Int =

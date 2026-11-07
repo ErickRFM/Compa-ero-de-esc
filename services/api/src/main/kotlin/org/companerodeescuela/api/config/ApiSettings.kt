@@ -441,10 +441,14 @@ class SettingsLoader(
                 "true" -> true
                 else -> throw ConfigurationException("PRODUCTION_INVITATIONS_ENABLED must be true or false")
             }
-        if (productionInvitationsEnabled &&
-            (!environment.isProduction || mongoUri.isBlank() || jwtSecret == null ||
-                verificationEmailKey == null || verificationEmailSender == null || mfaKey == null)
-        ) {
+        val productionInvitationsReady =
+            environment.isProduction &&
+                mongoUri.isNotBlank() &&
+                jwtSecret != null &&
+                verificationEmailKey != null &&
+                verificationEmailSender != null &&
+                mfaKey != null
+        if (productionInvitationsEnabled && !productionInvitationsReady) {
             throw ConfigurationException("Production invitations require production MongoDB, native authentication, MFA and Resend")
         }
 

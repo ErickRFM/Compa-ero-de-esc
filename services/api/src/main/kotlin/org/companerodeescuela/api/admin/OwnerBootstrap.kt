@@ -10,8 +10,8 @@ import org.bson.Document
 import org.companerodeescuela.api.auth.AccountIdentityChange
 import org.companerodeescuela.api.auth.PlatformAccountRepository
 import org.companerodeescuela.api.security.MfaService
-import org.companerodeescuela.shared.contracts.RegistrationAccountType
 import org.companerodeescuela.shared.contracts.AccountStatus
+import org.companerodeescuela.shared.contracts.RegistrationAccountType
 import org.companerodeescuela.shared.contracts.StepUpAction
 import org.companerodeescuela.shared.contracts.UserRole
 import java.security.MessageDigest

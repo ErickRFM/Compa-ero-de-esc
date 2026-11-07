@@ -69,8 +69,8 @@ class OwnerBootstrapTest {
             Signature
                 .getInstance("Ed25519")
                 .apply {
-                initSign(keyPair.private)
-                update(unsigned.digest().toByteArray(Charsets.UTF_8))
+                    initSign(keyPair.private)
+                    update(unsigned.digest().toByteArray(Charsets.UTF_8))
             }
                 .sign()
         val env =
@@ -339,8 +339,8 @@ class OwnerBootstrapTest {
                     Signature
                         .getInstance("Ed25519")
                         .apply {
-                        initSign(keyPair.private)
-                        update(unsignedDraft.digest().toByteArray(Charsets.UTF_8))
+                            initSign(keyPair.private)
+                            update(unsignedDraft.digest().toByteArray(Charsets.UTF_8))
                     }
                         .sign()
                 unsignedDraft.copy(

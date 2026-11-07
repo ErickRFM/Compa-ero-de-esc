@@ -187,6 +187,76 @@ class MongoOwnerBootstrapClaimsTest {
             }
         }
 
+    @Test fun `expired reservation is reclaimed by one concurrent recovery and committed claims remain permanent`() =
+        runBlocking {
+            val uri = System.getenv("V12_TEST_MONGODB_URI")
+            require(uri == "mongodb://127.0.0.1:27017")
+            MongoClient.create(uri).use { client ->
+                val db = client.getDatabase("owner_recovery_" + UUID.randomUUID().toString().replace("-", ""))
+                try {
+                    val authorizedAt = Instant.parse("2026-11-07T12:00:00Z")
+                    val stale =
+                        OwnerBootstrapClaim(
+                            "a".repeat(64),
+                            "candidate-old",
+                            "operator-old",
+                            "interrupted bootstrap",
+                            authorizedAt,
+                            authorizedAt.plusSeconds(900),
+                        )
+                    assertTrue(MongoOwnerBootstrapClaims(db).reserve(stale))
+
+                    val recoveryAt = authorizedAt.plusSeconds(901)
+                    val outcomes =
+                        coroutineScope {
+                            (1..24)
+                                .map { index ->
+                                    async {
+                                        MongoOwnerBootstrapClaims(db).reserve(
+                                            OwnerBootstrapClaim(
+                                                "%064x".format(index),
+                                                "candidate-$index",
+                                                "operator-$index",
+                                                "fresh signed recovery",
+                                                recoveryAt,
+                                                recoveryAt.plusSeconds(900),
+                                            ),
+                                        )
+                                    }
+                                }.awaitAll()
+                        }
+                    assertEquals(1, outcomes.count { it })
+
+                    val winner = assertNotNull(MongoOwnerBootstrapClaims(db).find())
+                    assertEquals(OwnerBootstrapClaimState.RESERVED, winner.state)
+                    assertTrue(
+                        MongoOwnerBootstrapClaims(db).commit(
+                            winner.digest,
+                            winner.accountId,
+                            recoveryAt.plusSeconds(30),
+                        ),
+                    )
+                    val later = recoveryAt.plusSeconds(1800)
+                    assertFalse(
+                        MongoOwnerBootstrapClaims(db).reserve(
+                            OwnerBootstrapClaim(
+                                "f".repeat(64),
+                                "candidate-reassigned",
+                                "operator-reassigned",
+                                "must never replace committed owner",
+                                later,
+                                later.plusSeconds(900),
+                            ),
+                        ),
+                    )
+                    assertEquals(OwnerBootstrapClaimState.COMMITTED, MongoOwnerBootstrapClaims(db).find()?.state)
+                    assertEquals(winner.digest, MongoOwnerBootstrapClaims(db).find()?.digest)
+                } finally {
+                    db.drop()
+                }
+            }
+        }
+
     @Test fun `concurrent independent operators reserve only one owner command`() =
         runBlocking {
             val uri = System.getenv("V12_TEST_MONGODB_URI")

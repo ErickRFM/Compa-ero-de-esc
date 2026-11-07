@@ -143,14 +143,59 @@ class OwnerBootstrapTest {
             assertEquals(setOf(UserRole.STUDENT, UserRole.SUPER_ADMIN), assertNotNull(accounts.findById("owner")).roles)
         }
 
-    private suspend fun fixture(): Triple<InMemoryPlatformAccountRepository, MfaService, OwnerBootstrapSpec> {
+    @Test fun `production owner is limited to independently verified designated email`() =
+        runTest {
+            val (accounts, mfa, spec) = fixture(email = "erik55509@hotmail.com", production = true)
+            val claims = InMemoryOwnerBootstrapClaims()
+            OwnerBootstrap.provision(spec, "production", "companero_prod", accounts, mfa, claims, clock)
+            val owner = assertNotNull(accounts.findById("owner"))
+            assertEquals(setOf(UserRole.STUDENT, UserRole.SUPER_ADMIN), owner.roles)
+            assertEquals("prod-deployment:operator-qa", owner.identityAudit.single().actorId)
+            assertEquals(1L, owner.authRevision)
+        }
+
+    @Test fun `production rejects qa config and non designated emails`() =
+        runTest {
+            val (accounts, mfa, spec) = fixture(email = "erik55509@hotmail.com", production = true)
+            assertFailsWith<IllegalArgumentException> {
+                OwnerBootstrap.provision(spec, "staging", "companero_qa", accounts, mfa, InMemoryOwnerBootstrapClaims(), clock)
+            }
+            val qa = fixture()
+            assertFailsWith<IllegalArgumentException> {
+                OwnerBootstrap.provision(
+                    qa.third.copy(production = true),
+                    "production",
+                    "companero_prod",
+                    qa.first,
+                    qa.second,
+                    InMemoryOwnerBootstrapClaims(),
+                    clock,
+                )
+            }
+            assertEquals(setOf(UserRole.STUDENT), assertNotNull(accounts.findById("owner")).roles)
+        }
+
+    @Test fun `production flag is opt in and fixed to hotmail`() {
+        assertEquals(null, OwnerBootstrap.parseProduction { null })
+        val env =
+            mapOf(
+                "PROD_OWNER_BOOTSTRAP_ENABLED" to "true",
+                "PROD_OWNER_BOOTSTRAP_EMAIL" to "attacker@example.com",
+            )
+        assertFailsWith<IllegalArgumentException> { OwnerBootstrap.parseProduction { env[it] } }
+    }
+
+    private suspend fun fixture(
+        email: String = "owner@example.test",
+        production: Boolean = false,
+    ): Triple<InMemoryPlatformAccountRepository, MfaService, OwnerBootstrapSpec> {
         val accounts = InMemoryPlatformAccountRepository()
         val password = "qa-test-password"
         val account =
             PlatformAccount(
                 "owner",
                 "Owner",
-                "owner@example.test",
+                email,
                 PasswordHasher().hash(password),
                 setOf(UserRole.STUDENT),
                 institutionId = "institution",
@@ -171,13 +216,14 @@ class OwnerBootstrapTest {
         val draft =
             OwnerBootstrapSpec(
                 "owner",
-                "owner@example.test",
+                email,
                 0,
                 "owner-op",
                 "operator-qa",
                 "QA owner enrollment",
                 clock.instant().epochSecond + 600,
                 "p".repeat(43),
+                production = production,
             )
         val proof =
             mfa.issueStepUp(

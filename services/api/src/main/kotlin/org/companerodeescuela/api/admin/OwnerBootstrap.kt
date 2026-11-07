@@ -18,7 +18,7 @@ import java.time.Clock
 import java.util.Date
 import java.util.Locale
 
-/** QA-only command. The operator label is a declared value, not independently authenticated identity. */
+/** One-time ownership command. Operator labels are audit metadata; deployment control and verified MFA authorize execution. */
 data class OwnerBootstrapSpec(
     val accountId: String,
     val email: String,
@@ -28,13 +28,14 @@ data class OwnerBootstrapSpec(
     val reason: String,
     val expiresAt: Long,
     val proof: String,
+    val production: Boolean = false,
 ) {
     fun digest(): String =
         MessageDigest
             .getInstance("SHA-256")
             .digest(
                 listOf(
-                    "companero.qa-first-owner.v1",
+                    if (production) "companero.prod-first-owner.v1" else "companero.qa-first-owner.v1",
                     accountId,
                     email,
                     expectedRevision.toString(),
@@ -84,8 +85,9 @@ class InMemoryOwnerBootstrapClaims : OwnerBootstrapClaims {
 /** One durable global reservation per database; never releases revoked authority. */
 class MongoOwnerBootstrapClaims(
     database: MongoDatabase,
+    collectionName: String = "qa_initial_owner_claims",
 ) : OwnerBootstrapClaims {
-    private val claims = database.getCollection<Document>("qa_initial_owner_claims")
+    private val claims = database.getCollection<Document>(collectionName)
 
     override suspend fun find(): OwnerBootstrapClaim? =
         claims.find(eq("_id", "global-owner")).firstOrNull()?.let {
@@ -140,6 +142,33 @@ object OwnerBootstrap {
         )
     }
 
+    /** Production bootstrap is a one-time deployment operation, never a public registration shortcut. */
+    fun parseProduction(env: (String) -> String?): OwnerBootstrapSpec? {
+        val enabled = env("PROD_OWNER_BOOTSTRAP_ENABLED") ?: "false"
+        require(enabled in setOf("true", "false")) { "Production owner bootstrap flag is invalid" }
+        if (enabled == "false") return null
+
+        fun required(name: String) =
+            requireNotNull(env(name)?.takeIf(String::isNotBlank)) { "Production owner bootstrap configuration is incomplete" }
+        val email = required("PROD_OWNER_BOOTSTRAP_EMAIL").trim().lowercase(Locale.ROOT)
+        require(email == "erik55509@hotmail.com") { "Production owner email does not match designated proprietor" }
+        val revision = requireNotNull(required("PROD_OWNER_BOOTSTRAP_EXPECTED_REVISION").toLongOrNull())
+        val expiry = requireNotNull(required("PROD_OWNER_BOOTSTRAP_EXPIRES_AT").toLongOrNull())
+        val proof = required("PROD_OWNER_BOOTSTRAP_PROOF")
+        require(proof.matches(Regex("[A-Za-z0-9_-]{43}"))) { "Production owner MFA proof is invalid" }
+        return OwnerBootstrapSpec(
+            accountId = required("PROD_OWNER_BOOTSTRAP_ACCOUNT_ID"),
+            email = email,
+            expectedRevision = revision,
+            operationId = required("PROD_OWNER_BOOTSTRAP_OPERATION_ID"),
+            operator = required("PROD_OWNER_BOOTSTRAP_OPERATOR"),
+            reason = required("PROD_OWNER_BOOTSTRAP_REASON"),
+            expiresAt = expiry,
+            proof = proof,
+            production = true,
+        )
+    }
+
     suspend fun provision(
         spec: OwnerBootstrapSpec,
         environment: String,
@@ -149,8 +178,19 @@ object OwnerBootstrap {
         claims: OwnerBootstrapClaims,
         clock: Clock = Clock.systemUTC(),
     ) {
-        require(environment in setOf("local", "staging") && databaseName.matches(Regex("[A-Za-z0-9_]+_qa"))) {
-            "Owner bootstrap requires an isolated QA database and nonproduction runtime"
+        if (spec.production) {
+            require(
+                environment == "production" &&
+                    databaseName.matches(Regex("[A-Za-z0-9_]+")) &&
+                    !databaseName.endsWith("_qa") &&
+                    !databaseName.endsWith("_dev") &&
+                    !databaseName.endsWith("_test"),
+            ) { "Production owner bootstrap requires a production runtime and distinct production database" }
+            require(spec.email == "erik55509@hotmail.com") { "Only the designated owner may claim production authority" }
+        } else {
+            require(environment in setOf("local", "staging") && databaseName.matches(Regex("[A-Za-z0-9_]+_qa"))) {
+                "Owner bootstrap requires an isolated QA database and nonproduction runtime"
+            }
         }
         require(spec.accountId.matches(Regex("[A-Za-z0-9_-]{1,128}")) && spec.operationId.matches(Regex("[A-Za-z0-9_-]{1,128}")))
         require(spec.operator.matches(Regex("[A-Za-z0-9_.@-]{1,100}")))
@@ -169,7 +209,7 @@ object OwnerBootstrap {
         )
         val account = requireNotNull(accounts.findById(spec.accountId)) { "Verified owner candidate is required" }
         val digest = spec.digest()
-        val declaredOperator = "qa-declared:${spec.operator}"
+        val declaredOperator = (if (spec.production) "prod-deployment:" else "qa-declared:") + spec.operator
         val existing = claims.find()
         val audit = account.identityAudit.lastOrNull()
         if (existing?.digest == digest &&
@@ -188,7 +228,7 @@ object OwnerBootstrap {
             return
         }
         require(spec.expiresAt > now.epochSecond && spec.expiresAt <= now.epochSecond + 900) {
-            "QA owner authorization expired or exceeds fifteen minutes"
+            "Owner authorization expired or exceeds fifteen minutes"
         }
         require(
             account.permitsSession &&

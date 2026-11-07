@@ -39,6 +39,7 @@ import org.companerodeescuela.api.grading.gradingRoutes
 import org.companerodeescuela.api.health.HealthService
 import org.companerodeescuela.api.health.healthRoutes
 import org.companerodeescuela.api.institutions.SiiiPilotInstitutionBootstrap
+import org.companerodeescuela.api.institutions.institutionOwnerProvisionRoutes
 import org.companerodeescuela.api.institutions.institutionRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
 import org.companerodeescuela.api.integrations.academic.siii.SiiiSectionProjectionFeature
@@ -67,6 +68,7 @@ import org.companerodeescuela.api.mail.ResendInvitationEmailGateway
 import org.companerodeescuela.api.plugins.configurePlugins
 import org.companerodeescuela.api.presence.schoolPresenceRoutes
 import org.companerodeescuela.api.representatives.groupRepresentativeRoutes
+import org.companerodeescuela.api.security.MfaSecretCipher
 import org.companerodeescuela.api.security.mfaRoutes
 import org.companerodeescuela.api.tutoring.tutorCaseRoutes
 import org.companerodeescuela.api.tutoring.tutoringRoutes
@@ -140,9 +142,10 @@ fun Application.module(
     // privilege inferred from an email, login form or invitation. This bootstrap
     // refuses production and requires an isolated *_qa database.
     val qaOwnerSpec = OwnerBootstrap.parse(System::getenv)
+    val prodOwnerSpec = OwnerBootstrap.parseProduction(System::getenv)
     val qaAdminSpec = QaAdminBootstrap.parse(System::getenv)
-    require(qaOwnerSpec == null || qaAdminSpec == null) {
-        "QA initial owner and institutional admin bootstrap cannot run together"
+    require(listOf(qaOwnerSpec, prodOwnerSpec, qaAdminSpec).count { it != null } <= 1) {
+        "Only one initial authority bootstrap may run at a time"
     }
     qaOwnerSpec?.let { desired ->
         require(settings.mongo.isConfigured && settings.hasAuthentication) {
@@ -157,6 +160,25 @@ fun Application.module(
                     identityGraph.accounts,
                     identityGraph.mfa,
                     MongoOwnerBootstrapClaims(mongoConnection.database()),
+                )
+            }
+        }
+    }
+    // A separate, operator-controlled production procedure requires a verified
+    // native account, scoped MFA proof, a production-only database and a durable one-time claim.
+    prodOwnerSpec?.let { desired ->
+        require(settings.mongo.isConfigured && settings.hasAuthentication) {
+            "Production owner bootstrap requires persistent authenticated identity"
+        }
+        runBlocking {
+            withTimeout(15_000L) {
+                OwnerBootstrap.provision(
+                    desired,
+                    settings.environment.name.lowercase(),
+                    settings.mongo.databaseName,
+                    identityGraph.accounts,
+                    identityGraph.mfa,
+                    MongoOwnerBootstrapClaims(mongoConnection.database(), "prod_initial_owner_claims"),
                 )
             }
         }
@@ -435,8 +457,8 @@ fun Application.module(
             InMemoryInvitationRepository()
         }
     val invitationOutbox =
-        if (settings.hasAuthentication && settings.mongo.isConfigured) {
-            MongoInvitationOutbox(mongoConnection.database())
+        if (settings.hasAuthentication && settings.mongo.isConfigured && settings.mfaEncryptionKey != null) {
+            MongoInvitationOutbox(mongoConnection.database(), MfaSecretCipher(settings.mfaEncryptionKey))
         } else {
             InMemoryInvitationOutbox()
         }
@@ -458,6 +480,27 @@ fun Application.module(
             identityGraph.institutions,
             invitationOutbox,
         )
+    val invitationWorkerConfigured =
+        settings.hasAuthentication &&
+            settings.mongo.isConfigured &&
+            settings.hasVerificationEmail &&
+            settings.mfaEncryptionKey != null
+    val invitationWorkerAllowed = !settings.environment.isProduction || settings.productionInvitationsEnabled
+    launchManagedWorker(
+        enabled = invitationWorkerConfigured && invitationWorkerAllowed,
+        context = Dispatchers.IO,
+    ) {
+        while (kotlin.coroutines.coroutineContext[kotlinx.coroutines.Job]?.isActive == true) {
+            try {
+                invitationDispatcher.retryPendingOutbox()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                log.warn("Invitation outbox retry unavailable; encrypted work retained")
+            }
+            kotlinx.coroutines.delay(30_000)
+        }
+    }
 
     routing {
         healthRoutes(settings = settings, healthService = healthService)
@@ -496,6 +539,15 @@ fun Application.module(
             rateLimitStore = rateLimitStore,
         )
         institutionRoutes(identityGraph.institutions)
+        institutionOwnerProvisionRoutes(
+            settings,
+            providerRegistry.identity,
+            identityGraph.refreshSessions,
+            identityGraph.accounts,
+            identityGraph.mfa,
+            identityGraph.institutions,
+            rateLimitStore,
+        )
         institutionalPushRoutes(
             institutionalPushAuthenticator,
             institutionalPushService,

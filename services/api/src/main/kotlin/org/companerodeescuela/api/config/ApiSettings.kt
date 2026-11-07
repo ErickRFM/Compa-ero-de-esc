@@ -76,6 +76,8 @@ data class ApiSettings(
     val firebaseServiceAccountJson: CharArray? = null,
     val lateSyncReviewWindowSeconds: Long = DEFAULT_LATE_SYNC_REVIEW_WINDOW_SECONDS,
     val attendanceQrNonceReuseThreshold: Int = DEFAULT_ATTENDANCE_QR_NONCE_REUSE_THRESHOLD,
+    /** Explicit deployment opt-in. Requires persistent backend, MFA and outbound mail. */
+    val productionInvitationsEnabled: Boolean = false,
 ) {
     companion object {
         const val DEFAULT_LATE_SYNC_REVIEW_WINDOW_SECONDS = 7_200L
@@ -121,6 +123,7 @@ data class ApiSettings(
             currentUserCacheTtlMillis == other.currentUserCacheTtlMillis &&
             lateSyncReviewWindowSeconds == other.lateSyncReviewWindowSeconds &&
             attendanceQrNonceReuseThreshold == other.attendanceQrNonceReuseThreshold &&
+            productionInvitationsEnabled == other.productionInvitationsEnabled &&
             hasVerificationEmail == other.hasVerificationEmail &&
             verificationEmailSender == other.verificationEmailSender &&
             (mfaEncryptionKey != null) == (other.mfaEncryptionKey != null) &&
@@ -153,6 +156,7 @@ data class ApiSettings(
         result = 31 * result + currentUserCacheTtlMillis
         result = 31 * result + lateSyncReviewWindowSeconds.hashCode()
         result = 31 * result + attendanceQrNonceReuseThreshold
+        result = 31 * result + productionInvitationsEnabled.hashCode()
         result = 31 * result + hasVerificationEmail.hashCode()
         result = 31 * result + (verificationEmailSender?.hashCode() ?: 0)
         result = 31 * result + (mfaEncryptionKey != null).hashCode()
@@ -184,6 +188,7 @@ data class ApiSettings(
             "currentUserCacheTtlMillis=$currentUserCacheTtlMillis, " +
             "lateSyncReviewWindowSeconds=$lateSyncReviewWindowSeconds, " +
             "attendanceQrNonceReuseThreshold=$attendanceQrNonceReuseThreshold, " +
+            "productionInvitationsEnabled=$productionInvitationsEnabled, " +
             "verificationEmailConfigured=$hasVerificationEmail, " +
             "mfaEncryptionConfigured=${mfaEncryptionKey != null}, " +
             "institutionIntegrationEncryptionConfigured=${institutionIntegrationEncryptionKey != null}, " +
@@ -430,6 +435,23 @@ class SettingsLoader(
         validateOptionalSecret("ATTENDANCE_QR_SECRET", attendanceQrSecret)
         validateSchoolPresence(schoolPresenceQrSha256, schoolWifiSsids, schoolWifiBssids)
 
+        val productionInvitationsEnabled =
+            when (env("PRODUCTION_INVITATIONS_ENABLED")?.trim()?.lowercase()) {
+                null, "false" -> false
+                "true" -> true
+                else -> throw ConfigurationException("PRODUCTION_INVITATIONS_ENABLED must be true or false")
+            }
+        val productionInvitationsReady =
+            environment.isProduction &&
+                mongoUri.isNotBlank() &&
+                jwtSecret != null &&
+                verificationEmailKey != null &&
+                verificationEmailSender != null &&
+                mfaKey != null
+        if (productionInvitationsEnabled && !productionInvitationsReady) {
+            throw ConfigurationException("Production invitations require production MongoDB, native authentication, MFA and Resend")
+        }
+
         return ApiSettings(
             serviceName = DEFAULT_SERVICE_NAME,
             environment = environment,
@@ -466,6 +488,7 @@ class SettingsLoader(
             firebaseServiceAccountJson = firebaseJson?.toCharArray(),
             lateSyncReviewWindowSeconds = lateSyncReviewWindowSeconds,
             attendanceQrNonceReuseThreshold = attendanceQrNonceReuseThreshold,
+            productionInvitationsEnabled = productionInvitationsEnabled,
         )
     }
 

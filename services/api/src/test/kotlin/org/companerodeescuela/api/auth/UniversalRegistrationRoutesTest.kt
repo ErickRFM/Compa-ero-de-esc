@@ -138,7 +138,7 @@ class UniversalRegistrationRoutesTest {
                 "OWNER_INVITE_CODE_SHA256" to hash,
             )
         scenario(env) { f ->
-            val payload = ",\\"ownerInvitationCode\\":\\"$code\\""
+            val payload = ",\"ownerInvitationCode\":\"$code\""
             assertEquals(
                 HttpStatusCode.Forbidden,
                 post("/auth/register", registrationBody("other@example.test", "OWNER_INVITED", payload)).status,
@@ -147,7 +147,7 @@ class UniversalRegistrationRoutesTest {
                 HttpStatusCode.Forbidden,
                 post(
                     "/auth/register",
-                    registrationBody("owner@example.test", "OWNER_INVITED", ",\\"ownerInvitationCode\\":\\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\""),
+                    registrationBody("owner@example.test", "OWNER_INVITED", ",\"ownerInvitationCode\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\""),
                 ).status,
             )
             val pending = register("owner@example.test", "OWNER_INVITED", payload)

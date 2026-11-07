@@ -269,7 +269,7 @@ object OwnerBootstrap {
                 expiry,
                 proof,
                 scope = "prod",
-                authorizationPublicKey = required("PROD_OWNER_BOOTSTRAP_OPERATOR_PUBLIC_KEY"),
+                authorizationPublicKey = required("PROD_OWNER_BOOTSTRAP_TRUSTED_OPERATOR_PUBLIC_KEY"),
                 authorizationSignature = required("PROD_OWNER_BOOTSTRAP_AUTHORIZATION"),
             )
         require(spec.hasValidOperatorAuthorization()) {

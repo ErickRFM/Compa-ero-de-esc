@@ -50,20 +50,35 @@ class OwnerBootstrapTest {
             val (accounts, mfa, qaSpec) = fixture()
             assertFailsWith<IllegalArgumentException> {
                 OwnerBootstrap.provision(
-                    qaSpec, "production", "companero_prod", accounts, mfa,
-                    InMemoryOwnerBootstrapClaims(), clock,
+                    qaSpec,
+                    "production",
+                    "companero_prod",
+                    accounts,
+                    mfa,
+                    InMemoryOwnerBootstrapClaims(),
+                    clock,
                 )
             }
             assertFailsWith<IllegalArgumentException> {
                 OwnerBootstrap.provision(
-                    qaSpec.copy(scope = "prod"), "production", "companero_qa", accounts, mfa,
-                    InMemoryOwnerBootstrapClaims(), clock,
+                    qaSpec.copy(scope = "prod"),
+                    "production",
+                    "companero_qa",
+                    accounts,
+                    mfa,
+                    InMemoryOwnerBootstrapClaims(),
+                    clock,
                 )
             }
             assertFailsWith<org.companerodeescuela.api.errors.ApiException.Forbidden> {
                 OwnerBootstrap.provision(
-                    qaSpec.copy(scope = "prod"), "production", "companero_prod", accounts, mfa,
-                    InMemoryOwnerBootstrapClaims(), clock,
+                    qaSpec.copy(scope = "prod"),
+                    "production",
+                    "companero_prod",
+                    accounts,
+                    mfa,
+                    InMemoryOwnerBootstrapClaims(),
+                    clock,
                 )
             }
             assertEquals(setOf(UserRole.STUDENT), assertNotNull(accounts.findById("owner")).roles)

@@ -93,9 +93,10 @@ internal fun Route.invitationRoutes(
     // Production is always opt-in and only exposes routes with durable storage and live outbound email.
     // This never relaxes the SUPER_ADMIN + verified email + per-command MFA checks.
     if (!settings.hasAuthentication) return
-    if (settings.environment == Environment.PRODUCTION &&
-        (!settings.productionInvitationsEnabled || !settings.mongo.isConfigured || !settings.hasVerificationEmail)
-    ) return
+    val productionBlocked =
+        settings.environment == Environment.PRODUCTION &&
+            (!settings.productionInvitationsEnabled || !settings.mongo.isConfigured || !settings.hasVerificationEmail)
+    if (productionBlocked) return
     val resolver = NativeActorResolver(accounts, sessions, AuthTokenService(settings), identity)
     val issuerLimiter = LoginAttemptLimiter(maxAttempts = 5, store = rateLimitStore)
     val acceptanceLimiter = LoginAttemptLimiter(maxAttempts = 10, store = rateLimitStore)

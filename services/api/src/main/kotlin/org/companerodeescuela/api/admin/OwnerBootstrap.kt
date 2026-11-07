@@ -179,11 +179,12 @@ object OwnerBootstrap {
         clock: Clock = Clock.systemUTC(),
     ) {
         if (spec.production) {
-            require(environment == "production" &&
-                databaseName.matches(Regex("[A-Za-z0-9_]+")) &&
-                !databaseName.endsWith("_qa") &&
-                !databaseName.endsWith("_dev") &&
-                !databaseName.endsWith("_test")
+            require(
+                environment == "production" &&
+                    databaseName.matches(Regex("[A-Za-z0-9_]+")) &&
+                    !databaseName.endsWith("_qa") &&
+                    !databaseName.endsWith("_dev") &&
+                    !databaseName.endsWith("_test"),
             ) { "Production owner bootstrap requires a production runtime and distinct production database" }
             require(spec.email == "erik55509@hotmail.com") { "Only the designated owner may claim production authority" }
         } else {

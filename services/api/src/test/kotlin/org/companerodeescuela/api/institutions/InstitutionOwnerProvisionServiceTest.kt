@@ -100,6 +100,8 @@ class InstitutionOwnerProvisionServiceTest {
             val created = service.create(owner, command, proof.proof)
             assertEquals("UPTLAX", created.id)
             assertEquals("Universidad Politecnica", assertNotNull(institutions.findEnabled("UPTLAX")).displayName)
-            assertFailsWith<ApiException.Forbidden> { service.create(owner, command, proof.proof) }
+            // Same-command retry reaches the repository and reports the existing institution.
+            // The MFA proof remains bound to this exact operation and cannot change its payload.
+            assertFailsWith<ApiException.Conflict> { service.create(owner, command, proof.proof) }
         }
 }

@@ -165,6 +165,54 @@ class UniversalRegistrationRoutesTest {
         }
     }
 
+    @Test fun `owner invitation does not consume its code when an existing unverified student identity blocks enrollment`() {
+        val code = "r".repeat(43)
+        val digest =
+            MessageDigest
+                .getInstance("SHA-256")
+                .digest(code.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+        val expiresAt = Instant.now().epochSecond + 3600
+        val env =
+            mapOf(
+                "APP_ENV" to "production",
+                "MONGODB_DATABASE" to "companero_prod",
+                "PROD_OWNER_ISOLATION_CERTIFIED" to "true",
+                "OWNER_INVITE_EMAIL" to "owner@example.test",
+                "OWNER_INVITE_CODE_SHA256" to digest,
+                "OWNER_INVITE_EXPIRES_AT" to expiresAt.toString(),
+            )
+
+        scenario(env) { f ->
+            val existing = register("owner@example.test", "STUDENT")
+            val response =
+                post(
+                    "/auth/register",
+                    registrationBody(
+                        "owner@example.test",
+                        "OWNER_INVITED",
+                        ",\\"ownerInvitationCode\\":\\"$code\\"",
+                    ),
+                )
+
+            assertEquals(HttpStatusCode.Conflict, response.status)
+            val stored = assertNotNull(f.accounts.findByIdentifier("owner@example.test"))
+            assertEquals(existing.user.id, stored.id)
+            assertEquals(RegistrationAccountType.STUDENT, stored.registrationIntent?.profile)
+            assertNull(stored.emailVerifiedAt)
+            assertTrue(
+                f.ownerInvitations.consume(
+                    digest,
+                    "owner@example.test",
+                    Instant.ofEpochSecond(expiresAt),
+                    f.clock.instant(),
+                    "collision-probe",
+                ),
+                "A duplicate-account rejection must happen before the one-time invitation is consumed",
+            )
+        }
+    }
+
     @Test fun `owner registration without production invitation cannot create an account`() =
         scenario { f ->
             val result =
@@ -302,6 +350,7 @@ class UniversalRegistrationRoutesTest {
         val accounts = InMemoryPlatformAccountRepository()
         val sessions = InMemoryRefreshSessionRepository()
         val mail = CapturedMail()
+        val ownerInvitations = InMemoryOwnerInvitationRepository()
         val clock = TestClock()
         val institutions = InMemoryInstitutionRepository(listOf(InstitutionSummary("test-campus", "Test campus")))
     }
@@ -325,6 +374,7 @@ class UniversalRegistrationRoutesTest {
                     verificationEmail = f.mail,
                     verificationClock = f.clock,
                     ownerInviteEnvironment = ownerEnv::get,
+                    ownerInvitationRepository = f.ownerInvitations,
                 )
                 institutionRoutes(f.institutions)
                 authenticate(AuthTokenService.PROVIDER_NAME) { get("/private-probe") { call.respond(HttpStatusCode.OK) } }

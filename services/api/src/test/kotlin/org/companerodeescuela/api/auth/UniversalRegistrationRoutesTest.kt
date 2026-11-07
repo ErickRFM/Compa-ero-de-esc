@@ -132,7 +132,7 @@ class UniversalRegistrationRoutesTest {
                 .joinToString("") { "%02x".format(it) }
         val env =
             mapOf(
-                "APP_ENV" to "production",
+                "APP_ENV" to "PRODUCTION",
                 "MONGODB_DATABASE" to "companero_prod",
                 "PROD_OWNER_ISOLATION_CERTIFIED" to "true",
                 "OWNER_INVITE_EMAIL" to "owner@example.test",

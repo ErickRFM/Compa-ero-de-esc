@@ -81,12 +81,17 @@ class AuthService(
             val expectedEmail = ownerInviteEnvironment("OWNER_INVITE_EMAIL")?.trim()?.lowercase()
             val digest = ownerInviteEnvironment("OWNER_INVITE_CODE_SHA256")
             val code = request.ownerInvitationCode
+            val expiry = ownerInviteEnvironment("OWNER_INVITE_EXPIRES_AT")?.toLongOrNull()
+            val nowSeconds = clock.instant().epochSecond
             val allowed =
                 ownerInviteEnvironment("APP_ENV") == "production" &&
                     ownerInviteEnvironment("MONGODB_DATABASE")?.endsWith("_prod") == true &&
                     ownerInviteEnvironment("PROD_OWNER_ISOLATION_CERTIFIED") == "true" &&
                     expectedEmail != null &&
                     email == expectedEmail &&
+                    expiry != null &&
+                    expiry > nowSeconds &&
+                    expiry <= nowSeconds + 7 * 24 * 60 * 60 &&
                     digest?.matches(Regex("[a-f0-9]{64}")) == true &&
                     code != null &&
                     code.matches(Regex("[A-Za-z0-9_-]{43}")) &&

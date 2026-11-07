@@ -162,17 +162,26 @@ class OwnerBootstrapTest {
             }
             val qa = fixture()
             assertFailsWith<IllegalArgumentException> {
-                OwnerBootstrap.provision(qa.third.copy(production = true), "production", "companero_prod", qa.first, qa.second, InMemoryOwnerBootstrapClaims(), clock)
+                OwnerBootstrap.provision(
+                    qa.third.copy(production = true),
+                    "production",
+                    "companero_prod",
+                    qa.first,
+                    qa.second,
+                    InMemoryOwnerBootstrapClaims(),
+                    clock,
+                )
             }
             assertEquals(setOf(UserRole.STUDENT), assertNotNull(accounts.findById("owner")).roles)
         }
 
     @Test fun `production flag is opt in and fixed to hotmail`() {
         assertEquals(null, OwnerBootstrap.parseProduction { null })
-        val env = mapOf(
-            "PROD_OWNER_BOOTSTRAP_ENABLED" to "true",
-            "PROD_OWNER_BOOTSTRAP_EMAIL" to "attacker@example.com",
-        )
+        val env =
+            mapOf(
+                "PROD_OWNER_BOOTSTRAP_ENABLED" to "true",
+                "PROD_OWNER_BOOTSTRAP_EMAIL" to "attacker@example.com",
+            )
         assertFailsWith<IllegalArgumentException> { OwnerBootstrap.parseProduction { env[it] } }
     }
 

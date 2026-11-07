@@ -64,7 +64,7 @@ fun createApiClient(
 
         install(HttpTimeout) {
             requestTimeoutMillis = 30_000
-            connectTimeoutMillis = 10_000
+            connectTimeoutMillis = 30_000
             socketTimeoutMillis = 30_000
         }
 

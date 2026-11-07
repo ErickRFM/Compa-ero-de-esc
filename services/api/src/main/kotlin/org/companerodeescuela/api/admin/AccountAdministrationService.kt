@@ -433,6 +433,13 @@ class AccountAdministrationService(
         identifier(request.operationId)
         val currentActor = policy.live(actor.toUserSummary())
         val target = accounts.findById(targetId) ?: throw ApiException.NotFound("Account was not found")
+        // The designated platform proprietor is not an institution-managed user.
+        // Even a different SUPER_ADMIN cannot suspend/revoke the owner's login.
+        if (target.email.trim().equals("erik55509@hotmail.com", ignoreCase = true) &&
+            UserRole.SUPER_ADMIN in target.roles
+        ) {
+            throw ApiException.Forbidden("Platform owner lifecycle is managed by a separate recovery process")
+        }
         val institution = effectiveInstitution(target) ?: throw ApiException.Forbidden("Account institution has not been assigned")
         policy.require(currentActor.toUserSummary(), AdminCapability.MANAGE_USERS, institution)
         if (target.id == currentActor.id ||

@@ -67,6 +67,7 @@ import org.companerodeescuela.api.mail.ResendInvitationEmailGateway
 import org.companerodeescuela.api.plugins.configurePlugins
 import org.companerodeescuela.api.presence.schoolPresenceRoutes
 import org.companerodeescuela.api.representatives.groupRepresentativeRoutes
+import org.companerodeescuela.api.security.MfaSecretCipher
 import org.companerodeescuela.api.security.mfaRoutes
 import org.companerodeescuela.api.tutoring.tutorCaseRoutes
 import org.companerodeescuela.api.tutoring.tutoringRoutes
@@ -455,8 +456,8 @@ fun Application.module(
             InMemoryInvitationRepository()
         }
     val invitationOutbox =
-        if (settings.hasAuthentication && settings.mongo.isConfigured) {
-            MongoInvitationOutbox(mongoConnection.database())
+        if (settings.hasAuthentication && settings.mongo.isConfigured && settings.mfaEncryptionKey != null) {
+            MongoInvitationOutbox(mongoConnection.database(), MfaSecretCipher(settings.mfaEncryptionKey))
         } else {
             InMemoryInvitationOutbox()
         }
@@ -478,6 +479,23 @@ fun Application.module(
             identityGraph.institutions,
             invitationOutbox,
         )
+    launchManagedWorker(
+        enabled = settings.hasAuthentication && settings.mongo.isConfigured &&
+            settings.hasVerificationEmail && settings.mfaEncryptionKey != null &&
+            (!settings.environment.isProduction || settings.productionInvitationsEnabled),
+        context = Dispatchers.IO,
+    ) {
+        while (kotlin.coroutines.coroutineContext[kotlinx.coroutines.Job]?.isActive == true) {
+            try {
+                invitationDispatcher.retryPendingOutbox()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                log.warn("Invitation outbox retry unavailable; encrypted work retained")
+            }
+            kotlinx.coroutines.delay(30_000)
+        }
+    }
 
     routing {
         healthRoutes(settings = settings, healthService = healthService)

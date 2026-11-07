@@ -1,7 +1,12 @@
 package org.companerodeescuela.api.admin
 
 import com.mongodb.MongoWriteException
+import com.mongodb.client.model.Filters.and
 import com.mongodb.client.model.Filters.eq
+import com.mongodb.client.model.Filters.lte
+import com.mongodb.client.model.FindOneAndUpdateOptions
+import com.mongodb.client.model.ReturnDocument
+import com.mongodb.client.model.Updates
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.sync.Mutex
@@ -19,6 +24,7 @@ import java.security.MessageDigest
 import java.security.Signature
 import java.security.spec.X509EncodedKeySpec
 import java.time.Clock
+import java.time.Instant
 import java.util.Base64
 import java.util.Date
 import java.util.Locale
@@ -61,18 +67,31 @@ data class OwnerBootstrapSpec(
     override fun toString(): String = "OwnerBootstrapSpec([redacted])"
 }
 
+enum class OwnerBootstrapClaimState {
+    RESERVED,
+    COMMITTED,
+}
+
 data class OwnerBootstrapClaim(
     val digest: String,
     val accountId: String,
     val operator: String,
     val reason: String,
-    val authorizedAt: java.time.Instant,
+    val authorizedAt: Instant,
+    val expiresAt: Instant,
+    val state: OwnerBootstrapClaimState = OwnerBootstrapClaimState.RESERVED,
 )
 
 interface OwnerBootstrapClaims {
     suspend fun find(): OwnerBootstrapClaim?
 
     suspend fun reserve(claim: OwnerBootstrapClaim): Boolean
+
+    suspend fun commit(
+        digest: String,
+        accountId: String,
+        committedAt: Instant,
+    ): Boolean
 }
 
 class InMemoryOwnerBootstrapClaims : OwnerBootstrapClaims {
@@ -84,31 +103,51 @@ class InMemoryOwnerBootstrapClaims : OwnerBootstrapClaims {
     override suspend fun reserve(claim: OwnerBootstrapClaim): Boolean =
         mutex.withLock {
             val previous = this.claim
-            if (previous == null) {
-                this.claim = claim
-                true
-            } else {
-                previous.digest == claim.digest
+            when {
+                previous == null -> {
+                    this.claim = claim
+                    true
+                }
+                previous.digest == claim.digest -> previous.state == OwnerBootstrapClaimState.RESERVED
+                previous.state == OwnerBootstrapClaimState.RESERVED &&
+                    !previous.expiresAt.isAfter(claim.authorizedAt) -> {
+                    this.claim = claim
+                    true
+                }
+                else -> false
             }
+        }
+
+    override suspend fun commit(
+        digest: String,
+        accountId: String,
+        committedAt: Instant,
+    ): Boolean =
+        mutex.withLock {
+            val current = claim ?: return@withLock false
+            if (current.digest != digest || current.accountId != accountId) return@withLock false
+            if (current.state == OwnerBootstrapClaimState.COMMITTED) return@withLock true
+            claim = current.copy(state = OwnerBootstrapClaimState.COMMITTED)
+            true
         }
 }
 
-/** One durable global reservation per database; never releases revoked authority. */
+/**
+ * One durable global reservation per database.
+ *
+ * A RESERVED claim is a short-lived lease tied to the signed command expiry. It can be
+ * replaced only after expiry, using a new independently authorized command. COMMITTED
+ * claims are permanent tombstones and are never reassigned. Legacy claims without an
+ * explicit state are treated as COMMITTED (fail closed).
+ */
 class MongoOwnerBootstrapClaims(
     database: MongoDatabase,
 ) : OwnerBootstrapClaims {
+    // The collection name is retained for backwards compatibility with existing QA claims.
     private val claims = database.getCollection<Document>("qa_initial_owner_claims")
 
     override suspend fun find(): OwnerBootstrapClaim? =
-        claims.find(eq("_id", "global-owner")).firstOrNull()?.let {
-            OwnerBootstrapClaim(
-                it.getString("digest"),
-                it.getString("accountId"),
-                it.getString("operator"),
-                it.getString("reason"),
-                it.getDate("authorizedAt").toInstant(),
-            )
-        }
+        claims.find(eq("_id", "global-owner")).firstOrNull()?.let(::toClaim)
 
     override suspend fun reserve(claim: OwnerBootstrapClaim): Boolean {
         try {
@@ -118,13 +157,89 @@ class MongoOwnerBootstrapClaims(
                     .append("accountId", claim.accountId)
                     .append("operator", claim.operator)
                     .append("reason", claim.reason)
-                    .append("authorizedAt", Date.from(claim.authorizedAt)),
+                    .append("authorizedAt", Date.from(claim.authorizedAt))
+                    .append("expiresAt", Date.from(claim.expiresAt))
+                    .append("state", OwnerBootstrapClaimState.RESERVED.name),
             )
             return true
         } catch (error: MongoWriteException) {
             if (error.error.code != 11000) throw error
         }
-        return find()?.digest == claim.digest
+
+        val previous = find() ?: return false
+        if (previous.digest == claim.digest) {
+            return previous.state == OwnerBootstrapClaimState.RESERVED
+        }
+        if (previous.state != OwnerBootstrapClaimState.RESERVED ||
+            previous.expiresAt.isAfter(claim.authorizedAt)
+        ) {
+            return false
+        }
+
+        // Compare-and-set the expired lease. Concurrent recovery commands cannot both win.
+        return claims.findOneAndUpdate(
+            and(
+                eq("_id", "global-owner"),
+                eq("digest", previous.digest),
+                eq("state", OwnerBootstrapClaimState.RESERVED.name),
+                lte("expiresAt", Date.from(claim.authorizedAt)),
+            ),
+            Updates.combine(
+                Updates.set("digest", claim.digest),
+                Updates.set("accountId", claim.accountId),
+                Updates.set("operator", claim.operator),
+                Updates.set("reason", claim.reason),
+                Updates.set("authorizedAt", Date.from(claim.authorizedAt)),
+                Updates.set("expiresAt", Date.from(claim.expiresAt)),
+                Updates.set("state", OwnerBootstrapClaimState.RESERVED.name),
+                Updates.set("recoveredFromDigest", previous.digest),
+                Updates.set("recoveredAt", Date.from(claim.authorizedAt)),
+            ),
+            FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
+        ) != null
+    }
+
+    override suspend fun commit(
+        digest: String,
+        accountId: String,
+        committedAt: Instant,
+    ): Boolean {
+        val committed =
+            claims.findOneAndUpdate(
+                and(
+                    eq("_id", "global-owner"),
+                    eq("digest", digest),
+                    eq("accountId", accountId),
+                    eq("state", OwnerBootstrapClaimState.RESERVED.name),
+                ),
+                Updates.combine(
+                    Updates.set("state", OwnerBootstrapClaimState.COMMITTED.name),
+                    Updates.set("committedAt", Date.from(committedAt)),
+                ),
+                FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
+            )
+        if (committed != null) return true
+
+        val current = find()
+        return current?.digest == digest &&
+            current.accountId == accountId &&
+            current.state == OwnerBootstrapClaimState.COMMITTED
+    }
+
+    private fun toClaim(document: Document): OwnerBootstrapClaim {
+        val state =
+            runCatching {
+                OwnerBootstrapClaimState.valueOf(document.getString("state") ?: OwnerBootstrapClaimState.COMMITTED.name)
+            }.getOrDefault(OwnerBootstrapClaimState.COMMITTED)
+        return OwnerBootstrapClaim(
+            document.getString("digest"),
+            document.getString("accountId"),
+            document.getString("operator"),
+            document.getString("reason"),
+            document.getDate("authorizedAt").toInstant(),
+            document.getDate("expiresAt")?.toInstant() ?: Instant.MAX,
+            state,
+        )
     }
 }
 
@@ -238,6 +353,7 @@ object OwnerBootstrap {
             UserRole.SUPER_ADMIN in account.roles &&
             account.accountStatus == AccountStatus.ACTIVE
         ) {
+            require(claims.commit(digest, account.id, now)) { "Owner bootstrap claim could not be finalized" }
             return
         }
         require(spec.expiresAt > now.epochSecond && spec.expiresAt <= now.epochSecond + 900) {
@@ -264,7 +380,18 @@ object OwnerBootstrap {
         }
         require(accounts.listAccounts().none { UserRole.SUPER_ADMIN in it.roles }) { "Existing owner requires normal administration" }
         mfa.requireStepUp(account, spec.proof, StepUpAction.PRIVILEGED_INVITE_ACCEPT, "global-owner", spec.operationId, digest)
-        require(claims.reserve(OwnerBootstrapClaim(digest, account.id, spec.operator, spec.reason, now))) { "Owner reservation conflicts" }
+        require(
+            claims.reserve(
+                OwnerBootstrapClaim(
+                    digest,
+                    account.id,
+                    spec.operator,
+                    spec.reason,
+                    now,
+                    Instant.ofEpochSecond(spec.expiresAt),
+                ),
+            ),
+        ) { "Owner reservation conflicts" }
         requireNotNull(
             accounts.changeIdentity(
                 account.id,
@@ -280,6 +407,9 @@ object OwnerBootstrap {
                 ),
             ),
         ) { "Owner candidate changed; authority was not granted" }
+        require(claims.commit(digest, account.id, now)) {
+            "Owner identity changed but its reservation is not committed; rerun the same authorized command"
+        }
     }
 }
 

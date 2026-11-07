@@ -183,6 +183,7 @@ fun RegistrationScreen(
                         R.string.registration_owner_invitation_code,
                         !state.submitting,
                         "registration_owner_invitation_code",
+                        KeyboardType.Password,
                     )
                 }
                 if (academicRequest) {

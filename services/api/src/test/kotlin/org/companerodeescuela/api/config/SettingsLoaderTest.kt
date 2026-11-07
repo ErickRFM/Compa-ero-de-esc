@@ -445,6 +445,48 @@ class SettingsLoaderTest {
         assertEquals(first, second)
         assertEquals(first.hashCode(), second.hashCode())
     }
+
+    @Test
+    @DisplayName("A production owner invitation requires the verified-email delivery path")
+    fun ownerInvitationRequiresProductionEmailVerificationGateway() {
+        val expiry =
+            java.time.Instant
+                .now()
+                .plusSeconds(3600)
+                .epochSecond
+                .toString()
+        val base =
+            listOf(
+                "APP_ENV" to "production",
+                "API_PORT" to "8080",
+                "MONGODB_DATABASE" to "companero_prod",
+                "MONGODB_URI" to "mongodb://localhost:27017",
+                "JWT_SECRET" to "j".repeat(40),
+                "MFA_ENCRYPTION_KEY" to "A".repeat(43),
+                "OWNER_INVITE_EMAIL" to "erik55509@hotmail.com",
+                "OWNER_INVITE_CODE_SHA256" to "a".repeat(64),
+                "OWNER_INVITE_EXPIRES_AT" to expiry,
+                "PROD_OWNER_ISOLATION_CERTIFIED" to "true",
+            )
+        val error =
+            assertFailsWith<ConfigurationException> {
+                loader(*base.toTypedArray()).load()
+            }
+        assertContains(error.message!!, "VERIFICATION_EMAIL_API_KEY")
+
+        val withEmail =
+            base +
+                listOf(
+                    "VERIFICATION_EMAIL_API_KEY" to "r".repeat(32),
+                    "VERIFICATION_EMAIL_SENDER" to "noreply@example.com",
+                )
+        val configured =
+            loader(
+                *withEmail.toTypedArray(),
+            ).load()
+        assertTrue(configured.hasVerificationEmail)
+        assertEquals("companero_prod", configured.mongo.databaseName)
+    }
 }
 
 class EnvironmentTest {

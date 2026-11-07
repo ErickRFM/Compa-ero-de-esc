@@ -20,8 +20,10 @@ import org.companerodeescuela.api.admin.OwnerBootstrap
 import org.companerodeescuela.api.admin.QaAdminBootstrap
 import org.companerodeescuela.api.admin.accountAdministrationRoutes
 import org.companerodeescuela.api.attendance.attendanceRoutes
+import org.companerodeescuela.api.auth.InMemoryOwnerInvitationRepository
 import org.companerodeescuela.api.auth.InMemoryRateLimitStore
 import org.companerodeescuela.api.auth.LoginAttemptLimiter
+import org.companerodeescuela.api.auth.MongoOwnerInvitationRepository
 import org.companerodeescuela.api.auth.MongoRateLimitStore
 import org.companerodeescuela.api.auth.PlatformSessionAuthority
 import org.companerodeescuela.api.auth.authRoutes
@@ -138,15 +140,34 @@ fun Application.module(
     }
     // Initial ownership is an explicit MFA-authorized operator command, never a
     // privilege inferred from an email, login form or invitation. This bootstrap
-    // refuses production and requires an isolated *_qa database.
+    // is scoped to a dedicated QA or production database, with separate MFA proof.
     val qaOwnerSpec = OwnerBootstrap.parse(System::getenv)
+    val prodOwnerSpec = OwnerBootstrap.parseProduction(System::getenv)
     val qaAdminSpec = QaAdminBootstrap.parse(System::getenv)
-    require(qaOwnerSpec == null || qaAdminSpec == null) {
-        "QA initial owner and institutional admin bootstrap cannot run together"
+    require(listOfNotNull(qaOwnerSpec, prodOwnerSpec, qaAdminSpec).size <= 1) {
+        "Only one privileged bootstrap command may run per startup"
     }
     qaOwnerSpec?.let { desired ->
         require(settings.mongo.isConfigured && settings.hasAuthentication) {
             "QA owner bootstrap requires persistent authenticated identity"
+        }
+        runBlocking {
+            withTimeout(15_000L) {
+                OwnerBootstrap.provision(
+                    desired,
+                    settings.environment.name.lowercase(),
+                    settings.mongo.databaseName,
+                    identityGraph.accounts,
+                    identityGraph.mfa,
+                    MongoOwnerBootstrapClaims(mongoConnection.database()),
+                )
+            }
+        }
+    }
+    // Production ownership is a distinct, explicitly scoped, MFA-authorized command.
+    prodOwnerSpec?.let { desired ->
+        require(settings.mongo.isConfigured && settings.hasAuthentication) {
+            "Production owner bootstrap requires persistent authenticated identity"
         }
         runBlocking {
             withTimeout(15_000L) {
@@ -459,6 +480,13 @@ fun Application.module(
             invitationOutbox,
         )
 
+    val ownerInvitationRepository =
+        if (settings.hasAuthentication && settings.mongo.isConfigured) {
+            MongoOwnerInvitationRepository(mongoConnection.database())
+        } else {
+            InMemoryOwnerInvitationRepository()
+        }
+
     routing {
         healthRoutes(settings = settings, healthService = healthService)
         authRoutes(
@@ -470,6 +498,7 @@ fun Application.module(
             institutions = identityGraph.institutions,
             verificationEmail = identityGraph.verificationEmail,
             sessionAuthority = sessionAuthority,
+            ownerInvitationRepository = ownerInvitationRepository,
         )
         mfaRoutes(settings, providerRegistry.identity, identityGraph.refreshSessions, identityGraph.accounts, identityGraph.mfa)
         accountAdministrationRoutes(

@@ -43,6 +43,7 @@ enum class RegistrationAccountType {
     TEACHER,
     TUTOR,
     PARTICIPANT,
+    OWNER_INVITED,
 }
 
 @Serializable
@@ -54,4 +55,5 @@ data class RegisterRequest(
     val requestedInstitutionId: String? = null,
     val identityReference: String? = null,
     val preferredGroup: String? = null,
+    val ownerInvitationCode: String? = null,
 )

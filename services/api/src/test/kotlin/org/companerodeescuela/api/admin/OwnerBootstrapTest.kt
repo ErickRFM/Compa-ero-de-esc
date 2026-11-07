@@ -5,20 +5,27 @@ import org.companerodeescuela.api.auth.AccountIdentityChange
 import org.companerodeescuela.api.auth.InMemoryPlatformAccountRepository
 import org.companerodeescuela.api.auth.PasswordHasher
 import org.companerodeescuela.api.auth.PlatformAccount
+import org.companerodeescuela.api.auth.RegistrationIntent
 import org.companerodeescuela.api.security.InMemoryMfaRepository
 import org.companerodeescuela.api.security.MfaSecretCipher
 import org.companerodeescuela.api.security.MfaService
 import org.companerodeescuela.api.security.Totp
 import org.companerodeescuela.shared.contracts.AccountStatus
+import org.companerodeescuela.shared.contracts.RegistrationAccountType
 import org.companerodeescuela.shared.contracts.StepUpAction
 import org.companerodeescuela.shared.contracts.UserRole
+import java.security.KeyPairGenerator
+import java.security.Signature
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class OwnerBootstrapTest {
     private val clock = Clock.fixed(Instant.parse("2026-11-02T12:00:30Z"), ZoneOffset.UTC)
@@ -31,6 +38,158 @@ class OwnerBootstrapTest {
             OwnerBootstrapSpec("x", "a@b", 0, "op", "operator", "test reason", 1, "secret").toString(),
         )
     }
+
+    @Test fun `production owner is opt in and requires isolation attestation`() {
+        assertEquals(null, OwnerBootstrap.parseProduction { null })
+        assertFailsWith<IllegalArgumentException> {
+            OwnerBootstrap.parseProduction { key ->
+                when (key) {
+                    "PROD_OWNER_BOOTSTRAP_ENABLED" -> "true"
+                    "PROD_OWNER_ISOLATION_CERTIFIED" -> "false"
+                    else -> null
+                }
+            }
+        }
+    }
+
+    @Test fun `production parser accepts only a signed operator authorization`() {
+        val keyPair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
+        val expiresAt = clock.instant().epochSecond + 600
+        val unsigned =
+            OwnerBootstrapSpec(
+                "owner",
+                "owner@example.test",
+                0,
+                "operation",
+                "operator-qa",
+                "QA owner enrollment",
+                expiresAt,
+                "p".repeat(43),
+                scope = "prod",
+            )
+        val signature =
+            Signature
+                .getInstance("Ed25519")
+                .apply {
+                    initSign(keyPair.private)
+                    update(unsigned.digest().toByteArray(Charsets.UTF_8))
+                }.sign()
+        val env =
+            mapOf(
+                "PROD_OWNER_BOOTSTRAP_ENABLED" to "true",
+                "PROD_OWNER_ISOLATION_CERTIFIED" to "true",
+                "PROD_OWNER_BOOTSTRAP_EXPECTED_REVISION" to "0",
+                "PROD_OWNER_BOOTSTRAP_EXPIRES_AT" to expiresAt.toString(),
+                "PROD_OWNER_BOOTSTRAP_PROOF" to "p".repeat(43),
+                "PROD_OWNER_BOOTSTRAP_ACCOUNT_ID" to "owner",
+                "PROD_OWNER_BOOTSTRAP_EMAIL" to "owner@example.test",
+                "PROD_OWNER_BOOTSTRAP_OPERATION_ID" to "operation",
+                "PROD_OWNER_BOOTSTRAP_OPERATOR" to "operator-qa",
+                "PROD_OWNER_BOOTSTRAP_REASON" to "QA owner enrollment",
+                "PROD_OWNER_BOOTSTRAP_TRUSTED_OPERATOR_PUBLIC_KEY" to
+                    Base64.getUrlEncoder().withoutPadding().encodeToString(keyPair.public.encoded),
+                "PROD_OWNER_BOOTSTRAP_AUTHORIZATION" to
+                    Base64.getUrlEncoder().withoutPadding().encodeToString(signature),
+            )
+        assertEquals(unsigned.digest(), OwnerBootstrap.parseProduction(env::get)?.digest())
+        assertFailsWith<IllegalArgumentException> {
+            OwnerBootstrap.parseProduction((env + ("PROD_OWNER_BOOTSTRAP_OPERATOR" to "unapproved"))::get)
+        }
+        val differentTrustAnchor = KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
+        val untrustedAnchorEnvironment =
+            env +
+                (
+                    "PROD_OWNER_BOOTSTRAP_TRUSTED_OPERATOR_PUBLIC_KEY" to
+                        Base64.getUrlEncoder().withoutPadding().encodeToString(differentTrustAnchor.public.encoded)
+                )
+        assertFailsWith<IllegalArgumentException> {
+            OwnerBootstrap.parseProduction(untrustedAnchorEnvironment::get)
+        }
+    }
+
+    @Test fun `production authorization signature binds the exact command`() =
+        runTest {
+            val (accounts, mfa, spec) = fixture(scope = "prod")
+            assertFailsWith<IllegalArgumentException> {
+                OwnerBootstrap.provision(
+                    spec.copy(reason = "different approved reason"),
+                    "production",
+                    "companero_prod",
+                    accounts,
+                    mfa,
+                    InMemoryOwnerBootstrapClaims(),
+                    clock,
+                )
+            }
+            assertEquals(setOf(UserRole.WORKSHOP_PARTICIPANT), assertNotNull(accounts.findById("owner")).roles)
+        }
+
+    @Test fun `production cannot use a QA scoped command or proof`() =
+        runTest {
+            val (accounts, mfa, qaSpec) = fixture()
+            assertFailsWith<IllegalArgumentException> {
+                OwnerBootstrap.provision(
+                    qaSpec,
+                    "production",
+                    "companero_prod",
+                    accounts,
+                    mfa,
+                    InMemoryOwnerBootstrapClaims(),
+                    clock,
+                )
+            }
+            assertFailsWith<IllegalArgumentException> {
+                OwnerBootstrap.provision(
+                    qaSpec.copy(scope = "prod"),
+                    "production",
+                    "companero_qa",
+                    accounts,
+                    mfa,
+                    InMemoryOwnerBootstrapClaims(),
+                    clock,
+                )
+            }
+            assertFailsWith<IllegalArgumentException> {
+                OwnerBootstrap.provision(
+                    qaSpec.copy(scope = "prod"),
+                    "production",
+                    "companero_prod",
+                    accounts,
+                    mfa,
+                    InMemoryOwnerBootstrapClaims(),
+                    clock,
+                )
+            }
+            assertEquals(setOf(UserRole.STUDENT), assertNotNull(accounts.findById("owner")).roles)
+        }
+
+    @Test fun `production refuses verified noninvited account even with valid MFA`() =
+        runTest {
+            val (accounts, mfa, spec) = fixture(scope = "prod", invited = false)
+            assertFailsWith<IllegalArgumentException> {
+                OwnerBootstrap.provision(
+                    spec,
+                    "production",
+                    "companero_prod",
+                    accounts,
+                    mfa,
+                    InMemoryOwnerBootstrapClaims(),
+                    clock,
+                )
+            }
+            assertEquals(setOf(UserRole.STUDENT), assertNotNull(accounts.findById("owner")).roles)
+        }
+
+    @Test fun `verified invited owner becomes only SUPER_ADMIN after production MFA`() =
+        runTest {
+            val (accounts, mfa, spec) = fixture(scope = "prod")
+            val claims = InMemoryOwnerBootstrapClaims()
+            OwnerBootstrap.provision(spec, "production", "companero_prod", accounts, mfa, claims, clock)
+            val owner = assertNotNull(accounts.findById("owner"))
+            assertEquals(setOf(UserRole.SUPER_ADMIN), owner.roles)
+            assertEquals("prod-declared:operator-qa", owner.identityAudit.single().actorId)
+            assertEquals(spec.digest(), claims.find()?.digest)
+        }
 
     @Test fun `verified student gains only the additional owner role through scoped MFA`() =
         runTest {
@@ -117,6 +276,67 @@ class OwnerBootstrapTest {
             assertEquals(setOf(UserRole.STUDENT), assertNotNull(accounts.findById("owner")).roles)
         }
 
+    @Test fun `expired pending reservation can be reclaimed by a newly authorized command`() =
+        runTest {
+            val claims = InMemoryOwnerBootstrapClaims()
+            val firstAuthorizedAt = Instant.parse("2026-11-02T12:00:00Z")
+            val expired =
+                OwnerBootstrapClaim(
+                    "a".repeat(64),
+                    "owner",
+                    "operator-one",
+                    "initial authorization",
+                    firstAuthorizedAt,
+                    firstAuthorizedAt.plusSeconds(900),
+                )
+            assertTrue(claims.reserve(expired))
+
+            val recoveredAt = firstAuthorizedAt.plusSeconds(901)
+            val replacement =
+                OwnerBootstrapClaim(
+                    "b".repeat(64),
+                    "owner",
+                    "operator-two",
+                    "fresh signed recovery authorization",
+                    recoveredAt,
+                    recoveredAt.plusSeconds(900),
+                )
+            assertTrue(claims.reserve(replacement))
+            assertEquals(replacement.digest, claims.find()?.digest)
+            assertEquals(OwnerBootstrapClaimState.RESERVED, claims.find()?.state)
+        }
+
+    @Test fun `committed owner reservation is permanent and cannot be reclaimed after expiry`() =
+        runTest {
+            val claims = InMemoryOwnerBootstrapClaims()
+            val authorizedAt = Instant.parse("2026-11-02T12:00:00Z")
+            val committed =
+                OwnerBootstrapClaim(
+                    "c".repeat(64),
+                    "owner",
+                    "operator-one",
+                    "approved owner bootstrap",
+                    authorizedAt,
+                    authorizedAt.plusSeconds(900),
+                )
+            assertTrue(claims.reserve(committed))
+            assertTrue(claims.commit(committed.digest, committed.accountId, authorizedAt.plusSeconds(30)))
+
+            val replacementAt = authorizedAt.plusSeconds(1800)
+            val replacement =
+                OwnerBootstrapClaim(
+                    "d".repeat(64),
+                    "owner-two",
+                    "operator-two",
+                    "attempted reassignment",
+                    replacementAt,
+                    replacementAt.plusSeconds(900),
+                )
+            assertFalse(claims.reserve(replacement))
+            assertEquals(committed.digest, claims.find()?.digest)
+            assertEquals(OwnerBootstrapClaimState.COMMITTED, claims.find()?.state)
+        }
+
     @Test fun `interrupted reservation can resume the same authorized command before proof expires`() =
         runTest {
             val (accounts, mfa, spec) = fixture()
@@ -134,6 +354,12 @@ class OwnerBootstrapTest {
                         }
                         return reserved
                     }
+
+                    override suspend fun commit(
+                        digest: String,
+                        accountId: String,
+                        committedAt: Instant,
+                    ): Boolean = durable.commit(digest, accountId, committedAt)
                 }
             assertFailsWith<IllegalStateException> {
                 OwnerBootstrap.provision(spec, "staging", "companero_qa", accounts, mfa, interrupted, clock)
@@ -141,9 +367,13 @@ class OwnerBootstrapTest {
             assertEquals(setOf(UserRole.STUDENT), assertNotNull(accounts.findById("owner")).roles)
             OwnerBootstrap.provision(spec, "staging", "companero_qa", accounts, mfa, interrupted, clock)
             assertEquals(setOf(UserRole.STUDENT, UserRole.SUPER_ADMIN), assertNotNull(accounts.findById("owner")).roles)
+            assertEquals(OwnerBootstrapClaimState.COMMITTED, durable.find()?.state)
         }
 
-    private suspend fun fixture(): Triple<InMemoryPlatformAccountRepository, MfaService, OwnerBootstrapSpec> {
+    private suspend fun fixture(
+        scope: String = "qa",
+        invited: Boolean = true,
+    ): Triple<InMemoryPlatformAccountRepository, MfaService, OwnerBootstrapSpec> {
         val accounts = InMemoryPlatformAccountRepository()
         val password = "qa-test-password"
         val account =
@@ -152,8 +382,9 @@ class OwnerBootstrapTest {
                 "Owner",
                 "owner@example.test",
                 PasswordHasher().hash(password),
-                setOf(UserRole.STUDENT),
+                if (scope == "prod" && invited) setOf(UserRole.WORKSHOP_PARTICIPANT) else setOf(UserRole.STUDENT),
                 institutionId = "institution",
+                registrationIntent = if (scope == "prod" && invited) RegistrationIntent(RegistrationAccountType.OWNER_INVITED) else null,
                 emailVerifiedAt = clock.instant().minusSeconds(60),
             )
         accounts.create(account)
@@ -168,7 +399,7 @@ class OwnerBootstrapTest {
             Totp.code(Totp.decodeSecret(enrollment.secret), enrollmentClock.instant().epochSecond),
         )
         val mfa = MfaService(accounts, factors, cipher, clock)
-        val draft =
+        val unsignedDraft =
             OwnerBootstrapSpec(
                 "owner",
                 "owner@example.test",
@@ -178,7 +409,25 @@ class OwnerBootstrapTest {
                 "QA owner enrollment",
                 clock.instant().epochSecond + 600,
                 "p".repeat(43),
+                scope = scope,
             )
+        val draft =
+            if (scope == "prod") {
+                val keyPair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
+                val signature =
+                    Signature
+                        .getInstance("Ed25519")
+                        .apply {
+                            initSign(keyPair.private)
+                            update(unsignedDraft.digest().toByteArray(Charsets.UTF_8))
+                        }.sign()
+                unsignedDraft.copy(
+                    authorizationPublicKey = Base64.getUrlEncoder().withoutPadding().encodeToString(keyPair.public.encoded),
+                    authorizationSignature = Base64.getUrlEncoder().withoutPadding().encodeToString(signature),
+                )
+            } else {
+                unsignedDraft
+            }
         val proof =
             mfa.issueStepUp(
                 account,

@@ -368,6 +368,46 @@ class SettingsLoader(
             throw ConfigurationException("Invalid VERIFICATION_EMAIL_SENDER")
         }
 
+        // A configured first-owner invitation must never consume its one-time code
+        // when the account-verification email path is unavailable.
+        val ownerInvitationConfigured =
+            listOf("OWNER_INVITE_EMAIL", "OWNER_INVITE_CODE_SHA256", "OWNER_INVITE_EXPIRES_AT")
+                .any { !env(it).isNullOrBlank() }
+        if (ownerInvitationConfigured) {
+            if (!environment.isProduction) {
+                throw ConfigurationException("OWNER_INVITE_* is allowed only when APP_ENV=production")
+            }
+            if (!databaseName.endsWith("_prod")) {
+                throw ConfigurationException("OWNER_INVITE_* requires MONGODB_DATABASE ending in _prod")
+            }
+            if (mongoUri.isBlank()) {
+                throw ConfigurationException("OWNER_INVITE_* requires MONGODB_URI")
+            }
+            val ownerInviteEmail = env("OWNER_INVITE_EMAIL")?.trim()?.lowercase()
+            if (ownerInviteEmail == null ||
+                ownerInviteEmail.length !in 3..128 ||
+                !Regex("^[^\\s@]+@[^\\s@]+$").matches(ownerInviteEmail)
+            ) {
+                throw ConfigurationException("OWNER_INVITE_EMAIL must be a valid bounded email address")
+            }
+            val ownerInviteDigest = env("OWNER_INVITE_CODE_SHA256")?.trim()
+            if (ownerInviteDigest == null || !Regex("[a-f0-9]{64}").matches(ownerInviteDigest)) {
+                throw ConfigurationException("OWNER_INVITE_CODE_SHA256 must be a lowercase SHA-256 digest")
+            }
+            val ownerInviteExpiry = env("OWNER_INVITE_EXPIRES_AT")?.trim()?.toLongOrNull()
+            if (ownerInviteExpiry == null || ownerInviteExpiry <= 0) {
+                throw ConfigurationException("OWNER_INVITE_EXPIRES_AT must be a positive Unix timestamp")
+            }
+            if (env("PROD_OWNER_ISOLATION_CERTIFIED") != "true") {
+                throw ConfigurationException("Owner invitations require certified production MongoDB isolation")
+            }
+            if (verificationEmailKey == null || verificationEmailSender == null) {
+                throw ConfigurationException(
+                    "Owner invitations require VERIFICATION_EMAIL_API_KEY and VERIFICATION_EMAIL_SENDER",
+                )
+            }
+        }
+
         val firebaseJson =
             env("FIREBASE_SERVICE_ACCOUNT_JSON_B64")?.takeIf { it.isNotBlank() }?.let { encoded ->
                 if (encoded.length > 24_000 || !encoded.matches(Regex("[A-Za-z0-9+/]+={0,2}"))) {

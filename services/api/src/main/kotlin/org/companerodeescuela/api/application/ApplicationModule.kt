@@ -140,9 +140,10 @@ fun Application.module(
     // privilege inferred from an email, login form or invitation. This bootstrap
     // refuses production and requires an isolated *_qa database.
     val qaOwnerSpec = OwnerBootstrap.parse(System::getenv)
+    val prodOwnerSpec = OwnerBootstrap.parseProduction(System::getenv)
     val qaAdminSpec = QaAdminBootstrap.parse(System::getenv)
-    require(qaOwnerSpec == null || qaAdminSpec == null) {
-        "QA initial owner and institutional admin bootstrap cannot run together"
+    require(listOf(qaOwnerSpec, prodOwnerSpec, qaAdminSpec).count { it != null } <= 1) {
+        "Only one initial authority bootstrap may run at a time"
     }
     qaOwnerSpec?.let { desired ->
         require(settings.mongo.isConfigured && settings.hasAuthentication) {
@@ -157,6 +158,25 @@ fun Application.module(
                     identityGraph.accounts,
                     identityGraph.mfa,
                     MongoOwnerBootstrapClaims(mongoConnection.database()),
+                )
+            }
+        }
+    }
+    // A separate, operator-controlled production procedure requires a verified
+    // native account, scoped MFA proof, a production-only database and a durable one-time claim.
+    prodOwnerSpec?.let { desired ->
+        require(settings.mongo.isConfigured && settings.hasAuthentication) {
+            "Production owner bootstrap requires persistent authenticated identity"
+        }
+        runBlocking {
+            withTimeout(15_000L) {
+                OwnerBootstrap.provision(
+                    desired,
+                    settings.environment.name.lowercase(),
+                    settings.mongo.databaseName,
+                    identityGraph.accounts,
+                    identityGraph.mfa,
+                    MongoOwnerBootstrapClaims(mongoConnection.database(), "prod_initial_owner_claims"),
                 )
             }
         }

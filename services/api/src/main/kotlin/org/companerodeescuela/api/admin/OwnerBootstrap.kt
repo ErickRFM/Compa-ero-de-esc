@@ -30,7 +30,9 @@ data class OwnerBootstrapSpec(
     val proof: String,
     val scope: String = "qa",
 ) {
-    init { require(scope in setOf("qa", "prod")) }
+    init {
+        require(scope in setOf("qa", "prod"))
+    }
 
     fun digest(): String =
         MessageDigest
@@ -125,6 +127,7 @@ object OwnerBootstrap {
         val enabled = env("PROD_OWNER_BOOTSTRAP_ENABLED") ?: "false"
         require(enabled in setOf("true", "false")) { "Invalid production owner flag" }
         if (enabled == "false") return null
+
         fun required(name: String) = requireNotNull(env(name)) { "Production owner configuration incomplete" }
         require(required("PROD_OWNER_ISOLATION_CERTIFIED") == "true") {
             "Production database isolation must be certified before bootstrap"

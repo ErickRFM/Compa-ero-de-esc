@@ -519,17 +519,16 @@ class V12AdministrationUiTest {
                 compose.onAllNodesWithTag("staff_submit").fetchSemanticsNodes().isNotEmpty()
             }
             compose.waitForIdle()
+            // On API 35 the keyboard insets can still animate after Compose reports idle.
+            // Wait for actual screen visibility rather than testing hard-coded root bounds.
             compose.waitUntil(10_000) {
-                compose
-                    .onAllNodesWithTag("staff_submit")
-                    .fetchSemanticsNodes()
-                    .firstOrNull()
-                    ?.boundsInRoot
-                    ?.let { it.bottom > 0f && it.top < 2400f } == true
+                runCatching {
+                    compose.onNodeWithTag("staff_submit").performScrollTo().assertIsDisplayed()
+                    true
+                }.getOrDefault(false)
             }
             compose
                 .onNodeWithTag("staff_submit")
-                .performScrollTo()
                 .assertIsDisplayed()
                 .assertIsEnabled()
                 // Exercise the exposed accessibility action once. Native IME animations on API35

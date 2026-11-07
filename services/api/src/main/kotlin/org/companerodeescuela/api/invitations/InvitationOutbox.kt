@@ -76,6 +76,8 @@ internal class InMemoryInvitationOutbox(
             entries.values
                 .filter {
                     it.nextAttemptAt <= now &&
+                        it.expiresAt > now &&
+                        it.tokenValue.isNotEmpty() &&
                         it.lastStatus != VerificationDeliveryStatus.DELIVERED &&
                         it.lastStatus != VerificationDeliveryStatus.FAILED
                 }.toList()

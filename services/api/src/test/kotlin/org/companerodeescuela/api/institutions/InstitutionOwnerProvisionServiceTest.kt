@@ -94,7 +94,7 @@ class InstitutionOwnerProvisionServiceTest {
             )
             val created = service.create(owner, command, proof.proof)
             assertEquals("UPTLAX", created.id)
-            assertEquals("Universidad Politecnica", assertNotNull(institutions.findEnabled("UPTLAX")).name)
+            assertEquals("Universidad Politecnica", assertNotNull(institutions.findEnabled("UPTLAX")).displayName)
             assertFailsWith<ApiException.Forbidden> { service.create(owner, command, proof.proof) }
         }
 }

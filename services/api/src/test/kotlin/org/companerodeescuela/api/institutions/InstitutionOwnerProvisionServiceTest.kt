@@ -29,25 +29,28 @@ class InstitutionOwnerProvisionServiceTest {
         runTest {
             val accounts = InMemoryPlatformAccountRepository()
             val institutions = InMemoryInstitutionRepository()
-            val service = InstitutionOwnerProvisionService(
-                accounts,
-                institutions,
-                MfaService(accounts, InMemoryMfaRepository(), null, clock),
-                clock,
-            )
-            val attacker = PlatformAccount(
-                "a",
-                "Other admin",
-                "other@example.test",
-                "hash",
-                setOf(UserRole.SUPER_ADMIN),
-                emailVerifiedAt = now.minusSeconds(10),
-            )
-            val unprivileged = attacker.copy(
-                id = "b",
-                email = "erik55509@hotmail.com",
-                roles = setOf(UserRole.STUDENT),
-            )
+            val service =
+                InstitutionOwnerProvisionService(
+                    accounts,
+                    institutions,
+                    MfaService(accounts, InMemoryMfaRepository(), null, clock),
+                    clock,
+                )
+            val attacker =
+                PlatformAccount(
+                    "a",
+                    "Other admin",
+                    "other@example.test",
+                    "hash",
+                    setOf(UserRole.SUPER_ADMIN),
+                    emailVerifiedAt = now.minusSeconds(10),
+                )
+            val unprivileged =
+                attacker.copy(
+                    id = "b",
+                    email = "erik55509@hotmail.com",
+                    roles = setOf(UserRole.STUDENT),
+                )
             accounts.create(attacker)
             accounts.create(unprivileged)
             assertFailsWith<ApiException.Forbidden> { service.prepare(attacker, command) }
@@ -60,14 +63,15 @@ class InstitutionOwnerProvisionServiceTest {
             val accounts = InMemoryPlatformAccountRepository()
             val institutions = InMemoryInstitutionRepository()
             val password = "owner-test-password"
-            val owner = PlatformAccount(
-                "owner",
-                "Owner",
-                "erik55509@hotmail.com",
-                PasswordHasher().hash(password),
-                setOf(UserRole.SUPER_ADMIN),
-                emailVerifiedAt = now.minusSeconds(60),
-            )
+            val owner =
+                PlatformAccount(
+                    "owner",
+                    "Owner",
+                    "erik55509@hotmail.com",
+                    PasswordHasher().hash(password),
+                    setOf(UserRole.SUPER_ADMIN),
+                    emailVerifiedAt = now.minusSeconds(60),
+                )
             accounts.create(owner)
             val factors = InMemoryMfaRepository()
             val cipher = MfaSecretCipher(ByteArray(32) { 1 })
@@ -83,15 +87,16 @@ class InstitutionOwnerProvisionServiceTest {
             val service = InstitutionOwnerProvisionService(accounts, institutions, mfa, clock)
             val digest = service.prepare(owner, command)
             assertFailsWith<ApiException.Forbidden> { service.create(owner, command, "invalid") }
-            val proof = mfa.issueStepUp(
-                owner,
-                password,
-                Totp.code(Totp.decodeSecret(pending.secret), now.epochSecond),
-                StepUpAction.INSTITUTION_MANAGEMENT,
-                InstitutionOwnerProvisionService.RESOURCE_ID,
-                command.operationId,
-                digest,
-            )
+            val proof =
+                mfa.issueStepUp(
+                    owner,
+                    password,
+                    Totp.code(Totp.decodeSecret(pending.secret), now.epochSecond),
+                    StepUpAction.INSTITUTION_MANAGEMENT,
+                    InstitutionOwnerProvisionService.RESOURCE_ID,
+                    command.operationId,
+                    digest,
+                )
             val created = service.create(owner, command, proof.proof)
             assertEquals("UPTLAX", created.id)
             assertEquals("Universidad Politecnica", assertNotNull(institutions.findEnabled("UPTLAX")).displayName)

@@ -86,6 +86,23 @@ class OwnerBootstrapTest {
             assertEquals(setOf(UserRole.STUDENT), assertNotNull(accounts.findById("owner")).roles)
         }
 
+    @Test fun `production refuses verified noninvited account even with valid MFA`() =
+        runTest {
+            val (accounts, mfa, spec) = fixture(scope = "prod", invited = false)
+            assertFailsWith<IllegalArgumentException> {
+                OwnerBootstrap.provision(
+                    spec,
+                    "production",
+                    "companero_prod",
+                    accounts,
+                    mfa,
+                    InMemoryOwnerBootstrapClaims(),
+                    clock,
+                )
+            }
+            assertEquals(setOf(UserRole.STUDENT), assertNotNull(accounts.findById("owner")).roles)
+        }
+
     @Test fun `verified invited owner becomes only SUPER_ADMIN after production MFA`() =
         runTest {
             val (accounts, mfa, spec) = fixture(scope = "prod")
@@ -208,7 +225,10 @@ class OwnerBootstrapTest {
             assertEquals(setOf(UserRole.STUDENT, UserRole.SUPER_ADMIN), assertNotNull(accounts.findById("owner")).roles)
         }
 
-    private suspend fun fixture(scope: String = "qa"): Triple<InMemoryPlatformAccountRepository, MfaService, OwnerBootstrapSpec> {
+    private suspend fun fixture(
+        scope: String = "qa",
+        invited: Boolean = true,
+    ): Triple<InMemoryPlatformAccountRepository, MfaService, OwnerBootstrapSpec> {
         val accounts = InMemoryPlatformAccountRepository()
         val password = "qa-test-password"
         val account =
@@ -217,9 +237,9 @@ class OwnerBootstrapTest {
                 "Owner",
                 "owner@example.test",
                 PasswordHasher().hash(password),
-                if (scope == "prod") setOf(UserRole.WORKSHOP_PARTICIPANT) else setOf(UserRole.STUDENT),
+                if (scope == "prod" && invited) setOf(UserRole.WORKSHOP_PARTICIPANT) else setOf(UserRole.STUDENT),
                 institutionId = "institution",
-                registrationIntent = if (scope == "prod") RegistrationIntent(RegistrationAccountType.OWNER_INVITED) else null,
+                registrationIntent = if (scope == "prod" && invited) RegistrationIntent(RegistrationAccountType.OWNER_INVITED) else null,
                 emailVerifiedAt = clock.instant().minusSeconds(60),
             )
         accounts.create(account)

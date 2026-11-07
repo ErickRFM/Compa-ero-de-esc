@@ -126,7 +126,8 @@ class UniversalRegistrationRoutesTest {
     @Test fun `owner registration requires mail-bound code and verification before privileges`() {
         val code = "t".repeat(43)
         val hash =
-            MessageDigest.getInstance("SHA-256")
+            MessageDigest
+                .getInstance("SHA-256")
                 .digest(code.toByteArray(Charsets.UTF_8))
                 .joinToString("") { "%02x".format(it) }
         val env =
@@ -148,7 +149,11 @@ class UniversalRegistrationRoutesTest {
                 HttpStatusCode.Forbidden,
                 post(
                     "/auth/register",
-                    registrationBody("owner@example.test", "OWNER_INVITED", ",\"ownerInvitationCode\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\""),
+                    registrationBody(
+                        "owner@example.test",
+                        "OWNER_INVITED",
+                        ",\"ownerInvitationCode\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"",
+                    ),
                 ).status,
             )
             val pending = register("owner@example.test", "OWNER_INVITED", payload)
@@ -304,30 +309,29 @@ class UniversalRegistrationRoutesTest {
     private fun scenario(
         ownerEnv: Map<String, String> = emptyMap(),
         block: suspend ApplicationTestBuilder.(Fixture) -> Unit,
-    ) =
-        testApplication {
-            val f = Fixture()
-            val settings = TestFixtures.settings().copy(jwtSecret = "0123456789abcdef0123456789abcdef".toCharArray())
-            val identity = MockIdentityProvider()
-            application {
-                configurePlugins(settings, f.sessions, PlatformSessionAuthority(f.accounts, identity))
-                routing {
-                    authRoutes(
-                        settings,
-                        identity,
-                        sessions = f.sessions,
-                        accounts = f.accounts,
-                        institutions = f.institutions,
-                        verificationEmail = f.mail,
-                        verificationClock = f.clock,
-                        ownerInviteEnvironment = ownerEnv::get,
-                    )
-                    institutionRoutes(f.institutions)
-                    authenticate(AuthTokenService.PROVIDER_NAME) { get("/private-probe") { call.respond(HttpStatusCode.OK) } }
-                }
+    ) = testApplication {
+        val f = Fixture()
+        val settings = TestFixtures.settings().copy(jwtSecret = "0123456789abcdef0123456789abcdef".toCharArray())
+        val identity = MockIdentityProvider()
+        application {
+            configurePlugins(settings, f.sessions, PlatformSessionAuthority(f.accounts, identity))
+            routing {
+                authRoutes(
+                    settings,
+                    identity,
+                    sessions = f.sessions,
+                    accounts = f.accounts,
+                    institutions = f.institutions,
+                    verificationEmail = f.mail,
+                    verificationClock = f.clock,
+                    ownerInviteEnvironment = ownerEnv::get,
+                )
+                institutionRoutes(f.institutions)
+                authenticate(AuthTokenService.PROVIDER_NAME) { get("/private-probe") { call.respond(HttpStatusCode.OK) } }
             }
-            block(f)
         }
+        block(f)
+    }
 
     private fun registrationBody(
         email: String,

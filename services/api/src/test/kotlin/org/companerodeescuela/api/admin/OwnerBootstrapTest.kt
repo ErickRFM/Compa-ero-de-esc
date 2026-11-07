@@ -86,7 +86,7 @@ class OwnerBootstrapTest {
                 "PROD_OWNER_BOOTSTRAP_OPERATION_ID" to "operation",
                 "PROD_OWNER_BOOTSTRAP_OPERATOR" to "operator-qa",
                 "PROD_OWNER_BOOTSTRAP_REASON" to "QA owner enrollment",
-                "PROD_OWNER_BOOTSTRAP_OPERATOR_PUBLIC_KEY" to
+                "PROD_OWNER_BOOTSTRAP_TRUSTED_OPERATOR_PUBLIC_KEY" to
                     Base64.getUrlEncoder().withoutPadding().encodeToString(keyPair.public.encoded),
                 "PROD_OWNER_BOOTSTRAP_AUTHORIZATION" to
                     Base64.getUrlEncoder().withoutPadding().encodeToString(signature),
@@ -94,6 +94,15 @@ class OwnerBootstrapTest {
         assertEquals(unsigned.digest(), OwnerBootstrap.parseProduction(env::get)?.digest())
         assertFailsWith<IllegalArgumentException> {
             OwnerBootstrap.parseProduction((env + ("PROD_OWNER_BOOTSTRAP_OPERATOR" to "unapproved"))::get)
+        }
+        val differentTrustAnchor = KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
+        assertFailsWith<IllegalArgumentException> {
+            OwnerBootstrap.parseProduction(
+                (env + (
+                    "PROD_OWNER_BOOTSTRAP_TRUSTED_OPERATOR_PUBLIC_KEY" to
+                        Base64.getUrlEncoder().withoutPadding().encodeToString(differentTrustAnchor.public.encoded)
+                ))::get,
+            )
         }
     }
 

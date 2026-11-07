@@ -28,13 +28,16 @@ data class OwnerBootstrapSpec(
     val reason: String,
     val expiresAt: Long,
     val proof: String,
+    val scope: String = "qa",
 ) {
+    init { require(scope in setOf("qa", "prod")) }
+
     fun digest(): String =
         MessageDigest
             .getInstance("SHA-256")
             .digest(
                 listOf(
-                    "companero.qa-first-owner.v1",
+                    "companero.$scope-first-owner.v1",
                     accountId,
                     email,
                     expectedRevision.toString(),
@@ -117,6 +120,32 @@ class MongoOwnerBootstrapClaims(
 }
 
 object OwnerBootstrap {
+    /** Explicit production authorization, distinct from the QA flow and digest. */
+    fun parseProduction(env: (String) -> String?): OwnerBootstrapSpec? {
+        val enabled = env("PROD_OWNER_BOOTSTRAP_ENABLED") ?: "false"
+        require(enabled in setOf("true", "false")) { "Invalid production owner flag" }
+        if (enabled == "false") return null
+        fun required(name: String) = requireNotNull(env(name)) { "Production owner configuration incomplete" }
+        require(required("PROD_OWNER_ISOLATION_CERTIFIED") == "true") {
+            "Production database isolation must be certified before bootstrap"
+        }
+        val revision = requireNotNull(required("PROD_OWNER_BOOTSTRAP_EXPECTED_REVISION").toLongOrNull())
+        val expiry = requireNotNull(required("PROD_OWNER_BOOTSTRAP_EXPIRES_AT").toLongOrNull())
+        val proof = required("PROD_OWNER_BOOTSTRAP_PROOF")
+        require(proof.matches(Regex("[A-Za-z0-9_-]{43}"))) { "Invalid production MFA proof" }
+        return OwnerBootstrapSpec(
+            required("PROD_OWNER_BOOTSTRAP_ACCOUNT_ID"),
+            required("PROD_OWNER_BOOTSTRAP_EMAIL"),
+            revision,
+            required("PROD_OWNER_BOOTSTRAP_OPERATION_ID"),
+            required("PROD_OWNER_BOOTSTRAP_OPERATOR"),
+            required("PROD_OWNER_BOOTSTRAP_REASON"),
+            expiry,
+            proof,
+            scope = "prod",
+        )
+    }
+
     /** The flag is an operator-controlled startup opt-in; never callable through a public route. */
     fun parse(env: (String) -> String?): OwnerBootstrapSpec? {
         val enabled = env("QA_OWNER_BOOTSTRAP_ENABLED") ?: "false"
@@ -149,9 +178,13 @@ object OwnerBootstrap {
         claims: OwnerBootstrapClaims,
         clock: Clock = Clock.systemUTC(),
     ) {
-        require(environment in setOf("local", "staging") && databaseName.matches(Regex("[A-Za-z0-9_]+_qa"))) {
-            "Owner bootstrap requires an isolated QA database and nonproduction runtime"
-        }
+        val permitted =
+            when (spec.scope) {
+                "qa" -> environment in setOf("local", "staging") && databaseName.matches(Regex("[A-Za-z0-9_]+_qa"))
+                "prod" -> environment == "production" && databaseName.matches(Regex("[A-Za-z0-9_]+_prod"))
+                else -> false
+            }
+        require(permitted) { "Owner bootstrap requires a matching isolated database and runtime" }
         require(spec.accountId.matches(Regex("[A-Za-z0-9_-]{1,128}")) && spec.operationId.matches(Regex("[A-Za-z0-9_-]{1,128}")))
         require(spec.operator.matches(Regex("[A-Za-z0-9_.@-]{1,100}")))
         require(spec.reason.length in 8..240 && spec.reason == spec.reason.trim() && spec.reason.none(Char::isISOControl))
@@ -169,7 +202,7 @@ object OwnerBootstrap {
         )
         val account = requireNotNull(accounts.findById(spec.accountId)) { "Verified owner candidate is required" }
         val digest = spec.digest()
-        val declaredOperator = "qa-declared:${spec.operator}"
+        val declaredOperator = "${spec.scope}-declared:${spec.operator}"
         val existing = claims.find()
         val audit = account.identityAudit.lastOrNull()
         if (existing?.digest == digest &&

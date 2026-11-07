@@ -19,8 +19,7 @@ internal data class InstitutionProvisionCommand(
     val displayName: String,
     val operationId: String,
 ) {
-    fun canonical(): InstitutionProvisionCommand =
-        copy(institutionId = institutionId.trim(), displayName = displayName.trim())
+    fun canonical(): InstitutionProvisionCommand = copy(institutionId = institutionId.trim(), displayName = displayName.trim())
 
     fun valid(): Boolean =
         institutionId.matches(Regex("[A-Za-z0-9_-]{2,64}")) &&

@@ -5,11 +5,13 @@ import org.companerodeescuela.api.auth.AccountIdentityChange
 import org.companerodeescuela.api.auth.InMemoryPlatformAccountRepository
 import org.companerodeescuela.api.auth.PasswordHasher
 import org.companerodeescuela.api.auth.PlatformAccount
+import org.companerodeescuela.api.auth.RegistrationIntent
 import org.companerodeescuela.api.security.InMemoryMfaRepository
 import org.companerodeescuela.api.security.MfaSecretCipher
 import org.companerodeescuela.api.security.MfaService
 import org.companerodeescuela.api.security.Totp
 import org.companerodeescuela.shared.contracts.AccountStatus
+import org.companerodeescuela.shared.contracts.RegistrationAccountType
 import org.companerodeescuela.shared.contracts.StepUpAction
 import org.companerodeescuela.shared.contracts.UserRole
 import java.time.Clock
@@ -31,6 +33,86 @@ class OwnerBootstrapTest {
             OwnerBootstrapSpec("x", "a@b", 0, "op", "operator", "test reason", 1, "secret").toString(),
         )
     }
+
+    @Test fun `production owner is opt in and requires isolation attestation`() {
+        assertEquals(null, OwnerBootstrap.parseProduction { null })
+        assertFailsWith<IllegalArgumentException> {
+            OwnerBootstrap.parseProduction { key ->
+                when (key) {
+                    "PROD_OWNER_BOOTSTRAP_ENABLED" -> "true"
+                    "PROD_OWNER_ISOLATION_CERTIFIED" -> "false"
+                    else -> null
+                }
+            }
+        }
+    }
+
+    @Test fun `production cannot use a QA scoped command or proof`() =
+        runTest {
+            val (accounts, mfa, qaSpec) = fixture()
+            assertFailsWith<IllegalArgumentException> {
+                OwnerBootstrap.provision(
+                    qaSpec,
+                    "production",
+                    "companero_prod",
+                    accounts,
+                    mfa,
+                    InMemoryOwnerBootstrapClaims(),
+                    clock,
+                )
+            }
+            assertFailsWith<IllegalArgumentException> {
+                OwnerBootstrap.provision(
+                    qaSpec.copy(scope = "prod"),
+                    "production",
+                    "companero_qa",
+                    accounts,
+                    mfa,
+                    InMemoryOwnerBootstrapClaims(),
+                    clock,
+                )
+            }
+            assertFailsWith<IllegalArgumentException> {
+                OwnerBootstrap.provision(
+                    qaSpec.copy(scope = "prod"),
+                    "production",
+                    "companero_prod",
+                    accounts,
+                    mfa,
+                    InMemoryOwnerBootstrapClaims(),
+                    clock,
+                )
+            }
+            assertEquals(setOf(UserRole.STUDENT), assertNotNull(accounts.findById("owner")).roles)
+        }
+
+    @Test fun `production refuses verified noninvited account even with valid MFA`() =
+        runTest {
+            val (accounts, mfa, spec) = fixture(scope = "prod", invited = false)
+            assertFailsWith<IllegalArgumentException> {
+                OwnerBootstrap.provision(
+                    spec,
+                    "production",
+                    "companero_prod",
+                    accounts,
+                    mfa,
+                    InMemoryOwnerBootstrapClaims(),
+                    clock,
+                )
+            }
+            assertEquals(setOf(UserRole.STUDENT), assertNotNull(accounts.findById("owner")).roles)
+        }
+
+    @Test fun `verified invited owner becomes only SUPER_ADMIN after production MFA`() =
+        runTest {
+            val (accounts, mfa, spec) = fixture(scope = "prod")
+            val claims = InMemoryOwnerBootstrapClaims()
+            OwnerBootstrap.provision(spec, "production", "companero_prod", accounts, mfa, claims, clock)
+            val owner = assertNotNull(accounts.findById("owner"))
+            assertEquals(setOf(UserRole.SUPER_ADMIN), owner.roles)
+            assertEquals("prod-declared:operator-qa", owner.identityAudit.single().actorId)
+            assertEquals(spec.digest(), claims.find()?.digest)
+        }
 
     @Test fun `verified student gains only the additional owner role through scoped MFA`() =
         runTest {
@@ -143,7 +225,10 @@ class OwnerBootstrapTest {
             assertEquals(setOf(UserRole.STUDENT, UserRole.SUPER_ADMIN), assertNotNull(accounts.findById("owner")).roles)
         }
 
-    private suspend fun fixture(): Triple<InMemoryPlatformAccountRepository, MfaService, OwnerBootstrapSpec> {
+    private suspend fun fixture(
+        scope: String = "qa",
+        invited: Boolean = true,
+    ): Triple<InMemoryPlatformAccountRepository, MfaService, OwnerBootstrapSpec> {
         val accounts = InMemoryPlatformAccountRepository()
         val password = "qa-test-password"
         val account =
@@ -152,8 +237,9 @@ class OwnerBootstrapTest {
                 "Owner",
                 "owner@example.test",
                 PasswordHasher().hash(password),
-                setOf(UserRole.STUDENT),
+                if (scope == "prod" && invited) setOf(UserRole.WORKSHOP_PARTICIPANT) else setOf(UserRole.STUDENT),
                 institutionId = "institution",
+                registrationIntent = if (scope == "prod" && invited) RegistrationIntent(RegistrationAccountType.OWNER_INVITED) else null,
                 emailVerifiedAt = clock.instant().minusSeconds(60),
             )
         accounts.create(account)
@@ -178,6 +264,7 @@ class OwnerBootstrapTest {
                 "QA owner enrollment",
                 clock.instant().epochSecond + 600,
                 "p".repeat(43),
+                scope = scope,
             )
         val proof =
             mfa.issueStepUp(

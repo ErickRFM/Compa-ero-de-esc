@@ -40,6 +40,7 @@ class AuthService(
     private val refreshRotationGrace: Duration = Duration.ofSeconds(60),
     private val maximumRefreshSessionAge: Duration = Duration.ofDays(90),
     sessionAuthority: PlatformSessionAuthority? = null,
+    private val ownerInviteEnvironment: (String) -> String? = System::getenv,
 ) {
     init {
         require(!refreshRotationGrace.isNegative && !refreshRotationGrace.isZero)
@@ -76,6 +77,32 @@ class AuthService(
             if (cleaned.length > maximum || cleaned.any { it.isISOControl() }) throw ApiException.Validation("Invalid $field")
             return cleaned
         }
+        if (request.accountType == RegistrationAccountType.OWNER_INVITED) {
+            val expectedEmail = ownerInviteEnvironment("OWNER_INVITE_EMAIL")?.trim()?.lowercase()
+            val digest = ownerInviteEnvironment("OWNER_INVITE_CODE_SHA256")
+            val code = request.ownerInvitationCode
+            val expiry = ownerInviteEnvironment("OWNER_INVITE_EXPIRES_AT")?.toLongOrNull()
+            val nowSeconds = clock.instant().epochSecond
+            val allowed =
+                ownerInviteEnvironment("APP_ENV") == "production" &&
+                    ownerInviteEnvironment("MONGODB_DATABASE")?.endsWith("_prod") == true &&
+                    ownerInviteEnvironment("PROD_OWNER_ISOLATION_CERTIFIED") == "true" &&
+                    expectedEmail != null &&
+                    email == expectedEmail &&
+                    expiry != null &&
+                    expiry > nowSeconds &&
+                    expiry <= nowSeconds + 7 * 24 * 60 * 60 &&
+                    digest?.matches(Regex("[a-f0-9]{64}")) == true &&
+                    code != null &&
+                    code.matches(Regex("[A-Za-z0-9_-]{43}")) &&
+                    MessageDigest.isEqual(
+                        MessageDigest.getInstance("SHA-256").digest(code.toByteArray(Charsets.UTF_8)),
+                        digest.chunked(2).map { it.toInt(16).toByte() }.toByteArray(),
+                    )
+            if (!allowed) throw ApiException.Forbidden("Owner registration invitation is unavailable")
+        } else if (request.ownerInvitationCode != null) {
+            throw ApiException.Validation("Owner invitation code is only valid for owner enrollment")
+        }
         val institutionPreference = bounded(request.requestedInstitutionId, 128, "institution")
         val reference = bounded(request.identityReference, 160, "identity reference")
         val groupPreference = bounded(request.preferredGroup, 128, "group preference")
@@ -87,7 +114,7 @@ class AuthService(
         if (institutionPreference != null && authenticationDependency { institutions.findEnabled(institutionPreference) } == null) {
             throw ApiException.Validation("Institution is not available for registration")
         }
-        if (request.accountType == RegistrationAccountType.PARTICIPANT &&
+        if (request.accountType in setOf(RegistrationAccountType.PARTICIPANT, RegistrationAccountType.OWNER_INVITED) &&
             (institutionPreference != null || reference != null || groupPreference != null)
         ) {
             throw ApiException.Validation("Participant registration does not request academic scope")

@@ -238,6 +238,14 @@ object OwnerBootstrap {
         ) {
             "Owner candidate must be current, verified and unprivileged"
         }
+        if (spec.scope == "prod") {
+            require(
+                account.registrationIntent?.profile == RegistrationAccountType.OWNER_INVITED &&
+                    account.roles == setOf(UserRole.WORKSHOP_PARTICIPANT),
+            ) {
+                "Production first owner must be a verified invitation-only owner candidate"
+            }
+        }
         require(accounts.listAccounts().none { UserRole.SUPER_ADMIN in it.roles }) { "Existing owner requires normal administration" }
         mfa.requireStepUp(account, spec.proof, StepUpAction.PRIVILEGED_INVITE_ACCEPT, "global-owner", spec.operationId, digest)
         require(claims.reserve(OwnerBootstrapClaim(digest, account.id, spec.operator, spec.reason, now))) { "Owner reservation conflicts" }
@@ -249,11 +257,7 @@ object OwnerBootstrap {
                     spec.operationId,
                     declaredOperator,
                     AccountStatus.ACTIVE,
-                    if (spec.scope == "prod" && account.registrationIntent?.profile == RegistrationAccountType.OWNER_INVITED) {
-                        setOf(UserRole.SUPER_ADMIN)
-                    } else {
-                        account.roles + UserRole.SUPER_ADMIN
-                    },
+                    if (spec.scope == "prod") setOf(UserRole.SUPER_ADMIN) else account.roles + UserRole.SUPER_ADMIN,
                     account.institutionId,
                     now,
                     scopeDigest = digest,

@@ -23,7 +23,9 @@ import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class OwnerBootstrapTest {
     private val clock = Clock.fixed(Instant.parse("2026-11-02T12:00:30Z"), ZoneOffset.UTC)
@@ -264,6 +266,67 @@ class OwnerBootstrapTest {
             assertEquals(setOf(UserRole.STUDENT), assertNotNull(accounts.findById("owner")).roles)
         }
 
+    @Test fun `expired pending reservation can be reclaimed by a newly authorized command`() =
+        runTest {
+            val claims = InMemoryOwnerBootstrapClaims()
+            val firstAuthorizedAt = Instant.parse("2026-11-02T12:00:00Z")
+            val expired =
+                OwnerBootstrapClaim(
+                    "a".repeat(64),
+                    "owner",
+                    "operator-one",
+                    "initial authorization",
+                    firstAuthorizedAt,
+                    firstAuthorizedAt.plusSeconds(900),
+                )
+            assertTrue(claims.reserve(expired))
+
+            val recoveredAt = firstAuthorizedAt.plusSeconds(901)
+            val replacement =
+                OwnerBootstrapClaim(
+                    "b".repeat(64),
+                    "owner",
+                    "operator-two",
+                    "fresh signed recovery authorization",
+                    recoveredAt,
+                    recoveredAt.plusSeconds(900),
+                )
+            assertTrue(claims.reserve(replacement))
+            assertEquals(replacement.digest, claims.find()?.digest)
+            assertEquals(OwnerBootstrapClaimState.RESERVED, claims.find()?.state)
+        }
+
+    @Test fun `committed owner reservation is permanent and cannot be reclaimed after expiry`() =
+        runTest {
+            val claims = InMemoryOwnerBootstrapClaims()
+            val authorizedAt = Instant.parse("2026-11-02T12:00:00Z")
+            val committed =
+                OwnerBootstrapClaim(
+                    "c".repeat(64),
+                    "owner",
+                    "operator-one",
+                    "approved owner bootstrap",
+                    authorizedAt,
+                    authorizedAt.plusSeconds(900),
+                )
+            assertTrue(claims.reserve(committed))
+            assertTrue(claims.commit(committed.digest, committed.accountId, authorizedAt.plusSeconds(30)))
+
+            val replacementAt = authorizedAt.plusSeconds(1800)
+            val replacement =
+                OwnerBootstrapClaim(
+                    "d".repeat(64),
+                    "owner-two",
+                    "operator-two",
+                    "attempted reassignment",
+                    replacementAt,
+                    replacementAt.plusSeconds(900),
+                )
+            assertFalse(claims.reserve(replacement))
+            assertEquals(committed.digest, claims.find()?.digest)
+            assertEquals(OwnerBootstrapClaimState.COMMITTED, claims.find()?.state)
+        }
+
     @Test fun `interrupted reservation can resume the same authorized command before proof expires`() =
         runTest {
             val (accounts, mfa, spec) = fixture()
@@ -281,6 +344,12 @@ class OwnerBootstrapTest {
                         }
                         return reserved
                     }
+
+                    override suspend fun commit(
+                        digest: String,
+                        accountId: String,
+                        committedAt: Instant,
+                    ): Boolean = durable.commit(digest, accountId, committedAt)
                 }
             assertFailsWith<IllegalStateException> {
                 OwnerBootstrap.provision(spec, "staging", "companero_qa", accounts, mfa, interrupted, clock)
@@ -288,6 +357,7 @@ class OwnerBootstrapTest {
             assertEquals(setOf(UserRole.STUDENT), assertNotNull(accounts.findById("owner")).roles)
             OwnerBootstrap.provision(spec, "staging", "companero_qa", accounts, mfa, interrupted, clock)
             assertEquals(setOf(UserRole.STUDENT, UserRole.SUPER_ADMIN), assertNotNull(accounts.findById("owner")).roles)
+            assertEquals(OwnerBootstrapClaimState.COMMITTED, durable.find()?.state)
         }
 
     private suspend fun fixture(

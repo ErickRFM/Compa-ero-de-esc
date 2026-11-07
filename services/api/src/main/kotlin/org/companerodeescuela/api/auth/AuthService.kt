@@ -28,7 +28,10 @@ import java.util.UUID
  * Institutional identity remains an optional fallback for users who have not
  * created a native account yet.
  */
-private data class OwnerInvitationAuthorization(val digest: String, val expiresAt: Instant)
+private data class OwnerInvitationAuthorization(
+    val digest: String,
+    val expiresAt: Instant,
+)
 
 class AuthService(
     private val identityProvider: IdentityProvider,

@@ -283,7 +283,6 @@ object OwnerBootstrap {
     }
 }
 
-
 /** The Ed25519 signature covers the canonical command digest, including operator, account, revision, reason and expiry. */
 private fun OwnerBootstrapSpec.hasValidOperatorAuthorization(): Boolean {
     val publicKeyValue = authorizationPublicKey ?: return false

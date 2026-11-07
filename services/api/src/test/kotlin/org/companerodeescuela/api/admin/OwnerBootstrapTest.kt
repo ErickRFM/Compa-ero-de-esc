@@ -96,13 +96,14 @@ class OwnerBootstrapTest {
             OwnerBootstrap.parseProduction((env + ("PROD_OWNER_BOOTSTRAP_OPERATOR" to "unapproved"))::get)
         }
         val differentTrustAnchor = KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
-        assertFailsWith<IllegalArgumentException> {
-            OwnerBootstrap.parseProduction(
-                (env + (
+        val untrustedAnchorEnvironment =
+            env +
+                (
                     "PROD_OWNER_BOOTSTRAP_TRUSTED_OPERATOR_PUBLIC_KEY" to
                         Base64.getUrlEncoder().withoutPadding().encodeToString(differentTrustAnchor.public.encoded)
-                ))::get,
-            )
+                )
+        assertFailsWith<IllegalArgumentException> {
+            OwnerBootstrap.parseProduction(untrustedAnchorEnvironment::get)
         }
     }
 

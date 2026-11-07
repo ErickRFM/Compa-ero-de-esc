@@ -444,7 +444,9 @@ class SettingsLoaderTest {
 
         assertEquals(first, second)
         assertEquals(first.hashCode(), second.hashCode())
-        @Test
+    }
+
+    @Test
     @DisplayName("A production owner invitation requires the verified-email delivery path")
     fun ownerInvitationRequiresProductionEmailVerificationGateway() {
         val expiry =
@@ -485,7 +487,6 @@ class SettingsLoaderTest {
         assertTrue(configured.hasVerificationEmail)
         assertEquals("companero_prod", configured.mongo.databaseName)
     }
-}
 }
 
 class EnvironmentTest {

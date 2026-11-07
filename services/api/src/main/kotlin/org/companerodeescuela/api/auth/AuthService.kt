@@ -19,6 +19,7 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.util.Base64
+import java.util.Locale
 import java.util.UUID
 
 /**
@@ -92,7 +93,7 @@ class AuthService(
             val expiry = ownerInviteEnvironment("OWNER_INVITE_EXPIRES_AT")?.toLongOrNull()
             val nowSeconds = clock.instant().epochSecond
             val allowed =
-                ownerInviteEnvironment("APP_ENV") == "production" &&
+                ownerInviteEnvironment("APP_ENV")?.trim()?.lowercase(Locale.ROOT) in setOf("prod", "production") &&
                     ownerInviteEnvironment("MONGODB_DATABASE")?.endsWith("_prod") == true &&
                     ownerInviteEnvironment("PROD_OWNER_ISOLATION_CERTIFIED") == "true" &&
                     expectedEmail != null &&

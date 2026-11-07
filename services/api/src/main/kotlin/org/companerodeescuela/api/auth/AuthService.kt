@@ -87,14 +87,15 @@ class AuthService(
         }
         var ownerInvitationAuthorization: OwnerInvitationAuthorization? = null
         if (request.accountType == RegistrationAccountType.OWNER_INVITED) {
-            val expectedEmail = ownerInviteEnvironment("OWNER_INVITE_EMAIL")?.trim()?.lowercase()
-            val digest = ownerInviteEnvironment("OWNER_INVITE_CODE_SHA256")
+            val expectedEmail = ownerInviteEnvironment("OWNER_INVITE_EMAIL")?.trim()?.lowercase(Locale.ROOT)
+            // Keep request-time checks aligned with SettingsLoader, which trims these environment values.
+            val digest = ownerInviteEnvironment("OWNER_INVITE_CODE_SHA256")?.trim()
             val code = request.ownerInvitationCode
-            val expiry = ownerInviteEnvironment("OWNER_INVITE_EXPIRES_AT")?.toLongOrNull()
+            val expiry = ownerInviteEnvironment("OWNER_INVITE_EXPIRES_AT")?.trim()?.toLongOrNull()
             val nowSeconds = clock.instant().epochSecond
             val allowed =
                 ownerInviteEnvironment("APP_ENV")?.trim()?.lowercase(Locale.ROOT) in setOf("prod", "production") &&
-                    ownerInviteEnvironment("MONGODB_DATABASE")?.endsWith("_prod") == true &&
+                    ownerInviteEnvironment("MONGODB_DATABASE")?.trim()?.endsWith("_prod") == true &&
                     ownerInviteEnvironment("PROD_OWNER_ISOLATION_CERTIFIED") == "true" &&
                     expectedEmail != null &&
                     email == expectedEmail &&

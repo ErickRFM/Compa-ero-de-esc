@@ -165,6 +165,34 @@ class UniversalRegistrationRoutesTest {
         }
     }
 
+    @Test fun `owner registration normalizes production settings consistently with the settings loader`() {
+        val code = "n".repeat(43)
+        val digest =
+            MessageDigest
+                .getInstance("SHA-256")
+                .digest(code.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+        val expiresAt = Instant.now().epochSecond + 3600
+        val env =
+            mapOf(
+                "APP_ENV" to " PRODUCTION ",
+                "MONGODB_DATABASE" to "companero_prod ",
+                "PROD_OWNER_ISOLATION_CERTIFIED" to "true",
+                "OWNER_INVITE_EMAIL" to " OWNER@EXAMPLE.TEST ",
+                "OWNER_INVITE_CODE_SHA256" to " $digest ",
+                "OWNER_INVITE_EXPIRES_AT" to " $expiresAt ",
+            )
+
+        scenario(env) { f ->
+            val pending = register("owner@example.test", "OWNER_INVITED", ",\\"ownerInvitationCode\\":\\"$code\\"")
+            assertTrue(pending.user.roles.isEmpty())
+            val verified = confirm(pending, assertNotNull(f.mail.tokens["owner@example.test"]))
+            assertEquals(AccountStatus.ACTIVE, verified.user.accountStatus)
+            assertEquals(setOf(UserRole.WORKSHOP_PARTICIPANT), verified.user.roles)
+            assertFalse(UserRole.SUPER_ADMIN in verified.user.roles)
+        }
+    }
+
     @Test fun `owner invitation does not consume its code when an existing unverified student identity blocks enrollment`() {
         val code = "r".repeat(43)
         val digest =

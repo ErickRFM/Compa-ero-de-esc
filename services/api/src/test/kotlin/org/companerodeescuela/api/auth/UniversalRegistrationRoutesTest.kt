@@ -136,6 +136,7 @@ class UniversalRegistrationRoutesTest {
                 "PROD_OWNER_ISOLATION_CERTIFIED" to "true",
                 "OWNER_INVITE_EMAIL" to "owner@example.test",
                 "OWNER_INVITE_CODE_SHA256" to hash,
+                "OWNER_INVITE_EXPIRES_AT" to (Instant.now().epochSecond + 3600).toString(),
             )
         scenario(env) { f ->
             val payload = ",\"ownerInvitationCode\":\"$code\""

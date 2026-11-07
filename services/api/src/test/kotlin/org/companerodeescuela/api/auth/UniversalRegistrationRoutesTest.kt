@@ -122,6 +122,21 @@ class UniversalRegistrationRoutesTest {
             assertEquals(HttpStatusCode.Unauthorized, get("/private-probe", verified).status)
         }
 
+    @Test fun `owner registration without production invitation cannot create an account`() =
+        scenario { f ->
+            val result =
+                post(
+                    "/auth/register",
+                    registrationBody(
+                        "owner@example.test",
+                        "OWNER_INVITED",
+                        ",\"ownerInvitationCode\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"",
+                    ),
+                )
+            assertEquals(HttpStatusCode.Forbidden, result.status)
+            assertNull(f.accounts.findByIdentifier("owner@example.test"))
+        }
+
     @Test fun `public privileged profile and unknown requested institutions are rejected`() =
         scenario { _ ->
             for (profile in listOf("ADMIN", "SUPER_ADMIN")) {

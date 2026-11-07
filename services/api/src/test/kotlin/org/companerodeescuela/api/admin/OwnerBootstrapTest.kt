@@ -3,6 +3,7 @@ package org.companerodeescuela.api.admin
 import kotlinx.coroutines.test.runTest
 import org.companerodeescuela.api.auth.AccountIdentityChange
 import org.companerodeescuela.api.auth.InMemoryPlatformAccountRepository
+import org.companerodeescuela.api.auth.RegistrationIntent
 import org.companerodeescuela.api.auth.PasswordHasher
 import org.companerodeescuela.api.auth.PlatformAccount
 import org.companerodeescuela.api.security.InMemoryMfaRepository
@@ -10,6 +11,7 @@ import org.companerodeescuela.api.security.MfaSecretCipher
 import org.companerodeescuela.api.security.MfaService
 import org.companerodeescuela.api.security.Totp
 import org.companerodeescuela.shared.contracts.AccountStatus
+import org.companerodeescuela.shared.contracts.RegistrationAccountType
 import org.companerodeescuela.shared.contracts.StepUpAction
 import org.companerodeescuela.shared.contracts.UserRole
 import java.time.Clock
@@ -82,6 +84,17 @@ class OwnerBootstrapTest {
                 )
             }
             assertEquals(setOf(UserRole.STUDENT), assertNotNull(accounts.findById("owner")).roles)
+        }
+
+    @Test fun `verified invited owner becomes only SUPER_ADMIN after production MFA`() =
+        runTest {
+            val (accounts, mfa, spec) = fixture(scope = "prod")
+            val claims = InMemoryOwnerBootstrapClaims()
+            OwnerBootstrap.provision(spec, "production", "companero_prod", accounts, mfa, claims, clock)
+            val owner = assertNotNull(accounts.findById("owner"))
+            assertEquals(setOf(UserRole.SUPER_ADMIN), owner.roles)
+            assertEquals("prod-declared:operator-qa", owner.identityAudit.single().actorId)
+            assertEquals(spec.digest(), claims.find()?.digest)
         }
 
     @Test fun `verified student gains only the additional owner role through scoped MFA`() =
@@ -195,7 +208,7 @@ class OwnerBootstrapTest {
             assertEquals(setOf(UserRole.STUDENT, UserRole.SUPER_ADMIN), assertNotNull(accounts.findById("owner")).roles)
         }
 
-    private suspend fun fixture(): Triple<InMemoryPlatformAccountRepository, MfaService, OwnerBootstrapSpec> {
+    private suspend fun fixture(scope: String = "qa"): Triple<InMemoryPlatformAccountRepository, MfaService, OwnerBootstrapSpec> {
         val accounts = InMemoryPlatformAccountRepository()
         val password = "qa-test-password"
         val account =
@@ -204,8 +217,9 @@ class OwnerBootstrapTest {
                 "Owner",
                 "owner@example.test",
                 PasswordHasher().hash(password),
-                setOf(UserRole.STUDENT),
+                if (scope == "prod") setOf(UserRole.WORKSHOP_PARTICIPANT) else setOf(UserRole.STUDENT),
                 institutionId = "institution",
+                registrationIntent = if (scope == "prod") RegistrationIntent(RegistrationAccountType.OWNER_INVITED) else null,
                 emailVerifiedAt = clock.instant().minusSeconds(60),
             )
         accounts.create(account)
@@ -230,6 +244,7 @@ class OwnerBootstrapTest {
                 "QA owner enrollment",
                 clock.instant().epochSecond + 600,
                 "p".repeat(43),
+                scope = scope,
             )
         val proof =
             mfa.issueStepUp(

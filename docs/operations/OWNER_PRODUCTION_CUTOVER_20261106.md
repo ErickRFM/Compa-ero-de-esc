@@ -1,7 +1,7 @@
 # Compañero — corte de producción e invitación del primer propietario
 
 **Destinatario designado:** `erik55509@hotmail.com`.
-**PR de implementación:** #292. **HEAD auditado:** `fa222c2d72ef1e6fbf9258ff6cddd8243b4d306c` (2026-11-07 19:32 UTC). CI de este HEAD: API `42407337675` `success`, iOS `42407337658` `success`, Android `42407337668` `failure` en `V12AdministrationUiTest.profileNavigatesToRealMfaRepositoryAndConfirmationClearsSetupMaterial` sobre Academic API 35. El primer intento informó `enrollmentRequests=0` con MFA disponible; se inició re-ejecución únicamente del job fallido (`128525929630`), todavía en curso al 20:53 UTC. No se declara CI verde hasta que ese intento concluya. El PR sigue abierto, draft y sin fusionar. Respaldo/restauración, aislamiento y migración continúan bloqueados.
+**PR de implementación:** #292. El último HEAD con CI completo verde verificado fue `d5bb0a7dd5012b47c0bf7002a2a78e99f7c9097b` (API `42413496305`, Android `42413496272`, iOS `42413496284`: `success`). Los commits posteriores incorporan recuperación atómica de reservas expiradas y validación contra un trust anchor; requieren CI completo propio antes de cualquier merge. El PR sigue abierto, draft y sin fusionar. Respaldo/restauración, aislamiento y migración continúan bloqueados.
 
 Este runbook es la secuencia autorizable para el primer propietario. No confirma que producción ya esté activada.
 

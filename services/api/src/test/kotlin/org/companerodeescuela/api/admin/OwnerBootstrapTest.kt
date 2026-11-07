@@ -72,7 +72,7 @@ class OwnerBootstrapTest {
                     clock,
                 )
             }
-            assertFailsWith<org.companerodeescuela.api.errors.ApiException.Forbidden> {
+            assertFailsWith<IllegalArgumentException> {
                 OwnerBootstrap.provision(
                     qaSpec.copy(scope = "prod"),
                     "production",

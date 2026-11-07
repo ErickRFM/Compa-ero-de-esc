@@ -66,10 +66,13 @@ class OwnerBootstrapTest {
                 scope = "prod",
             )
         val signature =
-            Signature.getInstance("Ed25519").apply {
+            Signature
+                .getInstance("Ed25519")
+                .apply {
                 initSign(keyPair.private)
                 update(unsigned.digest().toByteArray(Charsets.UTF_8))
-            }.sign()
+            }
+                .sign()
         val env =
             mapOf(
                 "PROD_OWNER_BOOTSTRAP_ENABLED" to "true",
@@ -333,10 +336,13 @@ class OwnerBootstrapTest {
             if (scope == "prod") {
                 val keyPair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
                 val signature =
-                    Signature.getInstance("Ed25519").apply {
+                    Signature
+                        .getInstance("Ed25519")
+                        .apply {
                         initSign(keyPair.private)
                         update(unsignedDraft.digest().toByteArray(Charsets.UTF_8))
-                    }.sign()
+                    }
+                        .sign()
                 unsignedDraft.copy(
                     authorizationPublicKey = Base64.getUrlEncoder().withoutPadding().encodeToString(keyPair.public.encoded),
                     authorizationSignature = Base64.getUrlEncoder().withoutPadding().encodeToString(signature),

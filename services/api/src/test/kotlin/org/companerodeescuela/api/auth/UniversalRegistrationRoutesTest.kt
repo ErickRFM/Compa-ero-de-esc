@@ -191,7 +191,7 @@ class UniversalRegistrationRoutesTest {
                     registrationBody(
                         "owner@example.test",
                         "OWNER_INVITED",
-                        ",\\"ownerInvitationCode\\":\\"$code\\"",
+                        ",\"ownerInvitationCode\":\"$code\"",
                     ),
                 )
 

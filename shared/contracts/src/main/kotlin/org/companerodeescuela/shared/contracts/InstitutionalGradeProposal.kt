@@ -53,29 +53,52 @@ object InstitutionalGradeProposalValidation {
 
     fun problems(value: InstitutionalGradeProposal): Set<String> {
         val result = linkedSetOf<String>()
-        if (value.contract != InstitutionalGradeProposal.CONTRACT || value.gradeScale != InstitutionalGradeProposal.GRADE_SCALE) {
+        if (
+            value.contract != InstitutionalGradeProposal.CONTRACT ||
+            value.gradeScale != InstitutionalGradeProposal.GRADE_SCALE
+        ) {
             result.add("UNSUPPORTED_CONTRACT")
         }
-        if (!uuid.matches(value.operationId) || !uuid.matches(value.institutionId) ||
-            !uuid.matches(value.sectionId) || !uuid.matches(value.academicPeriodId)
+        if (
+            !uuid.matches(value.operationId) ||
+            !uuid.matches(value.institutionId) ||
+            !uuid.matches(value.sectionId) ||
+            !uuid.matches(value.academicPeriodId)
         ) {
             result.add("INVALID_INSTITUTIONAL_ID")
         }
-        if (value.sourceVersion < 1 || !digest.matches(value.sourceDigest)) result.add("INVALID_VERSION")
-        if (!nativeId.matches(value.nativeClassroomId) || !externalId.matches(value.teacherExternalId) ||
+        if (
+            value.sourceVersion < 1 ||
+            !digest.matches(value.sourceDigest)
+        ) {
+            result.add("INVALID_VERSION")
+        }
+        if (
+            !nativeId.matches(value.nativeClassroomId) ||
+            !externalId.matches(value.teacherExternalId) ||
             !periodId.matches(value.gradingPeriod)
         ) {
             result.add("INVALID_SOURCE_ID")
         }
-        if (value.rows.size !in 1..500) result.add("BATCH_SIZE")
+        if (value.rows.size !in 1..500) {
+            result.add("BATCH_SIZE")
+        }
         val nativeStudents = mutableSetOf<String>()
         val officialStudents = mutableSetOf<String>()
         for (row in value.rows) {
-            if (!nativeId.matches(row.nativeStudentId) || !uuid.matches(row.studentSourceId)) {
+            if (
+                !nativeId.matches(row.nativeStudentId) ||
+                !uuid.matches(row.studentSourceId)
+            ) {
                 result.add("INVALID_STUDENT_ID")
             }
-            if (row.gradeHundredths !in 0..1000) result.add("INVALID_GRADE")
-            if (!nativeStudents.add(row.nativeStudentId) || !officialStudents.add(row.studentSourceId)) {
+            if (row.gradeHundredths !in 0..1000) {
+                result.add("INVALID_GRADE")
+            }
+            if (
+                !nativeStudents.add(row.nativeStudentId) ||
+                !officialStudents.add(row.studentSourceId)
+            ) {
                 result.add("DUPLICATE_STUDENT")
             }
         }

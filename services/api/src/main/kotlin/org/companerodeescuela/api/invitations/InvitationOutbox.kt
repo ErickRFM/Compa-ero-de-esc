@@ -220,33 +220,42 @@ internal class MongoInvitationOutbox(
                 Updates.set("tokenCiphertext", ""),
             ).matchedCount == 1L
 
-    private fun OutboxEntry.toDocument(): Document =
-        Document("_id", invitationId)
+    private fun OutboxEntry.toDocument(): Document {
+        val encryptedToken =
+            if (tokenValue.isEmpty()) {
+                ""
+            } else {
+                cipher.encrypt(
+                    invitationId,
+                    "platform-invitation-outbox",
+                    tokenValue.toByteArray(Charsets.UTF_8),
+                )
+            }
+        return Document("_id", invitationId)
             .append("recipient", recipient)
-            // Encrypt retry capability with authenticated, per-invitation binding.
-            .append(
-                "tokenCiphertext",
-                if (tokenValue.isEmpty()) "" else cipher.encrypt(invitationId, "platform-invitation-outbox", tokenValue.toByteArray(Charsets.UTF_8)),
-            )
+            .append("tokenCiphertext", encryptedToken)
             .append("expiresAt", Date.from(expiresAt))
             .append("attempts", attempts)
             .append("nextAttemptAt", Date.from(nextAttemptAt))
             .append("lastStatus", lastStatus.name)
             .append("createdAt", Date.from(createdAt))
+    }
 
     private fun Document.toOutboxEntry(): OutboxEntry? {
         return try {
+            val ciphertext = getString("tokenCiphertext") ?: return null
+            val value =
+                if (ciphertext.isEmpty()) {
+                    ""
+                } else {
+                    cipher
+                        .decrypt(getString("_id"), "platform-invitation-outbox", ciphertext)
+                        .toString(Charsets.UTF_8)
+                }
             OutboxEntry(
                 invitationId = getString("_id"),
                 recipient = getString("recipient"),
-                tokenValue =
-                    getString("tokenCiphertext")?.let { encrypted ->
-                        if (encrypted.isEmpty()) "" else cipher.decrypt(
-                            getString("_id"),
-                            "platform-invitation-outbox",
-                            encrypted,
-                        ).toString(Charsets.UTF_8)
-                    } ?: return null,
+                tokenValue = value,
                 expiresAt = getDate("expiresAt").toInstant(),
                 attempts = getInteger("attempts", 0),
                 nextAttemptAt = getDate("nextAttemptAt").toInstant(),

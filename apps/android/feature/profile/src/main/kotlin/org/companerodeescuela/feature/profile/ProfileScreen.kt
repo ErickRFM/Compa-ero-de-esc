@@ -147,7 +147,7 @@ fun ProfileScreen(
                 ProfileRow(
                     title = "Sistema escolar",
                     icon = Icons.Outlined.School,
-                    detail = "Conectar con SIII",
+                    detail = "Estado de sincronización institucional",
                     onClick = onIntegrations,
                 )
                 GroupDivider()
@@ -171,7 +171,7 @@ fun ProfileScreen(
                         ProfileRow(
                             title = "Horarios y grupos",
                             icon = Icons.Outlined.DateRange,
-                            detail = "Edición interna con MFA; publicación en SIII.",
+                            detail = "Edición interna con MFA de grupos y horarios.",
                             onClick = action,
                         )
                     }

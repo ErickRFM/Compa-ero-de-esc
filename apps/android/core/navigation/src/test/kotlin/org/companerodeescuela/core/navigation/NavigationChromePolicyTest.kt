@@ -2,6 +2,7 @@ package org.companerodeescuela.core.navigation
 
 import org.companerodeescuela.shared.contracts.UserRole
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -65,5 +66,17 @@ class NavigationChromePolicyTest {
         val config = RoleExperienceResolver.resolve(setOf(UserRole.TUTOR))
         val tabs = config.topLevelDestinations.map { it.destination.route }
         assertFalse(isSecondaryRoute(Destination.TutorRequests.route, config.startDestination.route, tabs))
+    }
+
+    @Test
+    fun `secondary title resolves known routes and defaults unknown to Volver`() {
+        assertEquals("Perfil", secondaryTitleForRoute(Destination.Profile.route))
+        assertEquals("Aceptar invitación", secondaryTitleForRoute(Destination.InvitationAcceptance.route))
+        assertEquals("Enviar invitación", secondaryTitleForRoute(Destination.InvitationIssue.route))
+        assertEquals("Acceso no disponible", secondaryTitleForRoute(Destination.RoleUnavailable.route))
+        assertEquals("Seguridad y MFA", secondaryTitleForRoute(Destination.Mfa.route))
+        assertEquals("Solicitud de tutoría", secondaryTitleForRoute(Destination.StaffApplication.route))
+        assertEquals("Volver", secondaryTitleForRoute("unknown-route"))
+        assertEquals("Volver", secondaryTitleForRoute(null))
     }
 }

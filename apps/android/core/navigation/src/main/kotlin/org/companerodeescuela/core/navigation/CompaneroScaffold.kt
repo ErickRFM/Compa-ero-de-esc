@@ -70,24 +70,7 @@ fun CompaneroScaffold(
             startRoute = startDestination.route,
             topLevelRoutes = topLevelDestinations.map { it.destination.route },
         )
-    val secondaryTitle =
-        when (currentDestination?.route) {
-            Destination.Profile.route -> "Perfil"
-            Destination.AppearanceSettings.route -> "Tema y accesibilidad"
-            Destination.IntegrationSettings.route -> "Integración institucional"
-            Destination.DesignSystemCatalog.route -> "Sistema visual"
-            Destination.Grading.route -> "Calificaciones"
-            Destination.Channel.route -> "Canal"
-            Destination.Classrooms.route -> "Clases"
-            Destination.Schedule.route -> "Horario"
-            Destination.Attendance.route -> "Asistencia"
-            Destination.RepresentativeInvitations.route -> "Representantes"
-            Destination.Mfa.route -> "Seguridad y MFA"
-            Destination.StaffApplication.route -> "Solicitud de tutoría"
-            Destination.TutorRequests.route -> "Solicitudes de tutoría"
-            Destination.TutorGroups.route -> "Grupos tutorados"
-            else -> "Volver"
-        }
+    val secondaryTitle = secondaryTitleForRoute(currentDestination?.route)
 
     val parentColors = MaterialTheme.colorScheme
     val lightTheme = parentColors.background.luminance() > 0.5f
@@ -212,3 +195,30 @@ fun CompaneroScaffold(
         }
     }
 }
+
+internal fun secondaryTitleForRoute(route: String?): String =
+    when (route) {
+        Destination.Profile.route -> "Perfil"
+        Destination.AppearanceSettings.route -> "Tema y accesibilidad"
+        Destination.IntegrationSettings.route -> "Integración institucional"
+        Destination.DesignSystemCatalog.route -> "Sistema visual"
+        Destination.Grading.route -> "Calificaciones"
+        Destination.Channel.route -> "Canal"
+        Destination.Classrooms.route -> "Clases"
+        Destination.Schedule.route -> "Horario"
+        Destination.Attendance.route -> "Asistencia"
+        Destination.RepresentativeInvitations.route -> "Representantes"
+        Destination.Mfa.route -> "Seguridad y MFA"
+        Destination.StaffApplication.route -> "Solicitud de tutoría"
+        Destination.TutorRequests.route -> "Solicitudes de tutoría"
+        Destination.TutorGroups.route -> "Grupos tutorados"
+        Destination.InvitationAcceptance.route -> "Aceptar invitación"
+        Destination.InvitationIssue.route -> "Enviar invitación"
+        Destination.RoleUnavailable.route -> "Acceso no disponible"
+        Destination.CoordinatorHome.route -> "Supervisión institucional"
+        Destination.AdminHome.route -> "Administración"
+        Destination.Home.route -> "Inicio"
+        Destination.TeacherHome.route -> "Inicio docente"
+        Destination.TutorHome.route -> "Tutoría"
+        else -> "Volver"
+    }

@@ -80,7 +80,12 @@ internal fun PlatformAccount.withVerifiedEmail(
         }
     val status =
         if (accountStatus == AccountStatus.ACTIVE ||
-            requireNotNull(intent).profile in setOf(RegistrationAccountType.STUDENT, RegistrationAccountType.PARTICIPANT, RegistrationAccountType.OWNER_INVITED)
+            requireNotNull(intent).profile in
+                setOf(
+                    RegistrationAccountType.STUDENT,
+                    RegistrationAccountType.PARTICIPANT,
+                    RegistrationAccountType.OWNER_INVITED,
+                )
         ) {
             AccountStatus.ACTIVE
         } else {

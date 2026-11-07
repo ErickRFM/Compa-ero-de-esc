@@ -234,8 +234,8 @@ internal class MongoInvitationOutbox(
             .append("lastStatus", lastStatus.name)
             .append("createdAt", Date.from(createdAt))
 
-    private fun Document.toOutboxEntry(): OutboxEntry? =
-        try {
+    private fun Document.toOutboxEntry(): OutboxEntry? {
+        return try {
             OutboxEntry(
                 invitationId = getString("_id"),
                 recipient = getString("recipient"),
@@ -256,4 +256,5 @@ internal class MongoInvitationOutbox(
         } catch (_: Exception) {
             null
         }
+    }
 }

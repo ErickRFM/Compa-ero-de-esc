@@ -444,36 +444,7 @@ class SettingsLoaderTest {
 
         assertEquals(first, second)
         assertEquals(first.hashCode(), second.hashCode())
-    }
-}
-
-class EnvironmentTest {
-    @Test
-    @DisplayName("Missing or empty APP_ENV is rejected")
-    fun rejectsMissingEnvironment() {
-        assertFailsWith<ConfigurationException> { Environment.parse(null) }
-        assertFailsWith<ConfigurationException> { Environment.parse("  ") }
-    }
-
-    @Test
-    @DisplayName("Common aliases are accepted")
-    fun acceptsAliases() {
-        assertEquals(Environment.LOCAL, Environment.parse("local"))
-        assertEquals(Environment.DEVELOPMENT, Environment.parse("dev"))
-        assertEquals(Environment.DEVELOPMENT, Environment.parse("development"))
-        assertEquals(Environment.STAGING, Environment.parse("staging"))
-        assertEquals(Environment.PRODUCTION, Environment.parse("PROD"))
-    }
-
-    @Test
-    @DisplayName("Only production reports isProduction")
-    fun isProduction() {
-        assertTrue(Environment.PRODUCTION.isProduction)
-        assertFalse(Environment.STAGING.isProduction)
-        assertFalse(Environment.LOCAL.isProduction)
-    }
-
-    @Test
+        @Test
     @DisplayName("A production owner invitation requires the verified-email delivery path")
     fun ownerInvitationRequiresProductionEmailVerificationGateway() {
         val expiry =
@@ -514,4 +485,33 @@ class EnvironmentTest {
         assertTrue(configured.hasVerificationEmail)
         assertEquals("companero_prod", configured.mongo.databaseName)
     }
+}
+}
+
+class EnvironmentTest {
+    @Test
+    @DisplayName("Missing or empty APP_ENV is rejected")
+    fun rejectsMissingEnvironment() {
+        assertFailsWith<ConfigurationException> { Environment.parse(null) }
+        assertFailsWith<ConfigurationException> { Environment.parse("  ") }
+    }
+
+    @Test
+    @DisplayName("Common aliases are accepted")
+    fun acceptsAliases() {
+        assertEquals(Environment.LOCAL, Environment.parse("local"))
+        assertEquals(Environment.DEVELOPMENT, Environment.parse("dev"))
+        assertEquals(Environment.DEVELOPMENT, Environment.parse("development"))
+        assertEquals(Environment.STAGING, Environment.parse("staging"))
+        assertEquals(Environment.PRODUCTION, Environment.parse("PROD"))
+    }
+
+    @Test
+    @DisplayName("Only production reports isProduction")
+    fun isProduction() {
+        assertTrue(Environment.PRODUCTION.isProduction)
+        assertFalse(Environment.STAGING.isProduction)
+        assertFalse(Environment.LOCAL.isProduction)
+    }
+
 }

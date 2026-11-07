@@ -70,7 +70,7 @@ class MongoInstitutionRepository(
         try {
             directory.insertOne(
                 Document("_id", institution.id)
-                    .append("displayName", institution.name)
+                    .append("displayName", institution.displayName)
                     .append("registrationEnabled", true)
                     .append("createdBy", actorId)
                     .append("createdOperationId", operationId)

@@ -7,11 +7,13 @@ Este runbook es la secuencia autorizable para el primer propietario. No confirma
 
 ## Datos constatados (6–7 nov 2026)
 
-- Render `srv-db0vt5s9v7es73d98pu0` sigue desplegando `main` en el commit `00b8f2eb1ec5bcd48ba6d7a6d99214e563a405ce`. No contiene la UI ni la política OWNER_INVITED.
-- Atlas `Cluster0` en el proyecto `companero_dev` contiene las bases `companero_dev` y `companero_qa`; `companero_prod` carece de colecciones.
-- Se creó `companero_prod_render_rw` con rol exclusivo `readWrite@companero_prod`, sin privilegios de administrador global.
-- La cuenta Hotmail no se encontró en `companero_dev.platform_accounts` durante el diagnóstico. **No afirmar que existe en producción sin volver a comprobar el destino efectivo.**
+- Auditoría directa (2026-11-07 17:41 UTC): Render `srv-db0vt5s9v7es73d98pu0` despliega `main`, `autoDeploy=yes`, y su último deploy `live` es `ca82942bb5ab9e220b5a58a0f4f4e11900e7c2c5` (base de este PR). Los logs de arranque confirman `APP_ENV=PRODUCTION`, pero el runtime abre MongoDB en `companero_dev`; por tanto, el aislamiento productivo **no está certificado** y la política `OWNER_INVITED` de este PR aún no está desplegada.
+- Atlas `Cluster0` pertenece al proyecto `companero_dev`, tier `FREE`, MongoDB 8.0.37. Solo aparecen las bases `companero_dev` (20 colecciones) y `companero_qa` (9 colecciones); `companero_prod` **no existe en el listado de bases**, no es simplemente una base vacía. `companero_dev` conserva 2 cuentas y 2 instituciones.
+- Atlas lista `companero_prod_render_rw` con `readWrite@companero_prod` y los usuarios QA con `readWrite@companero_qa`. Ninguno de esos usuarios restringidos explica la conexión de Render a `companero_dev`; el inventario también contiene un usuario `atlasAdmin`. La identidad efectiva del usuario Mongo configurado en Render sigue pendiente de verificar sin exponer URI ni contraseña.
+- La cuenta `erik55509@hotmail.com` no aparece en `companero_dev.platform_accounts` (consulta exacta sin resultados). No afirmar que existe en producción sin comprobar el destino efectivo.
 - La invitación inicial enviada por Gmail fue informativa; no contiene código de propietario.
+
+**Bloqueo de seguridad vigente:** el servicio productivo está ejecutándose con `APP_ENV=PRODUCTION` sobre `companero_dev`. No cambiar `MONGODB_DATABASE`, `MONGODB_URI`, roles ni datos hasta tener copia externa cifrada, restauración ensayada en destino aislado, inventario/hash por colección e índices y un rollback probado. El cluster es FREE y esta integración no expone operaciones de snapshot/restore; la prueba de recuperación debe realizarse con herramientas de respaldo externas y evidencia independiente. No configurar `PROD_OWNER_ISOLATION_CERTIFIED=true` mientras el runtime siga conectado a la base compartida.
 
 ## Preparación de MongoDB (no ejecutar por simple cambio de variables)
 

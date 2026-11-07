@@ -50,13 +50,15 @@ La última variable **solo** después de certificar de forma independiente el ai
 
 **El código de invitación NO otorga SUPER_ADMIN por sí mismo.**
 
+Al aceptar el registro, el backend consume el digest en `owner_registration_invitations` mediante una actualización condicional atómica. Mongo conserva únicamente el SHA-256, destinatario, caducidad, `consumedAt` y `consumedBy`; nunca el código en claro. El primer consumo gana entre todas las instancias. El registro consumido queda como tombstone: si falla la creación de la cuenta o el correo de verificación, no se reabre el mismo digest; se revoca/retira la invitación anterior y se emite un código aleatorio nuevo.
+
 ## Concesión y verificación del propietario
 
 Tras confirmar que la cuenta Hotmail existe y está verificada, y que posee MFA:
 
 1. Obtener `accountId` y `authRevision` actuales del servicio productivo, sin trasladar credenciales por el chat.
-2. Preparar operación efímera `PROD_OWNER_BOOTSTRAP_*` ligada por digest a correo, ID, revisión, operador autorizado, razón, expiración y rol. El titular aprueba MFA `PRIVILEGED_INVITE_ACCEPT` sobre `global-owner`.
-3. Verificar la identidad autorizada del operador fuera del valor simplemente declarado; la etiqueta del comando no prueba autorización. Revisión independiente obligatoria.
+2. Preparar operación efímera `PROD_OWNER_BOOTSTRAP_*` ligada por digest a correo, ID, revisión, operador, razón, expiración y rol. Configurar `PROD_OWNER_BOOTSTRAP_OPERATOR_PUBLIC_KEY` desde un trust anchor protegido y `PROD_OWNER_BOOTSTRAP_AUTHORIZATION` con la firma Ed25519 efímera. La clave privada permanece fuera de GitHub y Render. El titular aprueba MFA `PRIVILEGED_INVITE_ACCEPT` sobre `global-owner`.
+3. Verificar la firma Ed25519 del digest canónico. La firma cubre cuenta, correo, revisión, operación, operador declarado, razón, caducidad y `SUPER_ADMIN`; cambiar cualquier campo invalida la autorización. La TOTP del titular sigue siendo una prueba separada y obligatoria.
 4. Ejecutar el comando mediante arranque controlado, comprobar la reserva global y el cambio atómico de rol; comprobar `roles == [SUPER_ADMIN]` y auditoría.
 5. Borrar `PROD_OWNER_BOOTSTRAP_PROOF`, `PROD_OWNER_BOOTSTRAP_ENABLED`, `OWNER_INVITE_CODE_SHA256` y cualquier secreto efímero; volver a desplegar.
 6. Reautenticar en Compañero Gestión y confirmar facultades de invitación, roles, instituciones y carreras. Probar que otra cuenta no accede.

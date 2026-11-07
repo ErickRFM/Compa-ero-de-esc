@@ -14,12 +14,16 @@ import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.RegistrationAccountType
 import org.companerodeescuela.shared.contracts.StepUpAction
 import org.companerodeescuela.shared.contracts.UserRole
+import java.security.KeyFactory
 import java.security.MessageDigest
+import java.security.Signature
+import java.security.spec.X509EncodedKeySpec
 import java.time.Clock
+import java.util.Base64
 import java.util.Date
 import java.util.Locale
 
-/** QA-only command. The operator label is a declared value, not independently authenticated identity. */
+/** Startup-only command. Production requires a signed operator approval plus the candidate's MFA step-up. */
 data class OwnerBootstrapSpec(
     val accountId: String,
     val email: String,
@@ -30,6 +34,8 @@ data class OwnerBootstrapSpec(
     val expiresAt: Long,
     val proof: String,
     val scope: String = "qa",
+    val authorizationPublicKey: String? = null,
+    val authorizationSignature: String? = null,
 ) {
     init {
         require(scope in setOf("qa", "prod"))
@@ -137,17 +143,24 @@ object OwnerBootstrap {
         val expiry = requireNotNull(required("PROD_OWNER_BOOTSTRAP_EXPIRES_AT").toLongOrNull())
         val proof = required("PROD_OWNER_BOOTSTRAP_PROOF")
         require(proof.matches(Regex("[A-Za-z0-9_-]{43}"))) { "Invalid production MFA proof" }
-        return OwnerBootstrapSpec(
-            required("PROD_OWNER_BOOTSTRAP_ACCOUNT_ID"),
-            required("PROD_OWNER_BOOTSTRAP_EMAIL"),
-            revision,
-            required("PROD_OWNER_BOOTSTRAP_OPERATION_ID"),
-            required("PROD_OWNER_BOOTSTRAP_OPERATOR"),
-            required("PROD_OWNER_BOOTSTRAP_REASON"),
-            expiry,
-            proof,
-            scope = "prod",
-        )
+        val spec =
+            OwnerBootstrapSpec(
+                required("PROD_OWNER_BOOTSTRAP_ACCOUNT_ID"),
+                required("PROD_OWNER_BOOTSTRAP_EMAIL"),
+                revision,
+                required("PROD_OWNER_BOOTSTRAP_OPERATION_ID"),
+                required("PROD_OWNER_BOOTSTRAP_OPERATOR"),
+                required("PROD_OWNER_BOOTSTRAP_REASON"),
+                expiry,
+                proof,
+                scope = "prod",
+                authorizationPublicKey = required("PROD_OWNER_BOOTSTRAP_OPERATOR_PUBLIC_KEY"),
+                authorizationSignature = required("PROD_OWNER_BOOTSTRAP_AUTHORIZATION"),
+            )
+        require(spec.hasValidOperatorAuthorization()) {
+            "Production owner authorization signature is invalid"
+        }
+        return spec
     }
 
     /** The flag is an operator-controlled startup opt-in; never callable through a public route. */
@@ -189,6 +202,9 @@ object OwnerBootstrap {
                 else -> false
             }
         require(permitted) { "Owner bootstrap requires a matching isolated database and runtime" }
+        if (spec.scope == "prod") {
+            require(spec.hasValidOperatorAuthorization()) { "Production owner authorization signature is invalid" }
+        }
         require(spec.accountId.matches(Regex("[A-Za-z0-9_-]{1,128}")) && spec.operationId.matches(Regex("[A-Za-z0-9_-]{1,128}")))
         require(spec.operator.matches(Regex("[A-Za-z0-9_.@-]{1,100}")))
         require(spec.reason.length in 8..240 && spec.reason == spec.reason.trim() && spec.reason.none(Char::isISOControl))
@@ -265,4 +281,26 @@ object OwnerBootstrap {
             ),
         ) { "Owner candidate changed; authority was not granted" }
     }
+}
+
+
+/** The Ed25519 signature covers the canonical command digest, including operator, account, revision, reason and expiry. */
+private fun OwnerBootstrapSpec.hasValidOperatorAuthorization(): Boolean {
+    val publicKeyValue = authorizationPublicKey ?: return false
+    val signatureValue = authorizationSignature ?: return false
+    if (!publicKeyValue.matches(Regex("[A-Za-z0-9_-]{40,200}")) ||
+        !signatureValue.matches(Regex("[A-Za-z0-9_-]{80,120}"))
+    ) {
+        return false
+    }
+    return runCatching {
+        val publicKey =
+            KeyFactory.getInstance("Ed25519").generatePublic(
+                X509EncodedKeySpec(Base64.getUrlDecoder().decode(publicKeyValue)),
+            )
+        val verifier = Signature.getInstance("Ed25519")
+        verifier.initVerify(publicKey)
+        verifier.update(digest().toByteArray(Charsets.UTF_8))
+        verifier.verify(Base64.getUrlDecoder().decode(signatureValue))
+    }.getOrDefault(false)
 }

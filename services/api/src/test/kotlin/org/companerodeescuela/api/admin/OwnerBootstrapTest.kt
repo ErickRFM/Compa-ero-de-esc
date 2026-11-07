@@ -14,9 +14,12 @@ import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.RegistrationAccountType
 import org.companerodeescuela.shared.contracts.StepUpAction
 import org.companerodeescuela.shared.contracts.UserRole
+import java.security.KeyPairGenerator
+import java.security.Signature
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -46,6 +49,66 @@ class OwnerBootstrapTest {
             }
         }
     }
+
+    @Test fun `production parser accepts only a signed operator authorization`() {
+        val keyPair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
+        val expiresAt = clock.instant().epochSecond + 600
+        val unsigned =
+            OwnerBootstrapSpec(
+                "owner",
+                "owner@example.test",
+                0,
+                "operation",
+                "operator-qa",
+                "QA owner enrollment",
+                expiresAt,
+                "p".repeat(43),
+                scope = "prod",
+            )
+        val signature =
+            Signature.getInstance("Ed25519").apply {
+                initSign(keyPair.private)
+                update(unsigned.digest().toByteArray(Charsets.UTF_8))
+            }.sign()
+        val env =
+            mapOf(
+                "PROD_OWNER_BOOTSTRAP_ENABLED" to "true",
+                "PROD_OWNER_ISOLATION_CERTIFIED" to "true",
+                "PROD_OWNER_BOOTSTRAP_EXPECTED_REVISION" to "0",
+                "PROD_OWNER_BOOTSTRAP_EXPIRES_AT" to expiresAt.toString(),
+                "PROD_OWNER_BOOTSTRAP_PROOF" to "p".repeat(43),
+                "PROD_OWNER_BOOTSTRAP_ACCOUNT_ID" to "owner",
+                "PROD_OWNER_BOOTSTRAP_EMAIL" to "owner@example.test",
+                "PROD_OWNER_BOOTSTRAP_OPERATION_ID" to "operation",
+                "PROD_OWNER_BOOTSTRAP_OPERATOR" to "operator-qa",
+                "PROD_OWNER_BOOTSTRAP_REASON" to "QA owner enrollment",
+                "PROD_OWNER_BOOTSTRAP_OPERATOR_PUBLIC_KEY" to
+                    Base64.getUrlEncoder().withoutPadding().encodeToString(keyPair.public.encoded),
+                "PROD_OWNER_BOOTSTRAP_AUTHORIZATION" to
+                    Base64.getUrlEncoder().withoutPadding().encodeToString(signature),
+            )
+        assertEquals(unsigned.digest(), OwnerBootstrap.parseProduction(env::get)?.digest())
+        assertFailsWith<IllegalArgumentException> {
+            OwnerBootstrap.parseProduction((env + ("PROD_OWNER_BOOTSTRAP_OPERATOR" to "unapproved"))::get)
+        }
+    }
+
+    @Test fun `production authorization signature binds the exact command`() =
+        runTest {
+            val (accounts, mfa, spec) = fixture(scope = "prod")
+            assertFailsWith<IllegalArgumentException> {
+                OwnerBootstrap.provision(
+                    spec.copy(reason = "different approved reason"),
+                    "production",
+                    "companero_prod",
+                    accounts,
+                    mfa,
+                    InMemoryOwnerBootstrapClaims(),
+                    clock,
+                )
+            }
+            assertEquals(setOf(UserRole.WORKSHOP_PARTICIPANT), assertNotNull(accounts.findById("owner")).roles)
+        }
 
     @Test fun `production cannot use a QA scoped command or proof`() =
         runTest {
@@ -254,7 +317,7 @@ class OwnerBootstrapTest {
             Totp.code(Totp.decodeSecret(enrollment.secret), enrollmentClock.instant().epochSecond),
         )
         val mfa = MfaService(accounts, factors, cipher, clock)
-        val draft =
+        val unsignedDraft =
             OwnerBootstrapSpec(
                 "owner",
                 "owner@example.test",
@@ -266,6 +329,21 @@ class OwnerBootstrapTest {
                 "p".repeat(43),
                 scope = scope,
             )
+        val draft =
+            if (scope == "prod") {
+                val keyPair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
+                val signature =
+                    Signature.getInstance("Ed25519").apply {
+                        initSign(keyPair.private)
+                        update(unsignedDraft.digest().toByteArray(Charsets.UTF_8))
+                    }.sign()
+                unsignedDraft.copy(
+                    authorizationPublicKey = Base64.getUrlEncoder().withoutPadding().encodeToString(keyPair.public.encoded),
+                    authorizationSignature = Base64.getUrlEncoder().withoutPadding().encodeToString(signature),
+                )
+            } else {
+                unsignedDraft
+            }
         val proof =
             mfa.issueStepUp(
                 account,

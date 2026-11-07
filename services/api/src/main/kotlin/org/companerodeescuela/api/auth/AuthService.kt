@@ -17,6 +17,7 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.Clock
 import java.time.Duration
+import java.time.Instant
 import java.util.Base64
 import java.util.UUID
 
@@ -27,6 +28,8 @@ import java.util.UUID
  * Institutional identity remains an optional fallback for users who have not
  * created a native account yet.
  */
+private data class OwnerInvitationAuthorization(val digest: String, val expiresAt: Instant)
+
 class AuthService(
     private val identityProvider: IdentityProvider,
     private val tokenService: AuthTokenService,
@@ -41,6 +44,7 @@ class AuthService(
     private val maximumRefreshSessionAge: Duration = Duration.ofDays(90),
     sessionAuthority: PlatformSessionAuthority? = null,
     private val ownerInviteEnvironment: (String) -> String? = System::getenv,
+    private val ownerInvitationRepository: OwnerInvitationRepository = InMemoryOwnerInvitationRepository(),
 ) {
     init {
         require(!refreshRotationGrace.isNegative && !refreshRotationGrace.isZero)
@@ -77,6 +81,7 @@ class AuthService(
             if (cleaned.length > maximum || cleaned.any { it.isISOControl() }) throw ApiException.Validation("Invalid $field")
             return cleaned
         }
+        var ownerInvitationAuthorization: OwnerInvitationAuthorization? = null
         if (request.accountType == RegistrationAccountType.OWNER_INVITED) {
             val expectedEmail = ownerInviteEnvironment("OWNER_INVITE_EMAIL")?.trim()?.lowercase()
             val digest = ownerInviteEnvironment("OWNER_INVITE_CODE_SHA256")
@@ -100,6 +105,11 @@ class AuthService(
                         digest.chunked(2).map { it.toInt(16).toByte() }.toByteArray(),
                     )
             if (!allowed) throw ApiException.Forbidden("Owner registration invitation is unavailable")
+            ownerInvitationAuthorization =
+                OwnerInvitationAuthorization(
+                    requireNotNull(digest),
+                    Instant.ofEpochSecond(requireNotNull(expiry)),
+                )
         } else if (request.ownerInvitationCode != null) {
             throw ApiException.Validation("Owner invitation code is only valid for owner enrollment")
         }
@@ -130,6 +140,24 @@ class AuthService(
                 registrationIntent = RegistrationIntent(request.accountType, institutionPreference, reference, groupPreference),
                 createdAt = clock.instant(),
             )
+        ownerInvitationAuthorization?.let { invitation ->
+            if (authenticationDependency { accounts.findByIdentifier(email) } != null) {
+                throw ApiException.Conflict("An account with that email already exists")
+            }
+            // Consumption is deliberately fail-closed. If account persistence or verification delivery
+            // fails afterward, issue a fresh random invitation; never reopen this digest.
+            val consumed =
+                authenticationDependency {
+                    ownerInvitationRepository.consume(
+                        invitation.digest,
+                        email,
+                        invitation.expiresAt,
+                        clock.instant(),
+                        account.id,
+                    )
+                }
+            if (!consumed) throw ApiException.Forbidden("Owner registration invitation is unavailable")
+        }
         if (!authenticationDependency { accounts.create(account) }) {
             throw ApiException.Conflict("An account with that email already exists")
         }

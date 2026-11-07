@@ -21,6 +21,8 @@ import org.companerodeescuela.api.admin.QaAdminBootstrap
 import org.companerodeescuela.api.admin.accountAdministrationRoutes
 import org.companerodeescuela.api.attendance.attendanceRoutes
 import org.companerodeescuela.api.auth.InMemoryRateLimitStore
+import org.companerodeescuela.api.auth.InMemoryOwnerInvitationRepository
+import org.companerodeescuela.api.auth.MongoOwnerInvitationRepository
 import org.companerodeescuela.api.auth.LoginAttemptLimiter
 import org.companerodeescuela.api.auth.MongoRateLimitStore
 import org.companerodeescuela.api.auth.PlatformSessionAuthority
@@ -478,6 +480,13 @@ fun Application.module(
             invitationOutbox,
         )
 
+    val ownerInvitationRepository =
+        if (settings.hasAuthentication && settings.mongo.isConfigured) {
+            MongoOwnerInvitationRepository(mongoConnection.database())
+        } else {
+            InMemoryOwnerInvitationRepository()
+        }
+
     routing {
         healthRoutes(settings = settings, healthService = healthService)
         authRoutes(
@@ -489,6 +498,7 @@ fun Application.module(
             institutions = identityGraph.institutions,
             verificationEmail = identityGraph.verificationEmail,
             sessionAuthority = sessionAuthority,
+            ownerInvitationRepository = ownerInvitationRepository,
         )
         mfaRoutes(settings, providerRegistry.identity, identityGraph.refreshSessions, identityGraph.accounts, identityGraph.mfa)
         accountAdministrationRoutes(

@@ -10,10 +10,12 @@ Set-StrictMode -Version Latest
 
 $bytes = [byte[]]::new(32)
 try {
-    [Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+    $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
     $code = [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
-    $sha = [Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($code))
-    $digest = [Convert]::ToHexString($sha).ToLowerInvariant()
+    $hasher = [Security.Cryptography.SHA256]::Create()
+    try { $sha = $hasher.ComputeHash([Text.Encoding]::UTF8.GetBytes($code)) } finally { $hasher.Dispose() }
+    $digest = [BitConverter]::ToString($sha).Replace('-', '').ToLowerInvariant()
     if ($code.Length -ne 43 -or $digest.Length -ne 64) {
         throw 'Owner invitation generation failed verification'
     }

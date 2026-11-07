@@ -32,6 +32,43 @@ class OwnerBootstrapTest {
         )
     }
 
+    @Test fun `production owner is opt in and requires isolation attestation`() {
+        assertEquals(null, OwnerBootstrap.parseProduction { null })
+        assertFailsWith<IllegalArgumentException> {
+            OwnerBootstrap.parseProduction { key ->
+                when (key) {
+                    "PROD_OWNER_BOOTSTRAP_ENABLED" -> "true"
+                    "PROD_OWNER_ISOLATION_CERTIFIED" -> "false"
+                    else -> null
+                }
+            }
+        }
+    }
+
+    @Test fun `production cannot use a QA scoped command or proof`() =
+        runTest {
+            val (accounts, mfa, qaSpec) = fixture()
+            assertFailsWith<IllegalArgumentException> {
+                OwnerBootstrap.provision(
+                    qaSpec, "production", "companero_prod", accounts, mfa,
+                    InMemoryOwnerBootstrapClaims(), clock,
+                )
+            }
+            assertFailsWith<IllegalArgumentException> {
+                OwnerBootstrap.provision(
+                    qaSpec.copy(scope = "prod"), "production", "companero_qa", accounts, mfa,
+                    InMemoryOwnerBootstrapClaims(), clock,
+                )
+            }
+            assertFailsWith<org.companerodeescuela.api.errors.ApiException.Forbidden> {
+                OwnerBootstrap.provision(
+                    qaSpec.copy(scope = "prod"), "production", "companero_prod", accounts, mfa,
+                    InMemoryOwnerBootstrapClaims(), clock,
+                )
+            }
+            assertEquals(setOf(UserRole.STUDENT), assertNotNull(accounts.findById("owner")).roles)
+        }
+
     @Test fun `verified student gains only the additional owner role through scoped MFA`() =
         runTest {
             val (accounts, mfa, spec) = fixture()

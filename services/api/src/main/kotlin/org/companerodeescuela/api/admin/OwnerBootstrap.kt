@@ -146,8 +146,7 @@ class MongoOwnerBootstrapClaims(
     // The collection name is retained for backwards compatibility with existing QA claims.
     private val claims = database.getCollection<Document>("qa_initial_owner_claims")
 
-    override suspend fun find(): OwnerBootstrapClaim? =
-        claims.find(eq("_id", "global-owner")).firstOrNull()?.let(::toClaim)
+    override suspend fun find(): OwnerBootstrapClaim? = claims.find(eq("_id", "global-owner")).firstOrNull()?.let(::toClaim)
 
     override suspend fun reserve(claim: OwnerBootstrapClaim): Boolean {
         try {

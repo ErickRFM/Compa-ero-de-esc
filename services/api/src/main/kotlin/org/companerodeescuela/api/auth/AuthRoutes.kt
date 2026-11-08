@@ -46,6 +46,8 @@ fun Route.authRoutes(
     verificationEmail: VerificationEmailGateway = UnavailableVerificationEmailGateway,
     verificationClock: Clock = Clock.systemUTC(),
     sessionAuthority: PlatformSessionAuthority? = null,
+    ownerInviteEnvironment: (String) -> String? = System::getenv,
+    ownerInvitationRepository: OwnerInvitationRepository = InMemoryOwnerInvitationRepository(),
 ) {
     val tokenService = settings.jwtSecret?.let { AuthTokenService(settings) }
     val verification = AccountVerificationService(accounts, verificationEmail, verificationClock)
@@ -121,6 +123,8 @@ fun Route.authRoutes(
                         institutions = institutions,
                         verification = verification,
                         sessionAuthority = sessionAuthority,
+                        ownerInviteEnvironment = ownerInviteEnvironment,
+                        ownerInvitationRepository = ownerInvitationRepository,
                     )
                 } ?: throw ApiException.DependencyUnavailable(
                     "Authentication is not configured",

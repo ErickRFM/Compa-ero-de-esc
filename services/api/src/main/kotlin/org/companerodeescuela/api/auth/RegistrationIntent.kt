@@ -74,13 +74,18 @@ internal fun PlatformAccount.withVerifiedEmail(
         } else {
             when (requireNotNull(intent).profile) {
                 RegistrationAccountType.STUDENT -> setOf(UserRole.STUDENT)
-                RegistrationAccountType.PARTICIPANT -> setOf(UserRole.WORKSHOP_PARTICIPANT)
+                RegistrationAccountType.PARTICIPANT, RegistrationAccountType.OWNER_INVITED -> setOf(UserRole.WORKSHOP_PARTICIPANT)
                 RegistrationAccountType.TEACHER, RegistrationAccountType.TUTOR -> emptySet()
             }
         }
     val status =
         if (accountStatus == AccountStatus.ACTIVE ||
-            requireNotNull(intent).profile in setOf(RegistrationAccountType.STUDENT, RegistrationAccountType.PARTICIPANT)
+            requireNotNull(intent).profile in
+            setOf(
+                RegistrationAccountType.STUDENT,
+                RegistrationAccountType.PARTICIPANT,
+                RegistrationAccountType.OWNER_INVITED,
+            )
         ) {
             AccountStatus.ACTIVE
         } else {

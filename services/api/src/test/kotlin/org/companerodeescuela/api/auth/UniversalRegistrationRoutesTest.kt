@@ -156,7 +156,7 @@ class UniversalRegistrationRoutesTest {
                     ),
                 ).status,
             )
-            val pending = register("owner@example.test", "OWNER_INVITED", payload)
+            val pending = register("owner@example.test", "OWNER_INVITED", ",\"ownerInvitationCode\":\"$code\"")
             assertTrue(pending.user.roles.isEmpty())
             val verified = confirm(pending, assertNotNull(f.mail.tokens["owner@example.test"]))
             assertEquals(AccountStatus.ACTIVE, verified.user.accountStatus)

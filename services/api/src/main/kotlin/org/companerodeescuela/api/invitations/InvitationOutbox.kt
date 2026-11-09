@@ -3,6 +3,7 @@ package org.companerodeescuela.api.invitations
 import com.mongodb.client.model.Filters
 import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
+import com.mongodb.client.model.ReplaceOptions
 import com.mongodb.client.model.Updates
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import kotlinx.coroutines.flow.collect
@@ -158,11 +159,12 @@ internal class MongoInvitationOutbox(
             val id = legacy.getString("_id") ?: throw IllegalStateException("Legacy invitation outbox entry has no ID")
             val recipient = legacy.getString("recipient") ?: ""
             if (recipient.isNotEmpty()) {
-                val encrypted = cipher.encrypt(
-                    id,
-                    "platform-invitation-outbox-recipient",
-                    recipient.toByteArray(Charsets.UTF_8),
-                )
+                val encrypted =
+                    cipher.encrypt(
+                        id,
+                        "platform-invitation-outbox-recipient",
+                        recipient.toByteArray(Charsets.UTF_8),
+                    )
                 collection.updateOne(
                     Filters.and(Filters.eq("_id", id), Filters.exists("recipient")),
                     Updates.combine(
@@ -212,10 +214,11 @@ internal class MongoInvitationOutbox(
 
     override suspend fun replace(entry: OutboxEntry): Boolean {
         ensureIndexes()
+        val options = ReplaceOptions().upsert(true)
         collection.replaceOne(
             Filters.eq("_id", entry.invitationId),
             entry.toDocument(),
-            com.mongodb.client.model.ReplaceOptions().upsert(true),
+            options,
         )
         return true
     }

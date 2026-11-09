@@ -13,4 +13,6 @@ data class MaticaProgressSummary(
 )
 
 @Serializable
-data class MaticaProgressLinkRequest(val code: String)
+data class MaticaProgressLinkRequest(
+    val code: String,
+)

@@ -187,26 +187,38 @@ fun Route.maticaProgressRoutes(
     val service = if (settings.hasAuthentication && database != null && secret != null && baseUrl != null) {
         MaticaProgressService(secret, baseUrl, MongoMaticaLinkRepository(database))
     } else null
-    val resolver = NativeActorResolver(accounts, sessions, AuthTokenService(settings), org.companerodeescuela.api.integrations.UnavailableIdentityProvider)
+    val resolver =
+        NativeActorResolver(
+            accounts,
+            sessions,
+            AuthTokenService(settings),
+            org.companerodeescuela.api.integrations.UnavailableIdentityProvider,
+        )
 
     authenticate(AuthTokenService.PROVIDER_NAME) {
         route("/integrations/matica") {
             post("/link") {
                 call.response.header(HttpHeaders.CacheControl, "no-store")
                 val contentLength = call.request.headers[HttpHeaders.ContentLength]?.toLongOrNull()
-                if (contentLength != null && contentLength > 4_096) throw ApiException.Validation("El código de vínculo no es válido")
+                if (contentLength != null && contentLength > 4_096) {
+                    throw ApiException.Validation("El código de vínculo no es válido")
+                }
                 val actor = resolveStudent(call.principal<JWTPrincipal>()?.payload, resolver)
                 val input = call.receive<MaticaProgressLinkRequest>()
                 if (input.code.length > 2_048) throw ApiException.Validation("El código de vínculo no es válido")
                 val active = service ?: throw ApiException.DependencyUnavailable("La conexión con Mática aún no está configurada")
-                if (!active.link(actor.id, input.code, Instant.now())) throw ApiException.Conflict("El código venció, ya fue usado o no es válido")
+                if (!active.link(actor.id, input.code, Instant.now())) {
+                    throw ApiException.Conflict("El código venció, ya fue usado o no es válido")
+                }
                 call.respond(HttpStatusCode.Created, ApiResponse(mapOf("linked" to true)))
             }
             get("/progress") {
                 call.response.header(HttpHeaders.CacheControl, "no-store")
                 val actor = resolveStudent(call.principal<JWTPrincipal>()?.payload, resolver)
                 val active = service ?: throw ApiException.DependencyUnavailable("La conexión con Mática aún no está configurada")
-                val summary = active.progress(actor.id, Instant.now()) ?: throw ApiException.NotFound("Mática todavía no está vinculada")
+                val summary =
+                    active.progress(actor.id, Instant.now())
+                        ?: throw ApiException.NotFound("Mática todavía no está vinculada")
                 call.respond(HttpStatusCode.OK, ApiResponse(summary))
             }
             delete("/link") {
@@ -224,14 +236,22 @@ private fun isSecureMaticaBaseUrl(value: String): Boolean {
     if (value.length > 300) return false
     return try {
         val uri = URI(value)
-        uri.scheme == "https" && uri.host != null && uri.userInfo == null &&
-            uri.query == null && uri.fragment == null && uri.path.orEmpty() in setOf("", "/")
+        uri.scheme == "https" &&
+            uri.host != null &&
+            uri.userInfo == null &&
+            uri.query == null &&
+            uri.fragment == null &&
+            uri.path.orEmpty() in setOf("", "/")
     } catch (_: Exception) {
         false
     }
 }
 
-private suspend fun resolveStudent(payload: Payload?, resolver: NativeActorResolver) =
-    resolver.resolve(payload ?: throw ApiException.Unauthorized()).also { actor ->
-        if (UserRole.STUDENT !in actor.roles) throw ApiException.Forbidden("Una cuenta de estudiante es necesaria para vincular Mática")
+private suspend fun resolveStudent(
+    payload: Payload?,
+    resolver: NativeActorResolver,
+) = resolver.resolve(payload ?: throw ApiException.Unauthorized()).also { actor ->
+    if (UserRole.STUDENT !in actor.roles) {
+        throw ApiException.Forbidden("Una cuenta de estudiante es necesaria para vincular Mática")
     }
+}

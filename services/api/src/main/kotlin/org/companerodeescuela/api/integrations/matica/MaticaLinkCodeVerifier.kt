@@ -43,10 +43,17 @@ internal class MaticaLinkCodeVerifier(secret: ByteArray) {
             null
         }
     }
-    fun summarySignature(userId: String, timestamp: Long): String =
-        encoder.encodeToString(sign("summary|$userId|$timestamp"))
 
-    private fun sign(payload: String): ByteArray = Mac.getInstance("HmacSHA256").run {
+    fun summarySignature(
+        userId: String,
+        timestamp: Long,
+    ): String =
+        encoder.encodeToString(
+            sign("summary|$userId|$timestamp"),
+        )
+
+    private fun sign(payload: String): ByteArray =
+        Mac.getInstance("HmacSHA256").run {
         init(key)
         doFinal(payload.toByteArray())
     }

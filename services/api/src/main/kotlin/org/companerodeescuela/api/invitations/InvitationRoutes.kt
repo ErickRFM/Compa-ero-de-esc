@@ -27,41 +27,18 @@ import org.companerodeescuela.api.integrations.identity.IdentityProvider
 import org.companerodeescuela.api.plugins.clientAddress
 import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.api.security.NativeActorResolver
-import org.companerodeescuela.shared.contracts.AccountStatus
+import org.companerodeescuela.shared.contracts.AcceptRegistrationInvitationRequest
 import org.companerodeescuela.shared.contracts.ApiResponse
-import org.companerodeescuela.shared.contracts.VerificationDeliveryStatus
+import org.companerodeescuela.shared.contracts.PrepareRegistrationInvitationRequest
+import org.companerodeescuela.shared.contracts.RegistrationInvitationDispatchReceipt
+import org.companerodeescuela.shared.contracts.RegistrationInvitationPreparation
+import org.companerodeescuela.shared.contracts.RegistrationInvitationReceipt
 import java.time.Clock
 
-/** No public unauthenticated invitation-token oracle or role assignment route. */
-@Serializable
-internal data class InvitationCreateBody(
-    val recipient: String,
-    val institutionId: String,
-    val profile: String,
-    val operationId: String,
-    val proof: String? = null,
-)
-
-@Serializable
-internal data class InvitationPrepareResponse(
-    val operationId: String,
-    val resourceId: String,
-    val payloadDigest: String,
-)
-
-@Serializable
-internal data class InvitationSendResponse(
-    val invitationId: String,
-    val delivery: VerificationDeliveryStatus,
-    val expiresAtEpochSeconds: Long,
-)
-
-@Serializable
-internal data class InvitationAcceptBody(
-    val invitationId: String,
-    val code: String,
-    val operationId: String,
-)
+/**
+ * One wire contract with Android (`shared/contracts/RegistrationInvitationContracts.kt`):
+ * this route intentionally does not re-declare invitation payloads.
+ */
 
 @Serializable
 internal data class InvitationRetryBody(
@@ -72,12 +49,6 @@ internal data class InvitationRetryBody(
 @Serializable
 internal data class InvitationRevokeBody(
     val invitationId: String,
-)
-
-@Serializable
-internal data class InvitationAcceptResponse(
-    val invitationId: String,
-    val status: String,
 )
 
 internal fun Route.invitationRoutes(
@@ -95,13 +66,14 @@ internal fun Route.invitationRoutes(
     val resolver = NativeActorResolver(accounts, sessions, AuthTokenService(settings), identity)
     val issuerLimiter = LoginAttemptLimiter(maxAttempts = 5, store = rateLimitStore)
     val acceptanceLimiter = LoginAttemptLimiter(maxAttempts = 10, store = rateLimitStore)
+    val acceptance = InvitationAcceptanceService(accounts, invitations, clock)
 
     suspend fun ApplicationCall.nativeActor() =
         resolver.resolve(
             principal<JWTPrincipal>()?.payload ?: throw ApiException.Unauthorized(),
         )
 
-    fun toCommand(body: InvitationCreateBody): InvitationDispatchCommand {
+    fun toCommand(body: PrepareRegistrationInvitationRequest): InvitationDispatchCommand {
         val profile =
             InvitationProfile.entries.firstOrNull { it.name == body.profile }
                 ?: throw ApiException.Validation("Invalid invitation profile")
@@ -116,11 +88,15 @@ internal fun Route.invitationRoutes(
                     call.response.header(HttpHeaders.RetryAfter, it.toString())
                     throw ApiException.RateLimited()
                 }
-                val body = call.boundedBody(InvitationCreateBody.serializer(), AUTH_BODY_MAX_BYTES)
+                val body = call.boundedBody(PrepareRegistrationInvitationRequest.serializer(), AUTH_BODY_MAX_BYTES)
                 val prepared = service.prepare(actor, toCommand(body))
                 call.respond(
                     ApiResponse(
-                        InvitationPrepareResponse(prepared.operationId, prepared.resourceId, prepared.payloadDigest),
+                        RegistrationInvitationPreparation(
+                            prepared.operationId,
+                            prepared.resourceId,
+                            prepared.payloadDigest,
+                        ),
                         call.requestId(),
                     ),
                 )
@@ -131,13 +107,13 @@ internal fun Route.invitationRoutes(
                     call.response.header(HttpHeaders.RetryAfter, it.toString())
                     throw ApiException.RateLimited()
                 }
-                val body = call.boundedBody(InvitationCreateBody.serializer(), AUTH_BODY_MAX_BYTES)
+                val body = call.boundedBody(PrepareRegistrationInvitationRequest.serializer(), AUTH_BODY_MAX_BYTES)
                 val proof = body.proof ?: throw ApiException.Forbidden("Scoped MFA proof is required")
                 val result = service.dispatch(actor, toCommand(body), proof)
                 call.respond(
                     HttpStatusCode.Created,
                     ApiResponse(
-                        InvitationSendResponse(result.invitationId, result.delivery, result.expiresAtEpochSeconds),
+                        RegistrationInvitationDispatchReceipt(result.invitationId, result.delivery, result.expiresAtEpochSeconds),
                         call.requestId(),
                     ),
                 )
@@ -157,7 +133,7 @@ internal fun Route.invitationRoutes(
                 val result = service.retry(actor, body.invitationId, body.proof)
                 call.respond(
                     ApiResponse(
-                        InvitationSendResponse(result.invitationId, result.delivery, result.expiresAtEpochSeconds),
+                        RegistrationInvitationDispatchReceipt(result.invitationId, result.delivery, result.expiresAtEpochSeconds),
                         call.requestId(),
                     ),
                 )
@@ -176,7 +152,7 @@ internal fun Route.invitationRoutes(
                 if (!revoked) throw ApiException.Validation("Invitation cannot be revoked")
                 call.respond(
                     ApiResponse(
-                        InvitationAcceptResponse(body.invitationId, "REVOKED"),
+                        RegistrationInvitationReceipt(body.invitationId, "REVOKED"),
                         call.requestId(),
                     ),
                 )
@@ -194,32 +170,15 @@ internal fun Route.invitationRoutes(
                 call.response.header(HttpHeaders.RetryAfter, it.toString())
                 throw ApiException.RateLimited()
             }
-            val body = call.boundedBody(InvitationAcceptBody.serializer(), AUTH_BODY_MAX_BYTES)
+            val body = call.boundedBody(AcceptRegistrationInvitationRequest.serializer(), AUTH_BODY_MAX_BYTES)
             if (!Regex("[A-Za-z0-9_-]{43}").matches(body.invitationId) ||
                 !Regex("[A-Za-z0-9_-]{43}").matches(body.code) ||
                 !Regex("[A-Za-z0-9_-]{8,128}").matches(body.operationId)
             ) {
                 throw ApiException.Validation("Invitation is invalid or unavailable")
             }
-            val now = clock.instant()
-            if (!actor.permitsSession ||
-                actor.accountStatus !in setOf(AccountStatus.ACTIVE, AccountStatus.PENDING_APPROVAL) ||
-                actor.emailVerifiedAt == null ||
-                actor.emailVerifiedAt > now
-            ) {
-                throw ApiException.Forbidden("Verified native account is required")
-            }
-            val accepted =
-                invitations.accept(
-                    body.invitationId,
-                    InvitationToken.hash(body.code),
-                    actor.email,
-                    true,
-                    actor.id,
-                    body.operationId,
-                    now,
-                ) ?: throw ApiException.Validation("Invitation is invalid or unavailable")
-            call.respond(ApiResponse(InvitationAcceptResponse(accepted.id, accepted.status.name), call.requestId()))
+            val accepted = acceptance.accept(actor, body.invitationId, body.code, body.operationId)
+            call.respond(ApiResponse(RegistrationInvitationReceipt(accepted.invitationId, accepted.status.name), call.requestId()))
         }
     }
 }

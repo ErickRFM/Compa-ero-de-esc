@@ -1,5 +1,7 @@
 package org.companerodeescuela.api.mail
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import java.time.Clock
@@ -44,6 +46,20 @@ class ResendWebhookSignatureVerifierTest {
         assertFalse(verifier.verify(body.toByteArray(), null, timestamp, sign(body)))
         assertFalse(verifier.verify(body.toByteArray(), messageId, timestamp, null))
         assertFalse(verifier.verify(ByteArray(32 * 1024 + 1), messageId, timestamp, sign(body)))
+    }
+
+    @Test
+    @DisplayName("Extracts invitation correlation from Resend's array of name/value tags")
+    fun extractsInvitationIdFromProviderTags() {
+        val invitationId = "A".repeat(43)
+        val payload =
+            Json.parseToJsonElement(
+                """{"tags":[{"name":"category","value":"companero_invitation"},{"name":"invitation_id","value":"$invitationId"}]}""",
+            ).jsonObject
+
+        assertTrue(extractResendInvitationId(payload["tags"]) == invitationId)
+        val malformed = Json.parseToJsonElement("""{"tags":{"invitation_id":"$invitationId"}}""").jsonObject
+        assertFalse(extractResendInvitationId(malformed["tags"]) != null)
     }
 
     private fun sign(

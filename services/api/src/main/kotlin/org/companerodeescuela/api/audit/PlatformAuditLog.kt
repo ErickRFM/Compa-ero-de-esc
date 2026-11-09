@@ -36,7 +36,7 @@ internal data class PlatformAuditEvent(
             require(resourceId.isNotBlank() && resourceId.length <= 128)
             require(operationId == null || operationId.matches(Regex("[A-Za-z0-9_-]{1,128}")))
             require(outcome in setOf("STARTED", "SUCCEEDED", "FAILED"))
-            val identity = listOf(actorId, action, resourceType, resourceId, operationId.orEmpty()).joinToString("\n")
+            val identity = listOf(actorId, action, resourceType, resourceId, operationId.orEmpty(), outcome).joinToString("\n")
             val digest = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray(Charsets.UTF_8))
             val id = digest.joinToString("") { "%02x".format(it) }
             return PlatformAuditEvent(id, actorId, action, resourceType, resourceId, operationId, outcome, createdAt)

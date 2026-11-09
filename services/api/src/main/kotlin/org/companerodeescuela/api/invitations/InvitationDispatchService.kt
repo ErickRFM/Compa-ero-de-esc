@@ -212,6 +212,25 @@ internal class InvitationDispatchService(
         if (!authenticationDependency { repository.retry(invitationId, newToken.hash, now) }) {
             throw ApiException.Conflict("Invitation cannot be retried in its current state")
         }
+        if (outbox != null) {
+            val queued =
+                authenticationDependency {
+                    outbox.replace(
+                        OutboxEntry(
+                            invitationId = invitationId,
+                            recipient = existing.recipient,
+                            tokenValue = newToken.value,
+                            expiresAt = existing.expiresAt,
+                            nextAttemptAt = now.plusSeconds(60),
+                            createdAt = now,
+                        ),
+                    )
+                }
+            if (!queued) {
+                authenticationDependency { repository.revoke(invitationId, clock.instant()) }
+                throw ApiException.Conflict("Invitation retry cannot be queued")
+            }
+        }
         val delivery =
             try {
                 email.send(existing.recipient, newToken.value, invitationId, existing.expiresAt)
@@ -220,8 +239,14 @@ internal class InvitationDispatchService(
             } catch (_: Exception) {
                 VerificationDeliveryStatus.UNCONFIRMED
             }
-        if (delivery == VerificationDeliveryStatus.FAILED || delivery == VerificationDeliveryStatus.UNAVAILABLE) {
-            authenticationDependency { repository.revoke(invitationId, clock.instant()) }
+        when (delivery) {
+            VerificationDeliveryStatus.FAILED, VerificationDeliveryStatus.UNAVAILABLE -> {
+                authenticationDependency { repository.revoke(invitationId, clock.instant()) }
+                outbox?.markFailed(invitationId, clock.instant())
+            }
+            VerificationDeliveryStatus.ACCEPTED -> outbox?.clearToken(invitationId)
+            VerificationDeliveryStatus.DELIVERED -> outbox?.markDelivered(invitationId, clock.instant())
+            else -> Unit
         }
         return InvitationDispatchResult(invitationId, delivery, existing.expiresAt.epochSecond)
     }

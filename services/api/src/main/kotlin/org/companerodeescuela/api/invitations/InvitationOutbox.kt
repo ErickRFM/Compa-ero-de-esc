@@ -89,7 +89,8 @@ internal class InMemoryInvitationOutbox(
                         it.expiresAt > now &&
                         it.tokenValue.isNotEmpty() &&
                         it.lastStatus != VerificationDeliveryStatus.DELIVERED &&
-                        it.lastStatus != VerificationDeliveryStatus.FAILED
+                        it.lastStatus != VerificationDeliveryStatus.FAILED &&
+                        it.lastStatus != VerificationDeliveryStatus.ACCEPTED
                 }.toList()
         }
 
@@ -133,7 +134,11 @@ internal class InMemoryInvitationOutbox(
     override suspend fun clearToken(id: String): Boolean =
         mutex.withLock {
             val current = entries[id] ?: return@withLock false
-            entries[id] = current.copy(tokenValue = "", recipient = "")
+            entries[id] = current.copy(
+                lastStatus = VerificationDeliveryStatus.ACCEPTED,
+                tokenValue = "",
+                recipient = "",
+            )
             true
         }
 }
@@ -232,7 +237,12 @@ internal class MongoInvitationOutbox(
                 Filters.and(
                     Filters.lte("nextAttemptAt", Date.from(now)),
                     Filters.gt("expiresAt", Date.from(now)),
-                    Filters.nin("lastStatus", VerificationDeliveryStatus.DELIVERED.name, VerificationDeliveryStatus.FAILED.name),
+                    Filters.nin(
+                        "lastStatus",
+                        VerificationDeliveryStatus.DELIVERED.name,
+                        VerificationDeliveryStatus.FAILED.name,
+                        VerificationDeliveryStatus.ACCEPTED.name,
+                    ),
                 ),
             ).limit(50)
             .collect { doc -> doc.toOutboxEntry()?.takeIf { it.tokenValue.isNotEmpty() }?.let(result::add) }
@@ -288,6 +298,7 @@ internal class MongoInvitationOutbox(
             .updateOne(
                 Filters.eq("_id", id),
                 Updates.combine(
+                    Updates.set("lastStatus", VerificationDeliveryStatus.ACCEPTED.name),
                     Updates.unset("tokenCiphertext"),
                     Updates.unset("recipientCiphertext"),
                 ),

@@ -7,7 +7,6 @@ import com.mongodb.client.model.Indexes
 import com.mongodb.client.model.Updates
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import org.bson.Document
-import java.time.Instant
 import java.util.Date
 
 /**
@@ -58,15 +57,16 @@ internal class MongoResendWebhookAuditRepository(
             )
         }
 
-        val audit = Document("_id", event.messageId)
-            .append("source", "RESEND_WEBHOOK")
-            .append("action", event.type.uppercase().replace('.', '_'))
-            .append("resourceType", if (event.invitationId == null) "EMAIL" else "INVITATION")
-            .append("resourceId", event.invitationId ?: event.emailId)
-            .append("providerEmailId", event.emailId)
-            .append("eventAt", Date.from(event.createdAt))
-            .append("receivedAt", Date.from(event.receivedAt))
-            .append("processed", true)
+        val audit =
+            Document("_id", event.messageId)
+                .append("source", "RESEND_WEBHOOK")
+                .append("action", event.type.uppercase().replace('.', '_'))
+                .append("resourceType", if (event.invitationId == null) "EMAIL" else "INVITATION")
+                .append("resourceId", event.invitationId ?: event.emailId)
+                .append("providerEmailId", event.emailId)
+                .append("eventAt", Date.from(event.createdAt))
+                .append("receivedAt", Date.from(event.receivedAt))
+                .append("processed", true)
 
         return try {
             auditEvents.insertOne(audit)

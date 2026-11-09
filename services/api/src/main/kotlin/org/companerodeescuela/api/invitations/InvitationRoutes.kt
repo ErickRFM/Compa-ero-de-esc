@@ -36,6 +36,7 @@ import org.companerodeescuela.shared.contracts.RegistrationInvitationDispatchRec
 import org.companerodeescuela.shared.contracts.RegistrationInvitationPreparation
 import org.companerodeescuela.shared.contracts.RegistrationInvitationReceipt
 import java.time.Clock
+import java.util.UUID
 
 /**
  * One wire contract with Android (`shared/contracts/RegistrationInvitationContracts.kt`):
@@ -178,12 +179,13 @@ internal fun Route.invitationRoutes(
                 ) {
                     throw ApiException.Validation("Invitation or proof is invalid")
                 }
+                val auditOperationId = call.requestId() ?: UUID.randomUUID().toString()
                 recordAudit(
                     actor.id,
                     "INVITATION_RETRY",
                     "INVITATION",
                     body.invitationId,
-                    body.invitationId,
+                    auditOperationId,
                     "STARTED",
                 )
                 val result = service.retry(actor, body.invitationId, body.proof)
@@ -192,7 +194,7 @@ internal fun Route.invitationRoutes(
                     "INVITATION_RETRY",
                     "INVITATION",
                     result.invitationId,
-                    body.invitationId,
+                    auditOperationId,
                     "SUCCEEDED",
                 )
                 call.respond(
@@ -212,12 +214,13 @@ internal fun Route.invitationRoutes(
                 if (!Regex("[A-Za-z0-9_-]{1,128}").matches(body.invitationId)) {
                     throw ApiException.Validation("Invitation is invalid")
                 }
+                val auditOperationId = call.requestId() ?: UUID.randomUUID().toString()
                 recordAudit(
                     actor.id,
                     "INVITATION_REVOKE",
                     "INVITATION",
                     body.invitationId,
-                    body.invitationId,
+                    auditOperationId,
                     "STARTED",
                 )
                 val revoked = invitations.revoke(body.invitationId, clock.instant())
@@ -227,7 +230,7 @@ internal fun Route.invitationRoutes(
                     "INVITATION_REVOKE",
                     "INVITATION",
                     body.invitationId,
-                    body.invitationId,
+                    auditOperationId,
                     "SUCCEEDED",
                 )
                 call.respond(

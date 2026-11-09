@@ -53,20 +53,22 @@ class ResendWebhookSignatureVerifierTest {
     fun extractsInvitationIdFromProviderTags() {
         val invitationId = "A".repeat(43)
         val objectTags =
-            (Json.parseToJsonElement(
+            tags(
                 """{"tags":{"category":"companero_invitation","invitation_id":"$invitationId"}}""",
-            ) as JsonObject)["tags"]
+            )
         val arrayTags =
-            (Json.parseToJsonElement(
+            tags(
                 """{"tags":[{"name":"category","value":"companero_invitation"},{"name":"invitation_id","value":"$invitationId"}]}""",
-            ) as JsonObject)["tags"]
-        val malformed =
-            (Json.parseToJsonElement("""{"tags":"invalid"}""") as JsonObject)["tags"]
+            )
+        val malformed = tags("""{"tags":"invalid"}""")
 
         assertTrue(extractResendInvitationId(objectTags) == invitationId)
         assertTrue(extractResendInvitationId(arrayTags) == invitationId)
         assertFalse(extractResendInvitationId(malformed) != null)
     }
+
+    private fun tags(payload: String) =
+        (Json.parseToJsonElement(payload) as? JsonObject)?.get("tags")
 
     private fun sign(
         payload: String,

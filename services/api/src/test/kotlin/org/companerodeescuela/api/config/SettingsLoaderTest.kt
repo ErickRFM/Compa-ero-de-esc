@@ -266,7 +266,7 @@ class SettingsLoaderTest {
     }
 
     @Test
-    @DisplayName("Resend webhook secret is validated and redacted")
+    @DisplayName("Resend webhook signing secret is validated and never exposed")
     fun resendWebhookSecretIsValidatedAndRedacted() {
         val defaults =
             loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c").load()
@@ -276,7 +276,7 @@ class SettingsLoaderTest {
             loader(
                 "API_PORT" to "8080",
                 "MONGODB_DATABASE" to "c",
-                "RESEND_WEBHOOK_SECRET" to "invalid",
+                "RESEND_WEBHOOK_SECRET" to "not-a-webhook-secret",
             ).load()
         }
         val encoder = java.util.Base64.getEncoder()

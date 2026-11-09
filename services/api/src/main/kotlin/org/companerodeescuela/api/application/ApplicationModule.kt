@@ -66,6 +66,7 @@ import org.companerodeescuela.api.invitations.MongoInvitationRepository
 import org.companerodeescuela.api.invitations.UnavailableInvitationEmailGateway
 import org.companerodeescuela.api.invitations.invitationRoutes
 import org.companerodeescuela.api.mail.ResendInvitationEmailGateway
+import org.companerodeescuela.api.mail.resendWebhookRoutes
 import org.companerodeescuela.api.plugins.configurePlugins
 import org.companerodeescuela.api.presence.schoolPresenceRoutes
 import org.companerodeescuela.api.representatives.groupRepresentativeRoutes
@@ -489,6 +490,10 @@ fun Application.module(
 
     routing {
         healthRoutes(settings = settings, healthService = healthService)
+        resendWebhookRoutes(
+            signingSecret = settings.resendWebhookSecret,
+            database = if (settings.mongo.isConfigured) mongoConnection.database() else null,
+        )
         authRoutes(
             settings = settings,
             identityProvider = providerRegistry.identity,

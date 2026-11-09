@@ -80,10 +80,12 @@ internal fun Route.institutionOwnerProvisionRoutes(
         )
     }
 
-    suspend fun ApplicationCall.owner() =
+    suspend fun ApplicationCall.owner() = run {
+        response.header(HttpHeaders.CacheControl, "no-store")
         resolver.resolve(
             principal<JWTPrincipal>()?.payload ?: throw ApiException.Unauthorized(),
         )
+    }
 
     fun InstitutionProvisionBody.command(): InstitutionProvisionCommand =
         InstitutionProvisionCommand(institutionId, displayName, operationId)

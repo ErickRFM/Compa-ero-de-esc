@@ -9,6 +9,7 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.time.Instant
@@ -60,8 +61,15 @@ internal fun Route.resendWebhookRoutes(
                         ?: error("Missing event timestamp")
                 val emailId = data["email_id"]?.jsonPrimitive?.contentOrNull
                 if (type.startsWith("email.") && emailId.isNullOrBlank()) error("Missing provider email ID")
-                val tags = data["tags"]?.jsonObject
-                val rawInvitationId = tags?.get("invitation_id")?.jsonPrimitive?.contentOrNull
+                val rawInvitationId =
+                    data["tags"]?.jsonArray?.firstNotNullOfOrNull { tag ->
+                        val fields = tag.jsonObject
+                        if (fields["name"]?.jsonPrimitive?.contentOrNull == "invitation_id") {
+                            fields["value"]?.jsonPrimitive?.contentOrNull
+                        } else {
+                            null
+                        }
+                    }
                 val invitationId = rawInvitationId?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{43}")) }
                 VerifiedResendWebhookEvent(
                     messageId = requireNotNull(messageId),

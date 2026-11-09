@@ -453,7 +453,7 @@ fun Application.module(
             store = rateLimitStore,
         )
     val platformAuditLog =
-        if (settings.mongo.isConfigured) {
+        if (settings.hasAuthentication && settings.mongo.isConfigured) {
             MongoPlatformAuditLog(mongoConnection.database())
         } else {
             InMemoryPlatformAuditLog()

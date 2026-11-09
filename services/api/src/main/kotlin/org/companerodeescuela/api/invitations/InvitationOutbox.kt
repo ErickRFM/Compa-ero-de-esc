@@ -179,6 +179,7 @@ internal class MongoInvitationOutbox(
     }
 
     override suspend fun pending(now: Instant): List<OutboxEntry> {
+        ensureIndexes()
         val result = mutableListOf<OutboxEntry>()
         collection
             .find(

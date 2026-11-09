@@ -67,8 +67,7 @@ class ResendWebhookSignatureVerifierTest {
         assertFalse(extractResendInvitationId(malformed) != null)
     }
 
-    private fun tags(payload: String) =
-        (Json.parseToJsonElement(payload) as? JsonObject)?.get("tags")
+    private fun tags(payload: String) = (Json.parseToJsonElement(payload) as? JsonObject)?.get("tags")
 
     private fun sign(
         payload: String,

@@ -7,6 +7,15 @@ import java.util.Base64
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
+internal data class VerifiedResendWebhookEvent(
+    val messageId: String,
+    val type: String,
+    val emailId: String?,
+    val invitationId: String?,
+    val createdAt: java.time.Instant,
+    val receivedAt: java.time.Instant,
+)
+
 /** Verifies Resend's Svix signature against the exact raw request bytes. */
 internal class ResendWebhookSignatureVerifier(
     signingSecret: CharArray,

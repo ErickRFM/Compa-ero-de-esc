@@ -40,7 +40,8 @@ class SettingsLoaderTest {
     @Test
     @DisplayName("Resend webhook signing secret is validated and never exposed")
     fun resendWebhookSecretIsValidatedAndRedacted() {
-        val defaults = loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c").load()
+        val defaults =
+            loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c").load()
         assertFalse(defaults.hasResendWebhook)
 
         assertFailsWith<ConfigurationException> {
@@ -60,11 +61,12 @@ class SettingsLoaderTest {
         }
 
         val secret = "whsec_" + java.util.Base64.getEncoder().encodeToString(ByteArray(32) { it.toByte() })
-        val configured = loader(
-            "API_PORT" to "8080",
-            "MONGODB_DATABASE" to "c",
-            "RESEND_WEBHOOK_SECRET" to secret,
-        ).load()
+        val configured =
+            loader(
+                "API_PORT" to "8080",
+                "MONGODB_DATABASE" to "c",
+                "RESEND_WEBHOOK_SECRET" to secret,
+            ).load()
         assertTrue(configured.hasResendWebhook)
         assertFalse(configured.toString().contains(secret))
     }

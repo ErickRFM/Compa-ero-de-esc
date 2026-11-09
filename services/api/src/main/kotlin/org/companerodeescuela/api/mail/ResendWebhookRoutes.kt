@@ -55,20 +55,19 @@ internal fun Route.resendWebhookRoutes(
                 val root = Json.parseToJsonElement(rawBody.toString(Charsets.UTF_8)).jsonObject
                 val data = root["data"]?.jsonObject ?: error("Missing data")
                 val type = root["type"]?.jsonPrimitive?.contentOrNull ?: error("Missing event type")
-                val createdAt = root["created_at"]?.jsonPrimitive?.contentOrNull?.let(Instant::parse)
-                    ?: error("Missing event timestamp")
+                val createdAt =
+                    root["created_at"]?.jsonPrimitive?.contentOrNull?.let(Instant::parse)
+                        ?: error("Missing event timestamp")
                 val emailId = data["email_id"]?.jsonPrimitive?.contentOrNull
                 if (type.startsWith("email.") && emailId.isNullOrBlank()) error("Missing provider email ID")
-                val invitationId =
-                    data["tags"]?.jsonObject
-                        ?.get("invitation_id")
-                        ?.jsonPrimitive
-                        ?.contentOrNull
-                        ?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{43}")) }
+                val tags = data["tags"]?.jsonObject
+                val rawInvitationId = tags?.get("invitation_id")?.jsonPrimitive?.contentOrNull
+                val invitationId = rawInvitationId?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{43}")) }
                 VerifiedResendWebhookEvent(
                     messageId = requireNotNull(messageId),
-                    type = type.takeIf { it.matches(Regex("[a-z]+\\.[a-z_]{1,48}")) }
-                        ?: error("Invalid event type"),
+                    type =
+                        type.takeIf { it.matches(Regex("[a-z]+\\.[a-z_]{1,48}")) }
+                            ?: error("Invalid event type"),
                     emailId = emailId?.takeIf { it.length <= 128 },
                     invitationId = invitationId,
                     createdAt = createdAt,

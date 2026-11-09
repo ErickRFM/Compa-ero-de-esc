@@ -45,7 +45,7 @@ internal data class InstitutionProvisionPreparation(
     val payloadDigest: String,
 )
 
-internal fun Route.institutionOwnerProvisionRoutes(
+internal internal fun Route.institutionOwnerProvisionRoutes(
     settings: ApiSettings,
     identity: IdentityProvider,
     sessions: RefreshSessionRepository,

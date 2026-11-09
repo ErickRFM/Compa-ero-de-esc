@@ -34,8 +34,8 @@ import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.ApproveStaffRequest
 import org.companerodeescuela.shared.contracts.ApproveStudentAffiliationRequest
 import org.companerodeescuela.shared.contracts.TeacherApplicationRequest
-import java.util.UUID
 import org.companerodeescuela.shared.contracts.TutorApplicationRequest
+import java.util.UUID
 
 internal fun Route.accountAdministrationRoutes(
     settings: ApiSettings,
@@ -97,7 +97,7 @@ internal fun Route.accountAdministrationRoutes(
             post {
                 val actor = call.actor(true)
                 val request = call.administrationRequest(TutorApplicationRequest.serializer())
-                val operationId = call.requestId() ?: UUID.randomUUID().toString() ?: UUID.randomUUID().toString()
+                val operationId = call.requestId() ?: UUID.randomUUID().toString()
                 recordAudit(actor.id, "STAFF_APPLICATION_TUTOR", "STAFF_APPLICATION", actor.id, operationId, "STARTED")
                 val result = service.requestTutor(actor, request)
                 recordAudit(actor.id, "STAFF_APPLICATION_TUTOR", "STAFF_APPLICATION", actor.id, operationId, "SUCCEEDED")

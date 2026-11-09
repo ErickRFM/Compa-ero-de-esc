@@ -266,6 +266,46 @@ class SettingsLoaderTest {
     }
 
     @Test
+    @DisplayName("Production invitation dispatch is disabled by default and requires every dependency")
+    fun productionInvitationGateIsExplicitAndFailClosed() {
+        val local = loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c").load()
+        assertFalse(local.productionInvitationsEnabled)
+
+        assertFailsWith<ConfigurationException> {
+            loader(
+                "API_PORT" to "8080",
+                "MONGODB_DATABASE" to "c",
+                "PRODUCTION_INVITATIONS_ENABLED" to "true",
+            ).load()
+        }
+
+        val jwt = "j".repeat(40)
+        val mfa = "A".repeat(43)
+        val common = listOf(
+            "APP_ENV" to "production",
+            "API_PORT" to "8080",
+            "MONGODB_DATABASE" to "companero_prod",
+            "MONGODB_URI" to "mongodb://localhost:27017",
+            "JWT_SECRET" to jwt,
+            "MFA_ENCRYPTION_KEY" to mfa,
+            "PRODUCTION_INVITATIONS_ENABLED" to "true",
+        )
+        assertFailsWith<ConfigurationException> {
+            loader(*common.toTypedArray()).load()
+        }
+
+        val enabled = loader(
+            *(common + listOf(
+                "VERIFICATION_EMAIL_API_KEY" to "r".repeat(32),
+                "VERIFICATION_EMAIL_SENDER" to "noreply@example.com",
+            )).toTypedArray(),
+        ).load()
+        assertTrue(enabled.productionInvitationsEnabled)
+        assertTrue(enabled.hasVerificationEmail)
+        assertTrue(enabled.toString().contains("productionInvitationsEnabled=true"))
+    }
+
+    @Test
     @DisplayName("JWT and attendance QR signing secrets cannot be reused")
     fun rejectsReusedJwtAndAttendanceQrSecret() {
         val secret = "same-secret-".padEnd(40, 'x')

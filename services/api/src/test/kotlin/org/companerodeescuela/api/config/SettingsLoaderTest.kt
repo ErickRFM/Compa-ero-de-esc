@@ -268,7 +268,8 @@ class SettingsLoaderTest {
     @Test
     @DisplayName("Resend webhook secret is validated and redacted")
     fun resendWebhookSecretIsValidatedAndRedacted() {
-        val defaults = loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c").load()
+        val defaults =
+            loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c").load()
         assertFalse(defaults.hasResendWebhook)
 
         assertFailsWith<ConfigurationException> {
@@ -289,11 +290,12 @@ class SettingsLoaderTest {
         }
 
         val secret = "whsec_" + encoder.encodeToString(ByteArray(32) { it.toByte() })
-        val configured = loader(
-            "API_PORT" to "8080",
-            "MONGODB_DATABASE" to "c",
-            "RESEND_WEBHOOK_SECRET" to secret,
-        ).load()
+        val configured =
+            loader(
+                "API_PORT" to "8080",
+                "MONGODB_DATABASE" to "c",
+                "RESEND_WEBHOOK_SECRET" to secret,
+            ).load()
         assertTrue(configured.hasResendWebhook)
         assertFalse(configured.toString().contains(secret))
     }
@@ -315,8 +317,8 @@ class SettingsLoaderTest {
 
         val jwt = "j".repeat(40)
         val mfa = "A".repeat(43)
-        val webhookSecret =
-            "whsec_" + java.util.Base64.getEncoder().encodeToString(ByteArray(32) { it.toByte() })
+        val webhookEncoder = java.util.Base64.getEncoder()
+        val webhookSecret = "whsec_" + webhookEncoder.encodeToString(ByteArray(32) { it.toByte() })
         val common =
             listOf(
                 "APP_ENV" to "production",

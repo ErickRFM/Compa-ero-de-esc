@@ -69,6 +69,8 @@ data class ApiSettings(
     val currentUserCacheTtlMillis: Int = 0,
     val verificationEmailApiKey: CharArray? = null,
     val verificationEmailSender: String? = null,
+    /** Svix signing secret for Resend webhooks; never logged or returned. */
+    val resendWebhookSecret: CharArray? = null,
     val mfaEncryptionKey: ByteArray? = null,
     /** Separate AES-256 key for institutional HMAC credential encryption at rest. */
     val institutionIntegrationEncryptionKey: ByteArray? = null,
@@ -83,6 +85,7 @@ data class ApiSettings(
     }
 
     val hasVerificationEmail: Boolean get() = verificationEmailApiKey != null && verificationEmailSender != null
+    val hasResendWebhook: Boolean get() = resendWebhookSecret != null
     val hasFirebasePush: Boolean get() = firebaseServiceAccountJson != null
 
     val hasAuthentication: Boolean
@@ -123,6 +126,7 @@ data class ApiSettings(
             attendanceQrNonceReuseThreshold == other.attendanceQrNonceReuseThreshold &&
             hasVerificationEmail == other.hasVerificationEmail &&
             verificationEmailSender == other.verificationEmailSender &&
+            hasResendWebhook == other.hasResendWebhook &&
             (mfaEncryptionKey != null) == (other.mfaEncryptionKey != null) &&
             (institutionIntegrationEncryptionKey != null) == (other.institutionIntegrationEncryptionKey != null) &&
             hasFirebasePush == other.hasFirebasePush
@@ -155,6 +159,7 @@ data class ApiSettings(
         result = 31 * result + attendanceQrNonceReuseThreshold
         result = 31 * result + hasVerificationEmail.hashCode()
         result = 31 * result + (verificationEmailSender?.hashCode() ?: 0)
+        result = 31 * result + hasResendWebhook.hashCode()
         result = 31 * result + (mfaEncryptionKey != null).hashCode()
         result = 31 * result + (institutionIntegrationEncryptionKey != null).hashCode()
         result = 31 * result + hasFirebasePush.hashCode()
@@ -185,6 +190,7 @@ data class ApiSettings(
             "lateSyncReviewWindowSeconds=$lateSyncReviewWindowSeconds, " +
             "attendanceQrNonceReuseThreshold=$attendanceQrNonceReuseThreshold, " +
             "verificationEmailConfigured=$hasVerificationEmail, " +
+            "resendWebhookConfigured=$hasResendWebhook, " +
             "mfaEncryptionConfigured=${mfaEncryptionKey != null}, " +
             "institutionIntegrationEncryptionConfigured=${institutionIntegrationEncryptionKey != null}, " +
             "firebasePushConfigured=$hasFirebasePush, " +
@@ -349,6 +355,15 @@ class SettingsLoader(
             )
         }
 
+        val resendWebhookSecret =
+            env("RESEND_WEBHOOK_SECRET")?.trim()?.takeIf { it.isNotEmpty() }?.also { secret ->
+                val encoded = secret.removePrefix("whsec_")
+                val decoded = runCatching { Base64.getDecoder().decode(encoded) }.getOrNull()
+                if (!secret.startsWith("whsec_") || decoded?.size != 32) {
+                    throw ConfigurationException("RESEND_WEBHOOK_SECRET must be a Resend whsec_ secret containing 32 bytes")
+                }
+            }
+
         val verificationEmailKey = env("VERIFICATION_EMAIL_API_KEY")?.takeIf { it.isNotBlank() }
         val verificationEmailSender = env("VERIFICATION_EMAIL_SENDER")?.trim()?.takeIf { it.isNotEmpty() }
         if ((verificationEmailKey == null) !=
@@ -501,6 +516,7 @@ class SettingsLoader(
             currentUserCacheTtlMillis = currentUserCacheTtlMillis,
             verificationEmailApiKey = verificationEmailKey?.toCharArray(),
             verificationEmailSender = verificationEmailSender,
+            resendWebhookSecret = resendWebhookSecret?.toCharArray(),
             mfaEncryptionKey = mfaKey,
             institutionIntegrationEncryptionKey = institutionIntegrationKey,
             firebaseServiceAccountJson = firebaseJson?.toCharArray(),

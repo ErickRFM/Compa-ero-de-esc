@@ -144,6 +144,27 @@ internal class MongoInvitationOutbox(
         } catch (_: com.mongodb.MongoCommandException) {
             // Index already exists; safe to ignore
         }
+        // One-time compatibility migration: encrypt legacy plaintext retry tokens before workers read them.
+        collection.find(Filters.exists("tokenValue")).collect { legacy ->
+            val token = legacy.getString("tokenValue") ?: ""
+            if (token.isNotEmpty()) {
+                require(token.length in 20..64) { "Legacy invitation retry token has an invalid length" }
+                val id = legacy.getString("_id") ?: throw IllegalStateException("Legacy invitation outbox entry has no ID")
+                val encrypted = cipher.encrypt(id, "platform-invitation-outbox", token.toByteArray(Charsets.UTF_8))
+                collection.updateOne(
+                    Filters.and(Filters.eq("_id", id), Filters.exists("tokenValue")),
+                    Updates.combine(
+                        Updates.set("tokenCiphertext", encrypted),
+                        Updates.unset("tokenValue"),
+                    ),
+                )
+            } else {
+                collection.updateOne(
+                    Filters.eq("_id", legacy.getString("_id")),
+                    Updates.unset("tokenValue"),
+                )
+            }
+        }
         indexesReady = true
     }
 

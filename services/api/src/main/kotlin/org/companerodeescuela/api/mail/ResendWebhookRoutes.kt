@@ -9,6 +9,7 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -61,15 +62,7 @@ internal fun Route.resendWebhookRoutes(
                         ?: error("Missing event timestamp")
                 val emailId = data["email_id"]?.jsonPrimitive?.contentOrNull
                 if (type.startsWith("email.") && emailId.isNullOrBlank()) error("Missing provider email ID")
-                val rawInvitationId =
-                    data["tags"]?.jsonArray?.firstNotNullOfOrNull { tag ->
-                        val fields = tag.jsonObject
-                        if (fields["name"]?.jsonPrimitive?.contentOrNull == "invitation_id") {
-                            fields["value"]?.jsonPrimitive?.contentOrNull
-                        } else {
-                            null
-                        }
-                    }
+                val rawInvitationId = extractResendInvitationId(data["tags"])
                 val invitationId = rawInvitationId?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{43}")) }
                 VerifiedResendWebhookEvent(
                     messageId = requireNotNull(messageId),
@@ -94,3 +87,17 @@ internal fun Route.resendWebhookRoutes(
 }
 
 private const val MAX_WEBHOOK_BODY_BYTES = 32 * 1024
+
+
+/** Resend encodes tags as [{ "name": "...", "value": "..." }]. */
+internal fun extractResendInvitationId(tags: JsonElement?): String? =
+    runCatching {
+        tags?.jsonArray?.firstNotNullOfOrNull { tag ->
+            val fields = tag.jsonObject
+            if (fields["name"]?.jsonPrimitive?.contentOrNull == "invitation_id") {
+                fields["value"]?.jsonPrimitive?.contentOrNull
+            } else {
+                null
+            }
+        }
+    }.getOrNull()?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{43}")) }

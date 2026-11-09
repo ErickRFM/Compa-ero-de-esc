@@ -153,7 +153,30 @@ internal class MongoInvitationOutbox(
         } catch (_: com.mongodb.MongoCommandException) {
             // Index already exists; safe to ignore
         }
-        // One-time compatibility migration: encrypt legacy plaintext retry tokens before workers read them.
+        // One-time compatibility migrations encrypt legacy recipient addresses and retry tokens.
+        collection.find(Filters.exists("recipient")).collect { legacy ->
+            val id = legacy.getString("_id") ?: throw IllegalStateException("Legacy invitation outbox entry has no ID")
+            val recipient = legacy.getString("recipient") ?: ""
+            if (recipient.isNotEmpty()) {
+                val encrypted = cipher.encrypt(
+                    id,
+                    "platform-invitation-outbox-recipient",
+                    recipient.toByteArray(Charsets.UTF_8),
+                )
+                collection.updateOne(
+                    Filters.and(Filters.eq("_id", id), Filters.exists("recipient")),
+                    Updates.combine(
+                        Updates.set("recipientCiphertext", encrypted),
+                        Updates.unset("recipient"),
+                    ),
+                )
+            } else {
+                collection.updateOne(
+                    Filters.eq("_id", id),
+                    Updates.unset("recipient"),
+                )
+            }
+        }
         collection.find(Filters.exists("tokenValue")).collect { legacy ->
             val token = legacy.getString("tokenValue") ?: ""
             if (token.isNotEmpty()) {
@@ -182,8 +205,8 @@ internal class MongoInvitationOutbox(
         return try {
             collection.insertOne(entry.toDocument())
             true
-        } catch (_: com.mongodb.MongoWriteException) {
-            false
+        } catch (error: com.mongodb.MongoWriteException) {
+            if (error.error.code == 11000) false else throw error
         }
     }
 
@@ -272,8 +295,14 @@ internal class MongoInvitationOutbox(
                     tokenValue.toByteArray(Charsets.UTF_8),
                 )
             }
+        val encryptedRecipient =
+            cipher.encrypt(
+                invitationId,
+                "platform-invitation-outbox-recipient",
+                recipient.toByteArray(Charsets.UTF_8),
+            )
         return Document("_id", invitationId)
-            .append("recipient", recipient)
+            .append("recipientCiphertext", encryptedRecipient)
             .append("tokenCiphertext", encryptedToken)
             .append("expiresAt", Date.from(expiresAt))
             .append("attempts", attempts)
@@ -284,6 +313,11 @@ internal class MongoInvitationOutbox(
 
     private fun Document.toOutboxEntry(): OutboxEntry? {
         return try {
+            val recipientCiphertext = getString("recipientCiphertext") ?: return null
+            val recipient =
+                cipher
+                    .decrypt(getString("_id"), "platform-invitation-outbox-recipient", recipientCiphertext)
+                    .toString(Charsets.UTF_8)
             val ciphertext = getString("tokenCiphertext") ?: return null
             val value =
                 if (ciphertext.isEmpty()) {
@@ -295,7 +329,7 @@ internal class MongoInvitationOutbox(
                 }
             OutboxEntry(
                 invitationId = getString("_id"),
-                recipient = getString("recipient"),
+                recipient = recipient,
                 tokenValue = value,
                 expiresAt = getDate("expiresAt").toInstant(),
                 attempts = getInteger("attempts", 0),

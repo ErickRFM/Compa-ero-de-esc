@@ -13,32 +13,32 @@ class PlatformAuditLogTest {
     @DisplayName("Audit lifecycle events are distinct and duplicate writes are idempotent")
     fun lifecycleEventsAreDistinctAndIdempotent() =
         runBlocking {
-        val log = InMemoryPlatformAuditLog()
-        val createdAt = Instant.parse("2026-11-09T22:00:00Z")
-        val started =
-            PlatformAuditEvent.create(
-            actorId = "account-123",
-            action = "INVITATION_DISPATCH",
-            resourceType = "INVITATION_OPERATION",
-            resourceId = "operation-123",
-            operationId = "operation-123",
-            outcome = "STARTED",
-            createdAt = createdAt,
-        )
-        val completed =
-            PlatformAuditEvent.create(
-            actorId = "account-123",
-            action = "INVITATION_DISPATCH",
-            resourceType = "INVITATION_OPERATION",
-            resourceId = "operation-123",
-            operationId = "operation-123",
-            outcome = "SUCCEEDED",
-            createdAt = createdAt,
-        )
+            val log = InMemoryPlatformAuditLog()
+            val createdAt = Instant.parse("2026-11-09T22:00:00Z")
+            val started =
+                PlatformAuditEvent.create(
+                    actorId = "account-123",
+                    action = "INVITATION_DISPATCH",
+                    resourceType = "INVITATION_OPERATION",
+                    resourceId = "operation-123",
+                    operationId = "operation-123",
+                    outcome = "STARTED",
+                    createdAt = createdAt,
+                )
+            val completed =
+                PlatformAuditEvent.create(
+                    actorId = "account-123",
+                    action = "INVITATION_DISPATCH",
+                    resourceType = "INVITATION_OPERATION",
+                    resourceId = "operation-123",
+                    operationId = "operation-123",
+                    outcome = "SUCCEEDED",
+                    createdAt = createdAt,
+                )
 
-        assertNotEquals(started.id, completed.id)
-        assertTrue(log.record(started))
-        assertTrue(log.record(completed))
-        assertFalse(log.record(started))
-    }
+            assertNotEquals(started.id, completed.id)
+            assertTrue(log.record(started))
+            assertTrue(log.record(completed))
+            assertFalse(log.record(started))
+        }
 }

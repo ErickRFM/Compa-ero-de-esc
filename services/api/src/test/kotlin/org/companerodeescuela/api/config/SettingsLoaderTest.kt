@@ -284,14 +284,14 @@ class SettingsLoaderTest {
         val mfa = "A".repeat(43)
         val common =
             listOf(
-            "APP_ENV" to "production",
-            "API_PORT" to "8080",
-            "MONGODB_DATABASE" to "companero_prod",
-            "MONGODB_URI" to "mongodb://localhost:27017",
-            "JWT_SECRET" to jwt,
-            "MFA_ENCRYPTION_KEY" to mfa,
-            "PRODUCTION_INVITATIONS_ENABLED" to "true",
-        )
+                "APP_ENV" to "production",
+                "API_PORT" to "8080",
+                "MONGODB_DATABASE" to "companero_prod",
+                "MONGODB_URI" to "mongodb://localhost:27017",
+                "JWT_SECRET" to jwt,
+                "MFA_ENCRYPTION_KEY" to mfa,
+                "PRODUCTION_INVITATIONS_ENABLED" to "true",
+            )
         assertFailsWith<ConfigurationException> {
             loader(*common.toTypedArray()).load()
         }

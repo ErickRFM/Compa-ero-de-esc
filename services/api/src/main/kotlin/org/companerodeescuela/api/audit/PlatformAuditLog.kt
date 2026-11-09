@@ -8,7 +8,6 @@ import org.bson.Document
 import java.security.MessageDigest
 import java.time.Instant
 import java.util.Date
-import java.util.UUID
 
 internal data class PlatformAuditEvent(
     val id: String,
@@ -81,15 +80,16 @@ internal class MongoPlatformAuditLog(
 
     override suspend fun record(event: PlatformAuditEvent): Boolean {
         ensureIndexes()
-        val document = Document("_id", event.id)
-            .append("source", "PLATFORM_ADMIN")
-            .append("actorId", event.actorId)
-            .append("action", event.action)
-            .append("resourceType", event.resourceType)
-            .append("resourceId", event.resourceId)
-            .append("operationId", event.operationId)
-            .append("outcome", event.outcome)
-            .append("createdAt", Date.from(event.createdAt))
+        val document =
+            Document("_id", event.id)
+                .append("source", "PLATFORM_ADMIN")
+                .append("actorId", event.actorId)
+                .append("action", event.action)
+                .append("resourceType", event.resourceType)
+                .append("resourceId", event.resourceId)
+                .append("operationId", event.operationId)
+                .append("outcome", event.outcome)
+                .append("createdAt", Date.from(event.createdAt))
         return try {
             events.insertOne(document)
             true

@@ -24,11 +24,16 @@ Create one webhook for the QA endpoint and a separate webhook for production. Su
 - `email.suppressed`
 - `email.complained`
 
-The endpoint URL is the corresponding Render service's public base URL plus `/webhooks/resend`. Do not point QA events at production or share QA and production signing secrets.
+Use these confirmed Render endpoints:
+
+- QA: `https://companero-qa-univ-v25.onrender.com/webhooks/resend`
+- Production: `https://compa-ero-de-esc.onrender.com/webhooks/resend`
+
+Do not point QA events at production or share QA and production signing secrets.
 
 Copy the `signing_secret` returned by Resend (prefix `whsec_`) into the matching Render service as `RESEND_WEBHOOK_SECRET`. The application validates that it decodes to 32 bytes and never prints it. Restart/redeploy the service after setting the variable.
 
-There are currently no Resend webhooks configured for this account; create QA and production webhooks only after their respective Render public URLs are confirmed.
+There are currently no Resend webhooks configured for the connected account. Both Render public URLs are now confirmed. Create the QA webhook after the QA code is deployed; create the production webhook only after the production route is deployed.
 
 ## Event correlation and persistence
 

@@ -23,7 +23,6 @@ import io.ktor.server.routing.route
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -73,25 +72,28 @@ private class MongoMaticaLinkRepository(
     private val links: MongoCollection<Document> = database.getCollection("matica_progress_links")
     private val usedCodes: MongoCollection<Document> = database.getCollection("matica_progress_link_codes")
 
-    init {
-        runBlocking {
-            links.createIndex(
-                Indexes.ascending("companionUserId"),
-                IndexOptions().unique(true).name("ux_maticaprogress_companion"),
-            )
-            links.createIndex(
-                Indexes.ascending("maticaUserId"),
-                IndexOptions().unique(true).name("ux_maticaprogress_matica"),
-            )
-            usedCodes.createIndex(
-                Indexes.ascending("nonce"),
-                IndexOptions().unique(true).name("ux_maticaprogress_nonce"),
-            )
-            usedCodes.createIndex(
-                Indexes.ascending("expiresAt"),
-                IndexOptions().expireAfter(0, TimeUnit.SECONDS).name("ttl_maticaprogress_codes"),
-            )
-        }
+    @Volatile
+    private var indexesReady = false
+
+    private suspend fun ensureIndexes() {
+        if (indexesReady) return
+        links.createIndex(
+            Indexes.ascending("companionUserId"),
+            IndexOptions().unique(true).name("ux_maticaprogress_companion"),
+        )
+        links.createIndex(
+            Indexes.ascending("maticaUserId"),
+            IndexOptions().unique(true).name("ux_maticaprogress_matica"),
+        )
+        usedCodes.createIndex(
+            Indexes.ascending("nonce"),
+            IndexOptions().unique(true).name("ux_maticaprogress_nonce"),
+        )
+        usedCodes.createIndex(
+            Indexes.ascending("expiresAt"),
+            IndexOptions().expireAfter(0, TimeUnit.SECONDS).name("ttl_maticaprogress_codes"),
+        )
+        indexesReady = true
     }
 
     override suspend fun consumeAndLink(
@@ -100,6 +102,7 @@ private class MongoMaticaLinkRepository(
         nonce: String,
         expiresAt: Instant,
     ): Boolean {
+        ensureIndexes()
         try {
             usedCodes.insertOne(
                 Document("nonce", nonce)
@@ -125,15 +128,18 @@ private class MongoMaticaLinkRepository(
         }
     }
 
-    override suspend fun find(companionUserId: String): MaticaLinkRecord? =
-        links.find(eq("companionUserId", companionUserId)).firstOrNull()?.let { document ->
+    override suspend fun find(companionUserId: String): MaticaLinkRecord? {
+        ensureIndexes()
+        return links.find(eq("companionUserId", companionUserId)).firstOrNull()?.let { document ->
             MaticaLinkRecord(
                 companionUserId = document.getString("companionUserId"),
                 maticaUserId = document.getString("maticaUserId"),
             )
         }
+    }
 
     override suspend fun unlink(companionUserId: String) {
+        ensureIndexes()
         links.deleteOne(eq("companionUserId", companionUserId))
     }
 }

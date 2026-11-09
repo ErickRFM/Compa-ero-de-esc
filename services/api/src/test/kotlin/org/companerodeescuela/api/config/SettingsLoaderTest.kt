@@ -296,12 +296,13 @@ class SettingsLoaderTest {
         }
 
         val secret = "matica-secret-".padEnd(40, 'x')
-        val configured = loader(
-            "API_PORT" to "8080",
-            "MONGODB_DATABASE" to "c",
-            "MATICA_COMPANION_INTEGRATION_SECRET" to secret,
-            "MATICA_API_BASE_URL" to "https://matica.example.com",
-        ).load()
+        val configured =
+            loader(
+                "API_PORT" to "8080",
+                "MONGODB_DATABASE" to "c",
+                "MATICA_COMPANION_INTEGRATION_SECRET" to secret,
+                "MATICA_API_BASE_URL" to "https://matica.example.com",
+            ).load()
         assertTrue(configured.hasMaticaIntegration)
         assertEquals(secret, configured.maticaCompanionIntegrationSecret?.concatToString())
         assertFalse(configured.toString().contains(secret))

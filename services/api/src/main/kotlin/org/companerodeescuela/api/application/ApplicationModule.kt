@@ -457,8 +457,8 @@ fun Application.module(
             InMemoryInvitationRepository()
         }
     val invitationOutbox =
-        if (settings.hasAuthentication && settings.mongo.isConfigured) {
-            MongoInvitationOutbox(mongoConnection.database(), MfaSecretCipher(requireNotNull(settings.mfaEncryptionKey)))
+        if (settings.hasAuthentication && settings.mongo.isConfigured && settings.mfaEncryptionKey != null) {
+            MongoInvitationOutbox(mongoConnection.database(), MfaSecretCipher(settings.mfaEncryptionKey))
         } else {
             InMemoryInvitationOutbox()
         }

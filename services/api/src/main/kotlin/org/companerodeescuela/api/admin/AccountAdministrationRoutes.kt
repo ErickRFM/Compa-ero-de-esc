@@ -30,13 +30,14 @@ import org.companerodeescuela.api.integrations.identity.IdentityProvider
 import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.api.security.NativeActorResolver
 import org.companerodeescuela.shared.contracts.AccountLifecycleRequest
+import java.util.UUID
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.ApproveStaffRequest
 import org.companerodeescuela.shared.contracts.ApproveStudentAffiliationRequest
 import org.companerodeescuela.shared.contracts.TeacherApplicationRequest
 import org.companerodeescuela.shared.contracts.TutorApplicationRequest
 
-fun Route.accountAdministrationRoutes(
+internal fun Route.accountAdministrationRoutes(
     settings: ApiSettings,
     identity: IdentityProvider,
     sessions: RefreshSessionRepository,
@@ -96,7 +97,7 @@ fun Route.accountAdministrationRoutes(
             post {
                 val actor = call.actor(true)
                 val request = call.administrationRequest(TutorApplicationRequest.serializer())
-                val operationId = call.requestId()
+                val operationId = call.requestId() ?: UUID.randomUUID().toString()
                 recordAudit(actor.id, "STAFF_APPLICATION_TUTOR", "STAFF_APPLICATION", actor.id, operationId, "STARTED")
                 val result = service.requestTutor(actor, request)
                 recordAudit(actor.id, "STAFF_APPLICATION_TUTOR", "STAFF_APPLICATION", actor.id, operationId, "SUCCEEDED")

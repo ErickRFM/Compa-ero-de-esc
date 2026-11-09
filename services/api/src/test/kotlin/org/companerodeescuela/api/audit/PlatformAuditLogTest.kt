@@ -11,10 +11,12 @@ import kotlin.test.assertTrue
 class PlatformAuditLogTest {
     @Test
     @DisplayName("Audit lifecycle events are distinct and duplicate writes are idempotent")
-    fun lifecycleEventsAreDistinctAndIdempotent() = runBlocking {
+    fun lifecycleEventsAreDistinctAndIdempotent() =
+        runBlocking {
         val log = InMemoryPlatformAuditLog()
         val createdAt = Instant.parse("2026-11-09T22:00:00Z")
-        val started = PlatformAuditEvent.create(
+        val started =
+            PlatformAuditEvent.create(
             actorId = "account-123",
             action = "INVITATION_DISPATCH",
             resourceType = "INVITATION_OPERATION",
@@ -23,7 +25,8 @@ class PlatformAuditLogTest {
             outcome = "STARTED",
             createdAt = createdAt,
         )
-        val completed = PlatformAuditEvent.create(
+        val completed =
+            PlatformAuditEvent.create(
             actorId = "account-123",
             action = "INVITATION_DISPATCH",
             resourceType = "INVITATION_OPERATION",

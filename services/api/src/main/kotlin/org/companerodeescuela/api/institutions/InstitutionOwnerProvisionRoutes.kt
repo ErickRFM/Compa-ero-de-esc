@@ -124,6 +124,7 @@ internal fun Route.institutionOwnerProvisionRoutes(
                 }
                 val body = call.boundedBody(InstitutionProvisionBody.serializer(), AUTH_BODY_MAX_BYTES)
                 val proof = body.proof ?: throw ApiException.Forbidden("Scoped MFA proof is required")
+                service.prepare(actor, body.command())
                 recordAudit(
                     actor.id,
                     "INSTITUTION_CREATE",

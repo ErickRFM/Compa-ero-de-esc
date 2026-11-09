@@ -64,8 +64,12 @@ internal fun Route.invitationRoutes(
     // Production invitations remain disabled unless explicitly opted in with all required dependencies.
     val productionBlocked =
         settings.environment == Environment.PRODUCTION &&
-            (!settings.productionInvitationsEnabled || !settings.mongo.isConfigured || !settings.hasVerificationEmail ||
-                settings.mfaEncryptionKey == null)
+            (
+                !settings.productionInvitationsEnabled ||
+                    !settings.mongo.isConfigured ||
+                    !settings.hasVerificationEmail ||
+                    settings.mfaEncryptionKey == null
+            )
     if (!settings.hasAuthentication || productionBlocked) return
     val resolver = NativeActorResolver(accounts, sessions, AuthTokenService(settings), identity)
     val issuerLimiter = LoginAttemptLimiter(maxAttempts = 5, store = rateLimitStore)

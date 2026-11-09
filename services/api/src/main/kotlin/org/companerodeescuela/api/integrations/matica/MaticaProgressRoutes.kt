@@ -311,9 +311,9 @@ fun Route.maticaProgressRoutes(
             get("/progress") {
                 call.response.header(HttpHeaders.CacheControl, "no-store")
                 val actor = resolveStudent(call.principal<JWTPrincipal>()?.payload, resolver)
-                val active =
-                    service
-                        ?: throw ApiException.DependencyUnavailable("La conexión con Mática aún no está configurada")
+                // An unconfigured optional integration is equivalent to no link for Home:
+                // keep the code-entry flow available while POST /link remains fail-closed.
+                val active = service ?: throw ApiException.NotFound("Mática todavía no está vinculada")
                 val summary =
                     active.progress(actor.id, Instant.now())
                         ?: throw ApiException.NotFound("Mática todavía no está vinculada")

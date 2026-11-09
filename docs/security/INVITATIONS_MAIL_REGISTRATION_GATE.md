@@ -23,9 +23,13 @@ La operación de envío incorpora `proof`; no incluir nunca contraseñas, OTP o 
 
 ## Bloqueos antes de activar envíos
 
-- [ ] Implementar en Android Gestión la pantalla para emitir invitaciones con MFA y en Académica/Gestión la pantalla para aceptarlas usando ID + código; acompañarla de pruebas instrumentadas
-- [ ] Completar un outbox durable para recuperar fallos entre la escritura Mongo y el envío; un proceso interrumpido puede dejar un correo no procesado o una invitación sin mensaje
-- [ ] Hacer rate limiting compartido entre réplicas, auditoría persistente de emisor/operación y redacción de secretos en trazas
+- [x] Rutas desactivadas en producción por política (`settings.environment == Environment.PRODUCTION`), no por omisión accidental.
+- [x] Android Gestión emite invitaciones con MFA (ID + código) y Académica/Gestión las aceptan; prueba instrumentada de aceptación en CI.
+- [x] Contratos de invitación unificados (`shared/contracts/RegistrationInvitationContracts.kt`) sin duplicados entre API y Android; la aceptación vive en `InvitationAcceptanceService` y la ruta reutiliza el mismo contrato cableado.
+- [x] Rate limiting compartido entre réplicas (`MongoRateLimitStore`) para emisor y aceptación; revocación y reintento de invitaciones en `/admin/invitations`.
+- [ ] Outbox durable para recuperar fallos entre la escritura Mongo y el envío; un proceso interrumpido puede dejar un correo no procesado o una invitación sin mensaje
+- [ ] Webhook firmado de Resend para acreditar DELIVERED y rebotes (la aceptación del proveedor NO acredita entrega)
+- [ ] Auditoría persistente de emisor/operación y redacción de secretos en trazas
 - [ ] Verificar aislamiento de QA, institución habilitada, entrega real desde Resend y control de permisos por carrera
 - [ ] Ejecutar CI Android/API verde y casos de revocación, replay, expiración, concurrency y cuenta suspendida
 - [ ] Completar #280 y, para SUPER_ADMIN, #281: una invitación no sustituye autorización del titular, MFA ni bootstrap independiente

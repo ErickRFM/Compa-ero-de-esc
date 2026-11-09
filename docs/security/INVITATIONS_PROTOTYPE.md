@@ -1,6 +1,6 @@
 # Invitaciones: núcleo experimental
 
-Este código es un prototipo interno: no está conectado a rutas, envío de correo, registro ni interfaz y no concede roles. No lo desplegar como función disponible ni enviar enlaces hasta completar las garantías siguientes.
+Estado actualizado tras la consolidación de #277/#283/#284: el núcleo ya está conectado a rutas desactivadas en producción, al envío de correo de verificación y a la interfaz de Android, pero **nunca concede roles**. Antes de exponer una nueva capacidad, cumplidas las garantías siguientes.
 
 - El adaptador HTTP debe aceptar exclusivamente el código original, calcular su huella en el servidor, autenticar una cuenta nativa y comprobar correo verificado y alcance. Nunca debe devolver la huella ni aceptar como entrada el valor almacenado.
 - El servicio de aceptación aún no está conectado a una ruta. Antes de exponerlo, la ruta debe resolver identidad nativa y sesión vigentes, limitar cuerpo e intentos y cubrir pruebas HTTP. La lectura de cuenta y la aceptación son operaciones separadas: hay que cerrar o manejar la carrera con suspensión, cambio de cuenta o revocación antes de utilizar una aceptación como autoridad.

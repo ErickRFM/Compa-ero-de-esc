@@ -28,11 +28,15 @@ La operación de envío incorpora `proof`; no incluir nunca contraseñas, OTP o 
 - [x] Contratos de invitación unificados (`shared/contracts/RegistrationInvitationContracts.kt`) sin duplicados entre API y Android; la aceptación vive en `InvitationAcceptanceService` y la ruta reutiliza el mismo contrato cableado.
 - [x] Rate limiting compartido entre réplicas (`MongoRateLimitStore`) para emisor y aceptación; revocación y reintento de invitaciones en `/admin/invitations`.
 - [ ] Outbox durable para recuperar fallos entre la escritura Mongo y el envío; un proceso interrumpido puede dejar un correo no procesado o una invitación sin mensaje
-- [ ] Webhook firmado de Resend para acreditar DELIVERED y rebotes (la aceptación del proveedor NO acredita entrega)
-- [ ] Auditoría persistente de emisor/operación y redacción de secretos en trazas
+- [x] Endpoint Svix firmado, ventana anti-replay, tamaño acotado, tags de correlación y persistencia idempotente de eventos de Resend (`platform_audit_events`)
+- [ ] Configurar webhooks independientes en Resend para QA y producción y probar entrega real; la cuenta consultada todavía no tiene webhooks configurados
+- [ ] Auditoría persistente completa de actor/operación para todas las acciones administrativas (el registro de eventos de correo ya está implementado)
 - [ ] Verificar aislamiento de QA, institución habilitada, entrega real desde Resend y control de permisos por carrera
 - [ ] Ejecutar CI Android/API verde y casos de revocación, replay, expiración, concurrency y cuenta suspendida
 - [ ] Completar #280 y, para SUPER_ADMIN, #281: una invitación no sustituye autorización del titular, MFA ni bootstrap independiente
 - [ ] Activación productiva mediante PR explícito posterior y certificación autenticada
 
 Este bloque es una base de implementación, no autorización de enviar el correo de acceso todavía.
+
+
+La implementación del webhook y su procedimiento de activación están descritos en `docs/operations/RESEND_WEBHOOK_SETUP.md`. El código no habilita ni crea webhooks remotos automáticamente; se requiere configurar el endpoint y secreto por ambiente.

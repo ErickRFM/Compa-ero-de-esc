@@ -134,11 +134,12 @@ internal class InMemoryInvitationOutbox(
     override suspend fun clearToken(id: String): Boolean =
         mutex.withLock {
             val current = entries[id] ?: return@withLock false
-            entries[id] = current.copy(
-                lastStatus = VerificationDeliveryStatus.ACCEPTED,
-                tokenValue = "",
-                recipient = "",
-            )
+            entries[id] =
+                current.copy(
+                    lastStatus = VerificationDeliveryStatus.ACCEPTED,
+                    tokenValue = "",
+                    recipient = "",
+                )
             true
         }
 }

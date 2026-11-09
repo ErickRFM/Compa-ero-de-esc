@@ -58,14 +58,18 @@ internal class ResendInvitationEmailGateway(
                 put(
                     "tags",
                     buildJsonArray {
-                        add(buildJsonObject {
-                            put("name", "category")
-                            put("value", "companero_invitation")
-                        })
-                        add(buildJsonObject {
-                            put("name", "invitation_id")
-                            put("value", invitationId)
-                        })
+                        add(
+                            buildJsonObject {
+                                put("name", "category")
+                                put("value", "companero_invitation")
+                            },
+                        )
+                        add(
+                            buildJsonObject {
+                                put("name", "invitation_id")
+                                put("value", invitationId)
+                            },
+                        )
                     },
                 )
                 put(

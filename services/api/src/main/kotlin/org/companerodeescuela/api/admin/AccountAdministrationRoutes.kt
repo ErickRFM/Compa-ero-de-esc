@@ -30,11 +30,11 @@ import org.companerodeescuela.api.integrations.identity.IdentityProvider
 import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.api.security.NativeActorResolver
 import org.companerodeescuela.shared.contracts.AccountLifecycleRequest
-import java.util.UUID
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.ApproveStaffRequest
 import org.companerodeescuela.shared.contracts.ApproveStudentAffiliationRequest
 import org.companerodeescuela.shared.contracts.TeacherApplicationRequest
+import java.util.UUID
 import org.companerodeescuela.shared.contracts.TutorApplicationRequest
 
 internal fun Route.accountAdministrationRoutes(
@@ -97,7 +97,7 @@ internal fun Route.accountAdministrationRoutes(
             post {
                 val actor = call.actor(true)
                 val request = call.administrationRequest(TutorApplicationRequest.serializer())
-                val operationId = call.requestId() ?: UUID.randomUUID().toString()
+                val operationId = call.requestId() ?: UUID.randomUUID().toString() ?: UUID.randomUUID().toString()
                 recordAudit(actor.id, "STAFF_APPLICATION_TUTOR", "STAFF_APPLICATION", actor.id, operationId, "STARTED")
                 val result = service.requestTutor(actor, request)
                 recordAudit(actor.id, "STAFF_APPLICATION_TUTOR", "STAFF_APPLICATION", actor.id, operationId, "SUCCEEDED")
@@ -106,7 +106,7 @@ internal fun Route.accountAdministrationRoutes(
             post("/teacher") {
                 val actor = call.actor(true)
                 val request = call.administrationRequest(TeacherApplicationRequest.serializer())
-                val operationId = call.requestId()
+                val operationId = call.requestId() ?: UUID.randomUUID().toString()
                 recordAudit(actor.id, "STAFF_APPLICATION_TEACHER", "STAFF_APPLICATION", actor.id, operationId, "STARTED")
                 val result = service.requestTeacher(actor, request)
                 recordAudit(actor.id, "STAFF_APPLICATION_TEACHER", "STAFF_APPLICATION", actor.id, operationId, "SUCCEEDED")
@@ -123,7 +123,7 @@ internal fun Route.accountAdministrationRoutes(
                 val actor = call.actor(true)
                 val request = call.administrationRequest(ApproveStaffRequest.serializer())
                 val id = call.parameters["accountId"] ?: throw ApiException.Validation("Account is required")
-                val operationId = call.requestId()
+                val operationId = call.requestId() ?: UUID.randomUUID().toString()
                 recordAudit(actor.id, "ACCOUNT_STAFF_APPROVAL", "ACCOUNT", id, operationId, "STARTED")
                 val result = service.approveStaff(actor, id, request)
                 recordAudit(actor.id, "ACCOUNT_STAFF_APPROVAL", "ACCOUNT", id, operationId, "SUCCEEDED")
@@ -133,7 +133,7 @@ internal fun Route.accountAdministrationRoutes(
                 val actor = call.actor(true)
                 val request = call.administrationRequest(ApproveStudentAffiliationRequest.serializer())
                 val id = call.parameters["accountId"] ?: throw ApiException.Validation("Account is required")
-                val operationId = call.requestId()
+                val operationId = call.requestId() ?: UUID.randomUUID().toString()
                 recordAudit(actor.id, "ACCOUNT_STUDENT_AFFILIATION", "ACCOUNT", id, operationId, "STARTED")
                 val result = service.approveStudentAffiliation(actor, id, request)
                 recordAudit(actor.id, "ACCOUNT_STUDENT_AFFILIATION", "ACCOUNT", id, operationId, "SUCCEEDED")
@@ -143,7 +143,7 @@ internal fun Route.accountAdministrationRoutes(
                 val actor = call.actor(true)
                 val request = call.administrationRequest(AccountLifecycleRequest.serializer())
                 val id = call.parameters["accountId"] ?: throw ApiException.Validation("Account is required")
-                val operationId = call.requestId()
+                val operationId = call.requestId() ?: UUID.randomUUID().toString()
                 recordAudit(actor.id, "ACCOUNT_LIFECYCLE", "ACCOUNT", id, operationId, "STARTED")
                 val result = service.lifecycle(actor, id, request)
                 recordAudit(actor.id, "ACCOUNT_LIFECYCLE", "ACCOUNT", id, operationId, "SUCCEEDED")

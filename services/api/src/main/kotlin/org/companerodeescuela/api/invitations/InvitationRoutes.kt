@@ -179,7 +179,7 @@ internal fun Route.invitationRoutes(
                 ) {
                     throw ApiException.Validation("Invitation or proof is invalid")
                 }
-                val auditOperationId = call.requestId() ?: UUID.randomUUID().toString()
+                val auditOperationId = UUID.randomUUID().toString()
                 recordAudit(
                     actor.id,
                     "INVITATION_RETRY",
@@ -214,7 +214,7 @@ internal fun Route.invitationRoutes(
                 if (!Regex("[A-Za-z0-9_-]{1,128}").matches(body.invitationId)) {
                     throw ApiException.Validation("Invitation is invalid")
                 }
-                val auditOperationId = call.requestId() ?: UUID.randomUUID().toString()
+                val auditOperationId = UUID.randomUUID().toString()
                 recordAudit(
                     actor.id,
                     "INVITATION_REVOKE",

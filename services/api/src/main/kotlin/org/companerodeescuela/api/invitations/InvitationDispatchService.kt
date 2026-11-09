@@ -135,8 +135,9 @@ internal class InvitationDispatchService(
         }
         // Persist encrypted retry capability before network I/O so a process crash cannot strand it.
         if (outbox != null) {
-            val queued = authenticationDependency {
-                outbox.enqueue(
+            val queued =
+                authenticationDependency {
+                    outbox.enqueue(
                     OutboxEntry(
                         invitationId = id,
                         recipient = command.recipient,
@@ -241,16 +242,21 @@ internal class InvitationDispatchService(
                 authenticationDependency { queue.markFailed(entry.invitationId, now) }
                 continue
             }
-            val status = try {
-                email.send(entry.recipient, entry.tokenValue, entry.invitationId, entry.expiresAt)
-            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            val status =
+                try {
+                    email.send(entry.recipient, entry.tokenValue, entry.invitationId, entry.expiresAt)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                VerificationDeliveryStatus.UNCONFIRMED
-            }
+                } catch (_: Exception) {
+                    VerificationDeliveryStatus.UNCONFIRMED
+                }
             when (status) {
-                VerificationDeliveryStatus.ACCEPTED -> authenticationDependency { queue.clearToken(entry.invitationId) }
-                VerificationDeliveryStatus.DELIVERED -> authenticationDependency { queue.markDelivered(entry.invitationId, clock.instant()) }
+                VerificationDeliveryStatus.ACCEPTED ->
+                    authenticationDependency { queue.clearToken(entry.invitationId) }
+                VerificationDeliveryStatus.DELIVERED ->
+                    authenticationDependency {
+                        queue.markDelivered(entry.invitationId, clock.instant())
+                    }
                 VerificationDeliveryStatus.FAILED, VerificationDeliveryStatus.UNAVAILABLE -> {
                     authenticationDependency { queue.markFailed(entry.invitationId, clock.instant()) }
                     authenticationDependency { repository.revoke(entry.invitationId, clock.instant()) }

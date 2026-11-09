@@ -342,3 +342,8 @@ Checks de GitHub Actions sobre `43b16c22` (consulta `commits/{sha}/check-runs`):
   - `app-academic-debug.apk` (100.2 MB), `app-management-debug.apk` (100.2 MB), 2026-11-09 11:58.
   - `app-academic-release.apk` (73.1 MB), `app-management-release.apk` (73.1 MB), 2026-11-09 12:02/12:04.
 - Pendiente (no verificado): CI con instrumentación en emulador, despliegue en Render QA, correo real vía Resend e integraciones externas.
+
+
+---
+
+> **Cierre 2026-11-09:** PR #296 fusionado a `main` en `c684d298f3373f4f3dfa7e7f0e21c745eef2dc69`. CI sobre ese SHA: Backend compile/test/smoke, Android compile/test/lint/package y las cuatro instrumentaciones (Académica/Gestión × API 31/35) en success; los reintentos fueron por infraestructura del emulador, no por fallos de pruebas. APKs finales en `dist/apk-20261109/` (debug y test-release minificada firmada con la clave de pruebas interna del repositorio; distribución de producción requiere firma separada).

@@ -266,6 +266,48 @@ class SettingsLoaderTest {
     }
 
     @Test
+    @DisplayName("Mática integration requires a strong server secret and HTTPS origin")
+    fun maticaIntegrationSettingsAreValidatedAndRedacted() {
+        val defaults = loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c").load()
+        assertFalse(defaults.hasMaticaIntegration)
+
+        assertFailsWith<ConfigurationException> {
+            loader(
+                "API_PORT" to "8080",
+                "MONGODB_DATABASE" to "c",
+                "MATICA_COMPANION_INTEGRATION_SECRET" to "s".repeat(40),
+            ).load()
+        }
+        assertFailsWith<ConfigurationException> {
+            loader(
+                "API_PORT" to "8080",
+                "MONGODB_DATABASE" to "c",
+                "MATICA_COMPANION_INTEGRATION_SECRET" to "short",
+                "MATICA_API_BASE_URL" to "https://matica.example.com",
+            ).load()
+        }
+        assertFailsWith<ConfigurationException> {
+            loader(
+                "API_PORT" to "8080",
+                "MONGODB_DATABASE" to "c",
+                "MATICA_COMPANION_INTEGRATION_SECRET" to "s".repeat(40),
+                "MATICA_API_BASE_URL" to "http://matica.example.com",
+            ).load()
+        }
+
+        val secret = "matica-secret-".padEnd(40, 'x')
+        val configured = loader(
+            "API_PORT" to "8080",
+            "MONGODB_DATABASE" to "c",
+            "MATICA_COMPANION_INTEGRATION_SECRET" to secret,
+            "MATICA_API_BASE_URL" to "https://matica.example.com",
+        ).load()
+        assertTrue(configured.hasMaticaIntegration)
+        assertEquals(secret, configured.maticaCompanionIntegrationSecret?.concatToString())
+        assertFalse(configured.toString().contains(secret))
+    }
+
+    @Test
     @DisplayName("JWT and attendance QR signing secrets cannot be reused")
     fun rejectsReusedJwtAndAttendanceQrSecret() {
         val secret = "same-secret-".padEnd(40, 'x')

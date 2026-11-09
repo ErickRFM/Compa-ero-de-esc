@@ -18,13 +18,18 @@ internal data class MaticaLinkClaims(
     val scope: String = "progress:read",
 )
 
-internal class MaticaLinkCodeVerifier(secret: ByteArray) {
+internal class MaticaLinkCodeVerifier(
+    secret: ByteArray,
+) {
     private val key = SecretKeySpec(secret.copyOf(), "HmacSHA256")
     private val encoder = Base64.getUrlEncoder().withoutPadding()
     private val decoder = Base64.getUrlDecoder()
     private val json = Json
 
-    fun verify(code: String, now: Instant): MaticaLinkClaims? {
+    fun verify(
+        code: String,
+        now: Instant,
+    ): MaticaLinkClaims? {
         return try {
             if (code.length !in 32..2048) return null
             val parts = code.split('.')

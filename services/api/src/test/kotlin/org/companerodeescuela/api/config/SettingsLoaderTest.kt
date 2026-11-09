@@ -268,7 +268,8 @@ class SettingsLoaderTest {
     @Test
     @DisplayName("Production invitation dispatch is disabled by default and requires every dependency")
     fun productionInvitationGateIsExplicitAndFailClosed() {
-        val local = loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c").load()
+        val local =
+            loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c").load()
         assertFalse(local.productionInvitationsEnabled)
 
         assertFailsWith<ConfigurationException> {
@@ -294,12 +295,16 @@ class SettingsLoaderTest {
             loader(*common.toTypedArray()).load()
         }
 
-        val enabled = loader(
-            *(common + listOf(
-                "VERIFICATION_EMAIL_API_KEY" to "r".repeat(32),
-                "VERIFICATION_EMAIL_SENDER" to "noreply@example.com",
-            )).toTypedArray(),
-        ).load()
+        val enabled =
+            loader(
+                *(
+                    common +
+                        listOf(
+                            "VERIFICATION_EMAIL_API_KEY" to "r".repeat(32),
+                            "VERIFICATION_EMAIL_SENDER" to "noreply@example.com",
+                        )
+                ).toTypedArray(),
+            ).load()
         assertTrue(enabled.productionInvitationsEnabled)
         assertTrue(enabled.hasVerificationEmail)
         assertTrue(enabled.toString().contains("productionInvitationsEnabled=true"))

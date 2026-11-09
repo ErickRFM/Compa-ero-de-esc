@@ -445,14 +445,14 @@ class SettingsLoader(
             val validBaseUrl =
                 runCatching {
                     val uri = URI(maticaApiBaseUrl)
-                uri.scheme == "https" &&
-                    uri.host != null &&
-                    uri.userInfo == null &&
-                    uri.query == null &&
-                    uri.fragment == null &&
-                    uri.path.orEmpty() in setOf("", "/") &&
-                    maticaApiBaseUrl.length <= 300
-            }.getOrDefault(false)
+                    uri.scheme == "https" &&
+                        uri.host != null &&
+                        uri.userInfo == null &&
+                        uri.query == null &&
+                        uri.fragment == null &&
+                        uri.path.orEmpty() in setOf("", "/") &&
+                        maticaApiBaseUrl.length <= 300
+                }.getOrDefault(false)
             if (!validBaseUrl) throw ConfigurationException("MATICA_API_BASE_URL must be an HTTPS origin without credentials or path")
         }
 

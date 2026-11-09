@@ -409,7 +409,15 @@ private fun MaticaProgressCard(
                             Text("Reintentar")
                         }
                     }
-                    true -> Unit
+                    true -> {
+                        Text(
+                            "Mática está vinculada, pero el progreso no se pudo cargar.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        TextButton(onClick = onRefresh, enabled = !state.maticaLoading) {
+                            Text("Reintentar")
+                        }
+                    }
                 }
             }
             state.maticaError?.let {

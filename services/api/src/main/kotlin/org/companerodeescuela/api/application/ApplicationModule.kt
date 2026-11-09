@@ -41,6 +41,7 @@ import org.companerodeescuela.api.grading.gradingRoutes
 import org.companerodeescuela.api.health.HealthService
 import org.companerodeescuela.api.health.healthRoutes
 import org.companerodeescuela.api.institutions.SiiiPilotInstitutionBootstrap
+import org.companerodeescuela.api.institutions.institutionOwnerProvisionRoutes
 import org.companerodeescuela.api.institutions.institutionRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
 import org.companerodeescuela.api.integrations.academic.siii.SiiiSectionProjectionFeature
@@ -525,6 +526,15 @@ fun Application.module(
             rateLimitStore = rateLimitStore,
         )
         institutionRoutes(identityGraph.institutions)
+        institutionOwnerProvisionRoutes(
+            settings,
+            providerRegistry.identity,
+            identityGraph.refreshSessions,
+            identityGraph.accounts,
+            identityGraph.mfa,
+            identityGraph.institutions,
+            rateLimitStore,
+        )
         institutionalPushRoutes(
             institutionalPushAuthenticator,
             institutionalPushService,

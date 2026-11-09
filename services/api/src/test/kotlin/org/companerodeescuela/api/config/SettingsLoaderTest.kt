@@ -282,7 +282,8 @@ class SettingsLoaderTest {
 
         val jwt = "j".repeat(40)
         val mfa = "A".repeat(43)
-        val common = listOf(
+        val common =
+            listOf(
             "APP_ENV" to "production",
             "API_PORT" to "8080",
             "MONGODB_DATABASE" to "companero_prod",

@@ -17,6 +17,7 @@ import org.companerodeescuela.api.audit.PlatformAuditLog
 import org.companerodeescuela.api.auth.AUTH_BODY_MAX_BYTES
 import org.companerodeescuela.api.auth.AuthTokenService
 import org.companerodeescuela.api.auth.LoginAttemptLimiter
+import org.companerodeescuela.api.auth.PlatformAccount
 import org.companerodeescuela.api.auth.PlatformAccountRepository
 import org.companerodeescuela.api.auth.RateLimitStore
 import org.companerodeescuela.api.auth.RefreshSessionRepository
@@ -80,9 +81,9 @@ internal fun Route.institutionOwnerProvisionRoutes(
         )
     }
 
-    suspend fun ApplicationCall.owner() = run {
+    suspend fun ApplicationCall.owner(): PlatformAccount {
         response.header(HttpHeaders.CacheControl, "no-store")
-        resolver.resolve(
+        return resolver.resolve(
             principal<JWTPrincipal>()?.payload ?: throw ApiException.Unauthorized(),
         )
     }

@@ -125,6 +125,7 @@ data class ApiSettings(
             attendanceQrNonceReuseThreshold == other.attendanceQrNonceReuseThreshold &&
             hasVerificationEmail == other.hasVerificationEmail &&
             verificationEmailSender == other.verificationEmailSender &&
+            productionInvitationsEnabled == other.productionInvitationsEnabled &&
             (mfaEncryptionKey != null) == (other.mfaEncryptionKey != null) &&
             (institutionIntegrationEncryptionKey != null) == (other.institutionIntegrationEncryptionKey != null) &&
             hasFirebasePush == other.hasFirebasePush
@@ -157,6 +158,7 @@ data class ApiSettings(
         result = 31 * result + attendanceQrNonceReuseThreshold
         result = 31 * result + hasVerificationEmail.hashCode()
         result = 31 * result + (verificationEmailSender?.hashCode() ?: 0)
+        result = 31 * result + productionInvitationsEnabled.hashCode()
         result = 31 * result + (mfaEncryptionKey != null).hashCode()
         result = 31 * result + (institutionIntegrationEncryptionKey != null).hashCode()
         result = 31 * result + hasFirebasePush.hashCode()
@@ -187,6 +189,7 @@ data class ApiSettings(
             "lateSyncReviewWindowSeconds=$lateSyncReviewWindowSeconds, " +
             "attendanceQrNonceReuseThreshold=$attendanceQrNonceReuseThreshold, " +
             "verificationEmailConfigured=$hasVerificationEmail, " +
+            "productionInvitationsEnabled=$productionInvitationsEnabled, " +
             "mfaEncryptionConfigured=${mfaEncryptionKey != null}, " +
             "institutionIntegrationEncryptionConfigured=${institutionIntegrationEncryptionKey != null}, " +
             "firebasePushConfigured=$hasFirebasePush, " +

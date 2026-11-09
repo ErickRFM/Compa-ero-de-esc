@@ -20,8 +20,17 @@ import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 import org.bson.Document
 import org.companerodeescuela.api.auth.AuthTokenService
+import org.companerodeescuela.api.auth.PlatformAccount
 import org.companerodeescuela.api.auth.PlatformAccountRepository
 import org.companerodeescuela.api.auth.RefreshSessionRepository
 import org.companerodeescuela.api.config.ApiSettings
@@ -39,14 +48,6 @@ import java.time.Duration
 import java.time.Instant
 import java.util.Date
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.json.Json
 
 private data class MaticaLinkRecord(
     val companionUserId: String,
@@ -341,12 +342,16 @@ private fun isSecureMaticaBaseUrl(value: String): Boolean {
     }
 }
 
-private suspend fun resolveStudent(payload: Payload?, resolver: NativeActorResolver) =
-    resolver.resolve(payload ?: throw ApiException.Unauthorized()).also { actor ->
-        if (UserRole.STUDENT !in actor.roles) {
-            throw ApiException.Forbidden("Una cuenta de estudiante es necesaria para vincular Mática")
-        }
+private suspend fun resolveStudent(
+    payload: Payload?,
+    resolver: NativeActorResolver,
+): PlatformAccount {
+    val actor = resolver.resolve(payload ?: throw ApiException.Unauthorized())
+    if (UserRole.STUDENT !in actor.roles) {
+        throw ApiException.Forbidden("Una cuenta de estudiante es necesaria para vincular Mática")
     }
+    return actor
+}
 
 private const val MAX_LINK_REQUEST_BYTES = 4_096
 private const val MAX_LINK_CODE_LENGTH = 2_048

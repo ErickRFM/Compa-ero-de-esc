@@ -50,8 +50,9 @@ internal class ResendWebhookSignatureVerifier(
         if (timestampSeconds < now - toleranceSeconds || timestampSeconds > now + toleranceSeconds) return false
         if (signatures.isNullOrBlank() || signatures.length > MAX_SIGNATURE_HEADER_LENGTH) return false
 
-        val signedPayload = messageId + "." + timestamp + "." + rawBody.toString(StandardCharsets.UTF_8)
-        val expected = hmac(signedPayload.toByteArray(StandardCharsets.UTF_8))
+        val prefix = (messageId + "." + timestamp + ".").toByteArray(StandardCharsets.UTF_8)
+        val signedPayload = prefix + rawBody
+        val expected = hmac(signedPayload)
         return signatures.split(' ').any { candidate ->
             if (!candidate.startsWith("v1,")) {
                 false

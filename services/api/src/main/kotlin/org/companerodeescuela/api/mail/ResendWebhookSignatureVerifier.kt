@@ -35,7 +35,9 @@ internal class ResendWebhookSignatureVerifier(
         signatures: String?,
     ): Boolean {
         if (rawBody.isEmpty() || rawBody.size > MAX_BODY_BYTES) return false
-        if (messageId.isNullOrBlank() || messageId.length > 128 ||
+        if (
+            messageId.isNullOrBlank() ||
+            messageId.length > 128 ||
             !messageId.matches(Regex("[A-Za-z0-9_-]{1,128}"))
         ) {
             return false

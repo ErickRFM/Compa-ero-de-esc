@@ -9,7 +9,9 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
 import java.time.Instant
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -89,15 +91,20 @@ internal fun Route.resendWebhookRoutes(
 private const val MAX_WEBHOOK_BODY_BYTES = 32 * 1024
 
 
-/** Resend encodes tags as [{ "name": "...", "value": "..." }]. */
+/** Resend normalizes sent-email tags to an object; accept the API's input-array shape too. */
 internal fun extractResendInvitationId(tags: JsonElement?): String? =
     runCatching {
-        tags?.jsonArray?.firstNotNullOfOrNull { tag ->
-            val fields = tag.jsonObject
-            if (fields["name"]?.jsonPrimitive?.contentOrNull == "invitation_id") {
-                fields["value"]?.jsonPrimitive?.contentOrNull
-            } else {
-                null
-            }
+        when (tags) {
+            is JsonObject -> tags["invitation_id"]?.jsonPrimitive?.contentOrNull
+            is JsonArray ->
+                tags.firstNotNullOfOrNull { tag ->
+                    val fields = tag.jsonObject
+                    if (fields["name"]?.jsonPrimitive?.contentOrNull == "invitation_id") {
+                        fields["value"]?.jsonPrimitive?.contentOrNull
+                    } else {
+                        null
+                    }
+                }
+            else -> null
         }
     }.getOrNull()?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{43}")) }

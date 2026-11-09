@@ -26,6 +26,9 @@ import java.util.Date
 internal interface InvitationOutbox {
     suspend fun enqueue(entry: OutboxEntry): Boolean
 
+    /** Replaces a pending capability after an explicitly authorized manual retry. */
+    suspend fun replace(entry: OutboxEntry): Boolean = enqueue(entry)
+
     suspend fun pending(now: Instant): List<OutboxEntry>
 
     suspend fun markDelivered(
@@ -67,6 +70,12 @@ internal class InMemoryInvitationOutbox(
     override suspend fun enqueue(entry: OutboxEntry): Boolean =
         mutex.withLock {
             if (entry.invitationId in entries) return@withLock false
+            entries[entry.invitationId] = entry
+            true
+        }
+
+    override suspend fun replace(entry: OutboxEntry): Boolean =
+        mutex.withLock {
             entries[entry.invitationId] = entry
             true
         }
@@ -176,6 +185,16 @@ internal class MongoInvitationOutbox(
         } catch (_: com.mongodb.MongoWriteException) {
             false
         }
+    }
+
+    override suspend fun replace(entry: OutboxEntry): Boolean {
+        ensureIndexes()
+        collection.replaceOne(
+            Filters.eq("_id", entry.invitationId),
+            entry.toDocument(),
+            com.mongodb.client.model.ReplaceOptions().upsert(true),
+        )
+        return true
     }
 
     override suspend fun pending(now: Instant): List<OutboxEntry> {

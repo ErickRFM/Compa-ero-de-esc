@@ -12,7 +12,6 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
-import io.ktor.server.request.receive
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -29,6 +28,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import org.bson.Document
 import org.companerodeescuela.api.auth.AuthTokenService
+import org.companerodeescuela.api.auth.boundedBody
 import org.companerodeescuela.api.auth.PlatformAccount
 import org.companerodeescuela.api.auth.PlatformAccountRepository
 import org.companerodeescuela.api.auth.RefreshSessionRepository
@@ -291,7 +291,7 @@ fun Route.maticaProgressRoutes(
                 }
 
                 val actor = resolveStudent(call.principal<JWTPrincipal>()?.payload, resolver)
-                val input = call.receive<MaticaProgressLinkRequest>()
+                val input = call.boundedBody(MaticaProgressLinkRequest.serializer(), MAX_LINK_REQUEST_BYTES)
                 if (input.code.length > MAX_LINK_CODE_LENGTH) {
                     throw ApiException.Validation("El código de vínculo no es válido")
                 }

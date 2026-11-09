@@ -1,7 +1,7 @@
 package org.companerodeescuela.api.mail
 
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.JsonObject
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import java.time.Clock
@@ -53,22 +53,19 @@ class ResendWebhookSignatureVerifierTest {
     fun extractsInvitationIdFromProviderTags() {
         val invitationId = "A".repeat(43)
         val objectTags =
-            Json.parseToJsonElement(
+            (Json.parseToJsonElement(
                 """{"tags":{"category":"companero_invitation","invitation_id":"$invitationId"}}""",
-            )
-                .jsonObject
+            ) as JsonObject)["tags"]
         val arrayTags =
-            Json.parseToJsonElement(
+            (Json.parseToJsonElement(
                 """{"tags":[{"name":"category","value":"companero_invitation"},{"name":"invitation_id","value":"$invitationId"}]}""",
-            )
-                .jsonObject
+            ) as JsonObject)["tags"]
         val malformed =
-            Json.parseToJsonElement("""{"tags":"invalid"}""")
-                .jsonObject
+            (Json.parseToJsonElement("""{"tags":"invalid"}""") as JsonObject)["tags"]
 
-        assertTrue(extractResendInvitationId(objectTags["tags"]) == invitationId)
-        assertTrue(extractResendInvitationId(arrayTags["tags"]) == invitationId)
-        assertFalse(extractResendInvitationId(malformed["tags"]) != null)
+        assertTrue(extractResendInvitationId(objectTags) == invitationId)
+        assertTrue(extractResendInvitationId(arrayTags) == invitationId)
+        assertFalse(extractResendInvitationId(malformed) != null)
     }
 
     private fun sign(

@@ -103,6 +103,7 @@ internal class InMemoryInvitationOutbox(
                 current.copy(
                     lastStatus = VerificationDeliveryStatus.DELIVERED,
                     tokenValue = "",
+                    recipient = "",
                     attempts = current.attempts + 1,
                 )
             true
@@ -114,7 +115,7 @@ internal class InMemoryInvitationOutbox(
     ): Boolean =
         mutex.withLock {
             val current = entries[id] ?: return@withLock false
-            entries[id] = current.copy(lastStatus = VerificationDeliveryStatus.FAILED, tokenValue = "")
+            entries[id] = current.copy(lastStatus = VerificationDeliveryStatus.FAILED, tokenValue = "", recipient = "")
             true
         }
 
@@ -132,7 +133,7 @@ internal class InMemoryInvitationOutbox(
     override suspend fun clearToken(id: String): Boolean =
         mutex.withLock {
             val current = entries[id] ?: return@withLock false
-            entries[id] = current.copy(tokenValue = "")
+            entries[id] = current.copy(tokenValue = "", recipient = "")
             true
         }
 }
@@ -247,7 +248,8 @@ internal class MongoInvitationOutbox(
                 Filters.eq("_id", id),
                 Updates.combine(
                     Updates.set("lastStatus", VerificationDeliveryStatus.DELIVERED.name),
-                    Updates.set("tokenCiphertext", ""),
+                    Updates.unset("tokenCiphertext"),
+                    Updates.unset("recipientCiphertext"),
                     Updates.set("deliveredAt", Date.from(now)),
                     Updates.inc("attempts", 1),
                 ),
@@ -262,7 +264,8 @@ internal class MongoInvitationOutbox(
                 Filters.eq("_id", id),
                 Updates.combine(
                     Updates.set("lastStatus", VerificationDeliveryStatus.FAILED.name),
-                    Updates.set("tokenCiphertext", ""),
+                    Updates.unset("tokenCiphertext"),
+                    Updates.unset("recipientCiphertext"),
                 ),
             ).matchedCount == 1L
 
@@ -284,7 +287,10 @@ internal class MongoInvitationOutbox(
         collection
             .updateOne(
                 Filters.eq("_id", id),
-                Updates.set("tokenCiphertext", ""),
+                Updates.combine(
+                    Updates.unset("tokenCiphertext"),
+                    Updates.unset("recipientCiphertext"),
+                ),
             ).matchedCount == 1L
 
     private fun OutboxEntry.toDocument(): Document {

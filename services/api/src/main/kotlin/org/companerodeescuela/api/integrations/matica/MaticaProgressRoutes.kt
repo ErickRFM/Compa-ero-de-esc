@@ -2,9 +2,9 @@ package org.companerodeescuela.api.integrations.matica
 
 import com.auth0.jwt.interfaces.Payload
 import com.mongodb.MongoWriteException
+import com.mongodb.client.model.Filters.eq
 import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
-import com.mongodb.client.model.Filters.eq
 import com.mongodb.kotlin.client.coroutine.MongoCollection
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import io.ktor.http.HttpHeaders
@@ -38,7 +38,6 @@ import java.net.http.HttpResponse
 import java.time.Duration
 import java.time.Instant
 import java.util.Date
-import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -155,10 +154,7 @@ private class MaticaProgressService(
 ) {
     private val verifier = MaticaLinkCodeVerifier(secret)
     private val json = Json { ignoreUnknownKeys = true }
-    private val http =
-        HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(4))
-            .build()
+    private val http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(4)).build()
 
     suspend fun link(
         companionUserId: String,
@@ -181,20 +177,19 @@ private class MaticaProgressService(
     ): MaticaProgressSummary? {
         val link = links.find(companionUserId) ?: return null
         val timestamp = now.epochSecond
-        val request =
+        val requestBuilder =
             HttpRequest.newBuilder(
                 URI.create(
                     "${apiBaseUrl.trimEnd('/')}/v1/integrations/companion/summary/${link.maticaUserId}",
                 ),
             )
-                .timeout(Duration.ofSeconds(8))
-                .header("X-Matica-Companion-Timestamp", timestamp.toString())
-                .header(
-                    "X-Matica-Companion-Signature",
-                    verifier.summarySignature(link.maticaUserId, timestamp),
-                )
-                .GET()
-                .build()
+        requestBuilder.timeout(Duration.ofSeconds(8))
+        requestBuilder.header("X-Matica-Companion-Timestamp", timestamp.toString())
+        requestBuilder.header(
+            "X-Matica-Companion-Signature",
+            verifier.summarySignature(link.maticaUserId, timestamp),
+        )
+        val request = requestBuilder.GET().build()
 
         val response =
             try {
@@ -346,10 +341,7 @@ private fun isSecureMaticaBaseUrl(value: String): Boolean {
     }
 }
 
-private suspend fun resolveStudent(
-    payload: Payload?,
-    resolver: NativeActorResolver,
-) =
+private suspend fun resolveStudent(payload: Payload?, resolver: NativeActorResolver) =
     resolver.resolve(payload ?: throw ApiException.Unauthorized()).also { actor ->
         if (UserRole.STUDENT !in actor.roles) {
             throw ApiException.Forbidden("Una cuenta de estudiante es necesaria para vincular Mática")

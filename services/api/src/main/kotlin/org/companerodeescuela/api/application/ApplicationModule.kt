@@ -19,6 +19,8 @@ import org.companerodeescuela.api.admin.MongoOwnerBootstrapClaims
 import org.companerodeescuela.api.admin.OwnerBootstrap
 import org.companerodeescuela.api.admin.QaAdminBootstrap
 import org.companerodeescuela.api.admin.accountAdministrationRoutes
+import org.companerodeescuela.api.audit.InMemoryPlatformAuditLog
+import org.companerodeescuela.api.audit.MongoPlatformAuditLog
 import org.companerodeescuela.api.attendance.attendanceRoutes
 import org.companerodeescuela.api.auth.InMemoryOwnerInvitationRepository
 import org.companerodeescuela.api.auth.InMemoryRateLimitStore
@@ -471,6 +473,12 @@ fun Application.module(
         } else {
             UnavailableInvitationEmailGateway
         }
+    val platformAuditLog =
+        if (settings.mongo.isConfigured) {
+            MongoPlatformAuditLog(mongoConnection.database())
+        } else {
+            InMemoryPlatformAuditLog()
+        }
     val invitationDispatcher =
         InvitationDispatchService(
             identityGraph.accounts,
@@ -533,7 +541,8 @@ fun Application.module(
             identityGraph.accounts,
             identityGraph.mfa,
             identityGraph.institutions,
-            rateLimitStore,
+            rateLimitStore = rateLimitStore,
+            auditLog = platformAuditLog,
         )
         institutionalPushRoutes(
             institutionalPushAuthenticator,

@@ -37,7 +37,7 @@ There are currently no Resend webhooks configured for the connected account. Bot
 
 ## Event correlation and persistence
 
-Invitation email requests carry the Resend tags `category=companero_invitation` and `invitation_id=<opaque invitation ID>`. Resend includes tags in email webhook payloads, allowing delivery events to update the matching invitation without correlating by recipient address.
+Invitation email requests carry the Resend tags `category=companero_invitation` and `invitation_id=<opaque invitation ID>`. Current Resend webhook payloads expose `data.tags` as a key/value object; the parser also accepts the legacy name/value array. This lets delivery events update the matching invitation without correlating by recipient address.
 
 The API stores minimal records in `platform_audit_events`, keyed by `svix-id`. Duplicate deliveries are idempotent. The audit record contains event type, opaque resource ID, provider email ID and timestamps; it does not store the raw payload, recipient address, invitation code, API key or signing secret.
 

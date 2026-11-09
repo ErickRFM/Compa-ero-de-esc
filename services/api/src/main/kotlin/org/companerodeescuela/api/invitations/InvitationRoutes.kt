@@ -61,8 +61,12 @@ internal fun Route.invitationRoutes(
     clock: Clock = Clock.systemUTC(),
     rateLimitStore: RateLimitStore? = null,
 ) {
-    // Fail closed in production until real QA delivery, Android acceptance and recovery gates are certified.
-    if (!settings.hasAuthentication || settings.environment == Environment.PRODUCTION) return
+    // Production invitations remain disabled unless explicitly opted in with all required dependencies.
+    val productionBlocked =
+        settings.environment == Environment.PRODUCTION &&
+            (!settings.productionInvitationsEnabled || !settings.mongo.isConfigured || !settings.hasVerificationEmail ||
+                settings.mfaEncryptionKey == null)
+    if (!settings.hasAuthentication || productionBlocked) return
     val resolver = NativeActorResolver(accounts, sessions, AuthTokenService(settings), identity)
     val issuerLimiter = LoginAttemptLimiter(maxAttempts = 5, store = rateLimitStore)
     val acceptanceLimiter = LoginAttemptLimiter(maxAttempts = 10, store = rateLimitStore)

@@ -49,16 +49,18 @@ class ResendWebhookSignatureVerifierTest {
     }
 
     @Test
-    @DisplayName("Extracts invitation correlation from Resend's array of name/value tags")
+    @DisplayName("Extracts invitation correlation from Resend's object tags and legacy tag arrays")
     fun extractsInvitationIdFromProviderTags() {
         val invitationId = "A".repeat(43)
-        val payload =
+        val objectTags = Json.parseToJsonElement("""{"tags":{"category":"companero_invitation","invitation_id":"$invitationId"}}""").jsonObject
+        val arrayTags =
             Json.parseToJsonElement(
                 """{"tags":[{"name":"category","value":"companero_invitation"},{"name":"invitation_id","value":"$invitationId"}]}""",
             ).jsonObject
+        val malformed = Json.parseToJsonElement("""{"tags":"invalid"}""").jsonObject
 
-        assertTrue(extractResendInvitationId(payload["tags"]) == invitationId)
-        val malformed = Json.parseToJsonElement("""{"tags":{"invitation_id":"$invitationId"}}""").jsonObject
+        assertTrue(extractResendInvitationId(objectTags["tags"]) == invitationId)
+        assertTrue(extractResendInvitationId(arrayTags["tags"]) == invitationId)
         assertFalse(extractResendInvitationId(malformed["tags"]) != null)
     }
 

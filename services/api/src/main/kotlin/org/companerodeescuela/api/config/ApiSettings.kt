@@ -461,9 +461,16 @@ class SettingsLoader(
                 }
                 decoded
             }
-        if (productionInvitationsEnabled &&
-            (!environment.isProduction || mongoUri.isBlank() || jwtSecret.isNullOrBlank() ||
-                verificationEmailKey == null || verificationEmailSender == null || mfaKey == null)
+        if (
+            productionInvitationsEnabled &&
+            (
+                !environment.isProduction ||
+                    mongoUri.isBlank() ||
+                    jwtSecret.isNullOrBlank() ||
+                    verificationEmailKey == null ||
+                    verificationEmailSender == null ||
+                    mfaKey == null
+            )
         ) {
             throw ConfigurationException(
                 "PRODUCTION_INVITATIONS_ENABLED requires production, MongoDB, JWT, Resend and MFA encryption",

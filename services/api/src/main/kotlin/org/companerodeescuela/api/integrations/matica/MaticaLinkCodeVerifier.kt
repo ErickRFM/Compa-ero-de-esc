@@ -1,13 +1,14 @@
 package org.companerodeescuela.api.integrations.matica
 
-import java.security.MessageDigest
-import java.time.Instant
-import java.util.Base64
-import javax.crypto.Mac
-import javax.crypto.spec.SecretKeySpec
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import java.security.MessageDigest
+import java.time.Instant
+import java.util.Base64
+import java.util.UUID
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 
 @Serializable
 internal data class MaticaLinkClaims(
@@ -31,13 +32,22 @@ internal class MaticaLinkCodeVerifier(secret: ByteArray) {
             val expected = sign(parts[0])
             val provided = decoder.decode(parts[1])
             if (!MessageDigest.isEqual(expected, provided)) return null
-            val claims = json.decodeFromString(MaticaLinkClaims.serializer(), String(decoder.decode(parts[0])))
+            val claims =
+                json.decodeFromString(
+                    MaticaLinkClaims.serializer(),
+                    String(decoder.decode(parts[0]), Charsets.UTF_8),
+                )
             val expiresIn = claims.expiresAtEpochSeconds - now.epochSecond
-            if (claims.scope != "progress:read" || claims.expiresAtEpochSeconds <= now.epochSecond ||
-                expiresIn > MAX_LINK_CODE_TTL_SECONDS || claims.nonce.length > 80
-            ) return null
-            java.util.UUID.fromString(claims.subject)
-            java.util.UUID.fromString(claims.nonce)
+            if (
+                claims.scope != "progress:read" ||
+                claims.expiresAtEpochSeconds <= now.epochSecond ||
+                expiresIn > MAX_LINK_CODE_TTL_SECONDS ||
+                claims.nonce.length > 80
+            ) {
+                return null
+            }
+            UUID.fromString(claims.subject)
+            UUID.fromString(claims.nonce)
             claims
         } catch (_: Exception) {
             null
@@ -54,9 +64,9 @@ internal class MaticaLinkCodeVerifier(secret: ByteArray) {
 
     private fun sign(payload: String): ByteArray =
         Mac.getInstance("HmacSHA256").run {
-        init(key)
-        doFinal(payload.toByteArray())
-    }
+            init(key)
+            doFinal(payload.toByteArray())
+        }
 
     private companion object {
         const val MAX_LINK_CODE_TTL_SECONDS = 660L

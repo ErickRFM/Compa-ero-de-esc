@@ -69,6 +69,8 @@ data class ApiSettings(
     val currentUserCacheTtlMillis: Int = 0,
     val verificationEmailApiKey: CharArray? = null,
     val verificationEmailSender: String? = null,
+    /** Explicit opt-in for production invitation dispatch; disabled by default. */
+    val productionInvitationsEnabled: Boolean = false,
     val mfaEncryptionKey: ByteArray? = null,
     /** Separate AES-256 key for institutional HMAC credential encryption at rest. */
     val institutionIntegrationEncryptionKey: ByteArray? = null,
@@ -368,6 +370,13 @@ class SettingsLoader(
             throw ConfigurationException("Invalid VERIFICATION_EMAIL_SENDER")
         }
 
+        val productionInvitationsEnabled =
+            when (env("PRODUCTION_INVITATIONS_ENABLED")?.trim()?.lowercase()) {
+                null, "false" -> false
+                "true" -> true
+                else -> throw ConfigurationException("PRODUCTION_INVITATIONS_ENABLED must be true or false")
+            }
+
         // A configured first-owner invitation must never consume its one-time code
         // when the account-verification email path is unavailable.
         val ownerInvitationConfigured =
@@ -449,6 +458,14 @@ class SettingsLoader(
                 }
                 decoded
             }
+        if (productionInvitationsEnabled &&
+            (!environment.isProduction || mongoUri.isBlank() || jwtSecret.isNullOrBlank() ||
+                verificationEmailKey == null || verificationEmailSender == null || mfaKey == null)
+        ) {
+            throw ConfigurationException(
+                "PRODUCTION_INVITATIONS_ENABLED requires production, MongoDB, JWT, Resend and MFA encryption",
+            )
+        }
         if (
             mfaKey != null &&
             institutionIntegrationKey != null &&
@@ -501,6 +518,7 @@ class SettingsLoader(
             currentUserCacheTtlMillis = currentUserCacheTtlMillis,
             verificationEmailApiKey = verificationEmailKey?.toCharArray(),
             verificationEmailSender = verificationEmailSender,
+            productionInvitationsEnabled = productionInvitationsEnabled,
             mfaEncryptionKey = mfaKey,
             institutionIntegrationEncryptionKey = institutionIntegrationKey,
             firebaseServiceAccountJson = firebaseJson?.toCharArray(),

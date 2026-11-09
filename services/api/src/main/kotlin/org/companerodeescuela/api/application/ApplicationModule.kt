@@ -13,9 +13,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.companerodeescuela.api.academic.academicRoutes
+import org.companerodeescuela.api.academic.groups.academicGroupRoutes
 import org.companerodeescuela.api.audit.InMemoryPlatformAuditLog
 import org.companerodeescuela.api.audit.MongoPlatformAuditLog
-import org.companerodeescuela.api.academic.groups.academicGroupRoutes
 import org.companerodeescuela.api.admin.AccountAdministrationService
 import org.companerodeescuela.api.admin.MongoOwnerBootstrapClaims
 import org.companerodeescuela.api.admin.OwnerBootstrap

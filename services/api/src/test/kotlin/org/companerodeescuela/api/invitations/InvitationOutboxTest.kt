@@ -31,5 +31,8 @@ class InvitationOutboxTest {
             val pending = outbox.pending(now.plusSeconds(60))
             assertEquals(1, pending.size)
             assertEquals("new-token-value", pending.single().tokenValue)
+
+            assertTrue(outbox.clearToken("invitation-123"))
+            assertTrue(outbox.pending(now.plusSeconds(60)).isEmpty())
         }
 }

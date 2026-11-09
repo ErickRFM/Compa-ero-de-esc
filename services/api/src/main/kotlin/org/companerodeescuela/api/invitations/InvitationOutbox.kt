@@ -157,6 +157,10 @@ internal class MongoInvitationOutbox(
         if (indexesReady) return
         try {
             collection.createIndex(Indexes.ascending("nextAttemptAt"), IndexOptions().name("outbox_retry_idx"))
+            collection.createIndex(
+                Indexes.ascending("expiresAt"),
+                IndexOptions().expireAfter(0, java.util.concurrent.TimeUnit.SECONDS).name("outbox_expiry_ttl_idx"),
+            )
         } catch (_: com.mongodb.MongoCommandException) {
             // Index already exists; safe to ignore
         }

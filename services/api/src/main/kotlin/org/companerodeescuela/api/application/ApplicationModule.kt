@@ -13,6 +13,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.companerodeescuela.api.academic.academicRoutes
+import org.companerodeescuela.api.audit.InMemoryPlatformAuditLog
+import org.companerodeescuela.api.audit.MongoPlatformAuditLog
 import org.companerodeescuela.api.academic.groups.academicGroupRoutes
 import org.companerodeescuela.api.admin.AccountAdministrationService
 import org.companerodeescuela.api.admin.MongoOwnerBootstrapClaims
@@ -450,6 +452,12 @@ fun Application.module(
             progressiveDelayMaximum = java.time.Duration.ofSeconds(settings.loginProgressiveDelayMaxSeconds),
             store = rateLimitStore,
         )
+    val platformAuditLog =
+        if (settings.mongo.isConfigured) {
+            MongoPlatformAuditLog(mongoConnection.database())
+        } else {
+            InMemoryPlatformAuditLog()
+        }
     val invitationRepository =
         if (settings.hasAuthentication && settings.mongo.isConfigured) {
             MongoInvitationRepository(mongoConnection.database())
@@ -528,6 +536,7 @@ fun Application.module(
             invitationDispatcher,
             invitationRepository,
             rateLimitStore = rateLimitStore,
+            auditLog = platformAuditLog,
         )
         institutionRoutes(identityGraph.institutions)
         institutionalPushRoutes(

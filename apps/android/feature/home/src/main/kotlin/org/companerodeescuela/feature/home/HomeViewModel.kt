@@ -187,6 +187,9 @@ class HomeViewModel
                 when (val result = maticaRepository.link(code)) {
                     is Outcome.Success -> {
                         _state.update { it.copy(maticaBusy = false, maticaLinked = true, maticaError = null) }
+                        // The initial Home load may still be running; cancel it so the
+                        // newly linked account is fetched immediately instead of being skipped.
+                        maticaRefreshJob?.cancel()
                         refreshMaticaProgress()
                     }
                     is Outcome.Failure -> {

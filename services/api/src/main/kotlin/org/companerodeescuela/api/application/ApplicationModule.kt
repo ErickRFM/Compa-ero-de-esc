@@ -500,7 +500,12 @@ fun Application.module(
         healthRoutes(settings = settings, healthService = healthService)
         resendWebhookRoutes(
             signingSecret = settings.resendWebhookSecret,
-            database = if (settings.mongo.isConfigured) mongoConnection.database() else null,
+            database =
+                if (settings.hasAuthentication && settings.mongo.isConfigured) {
+                    mongoConnection.database()
+                } else {
+                    null
+                },
         )
         authRoutes(
             settings = settings,

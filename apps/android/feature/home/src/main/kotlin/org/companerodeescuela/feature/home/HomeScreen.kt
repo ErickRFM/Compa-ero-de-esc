@@ -24,13 +24,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -77,8 +82,10 @@ fun HomeScreen(
     displayName: String? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var maticaCode by remember { mutableStateOf("") }
     androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
         viewModel.refresh()
+        viewModel.refreshMaticaProgress()
     }
 
     val overview = state.overview
@@ -140,6 +147,15 @@ fun HomeScreen(
                     onOpenAttendance = onOpenAttendance,
                     onOpenChannel = onOpenChannel,
                     onOpenTasks = onOpenTasks,
+                )
+
+                MaticaProgressCard(
+                    state = state,
+                    code = maticaCode,
+                    onCodeChange = { maticaCode = it },
+                    onLink = { viewModel.linkMatica(maticaCode) },
+                    onUnlink = viewModel::unlinkMatica,
+                    onRefresh = viewModel::refreshMaticaProgress,
                 )
 
                 AnimatedVisibility(
@@ -306,6 +322,88 @@ fun HomeScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MaticaProgressCard(
+    state: HomeUiState,
+    code: String,
+    onCodeChange: (String) -> Unit,
+    onLink: () -> Unit,
+    onUnlink: () -> Unit,
+    onRefresh: () -> Unit,
+) {
+    V8GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
+            Text(
+                "Progreso de Mática",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (state.maticaLoading) {
+                Text("Cargando progreso…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            val progress = state.maticaProgress
+            if (progress != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        "${progress.totalXp} XP · Nivel ${progress.level}",
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Text(
+                        "🔥 ${progress.streak} días",
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Text(
+                    "${progress.weeklyXp} XP esta semana · Mejor racha ${progress.longestStreak}",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TextButton(onClick = onUnlink, enabled = !state.maticaBusy) {
+                    Text("Desvincular")
+                }
+            } else {
+                when (state.maticaLinked) {
+                    false -> {
+                        Text(
+                            "Conecta Mática para ver aquí tu XP, nivel y racha.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        OutlinedTextField(
+                            value = code,
+                            onValueChange = onCodeChange,
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Código temporal de Mática") },
+                            singleLine = true,
+                            enabled = !state.maticaBusy,
+                        )
+                        Button(
+                            onClick = onLink,
+                            enabled = !state.maticaBusy && code.isNotBlank(),
+                        ) {
+                            Text(if (state.maticaBusy) "Vinculando…" else "Vincular progreso")
+                        }
+                    }
+                    null -> {
+                        Text(
+                            "El progreso no está disponible ahora.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        TextButton(onClick = onRefresh, enabled = !state.maticaLoading) {
+                            Text("Reintentar")
+                        }
+                    }
+                    true -> Unit
+                }
+            }
+            state.maticaError?.let {
+                Text(it, color = MaterialTheme.colorScheme.error)
             }
         }
     }

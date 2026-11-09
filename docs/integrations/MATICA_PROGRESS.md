@@ -34,7 +34,7 @@ Endpoints de Mática: `POST /v1/integrations/companion/link-code` (sesión Máti
 
 El resumen procede de la gamificación guardada por el backend de Mática. Crossmath, gemas, trofeos y ciertos avances de dominio aún son locales y no se sincronizan en ese endpoint; no se presentan como si fueran datos del servidor. El panel no muestra notas escolares.
 
-La funcionalidad devuelve servicio no disponible hasta que ambos backends estén desplegados con estas variables. Un build correcto no confirma configuración ni operación en producción.
+Si la integración aún no está configurada, Inicio mantiene visible el campo para pegar el código; el intento de vinculación responde servicio no disponible hasta que ambos backends estén desplegados con estas variables. Un build correcto no confirma configuración ni operación en producción.
 
 
 La tarjeta de progreso y el repositorio autenticado de Android se incluyen en el mismo cambio que los endpoints de Compañero. El panel no bloquea la agenda ni el uso independiente de Compañero cuando Mática no está configurada.

@@ -520,6 +520,7 @@ fun Application.module(
             identityGraph.refreshSessions,
             identityGraph.accounts,
             administrationService,
+            auditLog = platformAuditLog,
         )
         institutionalIdentityLinkRoutes(
             settings,

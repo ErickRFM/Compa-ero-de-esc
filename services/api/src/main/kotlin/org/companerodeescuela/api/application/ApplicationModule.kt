@@ -43,8 +43,8 @@ import org.companerodeescuela.api.health.healthRoutes
 import org.companerodeescuela.api.institutions.SiiiPilotInstitutionBootstrap
 import org.companerodeescuela.api.institutions.institutionRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
-import org.companerodeescuela.api.integrations.matica.maticaProgressRoutes
 import org.companerodeescuela.api.integrations.academic.siii.SiiiSectionProjectionFeature
+import org.companerodeescuela.api.integrations.matica.maticaProgressRoutes
 import org.companerodeescuela.api.integrations.push.InMemoryInstitutionalIdentityLinkRepository
 import org.companerodeescuela.api.integrations.push.InstitutionalAttendanceHistoryService
 import org.companerodeescuela.api.integrations.push.InstitutionalEventProjectionWorker
@@ -501,15 +501,17 @@ fun Application.module(
             sessionAuthority = sessionAuthority,
             ownerInvitationRepository = ownerInvitationRepository,
         )
+        val maticaDatabase =
+            if (settings.mongo.isConfigured && settings.hasMaticaIntegration) {
+                mongoConnection.database()
+            } else {
+                null
+            }
         maticaProgressRoutes(
             settings = settings,
             accounts = identityGraph.accounts,
             sessions = identityGraph.refreshSessions,
-            database = if (settings.mongo.isConfigured && settings.hasMaticaIntegration) {
-                mongoConnection.database()
-            } else {
-                null
-            },
+            database = maticaDatabase,
             sharedSecret = settings.maticaCompanionIntegrationSecret?.concatToString(),
             apiBaseUrl = settings.maticaApiBaseUrl,
         )

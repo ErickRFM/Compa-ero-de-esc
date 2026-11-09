@@ -41,16 +41,14 @@ class MaticaLinkCodeVerifierTest {
         nonce: UUID,
         expiresAt: Long,
     ): String {
-        val payload =
-            encoder.encodeToString(
-                Json.encodeToString(
-                    MaticaLinkClaims.serializer(),
-                    MaticaLinkClaims(subject.toString(), expiresAt, nonce.toString()),
-                ).toByteArray(),
+        val claimsJson =
+            Json.encodeToString(
+                MaticaLinkClaims.serializer(),
+                MaticaLinkClaims(subject.toString(), expiresAt, nonce.toString()),
             )
-        val mac =
-            Mac.getInstance("HmacSHA256")
-                .apply { init(SecretKeySpec(secret, "HmacSHA256")) }
+        val payload = encoder.encodeToString(claimsJson.toByteArray())
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(secret, "HmacSHA256"))
         return "$payload.${encoder.encodeToString(mac.doFinal(payload.toByteArray()))}"
     }
 }

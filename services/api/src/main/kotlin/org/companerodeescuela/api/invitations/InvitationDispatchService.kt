@@ -138,16 +138,16 @@ internal class InvitationDispatchService(
             val queued =
                 authenticationDependency {
                     outbox.enqueue(
-                    OutboxEntry(
-                        invitationId = id,
-                        recipient = command.recipient,
-                        tokenValue = token.value,
-                        expiresAt = expiresAt,
-                        nextAttemptAt = now.plusSeconds(60),
-                        createdAt = now,
-                    ),
-                )
-            }
+                        OutboxEntry(
+                            invitationId = id,
+                            recipient = command.recipient,
+                            tokenValue = token.value,
+                            expiresAt = expiresAt,
+                            nextAttemptAt = now.plusSeconds(60),
+                            createdAt = now,
+                        ),
+                    )
+                }
             if (!queued) {
                 authenticationDependency { repository.revoke(id, clock.instant()) }
                 throw ApiException.Conflict("Invitation dispatch cannot be queued")
@@ -246,7 +246,7 @@ internal class InvitationDispatchService(
                 try {
                     email.send(entry.recipient, entry.tokenValue, entry.invitationId, entry.expiresAt)
                 } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                throw cancelled
+                    throw cancelled
                 } catch (_: Exception) {
                     VerificationDeliveryStatus.UNCONFIRMED
                 }
@@ -264,7 +264,11 @@ internal class InvitationDispatchService(
                 else -> {
                     val delaySeconds = (60L shl entry.attempts.coerceIn(0, 4)).coerceAtMost(900L)
                     authenticationDependency {
-                        queue.scheduleRetry(entry.invitationId, clock.instant().plusSeconds(delaySeconds), clock.instant())
+                        queue.scheduleRetry(
+                            entry.invitationId,
+                            clock.instant().plusSeconds(delaySeconds),
+                            clock.instant(),
+                        )
                     }
                 }
             }

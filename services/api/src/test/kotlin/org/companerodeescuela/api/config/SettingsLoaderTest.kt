@@ -334,15 +334,22 @@ class SettingsLoaderTest {
             loader(*common.toTypedArray()).load()
         }
 
-        val enabled =
+        val emailSettings =
+            listOf(
+                "VERIFICATION_EMAIL_API_KEY" to "r".repeat(32),
+                "VERIFICATION_EMAIL_SENDER" to "noreply@example.com",
+            )
+        assertFailsWith<ConfigurationException> {
             loader(
                 *(
-                    common +
-                        listOf(
-                            "VERIFICATION_EMAIL_API_KEY" to "r".repeat(32),
-                            "VERIFICATION_EMAIL_SENDER" to "noreply@example.com",
-                        )
+                    common.filterNot { it.first == "RESEND_WEBHOOK_SECRET" } +
+                        emailSettings
                 ).toTypedArray(),
+            ).load()
+        }
+        val enabled =
+            loader(
+                *(common + emailSettings).toTypedArray(),
             ).load()
         assertTrue(enabled.productionInvitationsEnabled)
         assertTrue(enabled.hasVerificationEmail)

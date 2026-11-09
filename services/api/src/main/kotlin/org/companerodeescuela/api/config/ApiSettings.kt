@@ -442,8 +442,9 @@ class SettingsLoader(
             throw ConfigurationException("MATICA_COMPANION_INTEGRATION_SECRET must be at least 32 characters")
         }
         if (maticaApiBaseUrl != null) {
-            val validBaseUrl = runCatching {
-                val uri = URI(maticaApiBaseUrl)
+            val validBaseUrl =
+                runCatching {
+                    val uri = URI(maticaApiBaseUrl)
                 uri.scheme == "https" &&
                     uri.host != null &&
                     uri.userInfo == null &&

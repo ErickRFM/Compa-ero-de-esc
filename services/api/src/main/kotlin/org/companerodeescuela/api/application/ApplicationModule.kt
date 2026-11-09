@@ -452,6 +452,12 @@ fun Application.module(
             progressiveDelayMaximum = java.time.Duration.ofSeconds(settings.loginProgressiveDelayMaxSeconds),
             store = rateLimitStore,
         )
+    val platformAuditLog =
+        if (settings.mongo.isConfigured) {
+            MongoPlatformAuditLog(mongoConnection.database())
+        } else {
+            InMemoryPlatformAuditLog()
+        }
     val invitationRepository =
         if (settings.hasAuthentication && settings.mongo.isConfigured) {
             MongoInvitationRepository(mongoConnection.database())
@@ -472,12 +478,6 @@ fun Application.module(
             )
         } else {
             UnavailableInvitationEmailGateway
-        }
-    val platformAuditLog =
-        if (settings.mongo.isConfigured) {
-            MongoPlatformAuditLog(mongoConnection.database())
-        } else {
-            InMemoryPlatformAuditLog()
         }
     val invitationDispatcher =
         InvitationDispatchService(

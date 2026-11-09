@@ -53,7 +53,7 @@ internal data class InvitationRevokeBody(
     val invitationId: String,
 )
 
-internal fun Route.invitationRoutes(
+internal internal fun Route.invitationRoutes(
     settings: ApiSettings,
     identity: IdentityProvider,
     sessions: RefreshSessionRepository,

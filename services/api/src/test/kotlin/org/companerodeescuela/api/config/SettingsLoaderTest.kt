@@ -51,7 +51,8 @@ class SettingsLoaderTest {
                 "RESEND_WEBHOOK_SECRET" to "not-a-webhook-secret",
             ).load()
         }
-        val malformed = "whsec_" + java.util.Base64.getEncoder().encodeToString(ByteArray(16))
+        val encoder = java.util.Base64.getEncoder()
+        val malformed = "whsec_" + encoder.encodeToString(ByteArray(16))
         assertFailsWith<ConfigurationException> {
             loader(
                 "API_PORT" to "8080",
@@ -60,7 +61,7 @@ class SettingsLoaderTest {
             ).load()
         }
 
-        val secret = "whsec_" + java.util.Base64.getEncoder().encodeToString(ByteArray(32) { it.toByte() })
+        val secret = "whsec_" + encoder.encodeToString(ByteArray(32) { it.toByte() })
         val configured =
             loader(
                 "API_PORT" to "8080",

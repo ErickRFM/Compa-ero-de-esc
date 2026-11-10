@@ -133,6 +133,26 @@ internal class InvitationDispatchService(
         if (!authenticationDependency { repository.create(record) }) {
             throw ApiException.Conflict("This invitation operation was already processed")
         }
+        // Persist encrypted retry capability before network I/O so a process crash cannot strand it.
+        if (outbox != null) {
+            val queued =
+                authenticationDependency {
+                    outbox.enqueue(
+                        OutboxEntry(
+                            invitationId = id,
+                            recipient = command.recipient,
+                            tokenValue = token.value,
+                            expiresAt = expiresAt,
+                            nextAttemptAt = now.plusSeconds(60),
+                            createdAt = now,
+                        ),
+                    )
+                }
+            if (!queued) {
+                authenticationDependency { repository.revoke(id, clock.instant()) }
+                throw ApiException.Conflict("Invitation dispatch cannot be queued")
+            }
+        }
         val delivery =
             try {
                 email.send(command.recipient, token.value, id, expiresAt)
@@ -141,22 +161,14 @@ internal class InvitationDispatchService(
             } catch (_: Exception) {
                 VerificationDeliveryStatus.UNCONFIRMED
             }
-        if (delivery == VerificationDeliveryStatus.FAILED || delivery == VerificationDeliveryStatus.UNAVAILABLE) {
-            authenticationDependency { repository.revoke(id, clock.instant()) }
-        } else if (delivery == VerificationDeliveryStatus.UNCONFIRMED && outbox != null) {
-            // Enqueue for asynchronous retry instead of leaving the invitation in limbo.
-            authenticationDependency {
-                outbox.enqueue(
-                    OutboxEntry(
-                        invitationId = id,
-                        recipient = command.recipient,
-                        tokenValue = token.value,
-                        expiresAt = expiresAt,
-                        nextAttemptAt = now.plusSeconds(60),
-                        createdAt = now,
-                    ),
-                )
+        when (delivery) {
+            VerificationDeliveryStatus.FAILED, VerificationDeliveryStatus.UNAVAILABLE -> {
+                authenticationDependency { repository.revoke(id, clock.instant()) }
+                outbox?.markFailed(id, clock.instant())
             }
+            VerificationDeliveryStatus.ACCEPTED -> outbox?.clearToken(id)
+            VerificationDeliveryStatus.DELIVERED -> outbox?.markDelivered(id, clock.instant())
+            else -> Unit
         }
         return InvitationDispatchResult(id, delivery, expiresAt.epochSecond)
     }
@@ -200,6 +212,25 @@ internal class InvitationDispatchService(
         if (!authenticationDependency { repository.retry(invitationId, newToken.hash, now) }) {
             throw ApiException.Conflict("Invitation cannot be retried in its current state")
         }
+        if (outbox != null) {
+            val queued =
+                authenticationDependency {
+                    outbox.replace(
+                        OutboxEntry(
+                            invitationId = invitationId,
+                            recipient = existing.recipient,
+                            tokenValue = newToken.value,
+                            expiresAt = existing.expiresAt,
+                            nextAttemptAt = now.plusSeconds(60),
+                            createdAt = now,
+                        ),
+                    )
+                }
+            if (!queued) {
+                authenticationDependency { repository.revoke(invitationId, clock.instant()) }
+                throw ApiException.Conflict("Invitation retry cannot be queued")
+            }
+        }
         val delivery =
             try {
                 email.send(existing.recipient, newToken.value, invitationId, existing.expiresAt)
@@ -208,10 +239,66 @@ internal class InvitationDispatchService(
             } catch (_: Exception) {
                 VerificationDeliveryStatus.UNCONFIRMED
             }
-        if (delivery == VerificationDeliveryStatus.FAILED || delivery == VerificationDeliveryStatus.UNAVAILABLE) {
-            authenticationDependency { repository.revoke(invitationId, clock.instant()) }
+        when (delivery) {
+            VerificationDeliveryStatus.FAILED, VerificationDeliveryStatus.UNAVAILABLE -> {
+                authenticationDependency { repository.revoke(invitationId, clock.instant()) }
+                outbox?.markFailed(invitationId, clock.instant())
+            }
+            VerificationDeliveryStatus.ACCEPTED -> outbox?.clearToken(invitationId)
+            VerificationDeliveryStatus.DELIVERED -> outbox?.markDelivered(invitationId, clock.instant())
+            else -> Unit
         }
         return InvitationDispatchResult(invitationId, delivery, existing.expiresAt.epochSecond)
+    }
+
+    /** Replays only live invitation capabilities whose persisted digest still matches. */
+    suspend fun retryPendingOutbox(): Int {
+        val queue = outbox ?: return 0
+        val now = clock.instant()
+        val pending = authenticationDependency { queue.pending(now) }
+        for (entry in pending) {
+            val invitation = authenticationDependency { repository.find(entry.invitationId) }
+            if (invitation == null ||
+                invitation.status != InvitationStatus.SENT ||
+                invitation.expiresAt <= now ||
+                invitation.recipient != entry.recipient ||
+                invitation.tokenHash != InvitationToken.hash(entry.tokenValue)
+            ) {
+                authenticationDependency { queue.markFailed(entry.invitationId, now) }
+                continue
+            }
+            val status =
+                try {
+                    email.send(entry.recipient, entry.tokenValue, entry.invitationId, entry.expiresAt)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    VerificationDeliveryStatus.UNCONFIRMED
+                }
+            when (status) {
+                VerificationDeliveryStatus.ACCEPTED ->
+                    authenticationDependency { queue.clearToken(entry.invitationId) }
+                VerificationDeliveryStatus.DELIVERED ->
+                    authenticationDependency {
+                        queue.markDelivered(entry.invitationId, clock.instant())
+                    }
+                VerificationDeliveryStatus.FAILED, VerificationDeliveryStatus.UNAVAILABLE -> {
+                    authenticationDependency { queue.markFailed(entry.invitationId, clock.instant()) }
+                    authenticationDependency { repository.revoke(entry.invitationId, clock.instant()) }
+                }
+                else -> {
+                    val delaySeconds = (60L shl entry.attempts.coerceIn(0, 4)).coerceAtMost(900L)
+                    authenticationDependency {
+                        queue.scheduleRetry(
+                            entry.invitationId,
+                            clock.instant().plusSeconds(delaySeconds),
+                            clock.instant(),
+                        )
+                    }
+                }
+            }
+        }
+        return pending.size
     }
 
     private suspend fun requireInstitution(command: InvitationDispatchCommand) {

@@ -157,17 +157,25 @@ class HomeViewModel
 
         fun refreshMaticaProgress() {
             if (maticaRefreshJob?.isActive == true) return
-            maticaRefreshJob = viewModelScope.launch {
-                _state.update { it.copy(maticaLoading = true, maticaError = null) }
-                when (val result = maticaRepository.load()) {
-                    is Outcome.Success -> _state.update {
-                        it.copy(maticaLoading = false, maticaProgress = result.value, maticaLinked = result.value != null, maticaError = null)
-                    }
-                    is Outcome.Failure -> _state.update {
-                        it.copy(maticaLoading = false, maticaLinked = null, maticaError = result.error.userMessage)
+            maticaRefreshJob =
+                viewModelScope.launch {
+                    _state.update { it.copy(maticaLoading = true, maticaError = null) }
+                    when (val result = maticaRepository.load()) {
+                        is Outcome.Success ->
+                            _state.update {
+                                it.copy(
+                                    maticaLoading = false,
+                                    maticaProgress = result.value,
+                                    maticaLinked = result.value != null,
+                                    maticaError = null,
+                                )
+                            }
+                        is Outcome.Failure ->
+                            _state.update {
+                                it.copy(maticaLoading = false, maticaLinked = null, maticaError = result.error.userMessage)
+                            }
                     }
                 }
-            }
         }
 
         fun linkMatica(code: String) {
@@ -189,7 +197,15 @@ class HomeViewModel
             viewModelScope.launch {
                 _state.update { it.copy(maticaBusy = true, maticaError = null) }
                 when (val result = maticaRepository.unlink()) {
-                    is Outcome.Success -> _state.update { it.copy(maticaBusy = false, maticaLinked = false, maticaProgress = null, maticaError = null) }
+                    is Outcome.Success ->
+                        _state.update {
+                            it.copy(
+                                maticaBusy = false,
+                                maticaLinked = false,
+                                maticaProgress = null,
+                                maticaError = null,
+                            )
+                        }
                     is Outcome.Failure -> _state.update { it.copy(maticaBusy = false, maticaError = result.error.userMessage) }
                 }
             }

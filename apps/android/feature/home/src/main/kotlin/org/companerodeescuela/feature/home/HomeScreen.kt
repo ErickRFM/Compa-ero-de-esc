@@ -24,12 +24,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Button
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -345,7 +345,10 @@ private fun MaticaProgressCard(
                     Text("${progress.totalXp} XP · Nivel ${progress.level}", fontWeight = FontWeight.Medium)
                     Text("🔥 ${progress.streak} días", color = MaterialTheme.colorScheme.primary)
                 }
-                Text("${progress.weeklyXp} XP esta semana · Mejor racha ${progress.longestStreak}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "${progress.weeklyXp} XP esta semana · Mejor racha ${progress.longestStreak}",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 TextButton(onClick = onUnlink, enabled = !state.maticaBusy) { Text("Desvincular") }
             } ?: if (state.maticaLinked == false) {
                 Text("Conecta Mática para ver aquí tu XP, nivel y racha.", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -362,7 +365,9 @@ private fun MaticaProgressCard(
             } else if (state.maticaLinked == null) {
                 Text("El progreso no está disponible ahora.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TextButton(onClick = onRefresh) { Text("Reintentar") }
-            } else Unit
+            } else {
+                Unit
+            }
             state.maticaError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
     }

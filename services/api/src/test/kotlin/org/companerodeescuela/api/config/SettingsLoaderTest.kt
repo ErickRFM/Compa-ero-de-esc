@@ -266,6 +266,99 @@ class SettingsLoaderTest {
     }
 
     @Test
+    @DisplayName("Resend webhook signing secret is validated and never exposed")
+    fun resendWebhookSecretIsValidatedAndRedacted() {
+        val defaults =
+            loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c").load()
+        assertFalse(defaults.hasResendWebhook)
+
+        assertFailsWith<ConfigurationException> {
+            loader(
+                "API_PORT" to "8080",
+                "MONGODB_DATABASE" to "c",
+                "RESEND_WEBHOOK_SECRET" to "not-a-webhook-secret",
+            ).load()
+        }
+        val encoder = java.util.Base64.getEncoder()
+        val malformed = "whsec_" + encoder.encodeToString(ByteArray(16))
+        assertFailsWith<ConfigurationException> {
+            loader(
+                "API_PORT" to "8080",
+                "MONGODB_DATABASE" to "c",
+                "RESEND_WEBHOOK_SECRET" to malformed,
+            ).load()
+        }
+
+        val secret = "whsec_" + encoder.encodeToString(ByteArray(32) { it.toByte() })
+        val configured =
+            loader(
+                "API_PORT" to "8080",
+                "MONGODB_DATABASE" to "c",
+                "RESEND_WEBHOOK_SECRET" to secret,
+            ).load()
+        assertTrue(configured.hasResendWebhook)
+        assertFalse(configured.toString().contains(secret))
+    }
+
+    @Test
+    @DisplayName("Production invitation dispatch is disabled by default and requires every dependency")
+    fun productionInvitationGateIsExplicitAndFailClosed() {
+        val local =
+            loader("API_PORT" to "8080", "MONGODB_DATABASE" to "c").load()
+        assertFalse(local.productionInvitationsEnabled)
+
+        assertFailsWith<ConfigurationException> {
+            loader(
+                "API_PORT" to "8080",
+                "MONGODB_DATABASE" to "c",
+                "PRODUCTION_INVITATIONS_ENABLED" to "true",
+            ).load()
+        }
+
+        val jwt = "j".repeat(40)
+        val mfa = "A".repeat(43)
+        val webhookEncoder = java.util.Base64.getEncoder()
+        val webhookSecret = "whsec_" + webhookEncoder.encodeToString(ByteArray(32) { it.toByte() })
+        val common =
+            listOf(
+                "APP_ENV" to "production",
+                "API_PORT" to "8080",
+                "MONGODB_DATABASE" to "companero_prod",
+                "MONGODB_URI" to "mongodb://localhost:27017",
+                "JWT_SECRET" to jwt,
+                "MFA_ENCRYPTION_KEY" to mfa,
+                "RESEND_WEBHOOK_SECRET" to webhookSecret,
+                "PRODUCTION_INVITATIONS_ENABLED" to "true",
+            )
+        assertFailsWith<ConfigurationException> {
+            loader(*common.toTypedArray()).load()
+        }
+
+        val emailSettings =
+            listOf(
+                "VERIFICATION_EMAIL_API_KEY" to "r".repeat(32),
+                "VERIFICATION_EMAIL_SENDER" to "noreply@example.com",
+            )
+        assertFailsWith<ConfigurationException> {
+            loader(
+                *(
+                    common.filterNot { it.first == "RESEND_WEBHOOK_SECRET" } +
+                        emailSettings
+                ).toTypedArray(),
+            ).load()
+        }
+        val enabled =
+            loader(
+                *(common + emailSettings).toTypedArray(),
+            ).load()
+        assertTrue(enabled.productionInvitationsEnabled)
+        assertTrue(enabled.hasVerificationEmail)
+        assertTrue(enabled.hasResendWebhook)
+        assertTrue(enabled.toString().contains("productionInvitationsEnabled=true"))
+        assertFalse(enabled.toString().contains(webhookSecret))
+    }
+
+    @Test
     @DisplayName("JWT and attendance QR signing secrets cannot be reused")
     fun rejectsReusedJwtAndAttendanceQrSecret() {
         val secret = "same-secret-".padEnd(40, 'x')

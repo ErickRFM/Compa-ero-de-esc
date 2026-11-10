@@ -137,4 +137,5 @@
 <string name="auth_coordinator_description">Consulta y coordina los grupos autorizados de tu institución.</string>
     <string name="registration_owner_invited">Propietario invitado</string>
     <string name="registration_owner_invitation_code">Código de invitación de propietario</string>
+    <string name="verification_delivered">Correo entregado en el buzón (confirmado).</string>
 </resources>

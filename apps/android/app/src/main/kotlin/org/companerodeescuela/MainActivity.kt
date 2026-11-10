@@ -682,7 +682,12 @@ class MainActivity : AppCompatActivity() {
                                                     )
                                                 },
                                                 onSecurity = { navController.navigate(Destination.Mfa.route) },
-                                                onInvitation = { navController.navigate(Destination.InvitationAcceptance.route) },
+                                                onInvitation =
+                                                    if (session.emailVerified) {
+                                                        { navController.navigate(Destination.InvitationAcceptance.route) }
+                                                    } else {
+                                                        null
+                                                    },
                                                 onInvitationIssue =
                                                     if (appDistribution == AppDistribution.MANAGEMENT &&
                                                         roleConfig.experience == AppExperience.SUPER_ADMIN &&
@@ -749,11 +754,19 @@ class MainActivity : AppCompatActivity() {
                                             }
                                         }
                                         composable(Destination.InvitationAcceptance.route) {
-                                            InvitationAcceptanceScreen(
-                                                state = session,
-                                                onAccept = sessionViewModel::acceptRegistrationInvitation,
-                                                onBack = { navController.popBackStack() },
-                                            )
+                                            if (session.emailVerified) {
+                                                InvitationAcceptanceScreen(
+                                                    state = session,
+                                                    onAccept = sessionViewModel::acceptRegistrationInvitation,
+                                                    onBack = { navController.popBackStack() },
+                                                )
+                                            } else {
+                                                RoleUnavailableScreen(
+                                                    roleConfig.experience,
+                                                    onLogout = sessionViewModel::logout,
+                                                    onBack = { navController.popBackStack() },
+                                                )
+                                            }
                                         }
                                         composable(Destination.Mfa.route) {
                                             MfaScreen(onBack = { navController.popBackStack() })

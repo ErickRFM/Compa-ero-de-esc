@@ -66,6 +66,7 @@ fun AccountOnboardingScreen(
                         stringResource(
                             when (state.verificationDelivery) {
                                 VerificationDeliveryStatus.ACCEPTED -> R.string.verification_accepted
+                                VerificationDeliveryStatus.DELIVERED -> R.string.verification_delivered
                                 VerificationDeliveryStatus.UNAVAILABLE -> R.string.verification_unavailable
                                 VerificationDeliveryStatus.FAILED -> R.string.verification_failed
                                 VerificationDeliveryStatus.UNCONFIRMED -> R.string.verification_unconfirmed

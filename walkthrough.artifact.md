@@ -322,3 +322,28 @@ Checks de GitHub Actions sobre `43b16c22` (consulta `commits/{sha}/check-runs`):
 | Android management instrumentation API 35 | **success** (una ejecución duplicada quedó `cancelled` al ser reemplazada) |
 
 **Pendiente por decisión de producto, no por integración:** los PR #277 y #282 siguen en borrador y no se fusionaron; los PR de Dependabot tampoco. Los bloqueos externos de §15 (Firebase, Mongo, contratos vivos SIII, D2/D4/D8/D9) siguen igual.
+
+---
+
+## 18. Consolidación del 2026-11-09 (invitaciones #277/#283/#284)
+
+- Se fusionaron en la rama `codex/invitaciones-consolidadas-20261104`, desde `main` en `43223c7d`:
+  - #277 `codex/invitacion-validacion` — servicio de aceptación `InvitationAcceptanceService` + sus pruebas.
+  - #283 `feat/secure-invitation-email-flow-20261103` — servicio de despacho MFA, rutas de administración, pasarela Resend de invitaciones.
+  - #284 `feat/android-invitation-accept-20261103` — pantallas de emisión/aceptación, contratos compartidos y prueba de UI instrumentada.
+- Ajustes de consolidación:
+  - `VerificationDeliveryStatus.DELIVERED` ahora existe en el contrato compartido (entrega confirmada solo con evidencia); textos ES/EN y el `when` de `AccountOnboardingScreen` actualizados.
+  - `InvitationRepository.find/markSent/expireDue` disponibles en memoria y Mongo para respaldar despacho, revocación y caducidad.
+  - `InvitationRoutes.kt` ya no redeclara payloads: usa `PrepareRegistrationInvitationRequest`, `RegistrationInvitationPreparation`, `RegistrationInvitationDispatchReceipt`, `AcceptRegistrationInvitationRequest` y `RegistrationInvitationReceipt` de `shared/contracts`, y delega la aceptación en `InvitationAcceptanceService`.
+  - `MainActivity` muestra "Aceptar invitación" solo para sesiones con correo verificado y la ruta queda igualmente guardada.
+  - Documentos de seguridad de invitaciones alineados con lo ya implementado y los gates que siguen abiertos.
+- Verificado **en esta máquina** el 2026-11-09 sobre esa rama: `ktlintCheck` OK; `:services:api:test` OK; `testDebugUnitTest` + unit tests de ambas flavors OK; compilación Kotlin de ambas flavors OK; `assembleAcademic/ManagementDebugAndroidTest` OK.
+- APKs generados localmente en `apps/android/app/build/outputs/apk/{academic,management}/...`:
+  - `app-academic-debug.apk` (100.2 MB), `app-management-debug.apk` (100.2 MB), 2026-11-09 11:58.
+  - `app-academic-release.apk` (73.1 MB), `app-management-release.apk` (73.1 MB), 2026-11-09 12:02/12:04.
+- Pendiente (no verificado): CI con instrumentación en emulador, despliegue en Render QA, correo real vía Resend e integraciones externas.
+
+
+---
+
+> **Cierre 2026-11-09:** PR #296 fusionado a `main` en `c684d298f3373f4f3dfa7e7f0e21c745eef2dc69`. CI sobre ese SHA: Backend compile/test/smoke, Android compile/test/lint/package y las cuatro instrumentaciones (Académica/Gestión × API 31/35) en success; los reintentos fueron por infraestructura del emulador, no por fallos de pruebas. APKs finales en `dist/apk-20261109/` (debug y test-release minificada firmada con la clave de pruebas interna del repositorio; distribución de producción requiere firma separada).

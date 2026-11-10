@@ -178,6 +178,8 @@ class SiiiAcademicService(
                                         link.externalId,
                                         expected.sourceVersion,
                                     ).section
+                            InstitutionalIdentityKind.COORDINATOR ->
+                                throw ApiException.Forbidden("A student or teacher identity is required")
                         }
                     } catch (
                         _: ApiException.NotFound,

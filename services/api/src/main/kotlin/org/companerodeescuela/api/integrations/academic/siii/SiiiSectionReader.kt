@@ -111,7 +111,9 @@ class SiiiSectionReader(
         kind: InstitutionalIdentityKind,
         role: UserRole,
     ) {
-        if (kind != InstitutionalIdentityKind.STUDENT && kind != InstitutionalIdentityKind.TEACHER) throw ApiException.Forbidden("A student or teacher identity is required")
+        if (kind != InstitutionalIdentityKind.STUDENT && kind != InstitutionalIdentityKind.TEACHER) {
+            throw ApiException.Forbidden("A student or teacher identity is required")
+        }
         if (identitySource != SessionIdentitySource.NATIVE) throw ApiException.Forbidden("A native platform session is required")
         val current = policy.live(actor)
         if (current.institutionId != institutionId ||

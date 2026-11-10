@@ -3,12 +3,14 @@ package org.companerodeescuela.api.invitations
 import com.mongodb.client.model.Filters
 import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
+import com.mongodb.client.model.ReplaceOptions
 import com.mongodb.client.model.Updates
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.bson.Document
+import org.companerodeescuela.api.security.MfaSecretCipher
 import org.companerodeescuela.shared.contracts.VerificationDeliveryStatus
 import java.time.Clock
 import java.time.Instant
@@ -24,6 +26,9 @@ import java.util.Date
  */
 internal interface InvitationOutbox {
     suspend fun enqueue(entry: OutboxEntry): Boolean
+
+    /** Replaces a pending capability after an explicitly authorized manual retry. */
+    suspend fun replace(entry: OutboxEntry): Boolean = enqueue(entry)
 
     suspend fun pending(now: Instant): List<OutboxEntry>
 
@@ -70,13 +75,22 @@ internal class InMemoryInvitationOutbox(
             true
         }
 
+    override suspend fun replace(entry: OutboxEntry): Boolean =
+        mutex.withLock {
+            entries[entry.invitationId] = entry
+            true
+        }
+
     override suspend fun pending(now: Instant): List<OutboxEntry> =
         mutex.withLock {
             entries.values
                 .filter {
                     it.nextAttemptAt <= now &&
+                        it.expiresAt > now &&
+                        it.tokenValue.isNotEmpty() &&
                         it.lastStatus != VerificationDeliveryStatus.DELIVERED &&
-                        it.lastStatus != VerificationDeliveryStatus.FAILED
+                        it.lastStatus != VerificationDeliveryStatus.FAILED &&
+                        it.lastStatus != VerificationDeliveryStatus.ACCEPTED
                 }.toList()
         }
 
@@ -90,6 +104,7 @@ internal class InMemoryInvitationOutbox(
                 current.copy(
                     lastStatus = VerificationDeliveryStatus.DELIVERED,
                     tokenValue = "",
+                    recipient = "",
                     attempts = current.attempts + 1,
                 )
             true
@@ -101,7 +116,7 @@ internal class InMemoryInvitationOutbox(
     ): Boolean =
         mutex.withLock {
             val current = entries[id] ?: return@withLock false
-            entries[id] = current.copy(lastStatus = VerificationDeliveryStatus.FAILED, tokenValue = "")
+            entries[id] = current.copy(lastStatus = VerificationDeliveryStatus.FAILED, tokenValue = "", recipient = "")
             true
         }
 
@@ -119,13 +134,19 @@ internal class InMemoryInvitationOutbox(
     override suspend fun clearToken(id: String): Boolean =
         mutex.withLock {
             val current = entries[id] ?: return@withLock false
-            entries[id] = current.copy(tokenValue = "")
+            entries[id] =
+                current.copy(
+                    lastStatus = VerificationDeliveryStatus.ACCEPTED,
+                    tokenValue = "",
+                    recipient = "",
+                )
             true
         }
 }
 
 internal class MongoInvitationOutbox(
     database: MongoDatabase,
+    private val cipher: MfaSecretCipher,
     private val clock: Clock = Clock.systemUTC(),
 ) : InvitationOutbox {
     private val collection = database.getCollection<Document>("platform_invitation_outbox")
@@ -137,8 +158,57 @@ internal class MongoInvitationOutbox(
         if (indexesReady) return
         try {
             collection.createIndex(Indexes.ascending("nextAttemptAt"), IndexOptions().name("outbox_retry_idx"))
+            collection.createIndex(
+                Indexes.ascending("expiresAt"),
+                IndexOptions().expireAfter(0, java.util.concurrent.TimeUnit.SECONDS).name("outbox_expiry_ttl_idx"),
+            )
         } catch (_: com.mongodb.MongoCommandException) {
             // Index already exists; safe to ignore
+        }
+        // One-time compatibility migrations encrypt legacy recipient addresses and retry tokens.
+        collection.find(Filters.exists("recipient")).collect { legacy ->
+            val id = legacy.getString("_id") ?: throw IllegalStateException("Legacy invitation outbox entry has no ID")
+            val recipient = legacy.getString("recipient") ?: ""
+            if (recipient.isNotEmpty()) {
+                val encrypted =
+                    cipher.encrypt(
+                        id,
+                        "platform-invitation-outbox-recipient",
+                        recipient.toByteArray(Charsets.UTF_8),
+                    )
+                collection.updateOne(
+                    Filters.and(Filters.eq("_id", id), Filters.exists("recipient")),
+                    Updates.combine(
+                        Updates.set("recipientCiphertext", encrypted),
+                        Updates.unset("recipient"),
+                    ),
+                )
+            } else {
+                collection.updateOne(
+                    Filters.eq("_id", id),
+                    Updates.unset("recipient"),
+                )
+            }
+        }
+        collection.find(Filters.exists("tokenValue")).collect { legacy ->
+            val token = legacy.getString("tokenValue") ?: ""
+            if (token.isNotEmpty()) {
+                require(token.length in 20..64) { "Legacy invitation retry token has an invalid length" }
+                val id = legacy.getString("_id") ?: throw IllegalStateException("Legacy invitation outbox entry has no ID")
+                val encrypted = cipher.encrypt(id, "platform-invitation-outbox", token.toByteArray(Charsets.UTF_8))
+                collection.updateOne(
+                    Filters.and(Filters.eq("_id", id), Filters.exists("tokenValue")),
+                    Updates.combine(
+                        Updates.set("tokenCiphertext", encrypted),
+                        Updates.unset("tokenValue"),
+                    ),
+                )
+            } else {
+                collection.updateOne(
+                    Filters.eq("_id", legacy.getString("_id")),
+                    Updates.unset("tokenValue"),
+                )
+            }
         }
         indexesReady = true
     }
@@ -148,16 +218,39 @@ internal class MongoInvitationOutbox(
         return try {
             collection.insertOne(entry.toDocument())
             true
-        } catch (_: com.mongodb.MongoWriteException) {
-            false
+        } catch (error: com.mongodb.MongoWriteException) {
+            if (error.error.code == 11000) false else throw error
         }
     }
 
+    override suspend fun replace(entry: OutboxEntry): Boolean {
+        ensureIndexes()
+        val options = ReplaceOptions().upsert(true)
+        collection.replaceOne(
+            Filters.eq("_id", entry.invitationId),
+            entry.toDocument(),
+            options,
+        )
+        return true
+    }
+
     override suspend fun pending(now: Instant): List<OutboxEntry> {
+        ensureIndexes()
         val result = mutableListOf<OutboxEntry>()
         collection
-            .find(Filters.lte("nextAttemptAt", Date.from(now)))
-            .collect { doc -> doc.toOutboxEntry()?.let(result::add) }
+            .find(
+                Filters.and(
+                    Filters.lte("nextAttemptAt", Date.from(now)),
+                    Filters.gt("expiresAt", Date.from(now)),
+                    Filters.nin(
+                        "lastStatus",
+                        VerificationDeliveryStatus.DELIVERED.name,
+                        VerificationDeliveryStatus.FAILED.name,
+                        VerificationDeliveryStatus.ACCEPTED.name,
+                    ),
+                ),
+            ).limit(50)
+            .collect { doc -> doc.toOutboxEntry()?.takeIf { it.tokenValue.isNotEmpty() }?.let(result::add) }
         return result
     }
 
@@ -170,7 +263,8 @@ internal class MongoInvitationOutbox(
                 Filters.eq("_id", id),
                 Updates.combine(
                     Updates.set("lastStatus", VerificationDeliveryStatus.DELIVERED.name),
-                    Updates.set("tokenValue", ""),
+                    Updates.unset("tokenCiphertext"),
+                    Updates.unset("recipientCiphertext"),
                     Updates.set("deliveredAt", Date.from(now)),
                     Updates.inc("attempts", 1),
                 ),
@@ -185,7 +279,8 @@ internal class MongoInvitationOutbox(
                 Filters.eq("_id", id),
                 Updates.combine(
                     Updates.set("lastStatus", VerificationDeliveryStatus.FAILED.name),
-                    Updates.set("tokenValue", ""),
+                    Updates.unset("tokenCiphertext"),
+                    Updates.unset("recipientCiphertext"),
                 ),
             ).matchedCount == 1L
 
@@ -207,25 +302,60 @@ internal class MongoInvitationOutbox(
         collection
             .updateOne(
                 Filters.eq("_id", id),
-                Updates.set("tokenValue", ""),
+                Updates.combine(
+                    Updates.set("lastStatus", VerificationDeliveryStatus.ACCEPTED.name),
+                    Updates.unset("tokenCiphertext"),
+                    Updates.unset("recipientCiphertext"),
+                ),
             ).matchedCount == 1L
 
-    private fun OutboxEntry.toDocument(): Document =
-        Document("_id", invitationId)
-            .append("recipient", recipient)
-            .append("tokenValue", tokenValue)
+    private fun OutboxEntry.toDocument(): Document {
+        val encryptedToken =
+            if (tokenValue.isEmpty()) {
+                ""
+            } else {
+                cipher.encrypt(
+                    invitationId,
+                    "platform-invitation-outbox",
+                    tokenValue.toByteArray(Charsets.UTF_8),
+                )
+            }
+        val encryptedRecipient =
+            cipher.encrypt(
+                invitationId,
+                "platform-invitation-outbox-recipient",
+                recipient.toByteArray(Charsets.UTF_8),
+            )
+        return Document("_id", invitationId)
+            .append("recipientCiphertext", encryptedRecipient)
+            .append("tokenCiphertext", encryptedToken)
             .append("expiresAt", Date.from(expiresAt))
             .append("attempts", attempts)
             .append("nextAttemptAt", Date.from(nextAttemptAt))
             .append("lastStatus", lastStatus.name)
             .append("createdAt", Date.from(createdAt))
+    }
 
-    private fun Document.toOutboxEntry(): OutboxEntry? =
-        try {
+    private fun Document.toOutboxEntry(): OutboxEntry? {
+        return try {
+            val recipientCiphertext = getString("recipientCiphertext") ?: return null
+            val recipient =
+                cipher
+                    .decrypt(getString("_id"), "platform-invitation-outbox-recipient", recipientCiphertext)
+                    .toString(Charsets.UTF_8)
+            val ciphertext = getString("tokenCiphertext") ?: return null
+            val value =
+                if (ciphertext.isEmpty()) {
+                    ""
+                } else {
+                    cipher
+                        .decrypt(getString("_id"), "platform-invitation-outbox", ciphertext)
+                        .toString(Charsets.UTF_8)
+                }
             OutboxEntry(
                 invitationId = getString("_id"),
-                recipient = getString("recipient"),
-                tokenValue = getString("tokenValue"),
+                recipient = recipient,
+                tokenValue = value,
                 expiresAt = getDate("expiresAt").toInstant(),
                 attempts = getInteger("attempts", 0),
                 nextAttemptAt = getDate("nextAttemptAt").toInstant(),
@@ -235,4 +365,5 @@ internal class MongoInvitationOutbox(
         } catch (_: Exception) {
             null
         }
+    }
 }

@@ -47,6 +47,7 @@ import org.companerodeescuela.api.institutions.institutionOwnerProvisionRoutes
 import org.companerodeescuela.api.institutions.institutionRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
 import org.companerodeescuela.api.integrations.academic.siii.SiiiSectionProjectionFeature
+import org.companerodeescuela.api.integrations.matica.maticaProgressRoutes
 import org.companerodeescuela.api.integrations.push.InMemoryInstitutionalIdentityLinkRepository
 import org.companerodeescuela.api.integrations.push.InstitutionalAttendanceHistoryService
 import org.companerodeescuela.api.integrations.push.InstitutionalEventProjectionWorker
@@ -540,6 +541,21 @@ fun Application.module(
             verificationEmail = identityGraph.verificationEmail,
             sessionAuthority = sessionAuthority,
             ownerInvitationRepository = ownerInvitationRepository,
+        )
+        val maticaIntegrationSecret = System.getenv("MATICA_COMPANION_INTEGRATION_SECRET")
+        val maticaApiBaseUrl = System.getenv("MATICA_API_BASE_URL")
+        maticaProgressRoutes(
+            settings = settings,
+            accounts = identityGraph.accounts,
+            sessions = identityGraph.refreshSessions,
+            database =
+                if (settings.mongo.isConfigured && !maticaIntegrationSecret.isNullOrBlank() && !maticaApiBaseUrl.isNullOrBlank()) {
+                    mongoConnection.database()
+                } else {
+                    null
+                },
+            sharedSecret = maticaIntegrationSecret,
+            apiBaseUrl = maticaApiBaseUrl,
         )
         mfaRoutes(settings, providerRegistry.identity, identityGraph.refreshSessions, identityGraph.accounts, identityGraph.mfa)
         accountAdministrationRoutes(

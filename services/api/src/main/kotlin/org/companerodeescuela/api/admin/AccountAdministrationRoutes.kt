@@ -15,6 +15,8 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.DeserializationStrategy
+import org.companerodeescuela.api.audit.PlatformAuditEvent
+import org.companerodeescuela.api.audit.PlatformAuditLog
 import org.companerodeescuela.api.auth.AuthTokenService
 import org.companerodeescuela.api.auth.LoginAttemptLimiter
 import org.companerodeescuela.api.auth.PlatformAccount
@@ -33,13 +35,15 @@ import org.companerodeescuela.shared.contracts.ApproveStaffRequest
 import org.companerodeescuela.shared.contracts.ApproveStudentAffiliationRequest
 import org.companerodeescuela.shared.contracts.TeacherApplicationRequest
 import org.companerodeescuela.shared.contracts.TutorApplicationRequest
+import java.util.UUID
 
-fun Route.accountAdministrationRoutes(
+internal fun Route.accountAdministrationRoutes(
     settings: ApiSettings,
     identity: IdentityProvider,
     sessions: RefreshSessionRepository,
     accounts: PlatformAccountRepository,
     service: AccountAdministrationService,
+    auditLog: PlatformAuditLog? = null,
 ) {
     if (!settings.hasAuthentication) return
     val tokens = AuthTokenService(settings)
@@ -57,6 +61,28 @@ fun Route.accountAdministrationRoutes(
         }
         return current
     }
+
+    suspend fun recordAudit(
+        actorId: String,
+        action: String,
+        resourceType: String,
+        resourceId: String,
+        operationId: String,
+        outcome: String,
+    ) {
+        auditLog?.record(
+            PlatformAuditEvent.create(
+                actorId = actorId,
+                action = action,
+                resourceType = resourceType,
+                resourceId = resourceId,
+                operationId = operationId,
+                outcome = outcome,
+                createdAt = java.time.Instant.now(),
+            ),
+        )
+    }
+
     authenticate(
         AuthTokenService.ACTIVE_PROVIDER_NAME,
         AuthTokenService.PENDING_APPROVAL_PROVIDER_NAME,
@@ -71,12 +97,20 @@ fun Route.accountAdministrationRoutes(
             post {
                 val actor = call.actor(true)
                 val request = call.administrationRequest(TutorApplicationRequest.serializer())
-                call.respond(HttpStatusCode.Created, ApiResponse(service.requestTutor(actor, request), call.requestId()))
+                val operationId = UUID.randomUUID().toString()
+                recordAudit(actor.id, "STAFF_APPLICATION_TUTOR", "STAFF_APPLICATION", actor.id, operationId, "STARTED")
+                val result = service.requestTutor(actor, request)
+                recordAudit(actor.id, "STAFF_APPLICATION_TUTOR", "STAFF_APPLICATION", actor.id, operationId, "SUCCEEDED")
+                call.respond(HttpStatusCode.Created, ApiResponse(result, operationId))
             }
             post("/teacher") {
                 val actor = call.actor(true)
                 val request = call.administrationRequest(TeacherApplicationRequest.serializer())
-                call.respond(HttpStatusCode.Created, ApiResponse(service.requestTeacher(actor, request), call.requestId()))
+                val operationId = UUID.randomUUID().toString()
+                recordAudit(actor.id, "STAFF_APPLICATION_TEACHER", "STAFF_APPLICATION", actor.id, operationId, "STARTED")
+                val result = service.requestTeacher(actor, request)
+                recordAudit(actor.id, "STAFF_APPLICATION_TEACHER", "STAFF_APPLICATION", actor.id, operationId, "SUCCEEDED")
+                call.respond(HttpStatusCode.Created, ApiResponse(result, operationId))
             }
         }
     }
@@ -89,19 +123,31 @@ fun Route.accountAdministrationRoutes(
                 val actor = call.actor(true)
                 val request = call.administrationRequest(ApproveStaffRequest.serializer())
                 val id = call.parameters["accountId"] ?: throw ApiException.Validation("Account is required")
-                call.respond(ApiResponse(service.approveStaff(actor, id, request), call.requestId()))
+                val operationId = UUID.randomUUID().toString()
+                recordAudit(actor.id, "ACCOUNT_STAFF_APPROVAL", "ACCOUNT", id, operationId, "STARTED")
+                val result = service.approveStaff(actor, id, request)
+                recordAudit(actor.id, "ACCOUNT_STAFF_APPROVAL", "ACCOUNT", id, operationId, "SUCCEEDED")
+                call.respond(ApiResponse(result, operationId))
             }
             post("/{accountId}/student-affiliation") {
                 val actor = call.actor(true)
                 val request = call.administrationRequest(ApproveStudentAffiliationRequest.serializer())
                 val id = call.parameters["accountId"] ?: throw ApiException.Validation("Account is required")
-                call.respond(ApiResponse(service.approveStudentAffiliation(actor, id, request), call.requestId()))
+                val operationId = UUID.randomUUID().toString()
+                recordAudit(actor.id, "ACCOUNT_STUDENT_AFFILIATION", "ACCOUNT", id, operationId, "STARTED")
+                val result = service.approveStudentAffiliation(actor, id, request)
+                recordAudit(actor.id, "ACCOUNT_STUDENT_AFFILIATION", "ACCOUNT", id, operationId, "SUCCEEDED")
+                call.respond(ApiResponse(result, operationId))
             }
             post("/{accountId}/lifecycle") {
                 val actor = call.actor(true)
                 val request = call.administrationRequest(AccountLifecycleRequest.serializer())
                 val id = call.parameters["accountId"] ?: throw ApiException.Validation("Account is required")
-                call.respond(ApiResponse(service.lifecycle(actor, id, request), call.requestId()))
+                val operationId = UUID.randomUUID().toString()
+                recordAudit(actor.id, "ACCOUNT_LIFECYCLE", "ACCOUNT", id, operationId, "STARTED")
+                val result = service.lifecycle(actor, id, request)
+                recordAudit(actor.id, "ACCOUNT_LIFECYCLE", "ACCOUNT", id, operationId, "SUCCEEDED")
+                call.respond(ApiResponse(result, operationId))
             }
         }
     }

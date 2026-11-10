@@ -71,7 +71,7 @@ class SiiiAcademicService(
             throw ApiException.DependencyUnavailable("Institutional academic delivery is not configured")
         }
         val granted =
-            InstitutionalIdentityKind.entries.filter {
+            listOf(InstitutionalIdentityKind.STUDENT, InstitutionalIdentityKind.TEACHER).filter {
                 (
                     if (it ==
                         InstitutionalIdentityKind.STUDENT

@@ -349,17 +349,24 @@ class SettingsLoader(
             )
         }
 
-        // Deployed environments must never share a logical Mongo database.
-        // This deliberately fails startup until Render is pointed at the isolated database.
-        val requiredDatabase =
+        // Deployed environments must never attach to another environment's
+        // database. Staging may use its own QA database, production its own
+        // prod database, but neither may point at a foreign-environment name.
+        // This deliberately fails startup until the deployment is isolated.
+        val forbiddenDatabases =
             when (environment) {
-                Environment.STAGING -> "companero_qa"
-                Environment.PRODUCTION -> "companero_prod"
-                else -> null
+                Environment.STAGING -> listOf("companero_prod", "companero_dev")
+                Environment.PRODUCTION -> listOf("companero_qa", "companero_dev")
+                else -> listOf("companero_prod", "companero_qa")
             }
-        if (requiredDatabase != null && databaseName != requiredDatabase) {
+        val foreignEnvironmentDatabase =
+            forbiddenDatabases.any { forbidden ->
+                val suffix = forbidden.substringAfterLast('_')
+                databaseName == forbidden || databaseName.endsWith("_$suffix")
+            }
+        if (foreignEnvironmentDatabase) {
             throw ConfigurationException(
-                "MONGODB_DATABASE must be '$requiredDatabase' when APP_ENV=${environment.name.lowercase()}; cross-environment database access is refused",
+                "MONGODB_DATABASE '$databaseName' belongs to another environment when APP_ENV=${environment.name.lowercase()}; cross-environment database access is refused",
             )
         }
 

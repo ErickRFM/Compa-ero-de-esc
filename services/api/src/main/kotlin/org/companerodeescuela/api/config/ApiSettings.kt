@@ -388,14 +388,6 @@ class SettingsLoader(
             throw ConfigurationException("Invalid VERIFICATION_EMAIL_SENDER")
         }
 
-        val resendWebhookSecret =
-            env("RESEND_WEBHOOK_SECRET")?.trim()?.takeIf { it.isNotEmpty() }?.also { secret ->
-                val encoded = secret.removePrefix("whsec_")
-                val decoded = runCatching { Base64.getDecoder().decode(encoded) }.getOrNull()
-                if (!secret.startsWith("whsec_") || decoded?.size != 32) {
-                    throw ConfigurationException("RESEND_WEBHOOK_SECRET must be a Resend whsec_ secret containing 32 bytes")
-                }
-            }
         val productionInvitationsEnabled =
             when (env("PRODUCTION_INVITATIONS_ENABLED")?.trim()?.lowercase()) {
                 null, "false" -> false

@@ -360,6 +360,27 @@ class SettingsLoader(
             )
         }
 
+        // Deployed environments must never attach to another environment's
+        // database. Staging may use its own QA database, production its own
+        // prod database, but neither may point at a foreign-environment name.
+        // This deliberately fails startup until the deployment is isolated.
+        val forbiddenDatabases =
+            when (environment) {
+                Environment.STAGING -> listOf("companero_prod", "companero_dev")
+                Environment.PRODUCTION -> listOf("companero_qa", "companero_dev")
+                else -> listOf("companero_prod", "companero_qa")
+            }
+        val foreignEnvironmentDatabase =
+            forbiddenDatabases.any { forbidden ->
+                val suffix = forbidden.substringAfterLast('_')
+                databaseName == forbidden || databaseName.endsWith("_$suffix")
+            }
+        if (foreignEnvironmentDatabase) {
+            throw ConfigurationException(
+                "MONGODB_DATABASE '$databaseName' belongs to another environment when APP_ENV=${environment.name.lowercase()}; cross-environment database access is refused",
+            )
+        }
+
         val resendWebhookSecret =
             env("RESEND_WEBHOOK_SECRET")?.trim()?.takeIf { it.isNotEmpty() }?.also { secret ->
                 val encoded = secret.removePrefix("whsec_")

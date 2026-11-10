@@ -349,6 +349,20 @@ class SettingsLoader(
             )
         }
 
+        // Deployed environments must never share a logical Mongo database.
+        // This deliberately fails startup until Render is pointed at the isolated database.
+        val requiredDatabase =
+            when (environment) {
+                Environment.STAGING -> "companero_qa"
+                Environment.PRODUCTION -> "companero_prod"
+                else -> null
+            }
+        if (requiredDatabase != null && databaseName != requiredDatabase) {
+            throw ConfigurationException(
+                "MONGODB_DATABASE must be '$requiredDatabase' when APP_ENV=${environment.name.lowercase()}; cross-environment database access is refused",
+            )
+        }
+
         val verificationEmailKey = env("VERIFICATION_EMAIL_API_KEY")?.takeIf { it.isNotBlank() }
         val verificationEmailSender = env("VERIFICATION_EMAIL_SENDER")?.trim()?.takeIf { it.isNotEmpty() }
         if ((verificationEmailKey == null) !=

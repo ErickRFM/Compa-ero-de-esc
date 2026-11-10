@@ -71,7 +71,7 @@ class SiiiAcademicService(
             throw ApiException.DependencyUnavailable("Institutional academic delivery is not configured")
         }
         val granted =
-            InstitutionalIdentityKind.entries.filter {
+            listOf(InstitutionalIdentityKind.STUDENT, InstitutionalIdentityKind.TEACHER).filter {
                 (
                     if (it ==
                         InstitutionalIdentityKind.STUDENT
@@ -178,6 +178,8 @@ class SiiiAcademicService(
                                         link.externalId,
                                         expected.sourceVersion,
                                     ).section
+                            InstitutionalIdentityKind.COORDINATOR ->
+                                throw ApiException.Forbidden("A student or teacher identity is required")
                         }
                     } catch (
                         _: ApiException.NotFound,

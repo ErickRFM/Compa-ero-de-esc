@@ -115,5 +115,41 @@ class InstitutionalIdentityLinkServiceTest {
                 service.link(admin.toUserSummary(), request.copy(nativeUserId = "other-student", proof = "invalid"))
             }
             assertEquals(null, service.resolve("campus", InstitutionalIdentityKind.STUDENT, "SIS-UNKNOWN"))
+
+            val coordinator =
+                PlatformAccount(
+                    id = "coordinator-1",
+                    displayName = "Verified Career Coordinator",
+                    email = "coordinator@example.test",
+                    passwordHash = "already-hashed",
+                    roles = setOf(UserRole.COORDINATOR),
+                    institutionId = "campus",
+                    emailVerifiedAt = clock.current,
+                )
+            accounts.create(coordinator)
+            val coordinatorRequest =
+                InstitutionalIdentityLinkRequest(
+                    institutionId = "campus",
+                    entityType = InstitutionalIdentityKind.COORDINATOR,
+                    externalId = "siii-user-0001",
+                    nativeUserId = coordinator.id,
+                    operationId = "link-coordinator-0001",
+                    proof = "",
+                )
+            val coordinatorDigest = InstitutionalIdentityLinkDigest.command(coordinatorRequest)
+            clock.current = clock.current.plusSeconds(30)
+            val coordinatorProof =
+                mfa.issueStepUp(
+                    admin,
+                    "operator-test-password",
+                    Totp.code(seed, clock.current.epochSecond),
+                    StepUpAction.MANAGE_ACADEMICS,
+                    "campus",
+                    coordinatorRequest.operationId,
+                    coordinatorDigest,
+                )
+            val coordinatorLink = service.link(admin.toUserSummary(), coordinatorRequest.copy(proof = coordinatorProof.proof))
+            assertEquals(coordinator.id, coordinatorLink.nativeUserId)
+            assertEquals(coordinator.id, service.resolve("campus", InstitutionalIdentityKind.COORDINATOR, "siii-user-0001")?.id)
         }
 }

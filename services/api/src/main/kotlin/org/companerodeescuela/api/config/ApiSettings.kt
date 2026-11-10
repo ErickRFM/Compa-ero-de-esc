@@ -69,6 +69,10 @@ data class ApiSettings(
     val currentUserCacheTtlMillis: Int = 0,
     val verificationEmailApiKey: CharArray? = null,
     val verificationEmailSender: String? = null,
+    /** Svix signing secret for Resend webhooks; never logged or returned. */
+    val resendWebhookSecret: CharArray? = null,
+    /** Explicit opt-in for production invitation dispatch; disabled by default. */
+    val productionInvitationsEnabled: Boolean = false,
     val mfaEncryptionKey: ByteArray? = null,
     /** Separate AES-256 key for institutional HMAC credential encryption at rest. */
     val institutionIntegrationEncryptionKey: ByteArray? = null,
@@ -83,6 +87,7 @@ data class ApiSettings(
     }
 
     val hasVerificationEmail: Boolean get() = verificationEmailApiKey != null && verificationEmailSender != null
+    val hasResendWebhook: Boolean get() = resendWebhookSecret != null
     val hasFirebasePush: Boolean get() = firebaseServiceAccountJson != null
 
     val hasAuthentication: Boolean
@@ -123,6 +128,8 @@ data class ApiSettings(
             attendanceQrNonceReuseThreshold == other.attendanceQrNonceReuseThreshold &&
             hasVerificationEmail == other.hasVerificationEmail &&
             verificationEmailSender == other.verificationEmailSender &&
+            hasResendWebhook == other.hasResendWebhook &&
+            productionInvitationsEnabled == other.productionInvitationsEnabled &&
             (mfaEncryptionKey != null) == (other.mfaEncryptionKey != null) &&
             (institutionIntegrationEncryptionKey != null) == (other.institutionIntegrationEncryptionKey != null) &&
             hasFirebasePush == other.hasFirebasePush
@@ -155,6 +162,8 @@ data class ApiSettings(
         result = 31 * result + attendanceQrNonceReuseThreshold
         result = 31 * result + hasVerificationEmail.hashCode()
         result = 31 * result + (verificationEmailSender?.hashCode() ?: 0)
+        result = 31 * result + hasResendWebhook.hashCode()
+        result = 31 * result + productionInvitationsEnabled.hashCode()
         result = 31 * result + (mfaEncryptionKey != null).hashCode()
         result = 31 * result + (institutionIntegrationEncryptionKey != null).hashCode()
         result = 31 * result + hasFirebasePush.hashCode()
@@ -185,6 +194,8 @@ data class ApiSettings(
             "lateSyncReviewWindowSeconds=$lateSyncReviewWindowSeconds, " +
             "attendanceQrNonceReuseThreshold=$attendanceQrNonceReuseThreshold, " +
             "verificationEmailConfigured=$hasVerificationEmail, " +
+            "resendWebhookConfigured=$hasResendWebhook, " +
+            "productionInvitationsEnabled=$productionInvitationsEnabled, " +
             "mfaEncryptionConfigured=${mfaEncryptionKey != null}, " +
             "institutionIntegrationEncryptionConfigured=${institutionIntegrationEncryptionKey != null}, " +
             "firebasePushConfigured=$hasFirebasePush, " +
@@ -349,6 +360,15 @@ class SettingsLoader(
             )
         }
 
+        val resendWebhookSecret =
+            env("RESEND_WEBHOOK_SECRET")?.trim()?.takeIf { it.isNotEmpty() }?.also { secret ->
+                val encoded = secret.removePrefix("whsec_")
+                val decoded = runCatching { Base64.getDecoder().decode(encoded) }.getOrNull()
+                if (!secret.startsWith("whsec_") || decoded?.size != 32) {
+                    throw ConfigurationException("RESEND_WEBHOOK_SECRET must be a Resend whsec_ secret containing 32 bytes")
+                }
+            }
+
         val verificationEmailKey = env("VERIFICATION_EMAIL_API_KEY")?.takeIf { it.isNotBlank() }
         val verificationEmailSender = env("VERIFICATION_EMAIL_SENDER")?.trim()?.takeIf { it.isNotEmpty() }
         if ((verificationEmailKey == null) !=
@@ -367,6 +387,13 @@ class SettingsLoader(
         ) {
             throw ConfigurationException("Invalid VERIFICATION_EMAIL_SENDER")
         }
+
+        val productionInvitationsEnabled =
+            when (env("PRODUCTION_INVITATIONS_ENABLED")?.trim()?.lowercase()) {
+                null, "false" -> false
+                "true" -> true
+                else -> throw ConfigurationException("PRODUCTION_INVITATIONS_ENABLED must be true or false")
+            }
 
         // A configured first-owner invitation must never consume its one-time code
         // when the account-verification email path is unavailable.
@@ -450,6 +477,22 @@ class SettingsLoader(
                 decoded
             }
         if (
+            productionInvitationsEnabled &&
+            (
+                !environment.isProduction ||
+                    mongoUri.isBlank() ||
+                    jwtSecret.isNullOrBlank() ||
+                    verificationEmailKey == null ||
+                    verificationEmailSender == null ||
+                    resendWebhookSecret == null ||
+                    mfaKey == null
+            )
+        ) {
+            throw ConfigurationException(
+                "PRODUCTION_INVITATIONS_ENABLED requires production, MongoDB, JWT, Resend and MFA encryption",
+            )
+        }
+        if (
             mfaKey != null &&
             institutionIntegrationKey != null &&
             mfaKey.contentEquals(institutionIntegrationKey)
@@ -501,6 +544,8 @@ class SettingsLoader(
             currentUserCacheTtlMillis = currentUserCacheTtlMillis,
             verificationEmailApiKey = verificationEmailKey?.toCharArray(),
             verificationEmailSender = verificationEmailSender,
+            resendWebhookSecret = resendWebhookSecret?.toCharArray(),
+            productionInvitationsEnabled = productionInvitationsEnabled,
             mfaEncryptionKey = mfaKey,
             institutionIntegrationEncryptionKey = institutionIntegrationKey,
             firebaseServiceAccountJson = firebaseJson?.toCharArray(),

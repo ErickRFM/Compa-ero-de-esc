@@ -14,6 +14,7 @@ import org.companerodeescuela.feature.auth.SessionUiState
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicReference
 
 class DistributionLoginUiTest {
     @get:Rule
@@ -24,14 +25,14 @@ class DistributionLoginUiTest {
 
     @Test
     fun automaticLoginDoesNotAskForAnExperience() {
-        var submitted: Pair<String, String>? = null
+        val submitted = AtomicReference<Pair<String, String>?>(null)
         compose.setContent {
             CompaneroTheme {
                 LoginScreen(
                     state = SessionUiState(checking = false),
                     distribution = distribution,
                     onLogin = { _, _, _ -> error("Automatic login must not select a role") },
-                    onAutomaticLogin = { username, password -> submitted = username to password },
+                    onAutomaticLogin = { username, password -> submitted.set(username to password) },
                 )
             }
         }
@@ -39,8 +40,8 @@ class DistributionLoginUiTest {
         compose.onNodeWithTag("login_username").performScrollTo().performTextInput("qa.docente")
         compose.onNodeWithTag("login_password").performScrollTo().performTextInput("test-password")
         compose.onNodeWithTag("login_submit").performScrollTo().performClick()
-        compose.waitUntil(10_000) { submitted != null }
-        assertEquals("qa.docente" to "test-password", submitted)
+        compose.waitUntil(10_000) { submitted.get() != null }
+        assertEquals("qa.docente" to "test-password", submitted.get())
         if (distribution == AppDistribution.ACADEMIC) {
             compose.onNodeWithTag("login_registration").assertExists()
         } else {

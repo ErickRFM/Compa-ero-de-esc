@@ -227,6 +227,27 @@ class SettingsLoaderTest {
     }
 
     @Test
+    @DisplayName("Staging and production cannot connect to another environment's Mongo database")
+    fun deployedEnvironmentsRejectCrossEnvironmentMongoDatabases() {
+        for ((environment, wrongDatabase) in listOf(
+            "staging" to "companero_dev",
+            "staging" to "companero_prod",
+            "production" to "companero_dev",
+            "production" to "companero_qa",
+        )) {
+            val error =
+                assertFailsWith<ConfigurationException> {
+                    loader(
+                        "APP_ENV" to environment,
+                        "API_PORT" to "8080",
+                        "MONGODB_DATABASE" to wrongDatabase,
+                    ).load()
+                }
+            assertContains(error.message!!, "cross-environment database access is refused")
+        }
+    }
+
+    @Test
     @DisplayName("Production requires a JWT secret")
     fun productionRequiresSecret() {
         val error =

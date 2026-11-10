@@ -347,3 +347,36 @@ Checks de GitHub Actions sobre `43b16c22` (consulta `commits/{sha}/check-runs`):
 ---
 
 > **Cierre 2026-11-09:** PR #296 fusionado a `main` en `c684d298f3373f4f3dfa7e7f0e21c745eef2dc69`. CI sobre ese SHA: Backend compile/test/smoke, Android compile/test/lint/package y las cuatro instrumentaciones (Académica/Gestión × API 31/35) en success; los reintentos fueron por infraestructura del emulador, no por fallos de pruebas. APKs finales en `dist/apk-20261109/` (debug y test-release minificada firmada con la clave de pruebas interna del repositorio; distribución de producción requiere firma separada).
+
+
+## 19. Sincronización y consolidación del 2026-11-10 (ronda completa de PRs)
+
+Fusionados a `main` en orden de dependencia, cada uno con checks requeridos verdes:
+
+| PR | Contenido | Merge commit |
+|---|---|---|
+| #296 | Contratos de invitación unificados API/Android, aceptación respaldada por servicio, `DELIVERED` explícito, gating por correo verificado | `c684d298` |
+| #297 | Outbox cifrado (AES-GCM) con worker de reintentos, reintento manual con token nuevo y TTL de expiración | `9da9cfc8` |
+| #300 | Webhook Svix firmado de Resend (anti-replay, cuerpo acotado, tags de correlación, auditoría idempotente en `platform_audit_events`) + runbook `docs/operations/RESEND_WEBHOOK_SETUP.md` | `1b4fca2f` |
+| #298 | Alta y habilitación de instituciones restringida a propietario verificado (rutas prepare/create + pruebas de negación) | `fc538865` |
+| #301 | Visibilidad de login en instrumentación académica | `324280c2` |
+| #302 | Aislamiento fail-closed de bases Mongo por ambiente (rechazo de nombres multi-entorno) | `b000dae1` |
+| #303 | Enlaces de cuenta SIII coordinador (kind COORDINATOR sin exceder académica estudiante/docente) | `7f926b44` |
+| #295 | Progreso Matica en Compa-ero (contratos compartidos, repositorio, rutas, pantallas) | `76de35e5` |
+
+Correcciones de consolidación aplicadas en las ramas antes de fusionar (todas verificadas localmente):
+
+- Conflictos de unión en `ApiSettings.kt` resueltos conservando ambos lados (`resendWebhookSecret` Svix y el gate `productionInvitationsEnabled`) sin declaraciones duplicadas.
+- El aislamiento de #302 pasó de exigir el nombre canónico exacto (rompía el contrato de las pruebas existentes de JWT/Mongo/MFA) a rechazar nombres pertenecientes a otro ambiente (`companero_prod`/`qa`/`dev` y sufijos), manteniendo el objetivo fail-closed.
+- #303: `when` exhaustivo sobre `InstitutionalIdentityKind` con rama COORDINATOR que mantiene la carga académica limitada a estudiante/docente; formato ktlint.
+- #295: formato ktlint en pantallas home/Matica y en pruebas del verificador de enlaces Matica.
+
+#293 (`feat/verified-product-owner-and-invitations-20261106`) **cerrado como superado** con su contenido ya fusionado por bloques en #292, #296, #297, #298 y #300; se descartó el rebase de 32 commits contra el sistema ya consolidado por riesgo de regresión sin valor añadido.
+
+CI y verificación:
+
+- Cada PR se fusionó con `mergeStateStatus CLEAN` y los check-runs requeridos de la protección de `main` (Backend compile/test/smoke y Android compile/test/lint/package) en success. Las cuatro instrumentaciones (Académica/Gestión × API 31/35) y el APK de registro QA también en success cuando aplicó.
+- En esta máquina: `ktlintCheck`, `:services:api:test`, compile Kotlin de API y Android en cada resolución de conflicto; suite completa del backend verde tras cada unión.
+- Las reejecuciones de jobs fueron por flakes de runner/emulador de GitHub Actions; ninguna prueba falló en intento exitoso.
+
+Pendientes externos reales (no verificables desde este entorno): crear los webhooks de Resend por ambiente (QA/producción) y probar ciclo de entrega real; despliegue en Render QA; correo real a `erik55509@hotmail.com`; aprovisionamiento de SUPER_ADMIN vía `OwnerBootstrap` con MFA del titular y autorización firmada (issue #281).

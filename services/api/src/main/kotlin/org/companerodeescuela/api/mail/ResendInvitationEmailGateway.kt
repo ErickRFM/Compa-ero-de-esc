@@ -56,6 +56,23 @@ internal class ResendInvitationEmailGateway(
                 put("to", buildJsonArray { add(recipient) })
                 put("subject", "Invitación a Compañero de Clase")
                 put(
+                    "tags",
+                    buildJsonArray {
+                        add(
+                            buildJsonObject {
+                                put("name", "category")
+                                put("value", "companero_invitation")
+                            },
+                        )
+                        add(
+                            buildJsonObject {
+                                put("name", "invitation_id")
+                                put("value", invitationId)
+                            },
+                        )
+                    },
+                )
+                put(
                     "text",
                     "Te invitaron a Compañero de Clase.\n\n" +
                         "Abre la aplicación y regístrate con este mismo correo. " +

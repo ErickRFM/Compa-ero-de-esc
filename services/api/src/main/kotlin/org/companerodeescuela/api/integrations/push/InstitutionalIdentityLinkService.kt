@@ -158,6 +158,7 @@ class InstitutionalIdentityLinkService(
         when (kind) {
             InstitutionalIdentityKind.STUDENT -> UserRole.STUDENT
             InstitutionalIdentityKind.TEACHER -> UserRole.TEACHER
+            InstitutionalIdentityKind.COORDINATOR -> UserRole.COORDINATOR
         }
 
     private fun InstitutionalIdentityLink.toSummary() =

@@ -20,6 +20,8 @@ import org.companerodeescuela.api.admin.OwnerBootstrap
 import org.companerodeescuela.api.admin.QaAdminBootstrap
 import org.companerodeescuela.api.admin.accountAdministrationRoutes
 import org.companerodeescuela.api.attendance.attendanceRoutes
+import org.companerodeescuela.api.audit.InMemoryPlatformAuditLog
+import org.companerodeescuela.api.audit.MongoPlatformAuditLog
 import org.companerodeescuela.api.auth.InMemoryOwnerInvitationRepository
 import org.companerodeescuela.api.auth.InMemoryRateLimitStore
 import org.companerodeescuela.api.auth.LoginAttemptLimiter
@@ -41,6 +43,7 @@ import org.companerodeescuela.api.grading.gradingRoutes
 import org.companerodeescuela.api.health.HealthService
 import org.companerodeescuela.api.health.healthRoutes
 import org.companerodeescuela.api.institutions.SiiiPilotInstitutionBootstrap
+import org.companerodeescuela.api.institutions.institutionOwnerProvisionRoutes
 import org.companerodeescuela.api.institutions.institutionRoutes
 import org.companerodeescuela.api.integrations.ProviderRegistry
 import org.companerodeescuela.api.integrations.academic.siii.SiiiSectionProjectionFeature
@@ -67,9 +70,11 @@ import org.companerodeescuela.api.invitations.MongoInvitationRepository
 import org.companerodeescuela.api.invitations.UnavailableInvitationEmailGateway
 import org.companerodeescuela.api.invitations.invitationRoutes
 import org.companerodeescuela.api.mail.ResendInvitationEmailGateway
+import org.companerodeescuela.api.mail.resendWebhookRoutes
 import org.companerodeescuela.api.plugins.configurePlugins
 import org.companerodeescuela.api.presence.schoolPresenceRoutes
 import org.companerodeescuela.api.representatives.groupRepresentativeRoutes
+import org.companerodeescuela.api.security.MfaSecretCipher
 import org.companerodeescuela.api.security.mfaRoutes
 import org.companerodeescuela.api.tutoring.tutorCaseRoutes
 import org.companerodeescuela.api.tutoring.tutoringRoutes
@@ -450,6 +455,12 @@ fun Application.module(
             progressiveDelayMaximum = java.time.Duration.ofSeconds(settings.loginProgressiveDelayMaxSeconds),
             store = rateLimitStore,
         )
+    val platformAuditLog =
+        if (settings.hasAuthentication && settings.mongo.isConfigured) {
+            MongoPlatformAuditLog(mongoConnection.database())
+        } else {
+            InMemoryPlatformAuditLog()
+        }
     val invitationRepository =
         if (settings.hasAuthentication && settings.mongo.isConfigured) {
             MongoInvitationRepository(mongoConnection.database())
@@ -457,8 +468,8 @@ fun Application.module(
             InMemoryInvitationRepository()
         }
     val invitationOutbox =
-        if (settings.hasAuthentication && settings.mongo.isConfigured) {
-            MongoInvitationOutbox(mongoConnection.database())
+        if (settings.hasAuthentication && settings.mongo.isConfigured && settings.mfaEncryptionKey != null) {
+            MongoInvitationOutbox(mongoConnection.database(), MfaSecretCipher(settings.mfaEncryptionKey))
         } else {
             InMemoryInvitationOutbox()
         }
@@ -480,6 +491,27 @@ fun Application.module(
             identityGraph.institutions,
             invitationOutbox,
         )
+    val invitationWorkerConfigured =
+        settings.hasAuthentication &&
+            settings.mongo.isConfigured &&
+            settings.hasVerificationEmail &&
+            settings.mfaEncryptionKey != null
+    val invitationWorkerAllowed = !settings.environment.isProduction || settings.productionInvitationsEnabled
+    launchManagedWorker(
+        enabled = invitationWorkerConfigured && invitationWorkerAllowed,
+        context = Dispatchers.IO,
+    ) {
+        while (kotlin.coroutines.coroutineContext[Job]?.isActive == true) {
+            try {
+                invitationDispatcher.retryPendingOutbox()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                log.warn("Invitation outbox retry unavailable; encrypted work retained")
+            }
+            kotlinx.coroutines.delay(30_000)
+        }
+    }
 
     val ownerInvitationRepository =
         if (settings.hasAuthentication && settings.mongo.isConfigured) {
@@ -490,6 +522,15 @@ fun Application.module(
 
     routing {
         healthRoutes(settings = settings, healthService = healthService)
+        resendWebhookRoutes(
+            signingSecret = settings.resendWebhookSecret,
+            database =
+                if (settings.hasAuthentication && settings.mongo.isConfigured) {
+                    mongoConnection.database()
+                } else {
+                    null
+                },
+        )
         authRoutes(
             settings = settings,
             identityProvider = providerRegistry.identity,
@@ -522,6 +563,7 @@ fun Application.module(
             identityGraph.refreshSessions,
             identityGraph.accounts,
             administrationService,
+            auditLog = platformAuditLog,
         )
         institutionalIdentityLinkRoutes(
             settings,
@@ -538,8 +580,19 @@ fun Application.module(
             invitationDispatcher,
             invitationRepository,
             rateLimitStore = rateLimitStore,
+            auditLog = platformAuditLog,
         )
         institutionRoutes(identityGraph.institutions)
+        institutionOwnerProvisionRoutes(
+            settings,
+            providerRegistry.identity,
+            identityGraph.refreshSessions,
+            identityGraph.accounts,
+            identityGraph.mfa,
+            identityGraph.institutions,
+            rateLimitStore = rateLimitStore,
+            auditLog = platformAuditLog,
+        )
         institutionalPushRoutes(
             institutionalPushAuthenticator,
             institutionalPushService,

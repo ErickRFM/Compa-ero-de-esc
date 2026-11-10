@@ -10,6 +10,9 @@ enum class InstitutionalIdentityKind {
 
     @SerialName("teacher")
     TEACHER,
+
+    @SerialName("coordinator")
+    COORDINATOR,
 }
 
 /** Links an institutional identifier to an already approved native account. */

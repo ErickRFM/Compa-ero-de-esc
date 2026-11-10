@@ -48,11 +48,11 @@ import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
-import org.companerodeescuela.core.ui.component.StatusNotice
-import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
+import org.companerodeescuela.core.ui.component.NoticeTone
+import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.feature.home.R
 import org.companerodeescuela.shared.contracts.AcademicGroupSummary
 import org.companerodeescuela.shared.contracts.AccountStatus

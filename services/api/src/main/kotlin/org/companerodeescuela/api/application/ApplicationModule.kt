@@ -20,6 +20,8 @@ import org.companerodeescuela.api.admin.OwnerBootstrap
 import org.companerodeescuela.api.admin.QaAdminBootstrap
 import org.companerodeescuela.api.admin.accountAdministrationRoutes
 import org.companerodeescuela.api.attendance.attendanceRoutes
+import org.companerodeescuela.api.audit.InMemoryPlatformAuditLog
+import org.companerodeescuela.api.audit.MongoPlatformAuditLog
 import org.companerodeescuela.api.auth.InMemoryOwnerInvitationRepository
 import org.companerodeescuela.api.auth.InMemoryRateLimitStore
 import org.companerodeescuela.api.auth.LoginAttemptLimiter
@@ -66,6 +68,7 @@ import org.companerodeescuela.api.invitations.MongoInvitationRepository
 import org.companerodeescuela.api.invitations.UnavailableInvitationEmailGateway
 import org.companerodeescuela.api.invitations.invitationRoutes
 import org.companerodeescuela.api.mail.ResendInvitationEmailGateway
+import org.companerodeescuela.api.mail.resendWebhookRoutes
 import org.companerodeescuela.api.plugins.configurePlugins
 import org.companerodeescuela.api.presence.schoolPresenceRoutes
 import org.companerodeescuela.api.representatives.groupRepresentativeRoutes
@@ -450,6 +453,12 @@ fun Application.module(
             progressiveDelayMaximum = java.time.Duration.ofSeconds(settings.loginProgressiveDelayMaxSeconds),
             store = rateLimitStore,
         )
+    val platformAuditLog =
+        if (settings.hasAuthentication && settings.mongo.isConfigured) {
+            MongoPlatformAuditLog(mongoConnection.database())
+        } else {
+            InMemoryPlatformAuditLog()
+        }
     val invitationRepository =
         if (settings.hasAuthentication && settings.mongo.isConfigured) {
             MongoInvitationRepository(mongoConnection.database())
@@ -511,6 +520,15 @@ fun Application.module(
 
     routing {
         healthRoutes(settings = settings, healthService = healthService)
+        resendWebhookRoutes(
+            signingSecret = settings.resendWebhookSecret,
+            database =
+                if (settings.hasAuthentication && settings.mongo.isConfigured) {
+                    mongoConnection.database()
+                } else {
+                    null
+                },
+        )
         authRoutes(
             settings = settings,
             identityProvider = providerRegistry.identity,
@@ -529,6 +547,7 @@ fun Application.module(
             identityGraph.refreshSessions,
             identityGraph.accounts,
             administrationService,
+            auditLog = platformAuditLog,
         )
         institutionalIdentityLinkRoutes(
             settings,
@@ -545,6 +564,7 @@ fun Application.module(
             invitationDispatcher,
             invitationRepository,
             rateLimitStore = rateLimitStore,
+            auditLog = platformAuditLog,
         )
         institutionRoutes(identityGraph.institutions)
         institutionalPushRoutes(

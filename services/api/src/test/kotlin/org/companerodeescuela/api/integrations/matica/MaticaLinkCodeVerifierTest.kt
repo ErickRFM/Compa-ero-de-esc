@@ -1,12 +1,12 @@
 package org.companerodeescuela.api.integrations.matica
 
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.time.Instant
 import java.util.Base64
 import java.util.UUID
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -36,10 +36,19 @@ class MaticaLinkCodeVerifierTest {
         assertNull(verifier.verify(issue(subject, nonce, now.epochSecond), now))
     }
 
-    private fun issue(subject: UUID, nonce: UUID, expiresAt: Long): String {
-        val payload = encoder.encodeToString(
-            Json.encodeToString(MaticaLinkClaims.serializer(), MaticaLinkClaims(subject.toString(), expiresAt, nonce.toString())).toByteArray(),
-        )
+    private fun issue(
+        subject: UUID,
+        nonce: UUID,
+        expiresAt: Long,
+    ): String {
+        val payload =
+            encoder.encodeToString(
+                Json
+                    .encodeToString(
+                        MaticaLinkClaims.serializer(),
+                        MaticaLinkClaims(subject.toString(), expiresAt, nonce.toString()),
+                    ).toByteArray(),
+            )
         val mac = Mac.getInstance("HmacSHA256").apply { init(SecretKeySpec(secret, "HmacSHA256")) }
         return "$payload.${encoder.encodeToString(mac.doFinal(payload.toByteArray()))}"
     }

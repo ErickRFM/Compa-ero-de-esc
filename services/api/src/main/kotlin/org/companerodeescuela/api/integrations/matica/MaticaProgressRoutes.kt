@@ -2,9 +2,9 @@ package org.companerodeescuela.api.integrations.matica
 
 import com.auth0.jwt.interfaces.Payload
 import com.mongodb.MongoWriteException
+import com.mongodb.client.model.Filters.eq
 import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
-import com.mongodb.client.model.Filters.eq
 import com.mongodb.kotlin.client.coroutine.MongoCollection
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import io.ktor.http.HttpHeaders
@@ -20,14 +20,6 @@ import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import java.time.Duration
-import java.time.Instant
-import java.util.Date
-import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
@@ -45,16 +37,35 @@ import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.MaticaProgressLinkRequest
 import org.companerodeescuela.shared.contracts.MaticaProgressSummary
 import org.companerodeescuela.shared.contracts.UserRole
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.time.Duration
+import java.time.Instant
+import java.util.Date
 
-private data class MaticaLinkRecord(val companionUserId: String, val maticaUserId: String)
+private data class MaticaLinkRecord(
+    val companionUserId: String,
+    val maticaUserId: String,
+)
 
 private interface MaticaLinkRepository {
-    suspend fun consumeAndLink(companionUserId: String, maticaUserId: String, nonce: String, expiresAt: Instant): Boolean
+    suspend fun consumeAndLink(
+        companionUserId: String,
+        maticaUserId: String,
+        nonce: String,
+        expiresAt: Instant,
+    ): Boolean
+
     suspend fun find(companionUserId: String): MaticaLinkRecord?
+
     suspend fun unlink(companionUserId: String)
 }
 
-private class MongoMaticaLinkRepository(database: MongoDatabase) : MaticaLinkRepository {
+private class MongoMaticaLinkRepository(
+    database: MongoDatabase,
+) : MaticaLinkRepository {
     private val links: MongoCollection<Document> = database.getCollection("matica_progress_links")
     private val usedCodes: MongoCollection<Document> = database.getCollection("matica_progress_link_codes")
 
@@ -63,11 +74,19 @@ private class MongoMaticaLinkRepository(database: MongoDatabase) : MaticaLinkRep
             links.createIndex(Indexes.ascending("companionUserId"), IndexOptions().unique(true).name("ux_maticaprogress_companion"))
             links.createIndex(Indexes.ascending("maticaUserId"), IndexOptions().unique(true).name("ux_maticaprogress_matica"))
             usedCodes.createIndex(Indexes.ascending("nonce"), IndexOptions().unique(true).name("ux_maticaprogress_nonce"))
-            usedCodes.createIndex(Indexes.ascending("expiresAt"), IndexOptions().expireAfter(0, java.util.concurrent.TimeUnit.SECONDS).name("ttl_maticaprogress_codes"))
+            usedCodes.createIndex(
+                Indexes.ascending("expiresAt"),
+                IndexOptions().expireAfter(0, java.util.concurrent.TimeUnit.SECONDS).name("ttl_maticaprogress_codes"),
+            )
         }
     }
 
-    override suspend fun consumeAndLink(companionUserId: String, maticaUserId: String, nonce: String, expiresAt: Instant): Boolean {
+    override suspend fun consumeAndLink(
+        companionUserId: String,
+        maticaUserId: String,
+        nonce: String,
+        expiresAt: Instant,
+    ): Boolean {
         try {
             usedCodes.insertOne(Document("nonce", nonce).append("expiresAt", Date.from(expiresAt)))
         } catch (error: MongoWriteException) {
@@ -75,7 +94,12 @@ private class MongoMaticaLinkRepository(database: MongoDatabase) : MaticaLinkRep
             throw error
         }
         try {
-            links.insertOne(Document("companionUserId", companionUserId).append("maticaUserId", maticaUserId).append("linkedAt", Date.from(Instant.now())))
+            links.insertOne(
+                Document(
+                    "companionUserId",
+                    companionUserId,
+                ).append("maticaUserId", maticaUserId).append("linkedAt", Date.from(Instant.now())),
+            )
             return true
         } catch (error: Exception) {
             // Do not burn a fresh code when the account link could not be stored.
@@ -114,7 +138,11 @@ private class MaticaProgressService(
     private val json = Json { ignoreUnknownKeys = true }
     private val http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(4)).build()
 
-    suspend fun link(companionUserId: String, code: String, now: Instant): Boolean {
+    suspend fun link(
+        companionUserId: String,
+        code: String,
+        now: Instant,
+    ): Boolean {
         val claims = verifier.verify(code, now) ?: return false
         if (links.find(companionUserId)?.maticaUserId == claims.subject) return true
         return links.consumeAndLink(
@@ -125,35 +153,48 @@ private class MaticaProgressService(
         )
     }
 
-    suspend fun progress(companionUserId: String, now: Instant): MaticaProgressSummary? {
+    suspend fun progress(
+        companionUserId: String,
+        now: Instant,
+    ): MaticaProgressSummary? {
         val link = links.find(companionUserId) ?: return null
         val timestamp = now.epochSecond
-        val request = HttpRequest.newBuilder(
-            URI.create("${apiBaseUrl.trimEnd('/')}/v1/integrations/companion/summary/${link.maticaUserId}"),
-        ).timeout(Duration.ofSeconds(8))
-            .header("X-Matica-Companion-Timestamp", timestamp.toString())
-            .header("X-Matica-Companion-Signature", verifier.summarySignature(link.maticaUserId, timestamp))
-            .GET().build()
-        val response = try {
-            withContext(Dispatchers.IO) {
-                val upstream = http.send(request, HttpResponse.BodyHandlers.ofInputStream())
-                val body = upstream.body().use { it.readNBytes(MAX_SUMMARY_BYTES + 1) }
-                upstream.statusCode() to body
+        val request =
+            HttpRequest
+                .newBuilder(
+                    URI.create("${apiBaseUrl.trimEnd('/')}/v1/integrations/companion/summary/${link.maticaUserId}"),
+                ).timeout(Duration.ofSeconds(8))
+                .header("X-Matica-Companion-Timestamp", timestamp.toString())
+                .header("X-Matica-Companion-Signature", verifier.summarySignature(link.maticaUserId, timestamp))
+                .GET()
+                .build()
+        val response =
+            try {
+                withContext(Dispatchers.IO) {
+                    val upstream = http.send(request, HttpResponse.BodyHandlers.ofInputStream())
+                    val body = upstream.body().use { it.readNBytes(MAX_SUMMARY_BYTES + 1) }
+                    upstream.statusCode() to body
+                }
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                if (error is InterruptedException) Thread.currentThread().interrupt()
+                throw ApiException.DependencyUnavailable("El progreso de Mática no está disponible ahora")
             }
-        } catch (error: Exception) {
-            if (error is kotlinx.coroutines.CancellationException) throw error
-            if (error is InterruptedException) Thread.currentThread().interrupt()
-            throw ApiException.DependencyUnavailable("El progreso de Mática no está disponible ahora")
-        }
         if (response.first !in 200..299 || response.second.size > MAX_SUMMARY_BYTES) {
             throw ApiException.DependencyUnavailable("El progreso de Mática no está disponible ahora")
         }
-        val summary = try {
-            json.decodeFromString<MaticaSummaryDto>(response.second.decodeToString())
-        } catch (error: Exception) {
-            throw ApiException.DependencyUnavailable("El progreso de Mática no está disponible ahora")
-        }
-        if (summary.totalXp < 0 || summary.weeklyXp < 0 || summary.level < 1 || summary.streak < 0 || summary.longestStreak < summary.streak) {
+        val summary =
+            try {
+                json.decodeFromString<MaticaSummaryDto>(response.second.decodeToString())
+            } catch (error: Exception) {
+                throw ApiException.DependencyUnavailable("El progreso de Mática no está disponible ahora")
+            }
+        if (summary.totalXp < 0 ||
+            summary.weeklyXp < 0 ||
+            summary.level < 1 ||
+            summary.streak < 0 ||
+            summary.longestStreak < summary.streak
+        ) {
             throw ApiException.DependencyUnavailable("El progreso de Mática no está disponible ahora")
         }
         return MaticaProgressSummary(
@@ -184,10 +225,19 @@ fun Route.maticaProgressRoutes(
     if (!settings.hasAuthentication) return
     val secret = sharedSecret?.trim()?.takeIf { it.toByteArray().size >= 32 }?.toByteArray()
     val baseUrl = apiBaseUrl?.trim()?.takeIf(::isSecureMaticaBaseUrl)
-    val service = if (settings.hasAuthentication && database != null && secret != null && baseUrl != null) {
-        MaticaProgressService(secret, baseUrl, MongoMaticaLinkRepository(database))
-    } else null
-    val resolver = NativeActorResolver(accounts, sessions, AuthTokenService(settings), org.companerodeescuela.api.integrations.UnavailableIdentityProvider)
+    val service =
+        if (settings.hasAuthentication && database != null && secret != null && baseUrl != null) {
+            MaticaProgressService(secret, baseUrl, MongoMaticaLinkRepository(database))
+        } else {
+            null
+        }
+    val resolver =
+        NativeActorResolver(
+            accounts,
+            sessions,
+            AuthTokenService(settings),
+            org.companerodeescuela.api.integrations.UnavailableIdentityProvider,
+        )
 
     authenticate(AuthTokenService.PROVIDER_NAME) {
         route("/integrations/matica") {
@@ -199,7 +249,14 @@ fun Route.maticaProgressRoutes(
                 val input = call.receive<MaticaProgressLinkRequest>()
                 if (input.code.length > 2_048) throw ApiException.Validation("El código de vínculo no es válido")
                 val active = service ?: throw ApiException.DependencyUnavailable("La conexión con Mática aún no está configurada")
-                if (!active.link(actor.id, input.code, Instant.now())) throw ApiException.Conflict("El código venció, ya fue usado o no es válido")
+                if (!active.link(
+                        actor.id,
+                        input.code,
+                        Instant.now(),
+                    )
+                ) {
+                    throw ApiException.Conflict("El código venció, ya fue usado o no es válido")
+                }
                 call.respond(HttpStatusCode.Created, ApiResponse(mapOf("linked" to true)))
             }
             get("/progress") {
@@ -224,14 +281,20 @@ private fun isSecureMaticaBaseUrl(value: String): Boolean {
     if (value.length > 300) return false
     return try {
         val uri = URI(value)
-        uri.scheme == "https" && uri.host != null && uri.userInfo == null &&
-            uri.query == null && uri.fragment == null && uri.path.orEmpty() in setOf("", "/")
+        uri.scheme == "https" &&
+            uri.host != null &&
+            uri.userInfo == null &&
+            uri.query == null &&
+            uri.fragment == null &&
+            uri.path.orEmpty() in setOf("", "/")
     } catch (_: Exception) {
         false
     }
 }
 
-private suspend fun resolveStudent(payload: Payload?, resolver: NativeActorResolver) =
-    resolver.resolve(payload ?: throw ApiException.Unauthorized()).also { actor ->
-        if (UserRole.STUDENT !in actor.roles) throw ApiException.Forbidden("Una cuenta de estudiante es necesaria para vincular Mática")
-    }
+private suspend fun resolveStudent(
+    payload: Payload?,
+    resolver: NativeActorResolver,
+) = resolver.resolve(payload ?: throw ApiException.Unauthorized()).also { actor ->
+    if (UserRole.STUDENT !in actor.roles) throw ApiException.Forbidden("Una cuenta de estudiante es necesaria para vincular Mática")
+}

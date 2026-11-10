@@ -72,6 +72,7 @@ import org.companerodeescuela.api.mail.resendWebhookRoutes
 import org.companerodeescuela.api.plugins.configurePlugins
 import org.companerodeescuela.api.presence.schoolPresenceRoutes
 import org.companerodeescuela.api.representatives.groupRepresentativeRoutes
+import org.companerodeescuela.api.security.MfaSecretCipher
 import org.companerodeescuela.api.security.mfaRoutes
 import org.companerodeescuela.api.tutoring.tutorCaseRoutes
 import org.companerodeescuela.api.tutoring.tutoringRoutes
@@ -465,8 +466,8 @@ fun Application.module(
             InMemoryInvitationRepository()
         }
     val invitationOutbox =
-        if (settings.hasAuthentication && settings.mongo.isConfigured) {
-            MongoInvitationOutbox(mongoConnection.database())
+        if (settings.hasAuthentication && settings.mongo.isConfigured && settings.mfaEncryptionKey != null) {
+            MongoInvitationOutbox(mongoConnection.database(), MfaSecretCipher(settings.mfaEncryptionKey))
         } else {
             InMemoryInvitationOutbox()
         }
@@ -488,6 +489,27 @@ fun Application.module(
             identityGraph.institutions,
             invitationOutbox,
         )
+    val invitationWorkerConfigured =
+        settings.hasAuthentication &&
+            settings.mongo.isConfigured &&
+            settings.hasVerificationEmail &&
+            settings.mfaEncryptionKey != null
+    val invitationWorkerAllowed = !settings.environment.isProduction || settings.productionInvitationsEnabled
+    launchManagedWorker(
+        enabled = invitationWorkerConfigured && invitationWorkerAllowed,
+        context = Dispatchers.IO,
+    ) {
+        while (kotlin.coroutines.coroutineContext[Job]?.isActive == true) {
+            try {
+                invitationDispatcher.retryPendingOutbox()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                log.warn("Invitation outbox retry unavailable; encrypted work retained")
+            }
+            kotlinx.coroutines.delay(30_000)
+        }
+    }
 
     val ownerInvitationRepository =
         if (settings.hasAuthentication && settings.mongo.isConfigured) {

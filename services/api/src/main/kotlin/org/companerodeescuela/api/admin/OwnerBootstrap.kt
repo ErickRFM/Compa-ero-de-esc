@@ -300,6 +300,7 @@ object OwnerBootstrap {
                 spec.expiresAt > 0,
         )
         val account = requireNotNull(accounts.findById(spec.accountId)) { "Verified owner candidate is required" }
+        val preservedRoles = account.roles.takeIf { it == setOf(UserRole.STUDENT) }.orEmpty()
         val digest = spec.digest()
         val declaredOperator = "prod-declared:${spec.operator}"
         val existing = claims.find()
@@ -330,14 +331,16 @@ object OwnerBootstrap {
                 account.authRevision == spec.expectedRevision &&
                 account.email.trim().lowercase(Locale.ROOT) == spec.email &&
                 account.roles.isNotEmpty() &&
-                account.roles.all { it in setOf(UserRole.STUDENT, UserRole.WORKSHOP_PARTICIPANT) },
+                account.roles.all { it in setOf(UserRole.STUDENT, UserRole.WORKSHOP_PARTICIPANT) } &&
+                account.roleApplications.isEmpty() &&
+                account.adminCapabilities.isEmpty(),
         ) {
             "Owner candidate must be current, verified and unprivileged"
         }
-        require(
-            account.registrationIntent?.profile == RegistrationAccountType.OWNER_INVITED &&
-                account.roles == setOf(UserRole.WORKSHOP_PARTICIPANT),
-        ) {
+        val workshopOwnerCandidate = account.roles == setOf(UserRole.WORKSHOP_PARTICIPANT)
+        val unscopedStudentOwnerCandidate = account.roles == setOf(UserRole.STUDENT) && account.institutionId == null
+        val hasValidOwnerCandidateRoles = workshopOwnerCandidate || unscopedStudentOwnerCandidate
+        require(account.registrationIntent?.profile == RegistrationAccountType.OWNER_INVITED && hasValidOwnerCandidateRoles) {
             "Production first owner must be a verified invitation-only owner candidate"
         }
         require(accounts.listAccounts().none { UserRole.SUPER_ADMIN in it.roles }) { "Existing owner requires normal administration" }
@@ -362,7 +365,7 @@ object OwnerBootstrap {
                     spec.operationId,
                     declaredOperator,
                     AccountStatus.ACTIVE,
-                    setOf(UserRole.SUPER_ADMIN),
+                    preservedRoles + UserRole.SUPER_ADMIN,
                     account.institutionId,
                     now,
                     scopeDigest = digest,

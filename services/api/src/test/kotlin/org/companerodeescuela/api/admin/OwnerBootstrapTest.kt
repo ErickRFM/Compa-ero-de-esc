@@ -25,6 +25,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class OwnerBootstrapTest {
@@ -178,6 +179,16 @@ class OwnerBootstrapTest {
             val afterExpiry = Clock.fixed(clock.instant().plusSeconds(1800), ZoneOffset.UTC)
             OwnerBootstrap.provision(spec, "production", "companero_dev", accounts, mfa, claims, afterExpiry)
             assertEquals(1, assertNotNull(accounts.findById("owner")).identityAudit.size)
+        }
+
+    @Test fun `verified invited student keeps student role after production bootstrap`() =
+        runTest {
+            val (accounts, mfa, spec) = fixture(activeStudentOwner = true)
+            OwnerBootstrap.provision(spec, "production", "companero_dev", accounts, mfa, InMemoryOwnerBootstrapClaims(), clock)
+            val owner = assertNotNull(accounts.findById("owner"))
+            assertEquals(setOf(UserRole.STUDENT, UserRole.SUPER_ADMIN), owner.roles)
+            assertNull(owner.institutionId)
+            assertEquals(1L, owner.authRevision)
         }
 
     @Test fun `production, shared databases, and altered MFA payload cannot grant owner authority`() =
@@ -340,18 +351,27 @@ class OwnerBootstrapTest {
             assertEquals(OwnerBootstrapClaimState.COMMITTED, durable.find()?.state)
         }
 
-    private suspend fun fixture(invited: Boolean = true): Triple<InMemoryPlatformAccountRepository, MfaService, OwnerBootstrapSpec> {
+    private suspend fun fixture(
+        invited: Boolean = true,
+        activeStudentOwner: Boolean = false,
+    ): Triple<InMemoryPlatformAccountRepository, MfaService, OwnerBootstrapSpec> {
         val accounts = InMemoryPlatformAccountRepository()
         val password = "owner-test-password"
+        val roles =
+            when {
+                activeStudentOwner -> setOf(UserRole.STUDENT)
+                invited -> setOf(UserRole.WORKSHOP_PARTICIPANT)
+                else -> setOf(UserRole.STUDENT)
+            }
         val account =
             PlatformAccount(
                 "owner",
                 "Owner",
                 "owner@example.test",
                 PasswordHasher().hash(password),
-                if (invited) setOf(UserRole.WORKSHOP_PARTICIPANT) else setOf(UserRole.STUDENT),
-                institutionId = "institution",
-                registrationIntent = if (invited) RegistrationIntent(RegistrationAccountType.OWNER_INVITED) else null,
+                roles,
+                institutionId = if (activeStudentOwner) null else "institution",
+                registrationIntent = if (invited || activeStudentOwner) RegistrationIntent(RegistrationAccountType.OWNER_INVITED) else null,
                 emailVerifiedAt = clock.instant().minusSeconds(60),
             )
         accounts.create(account)

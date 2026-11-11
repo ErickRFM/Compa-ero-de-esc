@@ -13,6 +13,48 @@ import kotlin.test.assertTrue
 
 class InvitationEmailTransportTest {
     @Test
+    fun `owner bootstrap invitation uses the existing email provider without promising a role`() =
+        runTest {
+            val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+            var body = ""
+            server.createContext("/emails") { exchange ->
+                body = exchange.requestBody.bufferedReader().readText()
+                val response = """{"id":"owner-mail-test"}""".toByteArray()
+                exchange.sendResponseHeaders(200, response.size.toLong())
+                exchange.responseBody.use { it.write(response) }
+                exchange.close()
+            }
+            server.start()
+            try {
+                val adapter =
+                    ResendInvitationEmailGateway(
+                        "local-test-only-key".toCharArray(),
+                        "sender@example.test",
+                        URI("http://127.0.0.1:${server.address.port}/emails"),
+                    )
+                val code = "a".repeat(43)
+                val id = "b".repeat(43)
+
+                assertEquals(
+                    VerificationDeliveryStatus.ACCEPTED,
+                    adapter.sendOwnerBootstrap(
+                        "erik55509@hotmail.com",
+                        code,
+                        id,
+                        Instant.parse("2026-11-12T20:00:00Z"),
+                    ),
+                )
+                assertTrue(body.contains("companero_owner_invitation"))
+                assertTrue(body.contains("OWNER_INVITED"))
+                assertTrue(body.contains("tu contraseña actual"))
+                assertTrue(body.contains("no concede permisos ni privilegios automáticamente"))
+                assertTrue(body.contains(code))
+            } finally {
+                server.stop(0)
+            }
+        }
+
+    @Test
     fun `provider acceptance returns accepted and email contains registration instructions`() =
         runTest {
             val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)

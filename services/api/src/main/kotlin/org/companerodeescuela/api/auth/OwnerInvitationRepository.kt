@@ -25,6 +25,14 @@ import java.util.Locale
  * is a permanent tombstone; recovery issues a new random code instead of reopening it.
  */
 interface OwnerInvitationRepository {
+    suspend fun claimDelivery(
+        digest: String,
+        recipient: String,
+        expiresAt: Instant,
+        now: Instant,
+        deliveryId: String,
+    ): Boolean
+
     suspend fun consume(
         digest: String,
         recipient: String,
@@ -60,6 +68,23 @@ class InMemoryOwnerInvitationRepository : OwnerInvitationRepository {
 
     private val mutex = Mutex()
     private val consumed = mutableMapOf<String, Consumption>()
+    private val deliveryClaims = mutableSetOf<String>()
+
+    override suspend fun claimDelivery(
+        digest: String,
+        recipient: String,
+        expiresAt: Instant,
+        now: Instant,
+        deliveryId: String,
+    ): Boolean =
+        mutex.withLock {
+            if (!validOwnerInvitationConsumption(digest, recipient, expiresAt, now, deliveryId)) {
+                return@withLock false
+            }
+            if (digest in deliveryClaims || digest in consumed) return@withLock false
+            deliveryClaims += digest
+            true
+        }
 
     override suspend fun consume(
         digest: String,
@@ -82,6 +107,47 @@ class MongoOwnerInvitationRepository(
     database: MongoDatabase,
 ) : OwnerInvitationRepository {
     private val records = database.getCollection<Document>("owner_registration_invitations")
+
+    override suspend fun claimDelivery(
+        digest: String,
+        recipient: String,
+        expiresAt: Instant,
+        now: Instant,
+        deliveryId: String,
+    ): Boolean {
+        if (!validOwnerInvitationConsumption(digest, recipient, expiresAt, now, deliveryId)) return false
+
+        val expiry = Date.from(expiresAt)
+        try {
+            records.updateOne(
+                eq("_id", digest),
+                Updates.combine(
+                    Updates.setOnInsert("recipient", recipient),
+                    Updates.setOnInsert("expiresAt", expiry),
+                    Updates.setOnInsert("createdAt", Date.from(now)),
+                ),
+                UpdateOptions().upsert(true),
+            )
+        } catch (error: MongoWriteException) {
+            if (error.error.code != 11000) throw error
+        }
+
+        return records.findOneAndUpdate(
+            and(
+                eq("_id", digest),
+                eq("recipient", recipient),
+                eq("expiresAt", expiry),
+                gt("expiresAt", Date.from(now)),
+                exists("consumedAt", false),
+                exists("deliveryAttemptedAt", false),
+            ),
+            Updates.combine(
+                Updates.set("deliveryAttemptedAt", Date.from(now)),
+                Updates.set("deliveryId", deliveryId),
+            ),
+            FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
+        ) != null
+    }
 
     override suspend fun consume(
         digest: String,

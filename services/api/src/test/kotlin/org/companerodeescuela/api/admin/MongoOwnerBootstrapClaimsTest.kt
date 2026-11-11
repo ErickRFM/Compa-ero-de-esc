@@ -11,8 +11,6 @@ import org.companerodeescuela.api.auth.PlatformAccount
 import org.companerodeescuela.api.security.MfaSecretCipher
 import org.companerodeescuela.api.security.MfaService
 import org.companerodeescuela.api.security.MongoMfaRepository
-import org.companerodeescuela.api.security.Totp
-import org.companerodeescuela.shared.contracts.StepUpAction
 import org.companerodeescuela.shared.contracts.UserRole
 import org.junit.jupiter.api.Timeout
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
@@ -22,6 +20,7 @@ import java.time.ZoneOffset
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -29,7 +28,7 @@ import kotlin.test.assertTrue
 @EnabledIfEnvironmentVariable(named = "V12_TEST_MONGODB_URI", matches = ".+")
 @Timeout(120)
 class MongoOwnerBootstrapClaimsTest {
-    @Test fun `independent Mongo services promote only once and preserve the student identity`() =
+    @Test fun `retired QA database cannot bootstrap owner and preserves existing student`() =
         runBlocking {
             val uri = System.getenv("V12_TEST_MONGODB_URI")
             require(uri == "mongodb://127.0.0.1:27017")
@@ -53,16 +52,7 @@ class MongoOwnerBootstrapClaimsTest {
                         )
                     assertTrue(accounts.create(account))
                     val key = MfaSecretCipher(ByteArray(32) { 5 })
-                    val earlier = Clock.fixed(now.minusSeconds(30), ZoneOffset.UTC)
-                    val enrolling = MfaService(accounts, MongoMfaRepository(db), key, earlier)
-                    val enrollment = enrolling.beginEnrollment(account, password)
-                    enrolling.confirmEnrollment(
-                        account,
-                        enrollment.enrollmentId,
-                        Totp.code(Totp.decodeSecret(enrollment.secret), earlier.instant().epochSecond),
-                    )
-                    val mfa = MfaService(accounts, MongoMfaRepository(db), key, clock)
-                    val draft =
+                    val spec =
                         OwnerBootstrapSpec(
                             "owner",
                             "owner@example.test",
@@ -73,44 +63,25 @@ class MongoOwnerBootstrapClaimsTest {
                             now.epochSecond + 600,
                             "p".repeat(43),
                         )
-                    val proof =
-                        mfa.issueStepUp(
-                            account,
-                            password,
-                            Totp.code(Totp.decodeSecret(enrollment.secret), now.epochSecond),
-                            StepUpAction.PRIVILEGED_INVITE_ACCEPT,
-                            "global-owner",
-                            draft.operationId,
-                            draft.digest(),
-                        )
-                    val spec = draft.copy(proof = proof.proof)
-                    val outcomes =
-                        coroutineScope {
-                            (1..12)
-                                .map {
-                                    async {
-                                        runCatching {
-                                            val repository = MongoPlatformAccountRepository(db)
-                                            OwnerBootstrap.provision(
-                                                spec,
-                                                "staging",
-                                                databaseName,
-                                                repository,
-                                                MfaService(repository, MongoMfaRepository(db), key, clock),
-                                                MongoOwnerBootstrapClaims(db),
-                                                clock,
-                                            )
-                                        }.isSuccess
-                                    }
-                                }.awaitAll()
+                    assertFailsWith<IllegalArgumentException> {
+                        runBlocking {
+                            OwnerBootstrap.provision(
+                                spec,
+                                "staging",
+                                databaseName,
+                                accounts,
+                                MfaService(accounts, MongoMfaRepository(db), key, clock),
+                                MongoOwnerBootstrapClaims(db),
+                                clock,
+                            )
                         }
-                    assertTrue(outcomes.any { it })
+                    }
                     val updated = assertNotNull(accounts.findById("owner"))
-                    assertEquals(setOf(UserRole.STUDENT, UserRole.SUPER_ADMIN), updated.roles)
+                    assertEquals(setOf(UserRole.STUDENT), updated.roles)
                     assertEquals("campus", updated.institutionId)
                     assertEquals(account.passwordHash, updated.passwordHash)
-                    assertEquals(1L, updated.authRevision)
-                    assertEquals(1, updated.identityAudit.size)
+                    assertEquals(0L, updated.authRevision)
+                    assertTrue(updated.identityAudit.isEmpty())
                 } finally {
                     db.drop()
                 }

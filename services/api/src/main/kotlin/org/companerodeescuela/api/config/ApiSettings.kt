@@ -360,24 +360,25 @@ class SettingsLoader(
             )
         }
 
-        // Deployed environments must never attach to another environment's
-        // database. Staging may use its own QA database, production its own
-        // prod database, but neither may point at a foreign-environment name.
-        // This deliberately fails startup until the deployment is isolated.
-        val forbiddenDatabases =
-            when (environment) {
-                Environment.STAGING -> listOf("companero_prod", "companero_dev")
-                Environment.PRODUCTION -> listOf("companero_qa", "companero_dev")
-                else -> listOf("companero_prod", "companero_qa")
-            }
-        val foreignEnvironmentDatabase =
-            forbiddenDatabases.any { forbidden ->
-                val suffix = forbidden.substringAfterLast('_')
-                databaseName == forbidden || databaseName.endsWith("_$suffix")
-            }
-        if (foreignEnvironmentDatabase) {
+        // There is one live deployment and one retained database. `companero_dev`
+        // is the existing production data store; do not force a parallel prod DB.
+        // The retired QA database name remains rejected in every runtime.
+        val invalidProductionDatabase =
+            environment == Environment.PRODUCTION &&
+                databaseName != "companero_dev"
+        val retiredQaDatabase =
+            databaseName == "companero_qa" ||
+                databaseName.endsWith("_qa")
+        val retiredProductionDatabase =
+            environment != Environment.PRODUCTION &&
+                (databaseName == "companero_prod" || databaseName.endsWith("_prod"))
+        if (invalidProductionDatabase || retiredQaDatabase || retiredProductionDatabase) {
             throw ConfigurationException(
-                "MONGODB_DATABASE '$databaseName' belongs to another environment when APP_ENV=${environment.name.lowercase()}; cross-environment database access is refused",
+                if (invalidProductionDatabase) {
+                    "MONGODB_DATABASE must be the retained production database 'companero_dev' when APP_ENV=production"
+                } else {
+                    "MONGODB_DATABASE '$databaseName' is retired; QA database access is disabled"
+                },
             )
         }
 
@@ -425,8 +426,8 @@ class SettingsLoader(
             if (!environment.isProduction) {
                 throw ConfigurationException("OWNER_INVITE_* is allowed only when APP_ENV=production")
             }
-            if (!databaseName.endsWith("_prod")) {
-                throw ConfigurationException("OWNER_INVITE_* requires MONGODB_DATABASE ending in _prod")
+            if (environment != Environment.PRODUCTION || databaseName != "companero_dev") {
+                throw ConfigurationException("OWNER_INVITE_* requires APP_ENV=production and MONGODB_DATABASE=companero_dev")
             }
             if (mongoUri.isBlank()) {
                 throw ConfigurationException("OWNER_INVITE_* requires MONGODB_URI")
@@ -447,7 +448,7 @@ class SettingsLoader(
                 throw ConfigurationException("OWNER_INVITE_EXPIRES_AT must be a positive Unix timestamp")
             }
             if (env("PROD_OWNER_ISOLATION_CERTIFIED") != "true") {
-                throw ConfigurationException("Owner invitations require certified production MongoDB isolation")
+                throw ConfigurationException("Owner invitations require the production owner bootstrap gate")
             }
             if (verificationEmailKey == null || verificationEmailSender == null) {
                 throw ConfigurationException(

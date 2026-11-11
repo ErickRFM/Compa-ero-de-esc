@@ -17,7 +17,6 @@ import org.companerodeescuela.api.academic.groups.academicGroupRoutes
 import org.companerodeescuela.api.admin.AccountAdministrationService
 import org.companerodeescuela.api.admin.MongoOwnerBootstrapClaims
 import org.companerodeescuela.api.admin.OwnerBootstrap
-import org.companerodeescuela.api.admin.QaAdminBootstrap
 import org.companerodeescuela.api.admin.accountAdministrationRoutes
 import org.companerodeescuela.api.attendance.attendanceRoutes
 import org.companerodeescuela.api.audit.InMemoryPlatformAuditLog
@@ -145,31 +144,8 @@ fun Application.module(
         }
     }
     // Initial ownership is an explicit MFA-authorized operator command, never a
-    // privilege inferred from an email, login form or invitation. This bootstrap
-    // is scoped to a dedicated QA or production database, with separate MFA proof.
-    val qaOwnerSpec = OwnerBootstrap.parse(System::getenv)
+    // privilege inferred from an email, login form or invitation.
     val prodOwnerSpec = OwnerBootstrap.parseProduction(System::getenv)
-    val qaAdminSpec = QaAdminBootstrap.parse(System::getenv)
-    require(listOfNotNull(qaOwnerSpec, prodOwnerSpec, qaAdminSpec).size <= 1) {
-        "Only one privileged bootstrap command may run per startup"
-    }
-    qaOwnerSpec?.let { desired ->
-        require(settings.mongo.isConfigured && settings.hasAuthentication) {
-            "QA owner bootstrap requires persistent authenticated identity"
-        }
-        runBlocking {
-            withTimeout(15_000L) {
-                OwnerBootstrap.provision(
-                    desired,
-                    settings.environment.name.lowercase(),
-                    settings.mongo.databaseName,
-                    identityGraph.accounts,
-                    identityGraph.mfa,
-                    MongoOwnerBootstrapClaims(mongoConnection.database()),
-                )
-            }
-        }
-    }
     // Production ownership is a distinct, explicitly scoped, MFA-authorized command.
     prodOwnerSpec?.let { desired ->
         require(settings.mongo.isConfigured && settings.hasAuthentication) {
@@ -184,26 +160,6 @@ fun Application.module(
                     identityGraph.accounts,
                     identityGraph.mfa,
                     MongoOwnerBootstrapClaims(mongoConnection.database()),
-                )
-            }
-        }
-    }
-    // One-time institution-level provisioning is a separate action and blocks startup on mismatch.
-    qaAdminSpec?.let { desired ->
-        require(
-            settings.mongo.isConfigured && settings.hasAuthentication,
-        ) { "QA admin bootstrap requires persistent authenticated identity" }
-        runBlocking {
-            withTimeout(15_000L) {
-                org.companerodeescuela.api.admin.QaAdminBootstrap.provision(
-                    desired,
-                    settings.environment.name.lowercase(),
-                    settings.mongo.databaseName,
-                    identityGraph.accounts,
-                    identityGraph.institutions,
-                    identityGraph.mfa,
-                    org.companerodeescuela.api.admin
-                        .MongoQaAdminBootstrapClaims(mongoConnection.database()),
                 )
             }
         }

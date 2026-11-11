@@ -1,6 +1,7 @@
 package org.companerodeescuela.api.auth
 
 import org.companerodeescuela.shared.contracts.AccountStatus
+import org.companerodeescuela.shared.contracts.RegistrationAccountType
 import org.companerodeescuela.shared.contracts.StaffApplicationStatus
 import org.companerodeescuela.shared.contracts.StaffRole
 import org.companerodeescuela.shared.contracts.UserRole
@@ -17,6 +18,7 @@ data class AccountIdentityChange(
     val scopeDigest: String? = null,
     val approvedApplicationId: String? = null,
     val capabilities: Set<org.companerodeescuela.shared.contracts.AdminCapability>? = null,
+    val registrationIntent: RegistrationIntent? = null,
 )
 
 /** Immutable grant/state audit, deliberately excludes passwords, emails and tokens. */
@@ -35,6 +37,8 @@ data class AccountIdentityAudit(
     val scopeDigest: String? = null,
     val approvedApplicationId: String? = null,
     val capabilitiesAfter: Set<org.companerodeescuela.shared.contracts.AdminCapability> = emptySet(),
+    val registrationProfileBefore: RegistrationAccountType? = null,
+    val registrationProfileAfter: RegistrationAccountType? = null,
 )
 
 internal const val MAX_IDENTITY_AUDIT_EVENTS = 1_000
@@ -53,6 +57,7 @@ internal fun PlatformAccount.isExactIdentityRetry(
             it.institutionAfter == change.institutionId &&
             it.scopeDigest == change.scopeDigest &&
             it.approvedApplicationId == change.approvedApplicationId &&
+            (change.registrationIntent == null || it.registrationProfileAfter == change.registrationIntent.profile) &&
             (change.capabilities == null || it.capabilitiesAfter == change.capabilities)
     }
 
@@ -87,6 +92,24 @@ internal fun PlatformAccount.applyIdentityChange(
         return null
     }
     if (change.scopeDigest != null && !Regex("[a-f0-9]{64}").matches(change.scopeDigest)) return null
+    val nextRegistrationIntent = change.registrationIntent
+    if (nextRegistrationIntent != null &&
+        (
+            registrationIntent?.profile != RegistrationAccountType.STUDENT ||
+                nextRegistrationIntent.profile != RegistrationAccountType.OWNER_INVITED ||
+                nextRegistrationIntent.requestedInstitutionId != null ||
+                nextRegistrationIntent.identityReference != null ||
+                nextRegistrationIntent.preferredGroup != null ||
+                accountStatus != AccountStatus.PENDING_VERIFICATION ||
+                emailVerifiedAt != null ||
+                roles.isNotEmpty() ||
+                change.accountStatus != accountStatus ||
+                change.roles != roles ||
+                change.institutionId != institutionId
+        )
+    ) {
+        return null
+    }
     val rolesAfter = change.roles.toSet()
     val generations = roleGenerations.toMutableMap()
     for (role in (roles - rolesAfter) + (rolesAfter - roles)) {
@@ -153,6 +176,8 @@ internal fun PlatformAccount.applyIdentityChange(
             change.scopeDigest,
             change.approvedApplicationId,
             capabilitiesAfter,
+            registrationIntent?.profile,
+            nextRegistrationIntent?.profile ?: registrationIntent?.profile,
         )
     return copy(
         active = change.accountStatus.permitsSession,
@@ -164,6 +189,7 @@ internal fun PlatformAccount.applyIdentityChange(
         roleGenerations = generations,
         adminCapabilities = capabilitiesAfter,
         roleApplications = applications,
+        registrationIntent = nextRegistrationIntent ?: registrationIntent,
         applicationRevision =
             if (change.approvedApplicationId !=
                 null

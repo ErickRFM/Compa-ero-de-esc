@@ -296,6 +296,59 @@ class UniversalRegistrationRoutesTest {
             assertNull(f.accounts.findByIdentifier("owner@example.test"))
         }
 
+    @Test fun `owner invitation converts verified student without changing identity password role or verification`() {
+        val code = "v".repeat(43)
+        val digest =
+            MessageDigest
+                .getInstance("SHA-256")
+                .digest(code.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+        val expiresAt = Instant.now().epochSecond + 3600
+        val env =
+            mapOf(
+                "APP_ENV" to "production",
+                "MONGODB_DATABASE" to "companero_dev",
+                "PROD_OWNER_ISOLATION_CERTIFIED" to "true",
+                "OWNER_INVITE_EMAIL" to "owner@example.test",
+                "OWNER_INVITE_CODE_SHA256" to digest,
+                "OWNER_INVITE_EXPIRES_AT" to expiresAt.toString(),
+            )
+
+        scenario(env) { f ->
+            val pending = register("owner@example.test", "STUDENT")
+            val verified = confirm(pending, assertNotNull(f.mail.tokens["owner@example.test"]))
+            val before = assertNotNull(f.accounts.findById(verified.user.id))
+            val oldVerificationToken = f.mail.tokens["owner@example.test"]
+            f.clock.advance(61)
+
+            val response =
+                post(
+                    "/auth/register",
+                    registrationBody(
+                        "owner@example.test",
+                        "OWNER_INVITED",
+                        ",\"ownerInvitationCode\":\"$code\"",
+                    ),
+                )
+            assertEquals(HttpStatusCode.Created, response.status, response.bodyAsText())
+            val converted = json.decodeFromString<ApiResponse<LoginResponse>>(response.bodyAsText()).data
+            val after = assertNotNull(f.accounts.findById(verified.user.id))
+
+            assertEquals(before.id, after.id)
+            assertEquals(before.passwordHash, after.passwordHash)
+            assertEquals(before.roles, after.roles)
+            assertEquals(setOf(UserRole.STUDENT), after.roles)
+            assertEquals(before.emailVerifiedAt, after.emailVerifiedAt)
+            assertEquals(RegistrationAccountType.OWNER_INVITED, after.registrationIntent?.profile)
+            assertTrue(converted.user.emailVerified)
+            assertEquals(setOf(UserRole.STUDENT), converted.user.roles)
+            assertEquals(2L, after.authRevision)
+            assertEquals(HttpStatusCode.Unauthorized, get("/auth/me", verified).status)
+            assertEquals(oldVerificationToken, f.mail.tokens["owner@example.test"])
+            assertFalse(UserRole.SUPER_ADMIN in after.roles)
+        }
+    }
+
     @Test fun `public privileged profile and unknown requested institutions are rejected`() =
         scenario { _ ->
             for (profile in listOf("ADMIN", "SUPER_ADMIN")) {

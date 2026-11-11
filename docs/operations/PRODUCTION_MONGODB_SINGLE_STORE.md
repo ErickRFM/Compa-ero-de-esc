@@ -16,7 +16,7 @@ Las aplicaciones Académica y Gestión usan la misma API productiva y el mismo s
 ## Datos y cuentas
 
 - No cambiar roles, contraseñas ni estado de cuentas para facilitar pruebas o despliegues.
-- La cuenta preexistente con `PENDING_VERIFICATION` se recupera solo mediante el flujo normal de verificación/restablecimiento del titular. No promoverla directamente ni duplicarla.
+- La cuenta del titular se conserva y se convierte únicamente con invitación de propietario. Si sigue `PENDING_VERIFICATION`, requiere la conversión y verificación normal; si ya está activa/verificada como `STUDENT` sin institución ni solicitudes académicas, la ruta de conversión conserva identidad, contraseña, verificación, MFA y rol `STUDENT`. No promoverla directamente ni duplicarla.
 - La primera cuenta `SUPER_ADMIN` requiere el proceso de bootstrap productivo autorizado, MFA, prueba firmada y auditoría. Una invitación o una dirección de correo por sí solas nunca conceden ese rol.
 - Los recorridos de registro y correo se prueban con cuentas controladas y datos sintéticos en herramientas locales o suites automatizadas; no se crea otro servicio ni otra base persistente.
 

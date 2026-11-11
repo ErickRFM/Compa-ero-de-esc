@@ -12,6 +12,7 @@ import org.companerodeescuela.shared.contracts.LoginResponse
 import org.companerodeescuela.shared.contracts.RefreshSessionRequest
 import org.companerodeescuela.shared.contracts.RegisterRequest
 import org.companerodeescuela.shared.contracts.RegistrationAccountType
+import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -109,7 +110,7 @@ class AuthService(
         }
         ownerInvitationAuthorization?.let { invitation ->
             val existing = authenticationDependency { accounts.findByIdentifier(email) }
-            if (existing != null) return convertPendingStudentToOwnerInvitation(existing, request.password, invitation)
+            if (existing != null) return convertStudentToOwnerInvitation(existing, request.password, invitation)
         }
         val account =
             PlatformAccount(
@@ -176,27 +177,32 @@ class AuthService(
         )
     }
 
-    private suspend fun convertPendingStudentToOwnerInvitation(
+    private suspend fun convertStudentToOwnerInvitation(
         existing: PlatformAccount,
         password: String,
         invitation: OwnerInvitationAuthorization,
     ): LoginResponse {
         val operationId = "owner-invite-conversion-${invitation.digest}"
+        val exactRetryStatus =
+            when (existing.accountStatus) {
+                AccountStatus.PENDING_VERIFICATION -> existing.emailVerifiedAt == null
+                AccountStatus.ACTIVE -> existing.emailVerifiedAt != null
+                else -> false
+            }
         val exactRetry =
-            existing.emailVerifiedAt == null &&
-                existing.registrationIntent?.profile == RegistrationAccountType.OWNER_INVITED &&
+            existing.registrationIntent?.profile == RegistrationAccountType.OWNER_INVITED &&
                 existing.identityAudit.any {
                     it.operationId == operationId &&
                         it.actorId == existing.id &&
                         it.scopeDigest == invitation.digest &&
                         it.registrationProfileBefore == RegistrationAccountType.STUDENT &&
                         it.registrationProfileAfter == RegistrationAccountType.OWNER_INVITED &&
-                        it.fromStatus == AccountStatus.PENDING_VERIFICATION &&
-                        it.toStatus == AccountStatus.PENDING_VERIFICATION &&
-                        it.rolesBefore.isEmpty() &&
-                        it.rolesAfter.isEmpty()
-                }
-        val eligible =
+                        it.fromStatus == existing.accountStatus &&
+                        it.toStatus == existing.accountStatus &&
+                        it.rolesAfter == existing.roles
+                } &&
+                exactRetryStatus
+        val eligiblePending =
             existing.permitsSession &&
                 existing.accountStatus == AccountStatus.PENDING_VERIFICATION &&
                 existing.emailVerifiedAt == null &&
@@ -206,20 +212,46 @@ class AuthService(
                 existing.roleApplications.isEmpty() &&
                 existing.adminCapabilities.isEmpty() &&
                 existing.identityAudit.isEmpty()
+        val eligibleVerifiedStudent =
+            existing.permitsSession &&
+                existing.accountStatus == AccountStatus.ACTIVE &&
+                existing.emailVerifiedAt != null &&
+                existing.registrationIntent == RegistrationIntent(RegistrationAccountType.STUDENT) &&
+                existing.roles == setOf(UserRole.STUDENT) &&
+                existing.institutionId == null &&
+                existing.roleApplications.isEmpty() &&
+                existing.adminCapabilities.isEmpty() &&
+                existing.identityAudit.singleOrNull()?.let { audit ->
+                    audit.operationId.startsWith("email-verification-") &&
+                        audit.actorId == existing.id &&
+                        audit.fromStatus == AccountStatus.PENDING_VERIFICATION &&
+                        audit.toStatus == AccountStatus.ACTIVE &&
+                        audit.rolesBefore.isEmpty() &&
+                        audit.rolesAfter == setOf(UserRole.STUDENT) &&
+                        audit.institutionBefore == null &&
+                        audit.institutionAfter == null &&
+                        audit.registrationProfileBefore == RegistrationAccountType.STUDENT &&
+                        audit.registrationProfileAfter == RegistrationAccountType.STUDENT &&
+                        audit.scopeDigest == null &&
+                        audit.approvedApplicationId == null
+                } == true
+        val eligible = eligiblePending || eligibleVerifiedStudent
         if (!exactRetry && !eligible) throw ApiException.Conflict("An account with that email already exists")
         if (!passwordHasher.verifyAsync(password, existing.passwordHash)) {
             throw ApiException.Conflict("An account with that email already exists")
         }
         val now = clock.instant()
-        val recentVerificationSends =
-            existing.emailVerification
-                ?.recentIssuedAt
-                .orEmpty()
-                .count { it > now.minusSeconds(3600) }
-        if (existing.emailVerification?.issuedAt?.let { now < it.plusSeconds(60) } == true ||
-            recentVerificationSends >= 3
-        ) {
-            throw ApiException.RateLimited("Wait before requesting another verification email")
+        if (existing.accountStatus == AccountStatus.PENDING_VERIFICATION) {
+            val recentVerificationSends =
+                existing.emailVerification
+                    ?.recentIssuedAt
+                    .orEmpty()
+                    .count { it > now.minusSeconds(3600) }
+            if (existing.emailVerification?.issuedAt?.let { now < it.plusSeconds(60) } == true ||
+                recentVerificationSends >= 3
+            ) {
+                throw ApiException.RateLimited("Wait before requesting another verification email")
+            }
         }
         if (!exactRetry) {
             val consumed =
@@ -250,17 +282,25 @@ class AuthService(
                         ),
                     )
                 } ?: throw ApiException.Conflict("Owner registration could not be completed; request a new invitation")
-            val delivery = verification.issue(updated.id)
-            return createSession(
-                updated.toUserSummary().copy(verificationDelivery = delivery.status),
+            return if (updated.emailVerifiedAt == null) {
+                val delivery = verification.issue(updated.id)
+                createSession(
+                    updated.toUserSummary().copy(verificationDelivery = delivery.status),
+                    SessionIdentitySource.NATIVE,
+                )
+            } else {
+                createSession(updated.toUserSummary(), SessionIdentitySource.NATIVE)
+            }
+        }
+        return if (existing.emailVerifiedAt == null) {
+            val delivery = verification.issue(existing.id)
+            createSession(
+                existing.toUserSummary().copy(verificationDelivery = delivery.status),
                 SessionIdentitySource.NATIVE,
             )
+        } else {
+            createSession(existing.toUserSummary(), SessionIdentitySource.NATIVE)
         }
-        val delivery = verification.issue(existing.id)
-        return createSession(
-            existing.toUserSummary().copy(verificationDelivery = delivery.status),
-            SessionIdentitySource.NATIVE,
-        )
     }
 
     suspend fun verifyEmail(

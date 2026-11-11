@@ -87,34 +87,7 @@ class AuthService(
         }
         var ownerInvitationAuthorization: OwnerInvitationAuthorization? = null
         if (request.accountType == RegistrationAccountType.OWNER_INVITED) {
-            val expectedEmail = ownerInviteEnvironment("OWNER_INVITE_EMAIL")?.trim()?.lowercase(Locale.ROOT)
-            // Keep request-time checks aligned with SettingsLoader, which trims these environment values.
-            val digest = ownerInviteEnvironment("OWNER_INVITE_CODE_SHA256")?.trim()
-            val code = request.ownerInvitationCode
-            val expiry = ownerInviteEnvironment("OWNER_INVITE_EXPIRES_AT")?.trim()?.toLongOrNull()
-            val nowSeconds = clock.instant().epochSecond
-            val allowed =
-                ownerInviteEnvironment("APP_ENV")?.trim()?.lowercase(Locale.ROOT) in setOf("prod", "production") &&
-                    ownerInviteEnvironment("MONGODB_DATABASE")?.trim()?.endsWith("_prod") == true &&
-                    ownerInviteEnvironment("PROD_OWNER_ISOLATION_CERTIFIED") == "true" &&
-                    expectedEmail != null &&
-                    email == expectedEmail &&
-                    expiry != null &&
-                    expiry > nowSeconds &&
-                    expiry <= nowSeconds + 7 * 24 * 60 * 60 &&
-                    digest?.matches(Regex("[a-f0-9]{64}")) == true &&
-                    code != null &&
-                    code.matches(Regex("[A-Za-z0-9_-]{43}")) &&
-                    MessageDigest.isEqual(
-                        MessageDigest.getInstance("SHA-256").digest(code.toByteArray(Charsets.UTF_8)),
-                        digest.chunked(2).map { it.toInt(16).toByte() }.toByteArray(),
-                    )
-            if (!allowed) throw ApiException.Forbidden("Owner registration invitation is unavailable")
-            ownerInvitationAuthorization =
-                OwnerInvitationAuthorization(
-                    requireNotNull(digest),
-                    Instant.ofEpochSecond(requireNotNull(expiry)),
-                )
+            ownerInvitationAuthorization = authorizeOwnerInvitation(email, request.ownerInvitationCode)
         } else if (request.ownerInvitationCode != null) {
             throw ApiException.Validation("Owner invitation code is only valid for owner enrollment")
         }
@@ -134,6 +107,10 @@ class AuthService(
         ) {
             throw ApiException.Validation("Participant registration does not request academic scope")
         }
+        ownerInvitationAuthorization?.let { invitation ->
+            val existing = authenticationDependency { accounts.findByIdentifier(email) }
+            if (existing != null) return convertPendingStudentToOwnerInvitation(existing, request.password, invitation)
+        }
         val account =
             PlatformAccount(
                 id = UUID.randomUUID().toString(),
@@ -146,9 +123,6 @@ class AuthService(
                 createdAt = clock.instant(),
             )
         ownerInvitationAuthorization?.let { invitation ->
-            if (authenticationDependency { accounts.findByIdentifier(email) } != null) {
-                throw ApiException.Conflict("An account with that email already exists")
-            }
             // Consumption is deliberately fail-closed. If account persistence or verification delivery
             // fails afterward, issue a fresh random invitation; never reopen this digest.
             val consumed =
@@ -168,6 +142,125 @@ class AuthService(
         }
         val delivery = verification.issue(account.id)
         return createSession(account.toUserSummary().copy(verificationDelivery = delivery.status), SessionIdentitySource.NATIVE)
+    }
+
+    private fun authorizeOwnerInvitation(
+        email: String,
+        code: String?,
+    ): OwnerInvitationAuthorization {
+        val expectedEmail = ownerInviteEnvironment("OWNER_INVITE_EMAIL")?.trim()?.lowercase(Locale.ROOT)
+        // Keep request-time checks aligned with SettingsLoader, which trims these environment values.
+        val digest = ownerInviteEnvironment("OWNER_INVITE_CODE_SHA256")?.trim()
+        val expiry = ownerInviteEnvironment("OWNER_INVITE_EXPIRES_AT")?.trim()?.toLongOrNull()
+        val nowSeconds = clock.instant().epochSecond
+        val allowed =
+            ownerInviteEnvironment("APP_ENV")?.trim()?.lowercase(Locale.ROOT) in setOf("prod", "production") &&
+                ownerInviteEnvironment("MONGODB_DATABASE")?.trim() == "companero_dev" &&
+                ownerInviteEnvironment("PROD_OWNER_ISOLATION_CERTIFIED") == "true" &&
+                expectedEmail != null &&
+                email == expectedEmail &&
+                expiry != null &&
+                expiry > nowSeconds &&
+                expiry <= nowSeconds + 7 * 24 * 60 * 60 &&
+                digest?.matches(Regex("[a-f0-9]{64}")) == true &&
+                code != null &&
+                code.matches(Regex("[A-Za-z0-9_-]{43}")) &&
+                MessageDigest.isEqual(
+                    MessageDigest.getInstance("SHA-256").digest(code.toByteArray(Charsets.UTF_8)),
+                    digest.chunked(2).map { it.toInt(16).toByte() }.toByteArray(),
+                )
+        if (!allowed) throw ApiException.Forbidden("Owner registration invitation is unavailable")
+        return OwnerInvitationAuthorization(
+            requireNotNull(digest),
+            Instant.ofEpochSecond(requireNotNull(expiry)),
+        )
+    }
+
+    private suspend fun convertPendingStudentToOwnerInvitation(
+        existing: PlatformAccount,
+        password: String,
+        invitation: OwnerInvitationAuthorization,
+    ): LoginResponse {
+        val operationId = "owner-invite-conversion-${invitation.digest}"
+        val exactRetry =
+            existing.emailVerifiedAt == null &&
+                existing.registrationIntent?.profile == RegistrationAccountType.OWNER_INVITED &&
+                existing.identityAudit.any {
+                    it.operationId == operationId &&
+                        it.actorId == existing.id &&
+                        it.scopeDigest == invitation.digest &&
+                        it.registrationProfileBefore == RegistrationAccountType.STUDENT &&
+                        it.registrationProfileAfter == RegistrationAccountType.OWNER_INVITED &&
+                        it.fromStatus == AccountStatus.PENDING_VERIFICATION &&
+                        it.toStatus == AccountStatus.PENDING_VERIFICATION &&
+                        it.rolesBefore.isEmpty() &&
+                        it.rolesAfter.isEmpty()
+                }
+        val eligible =
+            existing.permitsSession &&
+                existing.accountStatus == AccountStatus.PENDING_VERIFICATION &&
+                existing.emailVerifiedAt == null &&
+                existing.registrationIntent == RegistrationIntent(RegistrationAccountType.STUDENT) &&
+                existing.roles.isEmpty() &&
+                existing.institutionId == null &&
+                existing.roleApplications.isEmpty() &&
+                existing.adminCapabilities.isEmpty() &&
+                existing.identityAudit.isEmpty()
+        if (!exactRetry && !eligible) throw ApiException.Conflict("An account with that email already exists")
+        if (!passwordHasher.verifyAsync(password, existing.passwordHash)) {
+            throw ApiException.Conflict("An account with that email already exists")
+        }
+        val now = clock.instant()
+        val recentVerificationSends =
+            existing.emailVerification
+                ?.recentIssuedAt
+                .orEmpty()
+                .count { it > now.minusSeconds(3600) }
+        if (existing.emailVerification?.issuedAt?.let { now < it.plusSeconds(60) } == true ||
+            recentVerificationSends >= 3
+        ) {
+            throw ApiException.RateLimited("Wait before requesting another verification email")
+        }
+        if (!exactRetry) {
+            val consumed =
+                authenticationDependency {
+                    ownerInvitationRepository.consume(
+                        invitation.digest,
+                        existing.email,
+                        invitation.expiresAt,
+                        clock.instant(),
+                        existing.id,
+                    )
+                }
+            if (!consumed) throw ApiException.Forbidden("Owner registration invitation is unavailable")
+            val updated =
+                authenticationDependency {
+                    accounts.changeIdentity(
+                        existing.id,
+                        existing.authRevision,
+                        AccountIdentityChange(
+                            operationId = operationId,
+                            actorId = existing.id,
+                            accountStatus = existing.accountStatus,
+                            roles = existing.roles,
+                            institutionId = existing.institutionId,
+                            occurredAt = now,
+                            scopeDigest = invitation.digest,
+                            registrationIntent = RegistrationIntent(RegistrationAccountType.OWNER_INVITED),
+                        ),
+                    )
+                } ?: throw ApiException.Conflict("Owner registration could not be completed; request a new invitation")
+            val delivery = verification.issue(updated.id)
+            return createSession(
+                updated.toUserSummary().copy(verificationDelivery = delivery.status),
+                SessionIdentitySource.NATIVE,
+            )
+        }
+        val delivery = verification.issue(existing.id)
+        return createSession(
+            existing.toUserSummary().copy(verificationDelivery = delivery.status),
+            SessionIdentitySource.NATIVE,
+        )
     }
 
     suspend fun verifyEmail(

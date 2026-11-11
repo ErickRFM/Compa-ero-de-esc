@@ -262,12 +262,22 @@ class SettingsLoaderTest {
     }
 
     @Test
-    @DisplayName("Staging and production cannot connect to another environment's Mongo database")
-    fun deployedEnvironmentsRejectCrossEnvironmentMongoDatabases() {
+    @DisplayName("Production uses the retained database and rejects retired databases")
+    fun productionUsesRetainedMongoDatabase() {
+        assertEquals(
+            "companero_dev",
+            loader(
+                "APP_ENV" to "production",
+                "API_PORT" to "8080",
+                "MONGODB_DATABASE" to "companero_dev",
+                "MONGODB_URI" to "mongodb://localhost:27017",
+                "JWT_SECRET" to "j".repeat(40),
+                "MFA_ENCRYPTION_KEY" to "A".repeat(43),
+            ).load().mongo.databaseName,
+        )
         for ((environment, wrongDatabase) in listOf(
-            "staging" to "companero_dev",
             "staging" to "companero_prod",
-            "production" to "companero_dev",
+            "production" to "companero_prod",
             "production" to "companero_qa",
         )) {
             val error =
@@ -278,7 +288,7 @@ class SettingsLoaderTest {
                         "MONGODB_DATABASE" to wrongDatabase,
                     ).load()
                 }
-            assertContains(error.message!!, "cross-environment database access is refused")
+            assertContains(error.message!!, "MONGODB_DATABASE")
         }
     }
 
@@ -287,7 +297,7 @@ class SettingsLoaderTest {
     fun productionRequiresSecret() {
         val error =
             assertFailsWith<ConfigurationException> {
-                loader("APP_ENV" to "production", "API_PORT" to "8080", "MONGODB_DATABASE" to "c").load()
+                loader("APP_ENV" to "production", "API_PORT" to "8080", "MONGODB_DATABASE" to "companero_dev").load()
             }
         assertContains(error.message!!, "JWT_SECRET")
     }
@@ -301,7 +311,7 @@ class SettingsLoaderTest {
                 loader(
                     "APP_ENV" to "production",
                     "API_PORT" to "8080",
-                    "MONGODB_DATABASE" to "c",
+                    "MONGODB_DATABASE" to "companero_dev",
                     "JWT_SECRET" to jwt,
                     "MFA_ENCRYPTION_KEY" to "A".repeat(43),
                 ).load()
@@ -313,7 +323,7 @@ class SettingsLoaderTest {
                 loader(
                     "APP_ENV" to "production",
                     "API_PORT" to "8080",
-                    "MONGODB_DATABASE" to "c",
+                    "MONGODB_DATABASE" to "companero_dev",
                     "MONGODB_URI" to "mongodb://localhost:27017",
                     "JWT_SECRET" to jwt,
                 ).load()
@@ -344,7 +354,7 @@ class SettingsLoaderTest {
             listOf(
                 "APP_ENV" to "production",
                 "API_PORT" to "8080",
-                "MONGODB_DATABASE" to "companero_prod",
+                "MONGODB_DATABASE" to "companero_dev",
                 "MONGODB_URI" to "mongodb://localhost:27017",
                 "JWT_SECRET" to jwt,
                 "MFA_ENCRYPTION_KEY" to mfa,
@@ -573,7 +583,7 @@ class SettingsLoaderTest {
             listOf(
                 "APP_ENV" to "production",
                 "API_PORT" to "8080",
-                "MONGODB_DATABASE" to "companero_prod",
+                "MONGODB_DATABASE" to "companero_dev",
                 "MONGODB_URI" to "mongodb://localhost:27017",
                 "JWT_SECRET" to "j".repeat(40),
                 "MFA_ENCRYPTION_KEY" to "A".repeat(43),
@@ -599,7 +609,7 @@ class SettingsLoaderTest {
                 *withEmail.toTypedArray(),
             ).load()
         assertTrue(configured.hasVerificationEmail)
-        assertEquals("companero_prod", configured.mongo.databaseName)
+        assertEquals("companero_dev", configured.mongo.databaseName)
     }
 }
 

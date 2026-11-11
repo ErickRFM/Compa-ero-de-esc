@@ -39,20 +39,15 @@ data class OwnerBootstrapSpec(
     val reason: String,
     val expiresAt: Long,
     val proof: String,
-    val scope: String = "qa",
     val authorizationPublicKey: String? = null,
     val authorizationSignature: String? = null,
 ) {
-    init {
-        require(scope in setOf("qa", "prod"))
-    }
-
     fun digest(): String =
         MessageDigest
             .getInstance("SHA-256")
             .digest(
                 listOf(
-                    "companero.$scope-first-owner.v1",
+                    "companero.prod-first-owner.v1",
                     accountId,
                     email,
                     expectedRevision.toString(),
@@ -251,7 +246,7 @@ object OwnerBootstrap {
 
         fun required(name: String) = requireNotNull(env(name)) { "Production owner configuration incomplete" }
         require(required("PROD_OWNER_ISOLATION_CERTIFIED") == "true") {
-            "Production database isolation must be certified before bootstrap"
+            "Production owner bootstrap gate must be passed"
         }
         val revision = requireNotNull(required("PROD_OWNER_BOOTSTRAP_EXPECTED_REVISION").toLongOrNull())
         val expiry = requireNotNull(required("PROD_OWNER_BOOTSTRAP_EXPIRES_AT").toLongOrNull())
@@ -267,7 +262,6 @@ object OwnerBootstrap {
                 required("PROD_OWNER_BOOTSTRAP_REASON"),
                 expiry,
                 proof,
-                scope = "prod",
                 authorizationPublicKey = required("PROD_OWNER_BOOTSTRAP_TRUSTED_OPERATOR_PUBLIC_KEY"),
                 authorizationSignature = required("PROD_OWNER_BOOTSTRAP_AUTHORIZATION"),
             )
@@ -275,29 +269,6 @@ object OwnerBootstrap {
             "Production owner authorization signature is invalid"
         }
         return spec
-    }
-
-    /** The flag is an operator-controlled startup opt-in; never callable through a public route. */
-    fun parse(env: (String) -> String?): OwnerBootstrapSpec? {
-        val enabled = env("QA_OWNER_BOOTSTRAP_ENABLED") ?: "false"
-        require(enabled in setOf("true", "false")) { "QA owner bootstrap flag is invalid" }
-        if (enabled == "false") return null
-
-        fun required(name: String) = requireNotNull(env(name)) { "QA owner bootstrap configuration is incomplete" }
-        val revision = requireNotNull(required("QA_OWNER_BOOTSTRAP_EXPECTED_REVISION").toLongOrNull())
-        val expiry = requireNotNull(required("QA_OWNER_BOOTSTRAP_EXPIRES_AT").toLongOrNull())
-        val proof = required("QA_OWNER_BOOTSTRAP_PROOF")
-        require(proof.matches(Regex("[A-Za-z0-9_-]{43}"))) { "QA owner MFA proof is invalid" }
-        return OwnerBootstrapSpec(
-            required("QA_OWNER_BOOTSTRAP_ACCOUNT_ID"),
-            required("QA_OWNER_BOOTSTRAP_EMAIL"),
-            revision,
-            required("QA_OWNER_BOOTSTRAP_OPERATION_ID"),
-            required("QA_OWNER_BOOTSTRAP_OPERATOR"),
-            required("QA_OWNER_BOOTSTRAP_REASON"),
-            expiry,
-            proof,
-        )
     }
 
     suspend fun provision(
@@ -309,16 +280,10 @@ object OwnerBootstrap {
         claims: OwnerBootstrapClaims,
         clock: Clock = Clock.systemUTC(),
     ) {
-        val permitted =
-            when (spec.scope) {
-                "qa" -> environment in setOf("local", "staging") && databaseName.matches(Regex("[A-Za-z0-9_]+_qa"))
-                "prod" -> environment == "production" && databaseName.matches(Regex("[A-Za-z0-9_]+_prod"))
-                else -> false
-            }
-        require(permitted) { "Owner bootstrap requires a matching isolated database and runtime" }
-        if (spec.scope == "prod") {
-            require(spec.hasValidOperatorAuthorization()) { "Production owner authorization signature is invalid" }
+        require(environment == "production" && databaseName == "companero_dev") {
+            "Owner bootstrap requires the production runtime and retained production database"
         }
+        require(spec.hasValidOperatorAuthorization()) { "Production owner authorization signature is invalid" }
         require(spec.accountId.matches(Regex("[A-Za-z0-9_-]{1,128}")) && spec.operationId.matches(Regex("[A-Za-z0-9_-]{1,128}")))
         require(spec.operator.matches(Regex("[A-Za-z0-9_.@-]{1,100}")))
         require(spec.reason.length in 8..240 && spec.reason == spec.reason.trim() && spec.reason.none(Char::isISOControl))
@@ -336,7 +301,7 @@ object OwnerBootstrap {
         )
         val account = requireNotNull(accounts.findById(spec.accountId)) { "Verified owner candidate is required" }
         val digest = spec.digest()
-        val declaredOperator = "${spec.scope}-declared:${spec.operator}"
+        val declaredOperator = "prod-declared:${spec.operator}"
         val existing = claims.find()
         val audit = account.identityAudit.lastOrNull()
         if (existing?.digest == digest &&
@@ -356,7 +321,7 @@ object OwnerBootstrap {
             return
         }
         require(spec.expiresAt > now.epochSecond && spec.expiresAt <= now.epochSecond + 900) {
-            "QA owner authorization expired or exceeds fifteen minutes"
+            "Production owner authorization expired or exceeds fifteen minutes"
         }
         require(
             account.permitsSession &&
@@ -369,13 +334,11 @@ object OwnerBootstrap {
         ) {
             "Owner candidate must be current, verified and unprivileged"
         }
-        if (spec.scope == "prod") {
-            require(
-                account.registrationIntent?.profile == RegistrationAccountType.OWNER_INVITED &&
-                    account.roles == setOf(UserRole.WORKSHOP_PARTICIPANT),
-            ) {
-                "Production first owner must be a verified invitation-only owner candidate"
-            }
+        require(
+            account.registrationIntent?.profile == RegistrationAccountType.OWNER_INVITED &&
+                account.roles == setOf(UserRole.WORKSHOP_PARTICIPANT),
+        ) {
+            "Production first owner must be a verified invitation-only owner candidate"
         }
         require(accounts.listAccounts().none { UserRole.SUPER_ADMIN in it.roles }) { "Existing owner requires normal administration" }
         mfa.requireStepUp(account, spec.proof, StepUpAction.PRIVILEGED_INVITE_ACCEPT, "global-owner", spec.operationId, digest)
@@ -399,7 +362,7 @@ object OwnerBootstrap {
                     spec.operationId,
                     declaredOperator,
                     AccountStatus.ACTIVE,
-                    if (spec.scope == "prod") setOf(UserRole.SUPER_ADMIN) else account.roles + UserRole.SUPER_ADMIN,
+                    setOf(UserRole.SUPER_ADMIN),
                     account.institutionId,
                     now,
                     scopeDigest = digest,

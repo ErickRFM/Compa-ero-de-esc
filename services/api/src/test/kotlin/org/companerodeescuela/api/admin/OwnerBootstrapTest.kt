@@ -30,9 +30,8 @@ import kotlin.test.assertTrue
 class OwnerBootstrapTest {
     private val clock = Clock.fixed(Instant.parse("2026-11-02T12:00:30Z"), ZoneOffset.UTC)
 
-    @Test fun `startup opt in is disabled by default and never logs proof`() {
-        assertEquals(null, OwnerBootstrap.parse { null })
-        assertFailsWith<IllegalArgumentException> { OwnerBootstrap.parse { "invalid" } }
+    @Test fun `production startup opt in is disabled by default`() {
+        assertEquals(null, OwnerBootstrap.parseProduction { null })
         assertEquals(
             "OwnerBootstrapSpec([redacted])",
             OwnerBootstrapSpec("x", "a@b", 0, "op", "operator", "test reason", 1, "secret").toString(),
@@ -62,10 +61,9 @@ class OwnerBootstrapTest {
                 0,
                 "operation",
                 "operator-qa",
-                "QA owner enrollment",
+                "Production owner enrollment",
                 expiresAt,
                 "p".repeat(43),
-                scope = "prod",
             )
         val signature =
             Signature
@@ -85,7 +83,7 @@ class OwnerBootstrapTest {
                 "PROD_OWNER_BOOTSTRAP_EMAIL" to "owner@example.test",
                 "PROD_OWNER_BOOTSTRAP_OPERATION_ID" to "operation",
                 "PROD_OWNER_BOOTSTRAP_OPERATOR" to "operator-qa",
-                "PROD_OWNER_BOOTSTRAP_REASON" to "QA owner enrollment",
+                "PROD_OWNER_BOOTSTRAP_REASON" to "Production owner enrollment",
                 "PROD_OWNER_BOOTSTRAP_TRUSTED_OPERATOR_PUBLIC_KEY" to
                     Base64.getUrlEncoder().withoutPadding().encodeToString(keyPair.public.encoded),
                 "PROD_OWNER_BOOTSTRAP_AUTHORIZATION" to
@@ -109,12 +107,12 @@ class OwnerBootstrapTest {
 
     @Test fun `production authorization signature binds the exact command`() =
         runTest {
-            val (accounts, mfa, spec) = fixture(scope = "prod")
+            val (accounts, mfa, spec) = fixture()
             assertFailsWith<IllegalArgumentException> {
                 OwnerBootstrap.provision(
                     spec.copy(reason = "different approved reason"),
                     "production",
-                    "companero_prod",
+                    "companero_dev",
                     accounts,
                     mfa,
                     InMemoryOwnerBootstrapClaims(),
@@ -124,53 +122,25 @@ class OwnerBootstrapTest {
             assertEquals(setOf(UserRole.WORKSHOP_PARTICIPANT), assertNotNull(accounts.findById("owner")).roles)
         }
 
-    @Test fun `production cannot use a QA scoped command or proof`() =
+    @Test fun `production bootstrap rejects retired database names`() =
         runTest {
-            val (accounts, mfa, qaSpec) = fixture()
-            assertFailsWith<IllegalArgumentException> {
-                OwnerBootstrap.provision(
-                    qaSpec,
-                    "production",
-                    "companero_prod",
-                    accounts,
-                    mfa,
-                    InMemoryOwnerBootstrapClaims(),
-                    clock,
-                )
+            val (accounts, mfa, spec) = fixture()
+            for (database in listOf("companero_qa", "companero_prod")) {
+                assertFailsWith<IllegalArgumentException> {
+                    OwnerBootstrap.provision(spec, "production", database, accounts, mfa, InMemoryOwnerBootstrapClaims(), clock)
+                }
             }
-            assertFailsWith<IllegalArgumentException> {
-                OwnerBootstrap.provision(
-                    qaSpec.copy(scope = "prod"),
-                    "production",
-                    "companero_qa",
-                    accounts,
-                    mfa,
-                    InMemoryOwnerBootstrapClaims(),
-                    clock,
-                )
-            }
-            assertFailsWith<IllegalArgumentException> {
-                OwnerBootstrap.provision(
-                    qaSpec.copy(scope = "prod"),
-                    "production",
-                    "companero_prod",
-                    accounts,
-                    mfa,
-                    InMemoryOwnerBootstrapClaims(),
-                    clock,
-                )
-            }
-            assertEquals(setOf(UserRole.STUDENT), assertNotNull(accounts.findById("owner")).roles)
+            assertEquals(setOf(UserRole.WORKSHOP_PARTICIPANT), assertNotNull(accounts.findById("owner")).roles)
         }
 
     @Test fun `production refuses verified noninvited account even with valid MFA`() =
         runTest {
-            val (accounts, mfa, spec) = fixture(scope = "prod", invited = false)
+            val (accounts, mfa, spec) = fixture(invited = false)
             assertFailsWith<IllegalArgumentException> {
                 OwnerBootstrap.provision(
                     spec,
                     "production",
-                    "companero_prod",
+                    "companero_dev",
                     accounts,
                     mfa,
                     InMemoryOwnerBootstrapClaims(),
@@ -182,31 +152,31 @@ class OwnerBootstrapTest {
 
     @Test fun `verified invited owner becomes only SUPER_ADMIN after production MFA`() =
         runTest {
-            val (accounts, mfa, spec) = fixture(scope = "prod")
+            val (accounts, mfa, spec) = fixture()
             val claims = InMemoryOwnerBootstrapClaims()
-            OwnerBootstrap.provision(spec, "production", "companero_prod", accounts, mfa, claims, clock)
+            OwnerBootstrap.provision(spec, "production", "companero_dev", accounts, mfa, claims, clock)
             val owner = assertNotNull(accounts.findById("owner"))
             assertEquals(setOf(UserRole.SUPER_ADMIN), owner.roles)
-            assertEquals("prod-declared:operator-qa", owner.identityAudit.single().actorId)
+            assertEquals("prod-declared:operator-prod", owner.identityAudit.single().actorId)
             assertEquals(spec.digest(), claims.find()?.digest)
         }
 
-    @Test fun `verified student gains only the additional owner role through scoped MFA`() =
+    @Test fun `verified invited owner is promoted through production MFA`() =
         runTest {
             val (accounts, mfa, spec) = fixture()
             val claims = InMemoryOwnerBootstrapClaims()
-            OwnerBootstrap.provision(spec, "staging", "companero_qa", accounts, mfa, claims, clock)
+            OwnerBootstrap.provision(spec, "production", "companero_dev", accounts, mfa, claims, clock)
             val account = assertNotNull(accounts.findById("owner"))
-            assertEquals(setOf(UserRole.STUDENT, UserRole.SUPER_ADMIN), account.roles)
+            assertEquals(setOf(UserRole.SUPER_ADMIN), account.roles)
             assertEquals("institution", account.institutionId)
             assertEquals(1L, account.authRevision)
-            assertEquals("qa-declared:operator-qa", account.identityAudit.single().actorId)
+            assertEquals("prod-declared:operator-prod", account.identityAudit.single().actorId)
             assertEquals(spec.digest(), account.identityAudit.single().scopeDigest)
-            assertEquals("QA owner enrollment", claims.find()?.reason)
-            OwnerBootstrap.provision(spec, "staging", "companero_qa", accounts, mfa, claims, clock)
+            assertEquals("Production owner enrollment", claims.find()?.reason)
+            OwnerBootstrap.provision(spec, "production", "companero_dev", accounts, mfa, claims, clock)
             assertEquals(1, assertNotNull(accounts.findById("owner")).identityAudit.size)
             val afterExpiry = Clock.fixed(clock.instant().plusSeconds(1800), ZoneOffset.UTC)
-            OwnerBootstrap.provision(spec, "staging", "companero_qa", accounts, mfa, claims, afterExpiry)
+            OwnerBootstrap.provision(spec, "production", "companero_dev", accounts, mfa, claims, afterExpiry)
             assertEquals(1, assertNotNull(accounts.findById("owner")).identityAudit.size)
         }
 
@@ -218,18 +188,18 @@ class OwnerBootstrapTest {
                     OwnerBootstrap.provision(spec, environment, database, accounts, mfa, InMemoryOwnerBootstrapClaims(), clock)
                 }
             }
-            assertFailsWith<org.companerodeescuela.api.errors.ApiException.Forbidden> {
+            assertFailsWith<IllegalArgumentException> {
                 OwnerBootstrap.provision(
                     spec.copy(reason = "changed reason"),
-                    "staging",
-                    "companero_qa",
+                    "production",
+                    "companero_dev",
                     accounts,
                     mfa,
                     InMemoryOwnerBootstrapClaims(),
                     clock,
                 )
             }
-            assertEquals(setOf(UserRole.STUDENT), assertNotNull(accounts.findById("owner")).roles)
+            assertEquals(setOf(UserRole.WORKSHOP_PARTICIPANT), assertNotNull(accounts.findById("owner")).roles)
         }
 
     @Test fun `expired proof and revoked role cannot be restored by bootstrap retry`() =
@@ -238,8 +208,8 @@ class OwnerBootstrapTest {
             assertFailsWith<IllegalArgumentException> {
                 OwnerBootstrap.provision(
                     spec.copy(expiresAt = clock.instant().epochSecond),
-                    "staging",
-                    "companero_qa",
+                    "production",
+                    "companero_dev",
                     accounts,
                     mfa,
                     InMemoryOwnerBootstrapClaims(),
@@ -247,7 +217,7 @@ class OwnerBootstrapTest {
                 )
             }
             val claims = InMemoryOwnerBootstrapClaims()
-            OwnerBootstrap.provision(spec, "staging", "companero_qa", accounts, mfa, claims, clock)
+            OwnerBootstrap.provision(spec, "production", "companero_dev", accounts, mfa, claims, clock)
             assertNotNull(
                 accounts.changeIdentity(
                     "owner",
@@ -265,8 +235,8 @@ class OwnerBootstrapTest {
             assertFailsWith<IllegalArgumentException> {
                 OwnerBootstrap.provision(
                     spec,
-                    "staging",
-                    "companero_qa",
+                    "production",
+                    "companero_dev",
                     accounts,
                     mfa,
                     claims,
@@ -362,29 +332,26 @@ class OwnerBootstrapTest {
                     ): Boolean = durable.commit(digest, accountId, committedAt)
                 }
             assertFailsWith<IllegalStateException> {
-                OwnerBootstrap.provision(spec, "staging", "companero_qa", accounts, mfa, interrupted, clock)
+                OwnerBootstrap.provision(spec, "production", "companero_dev", accounts, mfa, interrupted, clock)
             }
-            assertEquals(setOf(UserRole.STUDENT), assertNotNull(accounts.findById("owner")).roles)
-            OwnerBootstrap.provision(spec, "staging", "companero_qa", accounts, mfa, interrupted, clock)
-            assertEquals(setOf(UserRole.STUDENT, UserRole.SUPER_ADMIN), assertNotNull(accounts.findById("owner")).roles)
+            assertEquals(setOf(UserRole.WORKSHOP_PARTICIPANT), assertNotNull(accounts.findById("owner")).roles)
+            OwnerBootstrap.provision(spec, "production", "companero_dev", accounts, mfa, interrupted, clock)
+            assertEquals(setOf(UserRole.SUPER_ADMIN), assertNotNull(accounts.findById("owner")).roles)
             assertEquals(OwnerBootstrapClaimState.COMMITTED, durable.find()?.state)
         }
 
-    private suspend fun fixture(
-        scope: String = "qa",
-        invited: Boolean = true,
-    ): Triple<InMemoryPlatformAccountRepository, MfaService, OwnerBootstrapSpec> {
+    private suspend fun fixture(invited: Boolean = true): Triple<InMemoryPlatformAccountRepository, MfaService, OwnerBootstrapSpec> {
         val accounts = InMemoryPlatformAccountRepository()
-        val password = "qa-test-password"
+        val password = "owner-test-password"
         val account =
             PlatformAccount(
                 "owner",
                 "Owner",
                 "owner@example.test",
                 PasswordHasher().hash(password),
-                if (scope == "prod" && invited) setOf(UserRole.WORKSHOP_PARTICIPANT) else setOf(UserRole.STUDENT),
+                if (invited) setOf(UserRole.WORKSHOP_PARTICIPANT) else setOf(UserRole.STUDENT),
                 institutionId = "institution",
-                registrationIntent = if (scope == "prod" && invited) RegistrationIntent(RegistrationAccountType.OWNER_INVITED) else null,
+                registrationIntent = if (invited) RegistrationIntent(RegistrationAccountType.OWNER_INVITED) else null,
                 emailVerifiedAt = clock.instant().minusSeconds(60),
             )
         accounts.create(account)
@@ -405,14 +372,13 @@ class OwnerBootstrapTest {
                 "owner@example.test",
                 0,
                 "owner-op",
-                "operator-qa",
-                "QA owner enrollment",
+                "operator-prod",
+                "Production owner enrollment",
                 clock.instant().epochSecond + 600,
                 "p".repeat(43),
-                scope = scope,
             )
         val draft =
-            if (scope == "prod") {
+            run {
                 val keyPair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
                 val signature =
                     Signature
@@ -425,8 +391,6 @@ class OwnerBootstrapTest {
                     authorizationPublicKey = Base64.getUrlEncoder().withoutPadding().encodeToString(keyPair.public.encoded),
                     authorizationSignature = Base64.getUrlEncoder().withoutPadding().encodeToString(signature),
                 )
-            } else {
-                unsignedDraft
             }
         val proof =
             mfa.issueStepUp(

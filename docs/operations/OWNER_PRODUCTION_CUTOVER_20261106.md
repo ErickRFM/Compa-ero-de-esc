@@ -3,7 +3,11 @@
 **Destinatario designado:** `erik55509@hotmail.com`.
 **PR de implementación:** #292. El último HEAD con CI completo verde verificado fue `d5bb0a7dd5012b47c0bf7002a2a78e99f7c9097b` (API `42413496305`, Android `42413496272`, iOS `42413496284`: `success`). Los commits posteriores incorporan recuperación atómica de reservas expiradas y validación contra un trust anchor; requieren CI completo propio antes de cualquier merge. El PR sigue abierto, draft y sin fusionar. Respaldo/restauración, aislamiento y migración continúan bloqueados.
 
-Este runbook es la secuencia autorizable para el primer propietario. No confirma que producción ya esté activada.
+> **Aviso de vigencia (2026-11-10): este runbook conserva anotaciones históricas y no debe leerse como estado actual de Git/CI.** El PR #292 se fusionó el 2026-11-08 (`de250aa5e05e4f1cc938971e11b4156ee5d9441b`); el código de recuperación de reservas y trust anchor quedó integrado y `origin/main` (`6e77b4d472bbe89d51f1651746e7b7d941316488`) tiene CI API y Android exitosos, incluida instrumentación Android Académica/Gestión API 31/35. Esos resultados no certifican el corte de Mongo, el correo real ni el bootstrap del propietario.
+>
+> Para operar, usar primero [el runbook vigente de Mongo de producción](PRODUCTION_MONGODB_SINGLE_STORE.md). El resto de este archivo es un registro histórico, anterior a la decisión de conservar `companero_dev` como única base. No seguir instrucciones de migración a `companero_prod` ni referencias al servicio QA.
+
+Este documento es un archivo histórico, no la secuencia autorizable para la operación actual. Sigue sin confirmar que el bootstrap del propietario se haya ejecutado.
 
 ## Corrección de recuperación y trust anchor (2026-11-07)
 

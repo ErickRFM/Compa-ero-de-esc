@@ -1,64 +1,23 @@
-# Compañero — ingreso de Súper Admin con correo independiente
+# Primera cuenta `SUPER_ADMIN` de Compañero
 
-**Cuenta designada exclusivamente para Compañero:** `erik55509@hotmail.com`.
+## Arquitectura de operación
 
-Este documento **no es una concesión de permisos** y su presencia no autoriza
-roles por coincidencia de correo. Nunca convertir la cuenta existente
-`erik55509@gmail.com` ni reenviar credenciales de otro perfil.
+Compañero usa una API productiva, las aplicaciones Académica y Gestión y la base existente `companero_dev`. QA ya no forma parte de los flujos desplegables. No crear otra cuenta ni modificar roles para hacer avanzar el alta.
 
-## Estado confirmado al 3-nov-2026
+## Secuencia autorizada
 
-- La cuenta Hotmail no estaba registrada en las colecciones consultadas de
-  `companero_dev` ni `companero_qa`. No hay evidencia aquí sobre la
-  base efectiva del entorno productivo de Render.
-- La invitación V26 de Resend existe como plantilla publicada y el remitente
-  de `companero.manecomb.com` está verificado. La plantilla necesita un enlace
-  real, personal y con expiración; no usar URL ficticia ni sustituirla por
-  la página principal.
-- La implementación de invitaciones en Ktor es aún prototipo no expuesto:
-  aceptación no equivale a promoción administrativa.
-- `OwnerBootstrap` está cableado para **QA aislado** con correo verificado,
-  MFA, prueba de autorización de vigencia corta, CAS, auditoría y reserva
-  persistente única. Rechaza explícitamente producción.
-- **Ningún mensaje de invitación se ha enviado ni se ha concedido Súper Admin.**
+1. Confirmar que el servicio de Render responde desde el commit aprobado, usa `APP_ENV=production` y `MONGODB_DATABASE=companero_dev`.
+2. Verificar el flujo real de registro, verificación y correo con el titular y su buzón controlado. Si el correo rebota, detenerse y resolver el transporte antes de emitir otra invitación.
+3. La cuenta existente en estado `PENDING_VERIFICATION` conserva su identidad y contraseña. El titular inicia el registro `OWNER_INVITED` con el mismo correo y la contraseña actual, e ingresa el código de invitación de un solo uso. El servicio cambia únicamente la intención de registro, conserva el ID y el hash de contraseña, y revoca sesiones previas. Se respetan los límites de reenvío de verificación.
+4. El titular verifica el correo desde el mensaje nuevo. Esto solo concede `WORKSHOP_PARTICIPANT`; no concede `SUPER_ADMIN` ni rol académico.
+5. Confirmar respaldo recuperable, MFA inscrito personalmente por el titular, aprobación firmada del operador y revisión de cuenta actual.
+6. Ejecutar el bootstrap de producción mediante las variables `PROD_OWNER_BOOTSTRAP_*`, más `PROD_OWNER_ISOLATION_CERTIFIED=true`. El bootstrap solo acepta una invitación de propietario verificada, requiere MFA y firma Ed25519 del operador, limita la autorización a 15 minutos y guarda auditoría/reserva atómica.
+7. Retirar las variables temporales del comando de bootstrap y verificar login nuevo, rol efectivo, auditoría y revocación de sesiones previas.
 
-## Orden de habilitación (obligatorio)
+Una invitación por correo no concede roles. El nombre o coincidencia de una dirección tampoco concede privilegios. No enviar códigos, pruebas MFA, claves ni secretos por GitHub, logs o chat.
 
-1. Terminar flujo de administradores por carrera, selector Android y
-   sincronización firmada de grants, revocaciones, horarios y QR; no asumir
-   que la capa de política Ktor por sí sola constituye integración completa.
-2. Obtener CI obligatorio verde de SIII, Ktor y Android; incorporar los PR
-   con resolución de conflictos y probar despliegues y reingreso de sesión.
-3. Verificar que el servicio productivo usa una base MongoDB de producción
-   distinta de desarrollo y QA, y que la autoridad HMAC de SIII coincide.
-4. Finalizar API de invitaciones: creación autorizada, entrega persistente,
-   token de un solo uso, verificación de destinatario, expiración, aceptación
-   autenticada y auditoría. La plantilla de Resend no se invoca hasta ese punto.
-5. Crear la cuenta Hotmail desde el registro real de la aplicación; confirmar
-   propiedad del correo e inscribir MFA del dispositivo del titular.
-6. En QA, ejecutar `OwnerBootstrap` únicamente con los datos **reales** de
-   cuenta y revisión: `QA_OWNER_BOOTSTRAP_ENABLED=true`,
-   `QA_OWNER_BOOTSTRAP_ACCOUNT_ID`, `QA_OWNER_BOOTSTRAP_EMAIL` con
-   el destinatario indicado, `QA_OWNER_BOOTSTRAP_EXPECTED_REVISION`,
-   `QA_OWNER_BOOTSTRAP_OPERATION_ID`, `QA_OWNER_BOOTSTRAP_OPERATOR`,
-   `QA_OWNER_BOOTSTRAP_REASON`, `QA_OWNER_BOOTSTRAP_EXPIRES_AT`
-   y `QA_OWNER_BOOTSTRAP_PROOF` emitido mediante MFA para el digest exacto.
-   Aplicar solo durante el arranque controlado, auditar e inmediatamente
-   deshabilitar el flag. No escribir códigos, contraseñas ni prueba MFA en Git.
-7. Para producción, establecer un proceso separado de designación propietaria
-   con autorización demostrable y auditoría. Nunca modificar la restricción
-   de `OwnerBootstrap` para permitir producción ni asignar `SUPER_ADMIN`
-   mediante actualización directa de MongoDB.
-8. Emitir invitación sólo cuando exista un enlace real y comprobado y la
-   promoción segura esté disponible. Comprobar aceptación de proveedor,
-   entrega cuando haya webhook validado, registro, autenticación, MFA,
-   alcance institucional y revocación.
-9. Verificar en una cuenta estudiante separada que no se filtra navegación ni
-   privilegios de Súper Admin. No reutilizar el QR Wi-Fi como asistencia.
+## Bloqueos operativos actuales
 
-## Señales de bloqueo
-
-No se cumple el gate de envío si CI está pendiente, hay PR sin merge,
-un despliegue no está verificado, no hay usuario Hotmail verificado,
-el enlace de invitación no existe, no hay promoción segura en producción,
-o las concesiones de carrera no han pasado E2E con dos instituciones.
+- El endpoint de webhook de Resend debe desplegarse y configurarse en el servicio productivo. El recorrido de verificación de correo debe probarse con un buzón controlado.
+- El acceso efectivo de Mongo de Render debe comprobarse en Atlas y limitarse a lo necesario en `companero_dev`.
+- No activar el bootstrap hasta que los controles anteriores y el respaldo se hayan verificado.

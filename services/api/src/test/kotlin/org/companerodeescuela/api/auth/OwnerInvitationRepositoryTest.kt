@@ -12,6 +12,34 @@ import kotlin.test.assertTrue
 
 class OwnerInvitationRepositoryTest {
     @Test
+    fun `owner invite delivery is atomically claimed once and does not consume registration`() =
+        runBlocking {
+            val repository = InMemoryOwnerInvitationRepository()
+            val now = Instant.parse("2026-11-07T12:00:00Z")
+            val expiresAt = now.plusSeconds(3600)
+            val digest = "d".repeat(64)
+            val claims =
+                coroutineScope {
+                    (1..24)
+                        .map { index ->
+                            async {
+                                repository.claimDelivery(
+                                    digest,
+                                    "erik55509@hotmail.com",
+                                    expiresAt,
+                                    now,
+                                    "delivery-$index",
+                                )
+                            }
+                        }.awaitAll()
+                }
+
+            assertEquals(1, claims.count { it })
+            assertTrue(repository.consume(digest, "erik55509@hotmail.com", expiresAt, now, "owner-account"))
+            assertFalse(repository.claimDelivery(digest, "erik55509@hotmail.com", expiresAt, now, "replay"))
+        }
+
+    @Test
     fun `one digest is consumed once across concurrent callers`() =
         runBlocking {
             val repository = InMemoryOwnerInvitationRepository()

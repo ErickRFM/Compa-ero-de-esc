@@ -66,8 +66,10 @@ import org.companerodeescuela.api.invitations.InMemoryInvitationRepository
 import org.companerodeescuela.api.invitations.InvitationDispatchService
 import org.companerodeescuela.api.invitations.MongoInvitationOutbox
 import org.companerodeescuela.api.invitations.MongoInvitationRepository
+import org.companerodeescuela.api.invitations.OwnerInviteEmailDispatchService
 import org.companerodeescuela.api.invitations.UnavailableInvitationEmailGateway
 import org.companerodeescuela.api.invitations.invitationRoutes
+import org.companerodeescuela.api.invitations.ownerInviteEmailDispatchRoutes
 import org.companerodeescuela.api.mail.ResendInvitationEmailGateway
 import org.companerodeescuela.api.mail.resendWebhookRoutes
 import org.companerodeescuela.api.plugins.configurePlugins
@@ -478,6 +480,10 @@ fun Application.module(
 
     routing {
         healthRoutes(settings = settings, healthService = healthService)
+        ownerInviteEmailDispatchRoutes(
+            settings = settings,
+            service = OwnerInviteEmailDispatchService(ownerInvitationRepository, invitationEmail),
+        )
         resendWebhookRoutes(
             signingSecret = settings.resendWebhookSecret,
             database =

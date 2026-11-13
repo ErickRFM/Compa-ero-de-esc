@@ -23,11 +23,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -336,39 +338,91 @@ private fun MaticaProgressCard(
     onUnlink: () -> Unit,
     onRefresh: () -> Unit,
 ) {
-    V8GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
-            Text("Progreso de Mática", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            if (state.maticaLoading) Text("Cargando progreso…", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            state.maticaProgress?.let { progress ->
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("${progress.totalXp} XP · Nivel ${progress.level}", fontWeight = FontWeight.Medium)
-                    Text("🔥 ${progress.streak} días", color = MaterialTheme.colorScheme.primary)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(20.dp),
+        tonalElevation = 1.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
+        ) {
+            Text(
+                "Progreso de Mática",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            if (state.maticaLoading) {
+                Text("Cargando progreso…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            val progress = state.maticaProgress
+            if (progress != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        "${progress.totalXp} XP · Nivel ${progress.level}",
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Text(
+                        "🔥 ${progress.streak} días",
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                 }
                 Text(
                     "${progress.weeklyXp} XP esta semana · Mejor racha ${progress.longestStreak}",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                TextButton(onClick = onUnlink, enabled = !state.maticaBusy) { Text("Desvincular") }
-            } ?: if (state.maticaLinked == false) {
-                Text("Conecta Mática para ver aquí tu XP, nivel y racha.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedTextField(
-                    value = code,
-                    onValueChange = onCodeChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Código temporal de Mática") },
-                    singleLine = true,
-                )
-                Button(onClick = onLink, enabled = !state.maticaBusy && code.isNotBlank()) {
-                    Text(if (state.maticaBusy) "Vinculando…" else "Vincular progreso")
+                TextButton(onClick = onUnlink, enabled = !state.maticaBusy) {
+                    Text("Desvincular")
                 }
-            } else if (state.maticaLinked == null) {
-                Text("El progreso no está disponible ahora.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TextButton(onClick = onRefresh) { Text("Reintentar") }
             } else {
-                Unit
+                when (state.maticaLinked) {
+                    false -> {
+                        Text(
+                            "Conecta Mática para ver aquí tu XP, nivel y racha.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        OutlinedTextField(
+                            value = code,
+                            onValueChange = onCodeChange,
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Código temporal de Mática") },
+                            singleLine = true,
+                            enabled = !state.maticaBusy,
+                        )
+                        Button(
+                            onClick = onLink,
+                            enabled = !state.maticaBusy && code.isNotBlank(),
+                        ) {
+                            Text(if (state.maticaBusy) "Vinculando…" else "Vincular progreso")
+                        }
+                    }
+                    null -> {
+                        Text(
+                            "El progreso no está disponible ahora.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        TextButton(onClick = onRefresh, enabled = !state.maticaLoading) {
+                            Text("Reintentar")
+                        }
+                    }
+                    true -> {
+                        Text(
+                            "Mática está vinculada, pero el progreso no se pudo cargar.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        TextButton(onClick = onRefresh, enabled = !state.maticaLoading) {
+                            Text("Reintentar")
+                        }
+                    }
+                }
             }
-            state.maticaError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            state.maticaError?.let {
+                Text(it, color = MaterialTheme.colorScheme.error)
+            }
         }
     }
 }

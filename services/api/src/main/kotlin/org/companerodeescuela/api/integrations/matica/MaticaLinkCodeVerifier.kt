@@ -6,6 +6,7 @@ import kotlinx.serialization.json.Json
 import java.security.MessageDigest
 import java.time.Instant
 import java.util.Base64
+import java.util.UUID
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
@@ -36,17 +37,22 @@ internal class MaticaLinkCodeVerifier(
             val expected = sign(parts[0])
             val provided = decoder.decode(parts[1])
             if (!MessageDigest.isEqual(expected, provided)) return null
-            val claims = json.decodeFromString(MaticaLinkClaims.serializer(), String(decoder.decode(parts[0])))
+            val claims =
+                json.decodeFromString(
+                    MaticaLinkClaims.serializer(),
+                    String(decoder.decode(parts[0]), Charsets.UTF_8),
+                )
             val expiresIn = claims.expiresAtEpochSeconds - now.epochSecond
-            if (claims.scope != "progress:read" ||
+            if (
+                claims.scope != "progress:read" ||
                 claims.expiresAtEpochSeconds <= now.epochSecond ||
                 expiresIn > MAX_LINK_CODE_TTL_SECONDS ||
                 claims.nonce.length > 80
             ) {
                 return null
             }
-            java.util.UUID.fromString(claims.subject)
-            java.util.UUID.fromString(claims.nonce)
+            UUID.fromString(claims.subject)
+            UUID.fromString(claims.nonce)
             claims
         } catch (_: Exception) {
             null
@@ -56,7 +62,10 @@ internal class MaticaLinkCodeVerifier(
     fun summarySignature(
         userId: String,
         timestamp: Long,
-    ): String = encoder.encodeToString(sign("summary|$userId|$timestamp"))
+    ): String =
+        encoder.encodeToString(
+            sign("summary|$userId|$timestamp"),
+        )
 
     private fun sign(payload: String): ByteArray =
         Mac.getInstance("HmacSHA256").run {

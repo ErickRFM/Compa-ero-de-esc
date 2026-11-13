@@ -1,6 +1,7 @@
 package org.companerodeescuela.api.config
 
 import org.companerodeescuela.shared.validation.Validators
+import java.net.URI
 import java.util.Base64
 
 /**
@@ -69,6 +70,8 @@ data class ApiSettings(
     val currentUserCacheTtlMillis: Int = 0,
     val verificationEmailApiKey: CharArray? = null,
     val verificationEmailSender: String? = null,
+    val maticaCompanionIntegrationSecret: CharArray? = null,
+    val maticaApiBaseUrl: String? = null,
     /** Svix signing secret for Resend webhooks; never logged or returned. */
     val resendWebhookSecret: CharArray? = null,
     /** Explicit opt-in for production invitation dispatch; disabled by default. */
@@ -89,6 +92,7 @@ data class ApiSettings(
     val hasVerificationEmail: Boolean get() = verificationEmailApiKey != null && verificationEmailSender != null
     val hasResendWebhook: Boolean get() = resendWebhookSecret != null
     val hasFirebasePush: Boolean get() = firebaseServiceAccountJson != null
+    val hasMaticaIntegration: Boolean get() = maticaCompanionIntegrationSecret != null && maticaApiBaseUrl != null
 
     val hasAuthentication: Boolean
         get() = jwtSecret != null
@@ -128,6 +132,8 @@ data class ApiSettings(
             attendanceQrNonceReuseThreshold == other.attendanceQrNonceReuseThreshold &&
             hasVerificationEmail == other.hasVerificationEmail &&
             verificationEmailSender == other.verificationEmailSender &&
+            hasMaticaIntegration == other.hasMaticaIntegration &&
+            maticaApiBaseUrl == other.maticaApiBaseUrl &&
             hasResendWebhook == other.hasResendWebhook &&
             productionInvitationsEnabled == other.productionInvitationsEnabled &&
             (mfaEncryptionKey != null) == (other.mfaEncryptionKey != null) &&
@@ -162,6 +168,8 @@ data class ApiSettings(
         result = 31 * result + attendanceQrNonceReuseThreshold
         result = 31 * result + hasVerificationEmail.hashCode()
         result = 31 * result + (verificationEmailSender?.hashCode() ?: 0)
+        result = 31 * result + hasMaticaIntegration.hashCode()
+        result = 31 * result + (maticaApiBaseUrl?.hashCode() ?: 0)
         result = 31 * result + hasResendWebhook.hashCode()
         result = 31 * result + productionInvitationsEnabled.hashCode()
         result = 31 * result + (mfaEncryptionKey != null).hashCode()
@@ -194,6 +202,7 @@ data class ApiSettings(
             "lateSyncReviewWindowSeconds=$lateSyncReviewWindowSeconds, " +
             "attendanceQrNonceReuseThreshold=$attendanceQrNonceReuseThreshold, " +
             "verificationEmailConfigured=$hasVerificationEmail, " +
+            "maticaIntegrationConfigured=$hasMaticaIntegration, " +
             "resendWebhookConfigured=$hasResendWebhook, " +
             "productionInvitationsEnabled=$productionInvitationsEnabled, " +
             "mfaEncryptionConfigured=${mfaEncryptionKey != null}, " +
@@ -473,6 +482,29 @@ class SettingsLoader(
                     .parse(json)
                 json
             }
+        val maticaSecret = env("MATICA_COMPANION_INTEGRATION_SECRET")?.takeIf { it.isNotBlank() }
+        val maticaApiBaseUrl = env("MATICA_API_BASE_URL")?.trim()?.takeIf { it.isNotEmpty() }
+        if ((maticaSecret == null) != (maticaApiBaseUrl == null)) {
+            throw ConfigurationException("Configure both MATICA_COMPANION_INTEGRATION_SECRET and MATICA_API_BASE_URL")
+        }
+        if (maticaSecret != null && maticaSecret.length < 32) {
+            throw ConfigurationException("MATICA_COMPANION_INTEGRATION_SECRET must be at least 32 characters")
+        }
+        if (maticaApiBaseUrl != null) {
+            val validBaseUrl =
+                runCatching {
+                    val uri = URI(maticaApiBaseUrl)
+                    uri.scheme == "https" &&
+                        uri.host != null &&
+                        uri.userInfo == null &&
+                        uri.query == null &&
+                        uri.fragment == null &&
+                        uri.path.orEmpty() in setOf("", "/") &&
+                        maticaApiBaseUrl.length <= 300
+                }.getOrDefault(false)
+            if (!validBaseUrl) throw ConfigurationException("MATICA_API_BASE_URL must be an HTTPS origin without credentials or path")
+        }
+
         val mfaKey =
             env("MFA_ENCRYPTION_KEY")?.let { encoded ->
                 val decoded = runCatching { Base64.getUrlDecoder().decode(encoded) }.getOrNull()
@@ -566,6 +598,8 @@ class SettingsLoader(
             currentUserCacheTtlMillis = currentUserCacheTtlMillis,
             verificationEmailApiKey = verificationEmailKey?.toCharArray(),
             verificationEmailSender = verificationEmailSender,
+            maticaCompanionIntegrationSecret = maticaSecret?.toCharArray(),
+            maticaApiBaseUrl = maticaApiBaseUrl,
             resendWebhookSecret = resendWebhookSecret?.toCharArray(),
             productionInvitationsEnabled = productionInvitationsEnabled,
             mfaEncryptionKey = mfaKey,

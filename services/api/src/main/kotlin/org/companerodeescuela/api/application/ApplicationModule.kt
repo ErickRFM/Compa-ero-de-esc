@@ -504,20 +504,19 @@ fun Application.module(
             sessionAuthority = sessionAuthority,
             ownerInvitationRepository = ownerInvitationRepository,
         )
-        val maticaIntegrationSecret = System.getenv("MATICA_COMPANION_INTEGRATION_SECRET")
-        val maticaApiBaseUrl = System.getenv("MATICA_API_BASE_URL")
+        val maticaDatabase =
+            if (settings.mongo.isConfigured && settings.hasMaticaIntegration) {
+                mongoConnection.database()
+            } else {
+                null
+            }
         maticaProgressRoutes(
             settings = settings,
             accounts = identityGraph.accounts,
             sessions = identityGraph.refreshSessions,
-            database =
-                if (settings.mongo.isConfigured && !maticaIntegrationSecret.isNullOrBlank() && !maticaApiBaseUrl.isNullOrBlank()) {
-                    mongoConnection.database()
-                } else {
-                    null
-                },
-            sharedSecret = maticaIntegrationSecret,
-            apiBaseUrl = maticaApiBaseUrl,
+            database = maticaDatabase,
+            sharedSecret = settings.maticaCompanionIntegrationSecret?.concatToString(),
+            apiBaseUrl = settings.maticaApiBaseUrl,
         )
         mfaRoutes(settings, providerRegistry.identity, identityGraph.refreshSessions, identityGraph.accounts, identityGraph.mfa)
         accountAdministrationRoutes(

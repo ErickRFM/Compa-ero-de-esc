@@ -91,7 +91,11 @@ class SmartRoleLoginUiTest {
             compose.waitForIdle()
             val config = node.fetchSemanticsNode().config
             observed = if (config.contains(SemanticsProperties.EditableText)) config[SemanticsProperties.EditableText].text else value
-            if (observed == value || (value.none { it == '\u2022' } && observed.all { it == '\u2022' } && observed.length == value.length)) return
+            val maskedMatch =
+                value.none { it == '\u2022' } &&
+                    observed.all { it == '\u2022' } &&
+                    observed.length == value.length
+            if (observed == value || maskedMatch) return
         }
         throw AssertionError("Field $tag kept value \"$observed\" instead of \"$value\" after three typing attempts")
     }

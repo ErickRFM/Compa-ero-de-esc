@@ -331,7 +331,9 @@ class V12AdministrationUiTest {
             compose.waitForIdle()
             val config = node.fetchSemanticsNode().config
             observed = if (config.contains(SemanticsProperties.EditableText)) config[SemanticsProperties.EditableText].text else value
-            if (observed == value) return
+            // Password fields expose the visual transformation's bullets through semantics, so an
+            // all-bullet run of the exact expected length also counts as a correct value.
+            if (observed == value || (value.none { it == '\u2022' } && observed.all { it == '\u2022' } && observed.length == value.length)) return
         }
         throw AssertionError("Field $tag kept value \"$observed\" instead of \"$value\" after three typing attempts")
     }

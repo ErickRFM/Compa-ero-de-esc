@@ -25,6 +25,7 @@ import org.companerodeescuela.feature.auth.LoginScreen
 import org.companerodeescuela.feature.auth.RegistrationScreen
 import org.companerodeescuela.feature.auth.SessionUiState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
@@ -47,9 +48,9 @@ class SmartRoleLoginUiTest {
     @Test fun roleChangesPreserveOneFormAndOnlySendDesiredAccess() {
         var submitted: Triple<String, String, AppExperience>? = null
         compose.setContent { loginTestContent(onLogin = { u, p, role -> submitted = Triple(u, p, role) }) }
-        compose.onNodeWithTag("login_username").performScrollTo().performTextInput("qa.docente")
-        compose.onNodeWithTag("login_password").performScrollTo().performTextInput("test-password")
-        compose.onNodeWithTag("role_TUTOR").performScrollTo().performClick()
+        typeExactly("login_username", "qa.docente")
+        typeExactly("login_password", "test-password")
+        selectChipWithRetry("role_TUTOR")
         // The keyboard may obscure the card; assert selected access and the retained shared form.
         compose.onNodeWithTag("role_TUTOR").assertIsSelected()
         compose.onNodeWithTag("login_registration").assertDoesNotExist()
@@ -61,9 +62,60 @@ class SmartRoleLoginUiTest {
         }
         compose.onNodeWithTag("login_submit").assertIsEnabled()
         compose.onNodeWithTag("login_submit").performScrollTo()
-        compose.onNodeWithTag("login_submit").performClick()
-        compose.waitUntil(10_000) { submitted != null }
+        // LoginScreen.submit() silently ignores a tap that lands while the pager snap is still
+        // settling. Re-click only while no submission was observed at all.
+        repeat(3) {
+            if (submitted == null) {
+                compose.onNodeWithTag("login_submit").performClick()
+                runCatching { compose.waitUntil(4_000) { submitted != null } }
+            }
+        }
+        assertNotNull(submitted)
         assertEquals(Triple("qa.docente", "test-password", AppExperience.TUTOR), submitted)
+    }
+
+    // API 35 IME batching flushes stray composing characters into the field after typing
+    // (observed as "test-passworde" and as a "Conrtase" tail). Verify the exact editable value
+    // and retype until it matches; the final Triple assertion stays the hard guard.
+    // Password fields expose the visual transformation's bullets through semantics, so an
+    // all-bullet run of the exact expected length also counts as a correct value.
+    private fun typeExactly(
+        tag: String,
+        value: String,
+    ) {
+        val node = compose.onNodeWithTag(tag).performScrollTo()
+        var observed = ""
+        repeat(3) {
+            node.performTextClearance()
+            node.performTextInput(value)
+            compose.waitForIdle()
+            val config = node.fetchSemanticsNode().config
+            observed = if (config.contains(SemanticsProperties.EditableText)) config[SemanticsProperties.EditableText].text else value
+            val maskedMatch =
+                value.none { it == '\u2022' } &&
+                    observed.all { it == '\u2022' } &&
+                    observed.length == value.length
+            if (observed == value || maskedMatch) return
+        }
+        throw AssertionError("Field $tag kept value \"$observed\" instead of \"$value\" after three typing attempts")
+    }
+
+    // The pager can swallow a chip tap mid-snap; re-click only while the chip never selected.
+    private fun selectChipWithRetry(tag: String) {
+        val chip = compose.onNodeWithTag(tag).performScrollTo()
+        repeat(3) {
+            chip.performClick()
+            val selected =
+                runCatching {
+                    compose.waitUntil(4_000) {
+                        val config = chip.fetchSemanticsNode().config
+                        config.contains(SemanticsProperties.Selected) && config[SemanticsProperties.Selected]
+                    }
+                    true
+                }.getOrDefault(false)
+            if (selected) return
+        }
+        chip.assertIsSelected()
     }
 
     @Test fun swipeArrowAndIndicatorSelectAllSixAccesses() {

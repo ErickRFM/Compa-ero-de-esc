@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -23,6 +24,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -313,6 +315,33 @@ class V12AdministrationUiTest {
         compose.waitUntil(timeoutMillis) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
     }
 
+    // API 35 IME batching flushes stray composing characters into the field after typing
+    // (observed as a "Conrtase" tail in the enrollment password, which then poisoned the
+    // request body). Verify the exact editable value and retype until it matches; the
+    // MockEngine body assertions stay the hard guard.
+    private fun typeExactly(
+        tag: String,
+        value: String,
+    ) {
+        val node = compose.onNodeWithTag(tag).performScrollTo()
+        var observed = ""
+        repeat(3) {
+            node.performTextClearance()
+            node.performTextInput(value)
+            compose.waitForIdle()
+            // Password fields expose the visual transformation's bullets through semantics, so an
+            // all-bullet run of the exact expected length also counts as a correct value.
+            val config = node.fetchSemanticsNode().config
+            observed = if (config.contains(SemanticsProperties.EditableText)) config[SemanticsProperties.EditableText].text else value
+            val maskedMatch =
+                value.none { it == '\u2022' } &&
+                    observed.all { it == '\u2022' } &&
+                    observed.length == value.length
+            if (observed == value || maskedMatch) return
+        }
+        throw AssertionError("Field $tag kept value \"$observed\" instead of \"$value\" after three typing attempts")
+    }
+
     private fun credentials() {
         compose.onNodeWithTag("admin_password").performTextInput("test-only-password")
         compose.onNodeWithTag("admin_otp").performTextInput("123456")
@@ -405,7 +434,7 @@ class V12AdministrationUiTest {
                     compose.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0,
                 )
             }
-            compose.onNodeWithTag("mfa_password").performScrollTo().performTextInput("test-only-password")
+            typeExactly("mfa_password", "test-only-password")
             dismissKeyboardBeforeSubmit()
             compose
                 .onNodeWithTag("mfa_enroll")
@@ -413,6 +442,12 @@ class V12AdministrationUiTest {
                 .assertIsDisplayed()
                 .assertIsEnabled()
                 .performClick()
+            compose.waitForIdle()
+            // API 35 can swallow the tap; MfaViewModel.enroll flips working synchronously when
+            // the click fires. Re-click only while nothing fired at all, never after a request.
+            if (f.enrollmentRequests.get() == 0 && !f.mfa.state.value.working && f.mfa.state.value.failure == null) {
+                compose.onNodeWithTag("mfa_enroll").performScrollTo().performClick()
+            }
             waitForMfaTransition(f, "enrollment") {
                 f.mfa.state.value.enrollment != null || f.mfa.state.value.failure != null
             }
@@ -424,7 +459,7 @@ class V12AdministrationUiTest {
             )
             assertEquals(1, f.enrollmentRequests.get())
             waitTag("mfa_setup_secret", timeoutMillis = 30000)
-            compose.onNodeWithTag("mfa_otp").performScrollTo().performTextInput("123456")
+            typeExactly("mfa_otp", "123456")
             dismissKeyboardBeforeSubmit()
             compose
                 .onNodeWithTag("mfa_confirm")

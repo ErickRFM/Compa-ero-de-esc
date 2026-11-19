@@ -22,6 +22,12 @@ sealed class Destination(
 
     data object AdminHome : Destination("admin-home")
 
+    data object AdminAccounts : Destination("admin-accounts")
+
+    data object AdminAcademic : Destination("admin-academic")
+
+    data object AdminHistory : Destination("admin-history")
+
     data object Schedule : Destination("schedule")
 
     data object Attendance : Destination("attendance")
@@ -72,6 +78,9 @@ enum class TopLevelDestination(
     TutorRequests(Destination.TutorRequests, "Solicitudes"),
     CoordinatorHome(Destination.CoordinatorHome, "Gestión"),
     AdminHome(Destination.AdminHome, "Administración"),
+    AdminAccounts(Destination.AdminAccounts, "Cuentas"),
+    AdminAcademic(Destination.AdminAcademic, "Académico"),
+    AdminHistory(Destination.AdminHistory, "Historial"),
     Schedule(Destination.Schedule, "Horario"),
     Classrooms(Destination.Classrooms, "Clases"),
     Grading(Destination.Grading, "Calificaciones"),

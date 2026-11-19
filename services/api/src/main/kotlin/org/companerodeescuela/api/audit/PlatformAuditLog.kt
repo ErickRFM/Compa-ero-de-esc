@@ -1,10 +1,15 @@
 package org.companerodeescuela.api.audit
 
 import com.mongodb.MongoWriteException
+import com.mongodb.client.model.Filters.and
+import com.mongodb.client.model.Filters.eq
 import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
+import com.mongodb.client.model.Sorts
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
+import kotlinx.coroutines.flow.toList
 import org.bson.Document
+import org.bson.conversions.Bson
 import java.security.MessageDigest
 import java.time.Instant
 import java.util.Date
@@ -45,12 +50,31 @@ internal data class PlatformAuditEvent(
 
 internal interface PlatformAuditLog {
     suspend fun record(event: PlatformAuditEvent): Boolean
+
+    suspend fun listRecent(
+        limit: Int = 50,
+        action: String? = null,
+        actorId: String? = null,
+    ): List<PlatformAuditEvent> = emptyList()
 }
 
 internal class InMemoryPlatformAuditLog : PlatformAuditLog {
     private val events = java.util.concurrent.ConcurrentHashMap<String, PlatformAuditEvent>()
 
     override suspend fun record(event: PlatformAuditEvent): Boolean = events.putIfAbsent(event.id, event) == null
+
+    override suspend fun listRecent(
+        limit: Int,
+        action: String?,
+        actorId: String?,
+    ): List<PlatformAuditEvent> =
+        events.values
+            .asSequence()
+            .filter { action == null || it.action == action }
+            .filter { actorId == null || it.actorId == actorId }
+            .sortedByDescending { it.createdAt }
+            .take(limit.coerceIn(1, 100))
+            .toList()
 }
 
 internal class MongoPlatformAuditLog(
@@ -96,5 +120,45 @@ internal class MongoPlatformAuditLog(
         } catch (error: MongoWriteException) {
             if (error.error.code == 11000) false else throw error
         }
+    }
+
+    override suspend fun listRecent(
+        limit: Int,
+        action: String?,
+        actorId: String?,
+    ): List<PlatformAuditEvent> {
+        ensureIndexes()
+        val filters = mutableListOf<Bson>()
+        if (action != null) filters += eq("action", action)
+        if (actorId != null) filters += eq("actorId", actorId)
+        val cursor =
+            when (filters.size) {
+                0 -> events.find()
+                1 -> events.find(filters.first())
+                else -> events.find(and(filters))
+            }
+        return cursor
+            .sort(Sorts.descending("createdAt"))
+            .limit(limit.coerceIn(1, 100))
+            .toList()
+            .mapNotNull { doc ->
+                val id = doc.getString("_id") ?: return@mapNotNull null
+                val actor = doc.getString("actorId") ?: return@mapNotNull null
+                val eventAction = doc.getString("action") ?: return@mapNotNull null
+                val resourceType = doc.getString("resourceType") ?: return@mapNotNull null
+                val resourceId = doc.getString("resourceId") ?: return@mapNotNull null
+                val outcome = doc.getString("outcome") ?: return@mapNotNull null
+                val createdAt = doc.getDate("createdAt")?.toInstant() ?: return@mapNotNull null
+                PlatformAuditEvent(
+                    id = id,
+                    actorId = actor,
+                    action = eventAction,
+                    resourceType = resourceType,
+                    resourceId = resourceId,
+                    operationId = doc.getString("operationId"),
+                    outcome = outcome,
+                    createdAt = createdAt,
+                )
+            }
     }
 }

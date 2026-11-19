@@ -134,6 +134,11 @@ internal interface InvitationRepository {
         newTokenHash: String,
         now: Instant,
     ): Boolean = false
+
+    suspend fun listRecent(
+        limit: Int = 50,
+        institutionId: String? = null,
+    ): List<InvitationRecord> = emptyList()
 }
 
 internal class InMemoryInvitationRepository : InvitationRepository {
@@ -151,6 +156,19 @@ internal class InMemoryInvitationRepository : InvitationRepository {
         }
 
     override suspend fun find(id: String): InvitationRecord? = mutex.withLock { records[id] }
+
+    override suspend fun listRecent(
+        limit: Int,
+        institutionId: String?,
+    ): List<InvitationRecord> =
+        mutex.withLock {
+            records.values
+                .asSequence()
+                .filter { institutionId == null || it.institutionId == institutionId }
+                .sortedByDescending { it.createdAt }
+                .take(limit.coerceIn(1, 100))
+                .toList()
+        }
 
     override suspend fun markSent(
         id: String,

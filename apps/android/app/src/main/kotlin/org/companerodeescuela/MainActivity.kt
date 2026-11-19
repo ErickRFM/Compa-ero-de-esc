@@ -54,6 +54,9 @@ import org.companerodeescuela.core.navigation.CompaneroScaffold
 import org.companerodeescuela.core.navigation.Destination
 import org.companerodeescuela.core.navigation.RoleExperienceResolver
 import org.companerodeescuela.feature.admin.adminHomeScreen
+import org.companerodeescuela.feature.admin.superAdminAcademicScreen
+import org.companerodeescuela.feature.admin.superAdminAccountsScreen
+import org.companerodeescuela.feature.admin.superAdminHistoryScreen
 import org.companerodeescuela.feature.attendance.AttendanceMode
 import org.companerodeescuela.feature.attendance.TeacherHomeScreen
 import org.companerodeescuela.feature.attendance.attendanceScreen
@@ -461,6 +464,10 @@ class MainActivity : AppCompatActivity() {
                                             )
                                         }
                                         composable(Destination.AdminHome.route) {
+                                            val canIssueInvitations =
+                                                appDistribution == AppDistribution.MANAGEMENT &&
+                                                    roleConfig.experience == AppExperience.SUPER_ADMIN &&
+                                                    org.companerodeescuela.shared.contracts.UserRole.SUPER_ADMIN in session.roles
                                             adminHomeScreen(
                                                 onOpenSecurity = { navController.navigate(Destination.Mfa.route) },
                                                 onOpenSchedule = {
@@ -479,7 +486,79 @@ class MainActivity : AppCompatActivity() {
                                                         launchSingleTop = true
                                                     }
                                                 },
+                                                isSuperAdmin = roleConfig.experience == AppExperience.SUPER_ADMIN,
+                                                onOpenInvitations =
+                                                    if (canIssueInvitations) {
+                                                        { navController.navigate(Destination.InvitationIssue.route) }
+                                                    } else {
+                                                        null
+                                                    },
                                             )
+                                        }
+                                        composable(Destination.AdminAccounts.route) {
+                                            if (appDistribution == AppDistribution.MANAGEMENT &&
+                                                roleConfig.experience == AppExperience.SUPER_ADMIN &&
+                                                org.companerodeescuela.shared.contracts.UserRole.SUPER_ADMIN in session.roles
+                                            ) {
+                                                superAdminAccountsScreen(
+                                                    onOpenInvitations = {
+                                                        navController.navigate(Destination.InvitationIssue.route)
+                                                    },
+                                                )
+                                            } else {
+                                                RoleUnavailableScreen(
+                                                    roleConfig.experience,
+                                                    onLogout = sessionViewModel::logout,
+                                                    onBack = { navController.popBackStack() },
+                                                )
+                                            }
+                                        }
+                                        composable(Destination.AdminAcademic.route) {
+                                            if (appDistribution == AppDistribution.MANAGEMENT &&
+                                                roleConfig.experience == AppExperience.SUPER_ADMIN &&
+                                                org.companerodeescuela.shared.contracts.UserRole.SUPER_ADMIN in session.roles
+                                            ) {
+                                                superAdminAcademicScreen(
+                                                    onOpenSchedule = {
+                                                        navController.navigate(Destination.Schedule.route) {
+                                                            launchSingleTop = true
+                                                        }
+                                                    },
+                                                    onOpenClassrooms = {
+                                                        navController.navigate(Destination.Classrooms.route) {
+                                                            launchSingleTop = true
+                                                        }
+                                                    },
+                                                    onOpenChannel = {
+                                                        navController.navigate(Destination.Channel.route) {
+                                                            launchSingleTop = true
+                                                        }
+                                                    },
+                                                    onOpenIntegrations = {
+                                                        navController.navigate(Destination.IntegrationSettings.route)
+                                                    },
+                                                )
+                                            } else {
+                                                RoleUnavailableScreen(
+                                                    roleConfig.experience,
+                                                    onLogout = sessionViewModel::logout,
+                                                    onBack = { navController.popBackStack() },
+                                                )
+                                            }
+                                        }
+                                        composable(Destination.AdminHistory.route) {
+                                            if (appDistribution == AppDistribution.MANAGEMENT &&
+                                                roleConfig.experience == AppExperience.SUPER_ADMIN &&
+                                                org.companerodeescuela.shared.contracts.UserRole.SUPER_ADMIN in session.roles
+                                            ) {
+                                                superAdminHistoryScreen()
+                                            } else {
+                                                RoleUnavailableScreen(
+                                                    roleConfig.experience,
+                                                    onLogout = sessionViewModel::logout,
+                                                    onBack = { navController.popBackStack() },
+                                                )
+                                            }
                                         }
                                         composable(Destination.Schedule.route) {
                                             if (

@@ -15,7 +15,7 @@ El código de vínculo dura 10 minutos. Compañero consume el nonce una sola vez
 1. En Mática: Perfil → Compartir progreso con Compañero → Generar código.
 2. En Compañero: Inicio → Progreso de Mática → Vincular; pegar el código.
 3. Compañero conserva el par de IDs en Mongo y consulta el resumen firmado entre servidores.
-4. Al abrir Inicio o actualizar, la app muestra XP total, XP semanal, nivel y rachas.
+4. Al abrir Inicio o actualizar, la app muestra XP total, XP semanal, nivel y rachas. Mientras carga se muestra un estado de progreso; ante un fallo permite reintentar. Si no está vinculada, el flujo muestra el campo de código temporal; si está vinculada pero falla la consulta, explica el problema sin ocultar el enlace.
 
 Endpoints de Mática: `POST /v1/integrations/companion/link-code` (sesión Mática) y `GET /v1/integrations/companion/summary/{userId}` (firma servidor a servidor). En Compañero: `POST /integrations/matica/link`, `GET /integrations/matica/progress` y `DELETE /integrations/matica/link` (sesión nativa de estudiante).
 
@@ -23,4 +23,4 @@ Endpoints de Mática: `POST /v1/integrations/companion/link-code` (sesión Máti
 
 El resumen procede de la gamificación guardada por el backend de Mática. Crossmath, gemas, trofeos y ciertos avances de dominio aún son locales y no se sincronizan en ese endpoint; no se presentan como si fueran datos del servidor. El panel no muestra notas escolares.
 
-La funcionalidad devuelve servicio no disponible hasta que ambos backends estén desplegados con estas variables. Un build correcto no confirma configuración ni operación en producción.
+Si la integración aún no está configurada, el campo para pegar el código permanece visible, pero el intento de enlace falla de forma cerrada con servicio no disponible. El backend limita el cuerpo de la solicitud antes de decodificar JSON y rechaza códigos inválidos, expirados o reutilizados. Un build correcto no confirma configuración ni operación en producción.

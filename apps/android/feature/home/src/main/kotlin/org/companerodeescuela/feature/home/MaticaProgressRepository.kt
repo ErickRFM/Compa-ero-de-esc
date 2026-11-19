@@ -30,8 +30,9 @@ class MaticaProgressRepository
                 val result =
                     apiCall {
                         client
-                            .get("integrations/matica/progress") { bearerAuth(token) }
-                            .requireBody<ApiResponse<MaticaProgressSummary>>()
+                            .get("integrations/matica/progress") {
+                                bearerAuth(token)
+                            }.requireBody<ApiResponse<MaticaProgressSummary>>()
                     }.map { it.data }
                 when (result) {
                     is Outcome.Success -> Outcome.Success(result.value)
@@ -59,7 +60,10 @@ class MaticaProgressRepository
         suspend fun unlink(): Outcome<Unit> =
             protectedCall { token ->
                 apiCall {
-                    client.delete("integrations/matica/link") { bearerAuth(token) }.requireUnit()
+                    client
+                        .delete("integrations/matica/link") {
+                            bearerAuth(token)
+                        }.requireUnit()
                 }
             }
 

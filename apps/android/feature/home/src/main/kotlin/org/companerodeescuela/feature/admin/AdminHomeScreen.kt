@@ -1,5 +1,6 @@
 package org.companerodeescuela.feature.admin
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -36,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -74,6 +77,8 @@ fun adminHomeScreen(
     onOpenSecurity: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: AdminViewModel = hiltViewModel(),
+    isSuperAdmin: Boolean = false,
+    onOpenInvitations: (() -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(viewModel) { viewModel.refresh() }
@@ -93,6 +98,8 @@ fun adminHomeScreen(
         modifier,
         onStudentAffiliation = viewModel::prepareStudentAffiliation,
         onInstitutionalLink = viewModel::prepareInstitutionalLink,
+        isSuperAdmin = isSuperAdmin,
+        onOpenInvitations = onOpenInvitations,
     )
 }
 
@@ -113,10 +120,13 @@ fun adminHomeScreenContent(
     modifier: Modifier = Modifier,
     onStudentAffiliation: (String, String) -> Unit = { _, _ -> },
     onInstitutionalLink: (String, String) -> Unit = { _, _ -> },
+    isSuperAdmin: Boolean = false,
+    onOpenInvitations: (() -> Unit)? = null,
 ) {
     var linkTarget by remember(state.ownerKey) { mutableStateOf<AdminUserSummary?>(null) }
     var externalReference by remember(state.ownerKey, linkTarget?.user?.id) { mutableStateOf("") }
     var tutorSelection by remember(state.ownerKey) { mutableStateOf<Pair<AdminUserSummary, StaffApplication>?>(null) }
+    var directoryFilter by rememberSaveable(state.ownerKey) { mutableStateOf(AdminDirectoryFilter.ALL) }
     Column(
         modifier
             .fillMaxSize()
@@ -127,8 +137,8 @@ fun adminHomeScreenContent(
     ) {
         V8ScreenHeader {
             V8PageTitle(
-                title = stringResource(R.string.admin_title),
-                description = stringResource(R.string.admin_description),
+                title = stringResource(if (isSuperAdmin) R.string.super_admin_title else R.string.admin_title),
+                description = stringResource(if (isSuperAdmin) R.string.super_admin_description else R.string.admin_description),
             )
         }
         OutlinedButton(
@@ -138,7 +148,37 @@ fun adminHomeScreenContent(
         ) { Text(stringResource(R.string.admin_refresh)) }
         if (state.loading) CircularProgressIndicator(Modifier.testTag("admin_loading"))
         state.failure?.let { adminFailure(it) }
-        if (state.completedOperationId != null) Text(stringResource(R.string.admin_done), modifier = Modifier.testTag("admin_done"))
+        if (state.completedOperationId != null) {
+            StatusNotice(
+                title = stringResource(R.string.admin_done_title),
+                message = stringResource(R.string.admin_done),
+                tone = NoticeTone.SUCCESS,
+                modifier = Modifier.testTag("admin_done"),
+            )
+        }
+        if (isSuperAdmin && onOpenInvitations != null) {
+            V8GlassCard(Modifier.fillMaxWidth(), emphasized = true) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        stringResource(R.string.admin_invite_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        stringResource(R.string.admin_invite_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    V8RedPrimaryButton(
+                        text = stringResource(R.string.admin_invite_action),
+                        onClick = onOpenInvitations,
+                        enabled = !state.working,
+                        modifier = Modifier.fillMaxWidth().testTag("admin_invite_action"),
+                    )
+                }
+            }
+        }
         Text(stringResource(R.string.admin_tools), style = MaterialTheme.typography.titleLarge)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             adminShortcutTile(
@@ -174,18 +214,45 @@ fun adminHomeScreenContent(
         }
         state.overview?.let { overview ->
             V8GlassCard(Modifier.fillMaxWidth(), emphasized = true) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("admin_metrics")) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.testTag("admin_metrics")) {
                     Text(
-                        "Métricas institucionales",
+                        stringResource(R.string.admin_metrics_title),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
-                    Text(stringResource(R.string.admin_metrics_total, overview.metrics.totalUsers))
-                    Text(stringResource(R.string.admin_metrics_pending, overview.metrics.pendingStaff))
-                    Text(stringResource(R.string.admin_metrics_teachers, overview.metrics.activeTeachers))
-                    Text(stringResource(R.string.admin_metrics_tutors, overview.metrics.activeTutors))
-                    Text(stringResource(R.string.admin_metrics_suspended, overview.metrics.suspended))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        FilterChip(
+                            selected = directoryFilter == AdminDirectoryFilter.ALL,
+                            onClick = { directoryFilter = AdminDirectoryFilter.ALL },
+                            label = { Text("${stringResource(R.string.admin_kpi_users)}: ${overview.metrics.totalUsers}") },
+                        )
+                        FilterChip(
+                            selected = directoryFilter == AdminDirectoryFilter.PENDING,
+                            onClick = { directoryFilter = AdminDirectoryFilter.PENDING },
+                            label = { Text("${stringResource(R.string.admin_kpi_pending)}: ${overview.metrics.pendingStaff}") },
+                        )
+                        FilterChip(
+                            selected = directoryFilter == AdminDirectoryFilter.SUSPENDED,
+                            onClick = { directoryFilter = AdminDirectoryFilter.SUSPENDED },
+                            label = { Text("${stringResource(R.string.admin_kpi_suspended)}: ${overview.metrics.suspended}") },
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Text(
+                            stringResource(R.string.admin_metrics_teachers, overview.metrics.activeTeachers),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            stringResource(R.string.admin_metrics_tutors, overview.metrics.activeTutors),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
             Text(stringResource(R.string.admin_requests), style = MaterialTheme.typography.titleLarge)
@@ -227,6 +294,8 @@ fun adminHomeScreenContent(
             adminUserDirectory(
                 users = overview.users,
                 ownerKey = state.ownerKey,
+                filter = directoryFilter,
+                onFilterChange = { directoryFilter = it },
                 loading = state.loading,
                 working = state.working,
                 onLifecycle = onLifecycle,
@@ -307,23 +376,25 @@ private fun adminShortcutTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    V8GlassCard(modifier = modifier) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    V8GlassCard(
+        modifier =
+            modifier
+                .heightIn(min = 76.dp)
+                .clickable(role = Role.Button, onClick = onClick)
+                .testTag(tag),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
             Text(
                 description,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            TextButton(
-                onClick = onClick,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag(tag),
-            ) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
         }
     }
 }
@@ -332,10 +403,13 @@ private fun adminShortcutTile(
  * Bounded, searchable in-memory directory. The server owns authorization and institutional scope;
  * this component only filters the already-authorized users returned to the current administrator.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun adminUserDirectory(
+internal fun adminUserDirectory(
     users: List<AdminUserSummary>,
     ownerKey: String?,
+    filter: AdminDirectoryFilter,
+    onFilterChange: (AdminDirectoryFilter) -> Unit,
     loading: Boolean,
     working: Boolean,
     onLifecycle: (String, AccountStatus) -> Unit,
@@ -343,7 +417,6 @@ private fun adminUserDirectory(
     onInstitutionalLink: (String) -> Unit,
 ) {
     var query by rememberSaveable(ownerKey) { mutableStateOf("") }
-    var filter by rememberSaveable(ownerKey) { mutableStateOf(AdminDirectoryFilter.ALL) }
     var requestedPage by rememberSaveable(ownerKey) { mutableIntStateOf(0) }
     val filtered = filterAdminDirectoryUsers(users, query, filter)
     val pageCount = ((filtered.size + ADMIN_DIRECTORY_PAGE_SIZE - 1) / ADMIN_DIRECTORY_PAGE_SIZE).coerceAtLeast(1)
@@ -376,7 +449,7 @@ private fun adminUserDirectory(
                 FilterChip(
                     selected = filter == option,
                     onClick = {
-                        filter = option
+                        onFilterChange(option)
                         requestedPage = 0
                     },
                     label = { Text(stringResource(label)) },
@@ -400,7 +473,29 @@ private fun adminUserDirectory(
                     user.user.email?.let { email ->
                         Text(email, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Text(stringResource(statusResource(user.user.accountStatus)))
+                    val roleLabels =
+                        user.user.roles
+                            .mapNotNull { roleResource(it) }
+                            .map { stringResource(it) }
+                    Text(
+                        text =
+                            buildString {
+                                append(stringResource(statusResource(user.user.accountStatus)))
+                                if (roleLabels.isNotEmpty()) {
+                                    append(" · ")
+                                    append(roleLabels.joinToString(", "))
+                                }
+                            },
+                        style = MaterialTheme.typography.labelMedium,
+                        color =
+                            if (user.user.accountStatus == AccountStatus.REVOKED ||
+                                user.user.accountStatus == AccountStatus.SUSPENDED
+                            ) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                    )
                     val pendingInstitution = user.requestedInstitutionId
                     if (user.user.emailVerified &&
                         user.user.accountStatus == AccountStatus.ACTIVE &&
@@ -428,14 +523,27 @@ private fun adminUserDirectory(
                         }
                     }
                     if (user.user.accountStatus != AccountStatus.REVOKED) {
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            TextButton(
-                                onClick = { onLifecycle(user.user.id, AccountStatus.SUSPENDED) },
-                                enabled = !loading && !working && user.user.accountStatus != AccountStatus.SUSPENDED,
-                            ) { Text(stringResource(R.string.admin_suspend)) }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            if (user.user.accountStatus == AccountStatus.SUSPENDED) {
+                                TextButton(
+                                    onClick = { onLifecycle(user.user.id, AccountStatus.ACTIVE) },
+                                    enabled = !loading && !working,
+                                    modifier = Modifier.testTag("admin_reactivate_${user.user.id}"),
+                                ) { Text(stringResource(R.string.admin_reactivate)) }
+                            } else {
+                                TextButton(
+                                    onClick = { onLifecycle(user.user.id, AccountStatus.SUSPENDED) },
+                                    enabled = !loading && !working,
+                                ) { Text(stringResource(R.string.admin_suspend)) }
+                            }
                             TextButton(
                                 onClick = { onLifecycle(user.user.id, AccountStatus.REVOKED) },
                                 enabled = !loading && !working,
+                                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                             ) { Text(stringResource(R.string.admin_revoke)) }
                         }
                     }
@@ -530,11 +638,15 @@ private fun adminUserDirectory(
 ) {
     var password by remember(operation.operationId) { mutableStateOf("") }
     var otp by remember(operation.operationId) { mutableStateOf("") }
+    val destructive = operation.kind == AdminOperationKind.REVOKE_ACCOUNT
     AlertDialog(properties = DialogProperties(securePolicy = SecureFlagPolicy.SecureOn), onDismissRequest = {
         if (!working) onDismiss()
     }, title = { Text(stringResource(R.string.admin_confirm_title)) }, text = {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(stringResource(R.string.admin_confirm_description, operation.targetName))
+            Text(
+                text = stringResource(operationDescriptionResource(operation.kind), operation.targetName),
+                color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             OutlinedTextField(
                 password,
                 { password = it.take(128) },
@@ -573,12 +685,18 @@ private fun adminUserDirectory(
                 onConfirm(credential, code)
             },
             enabled = !working,
+            colors =
+                if (destructive) {
+                    ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                } else {
+                    ButtonDefaults.textButtonColors()
+                },
             modifier = Modifier.testTag("admin_confirm"),
         ) { Text(stringResource(R.string.admin_confirm)) }
     }, dismissButton = { TextButton(onDismiss, enabled = !working) { Text(stringResource(R.string.admin_cancel)) } })
 }
 
-@Composable private fun adminFailure(error: AppError) {
+@Composable internal fun adminFailure(error: AppError) {
     val resource =
         when (error) {
             is AppError.Network -> R.string.admin_error_network
@@ -603,6 +721,31 @@ private fun adminUserDirectory(
         modifier = Modifier.testTag("admin_error"),
     )
 }
+
+private fun operationDescriptionResource(kind: AdminOperationKind): Int =
+    when (kind) {
+        AdminOperationKind.APPROVE_STAFF -> R.string.admin_confirm_approve_staff
+        AdminOperationKind.AFFILIATE_STUDENT -> R.string.admin_confirm_affiliate_student
+        AdminOperationKind.LINK_SIII -> R.string.admin_confirm_link_siii
+        AdminOperationKind.SUSPEND_ACCOUNT -> R.string.admin_confirm_suspend
+        AdminOperationKind.REVOKE_ACCOUNT -> R.string.admin_confirm_revoke
+        AdminOperationKind.REACTIVATE_ACCOUNT -> R.string.admin_confirm_reactivate
+        AdminOperationKind.REVOKE_TUTOR_ASSIGNMENT -> R.string.admin_confirm_revoke_assignment
+        AdminOperationKind.OTHER -> R.string.admin_confirm_description
+    }
+
+private fun roleResource(role: UserRole): Int? =
+    when (role) {
+        UserRole.SUPER_ADMIN -> R.string.admin_role_super_admin
+        UserRole.ADMIN -> R.string.admin_role_admin
+        UserRole.COORDINATOR -> R.string.admin_role_coordinator
+        UserRole.PRINCIPAL -> R.string.admin_role_principal
+        UserRole.TEACHER -> R.string.admin_role_teacher
+        UserRole.TEACHER_PENDING -> R.string.admin_role_teacher_pending
+        UserRole.TUTOR -> R.string.admin_role_tutor
+        UserRole.STUDENT -> R.string.admin_role_student
+        else -> null
+    }
 
 private fun statusResource(status: AccountStatus) =
     when (status) {

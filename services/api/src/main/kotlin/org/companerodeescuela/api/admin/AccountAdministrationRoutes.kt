@@ -30,11 +30,15 @@ import org.companerodeescuela.api.integrations.identity.IdentityProvider
 import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.api.security.NativeActorResolver
 import org.companerodeescuela.shared.contracts.AccountLifecycleRequest
+import org.companerodeescuela.shared.contracts.AccountStatus
+import org.companerodeescuela.shared.contracts.AdminAuditEntry
+import org.companerodeescuela.shared.contracts.AdminCapability
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.ApproveStaffRequest
 import org.companerodeescuela.shared.contracts.ApproveStudentAffiliationRequest
 import org.companerodeescuela.shared.contracts.TeacherApplicationRequest
 import org.companerodeescuela.shared.contracts.TutorApplicationRequest
+import org.companerodeescuela.shared.contracts.UserRole
 import java.util.UUID
 
 internal fun Route.accountAdministrationRoutes(
@@ -148,6 +152,48 @@ internal fun Route.accountAdministrationRoutes(
                 val result = service.lifecycle(actor, id, request)
                 recordAudit(actor.id, "ACCOUNT_LIFECYCLE", "ACCOUNT", id, operationId, "SUCCEEDED")
                 call.respond(ApiResponse(result, operationId))
+            }
+        }
+        route("/admin/audit") {
+            get {
+                val actor = call.actor()
+                val isSuperAdmin = UserRole.SUPER_ADMIN in actor.roles
+                val canViewAudit =
+                    actor.accountStatus == AccountStatus.ACTIVE &&
+                        actor.emailVerifiedAt != null &&
+                        (isSuperAdmin || (UserRole.ADMIN in actor.roles && AdminCapability.VIEW_AUDIT in actor.adminCapabilities))
+                if (!canViewAudit) throw ApiException.Forbidden("Audit log access is not authorized")
+                val limit =
+                    call.request.queryParameters["limit"]
+                        ?.toIntOrNull()
+                        ?.coerceIn(1, 100) ?: 50
+                val action =
+                    call.request.queryParameters["action"]
+                        ?.trim()
+                        ?.takeIf { it.isNotEmpty() }
+                        ?.also {
+                            if (!it.matches(Regex("[A-Z_]{1,64}"))) {
+                                throw ApiException.Validation("Invalid audit action filter")
+                            }
+                        }
+                val actorFilter = if (isSuperAdmin) null else actor.id
+                val entries =
+                    auditLog
+                        ?.listRecent(limit = limit, action = action, actorId = actorFilter)
+                        .orEmpty()
+                        .map { event ->
+                            AdminAuditEntry(
+                                id = event.id,
+                                actorId = event.actorId,
+                                action = event.action,
+                                resourceType = event.resourceType,
+                                resourceId = event.resourceId,
+                                operationId = event.operationId,
+                                outcome = event.outcome,
+                                createdAtEpochSeconds = event.createdAt.epochSecond,
+                            )
+                        }
+                call.respond(ApiResponse(entries, call.requestId()))
             }
         }
     }

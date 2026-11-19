@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
 import org.companerodeescuela.core.network.MfaRepository
+import org.companerodeescuela.shared.contracts.InstitutionSummary
 import org.companerodeescuela.shared.contracts.MfaStepUpRequest
 import org.companerodeescuela.shared.contracts.PrepareRegistrationInvitationRequest
 import org.companerodeescuela.shared.contracts.StepUpAction
@@ -21,6 +22,8 @@ data class InvitationIssueState(
     val working: Boolean = false,
     val delivery: VerificationDeliveryStatus? = null,
     val failure: AppError? = null,
+    val institutions: List<InstitutionSummary> = emptyList(),
+    val institutionsLoading: Boolean = false,
 )
 
 @HiltViewModel
@@ -33,6 +36,27 @@ class InvitationIssueViewModel
         private val mutable = MutableStateFlow(InvitationIssueState())
         val state: StateFlow<InvitationIssueState> = mutable.asStateFlow()
 
+        init {
+            loadInstitutions()
+        }
+
+        fun loadInstitutions() {
+            if (mutable.value.institutionsLoading) return
+            mutable.value = mutable.value.copy(institutionsLoading = true)
+            viewModelScope.launch {
+                val loaded =
+                    when (val result = auth.institutions()) {
+                        is Outcome.Success -> result.value
+                        is Outcome.Failure -> emptyList()
+                    }
+                mutable.value =
+                    mutable.value.copy(
+                        institutions = loaded,
+                        institutionsLoading = false,
+                    )
+            }
+        }
+
         /** Sensitive inputs are passed to a transient coroutine and never saved in UI state. */
         fun send(
             recipient: String,
@@ -42,7 +66,7 @@ class InvitationIssueViewModel
             otp: String,
         ) {
             if (mutable.value.working) return
-            mutable.value = InvitationIssueState(working = true)
+            mutable.value = mutable.value.copy(working = true, delivery = null, failure = null)
             val request =
                 PrepareRegistrationInvitationRequest(
                     recipient = recipient.trim().lowercase(),
@@ -53,7 +77,7 @@ class InvitationIssueViewModel
             viewModelScope.launch {
                 val prepared = auth.prepareRegistrationInvitation(request)
                 if (prepared is Outcome.Failure) {
-                    mutable.value = InvitationIssueState(failure = prepared.error)
+                    mutable.value = mutable.value.copy(working = false, failure = prepared.error)
                     return@launch
                 }
                 val scope = (prepared as Outcome.Success).value
@@ -69,19 +93,23 @@ class InvitationIssueViewModel
                         ),
                     )
                 if (proof is Outcome.Failure) {
-                    mutable.value = InvitationIssueState(failure = proof.error)
+                    mutable.value = mutable.value.copy(working = false, failure = proof.error)
                     return@launch
                 }
                 val result = auth.sendRegistrationInvitation(request.copy(proof = (proof as Outcome.Success).value.proof))
                 mutable.value =
                     when (result) {
-                        is Outcome.Success -> InvitationIssueState(delivery = result.value.delivery)
-                        is Outcome.Failure -> InvitationIssueState(failure = result.error)
+                        is Outcome.Success ->
+                            mutable.value.copy(working = false, delivery = result.value.delivery, failure = null)
+                        is Outcome.Failure ->
+                            mutable.value.copy(working = false, delivery = null, failure = result.error)
                     }
             }
         }
 
         fun clearStatus() {
-            if (!mutable.value.working) mutable.value = InvitationIssueState()
+            if (!mutable.value.working) {
+                mutable.value = mutable.value.copy(delivery = null, failure = null)
+            }
         }
     }

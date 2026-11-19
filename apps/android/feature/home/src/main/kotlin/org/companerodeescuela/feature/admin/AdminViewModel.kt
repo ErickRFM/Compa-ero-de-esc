@@ -174,9 +174,23 @@ class AdminViewModel
         ) {
             command = next
             proof = null
+            val kind =
+                when (next) {
+                    is Command.Approval -> AdminOperationKind.APPROVE_STAFF
+                    is Command.Affiliation -> AdminOperationKind.AFFILIATE_STUDENT
+                    is Command.IdentityLink -> AdminOperationKind.LINK_SIII
+                    is Command.Revocation -> AdminOperationKind.REVOKE_TUTOR_ASSIGNMENT
+                    is Command.Lifecycle ->
+                        when (next.body.status) {
+                            AccountStatus.SUSPENDED -> AdminOperationKind.SUSPEND_ACCOUNT
+                            AccountStatus.REVOKED -> AdminOperationKind.REVOKE_ACCOUNT
+                            AccountStatus.ACTIVE -> AdminOperationKind.REACTIVATE_ACCOUNT
+                            else -> AdminOperationKind.OTHER
+                        }
+                }
             mutable.value =
                 mutable.value.copy(
-                    operation = AdminOperation(next.operationId, next.target, next.action, name),
+                    operation = AdminOperation(next.operationId, next.target, next.action, name, kind),
                     failure = null,
                     completedOperationId = null,
                 )
@@ -257,8 +271,9 @@ class AdminViewModel
                 mutable.value.overview
                     ?.users
                     ?.find { it.user.id == userId } ?: return invalid()
+            val canRestore = target.user.accountStatus == AccountStatus.SUSPENDED && status == AccountStatus.ACTIVE
             if (target.user.accountStatus == AccountStatus.REVOKED ||
-                status !in setOf(AccountStatus.SUSPENDED, AccountStatus.REVOKED)
+                (!canRestore && status !in setOf(AccountStatus.SUSPENDED, AccountStatus.REVOKED))
             ) {
                 return invalid()
             }
@@ -409,5 +424,73 @@ class AdminViewModel
                         }
                     }
                 }
+        }
+
+        fun refreshAudit() {
+            val capturedOwner = owner ?: return
+            val captured = generation
+            mutable.value = mutable.value.copy(auditLoading = true, auditFailure = null)
+            viewModelScope.launch {
+                val result = repository.auditLog()
+                if (!current(captured, capturedOwner)) return@launch
+                mutable.value =
+                    when (result) {
+                        is Outcome.Success ->
+                            mutable.value.copy(
+                                auditEntries = result.value,
+                                auditLoading = false,
+                                auditFailure = null,
+                            )
+                        is Outcome.Failure ->
+                            mutable.value.copy(
+                                auditLoading = false,
+                                auditFailure = result.error,
+                            )
+                    }
+            }
+        }
+
+        fun refreshInvitations() {
+            val capturedOwner = owner ?: return
+            val captured = generation
+            mutable.value = mutable.value.copy(invitationsLoading = true, invitationsFailure = null)
+            viewModelScope.launch {
+                val result = repository.invitations()
+                if (!current(captured, capturedOwner)) return@launch
+                mutable.value =
+                    when (result) {
+                        is Outcome.Success ->
+                            mutable.value.copy(
+                                invitations = result.value,
+                                invitationsLoading = false,
+                                invitationsFailure = null,
+                            )
+                        is Outcome.Failure ->
+                            mutable.value.copy(
+                                invitationsLoading = false,
+                                invitationsFailure = result.error,
+                            )
+                    }
+            }
+        }
+
+        fun revokeInvitation(invitationId: String) {
+            val capturedOwner = owner ?: return
+            val captured = generation
+            if (mutable.value.working) return
+            mutable.value = mutable.value.copy(working = true, invitationsFailure = null)
+            viewModelScope.launch {
+                val result = repository.revokeInvitation(invitationId)
+                if (!current(captured, capturedOwner)) return@launch
+                when (result) {
+                    is Outcome.Success -> {
+                        mutable.value = mutable.value.copy(working = false, completedOperationId = invitationId)
+                        refreshInvitations()
+                    }
+                    is Outcome.Failure -> {
+                        mutable.value = mutable.value.copy(working = false, invitationsFailure = result.error)
+                    }
+                }
+            }
         }
     }

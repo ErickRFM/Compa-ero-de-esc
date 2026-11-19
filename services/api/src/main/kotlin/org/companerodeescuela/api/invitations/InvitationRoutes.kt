@@ -10,6 +10,7 @@ import io.ktor.server.auth.principal
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import kotlinx.serialization.Serializable
@@ -30,11 +31,14 @@ import org.companerodeescuela.api.plugins.clientAddress
 import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.api.security.NativeActorResolver
 import org.companerodeescuela.shared.contracts.AcceptRegistrationInvitationRequest
+import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.PrepareRegistrationInvitationRequest
 import org.companerodeescuela.shared.contracts.RegistrationInvitationDispatchReceipt
 import org.companerodeescuela.shared.contracts.RegistrationInvitationPreparation
 import org.companerodeescuela.shared.contracts.RegistrationInvitationReceipt
+import org.companerodeescuela.shared.contracts.RegistrationInvitationSummary
+import org.companerodeescuela.shared.contracts.UserRole
 import java.time.Clock
 import java.util.UUID
 
@@ -115,6 +119,45 @@ internal fun Route.invitationRoutes(
 
     authenticate(AuthTokenService.PROVIDER_NAME) {
         route("/admin/invitations") {
+            get {
+                val actor = call.nativeActor()
+                if (actor.accountStatus != AccountStatus.ACTIVE ||
+                    actor.emailVerifiedAt == null ||
+                    UserRole.SUPER_ADMIN !in actor.roles
+                ) {
+                    throw ApiException.Forbidden("Verified super administrator is required to list invitations")
+                }
+                val limit =
+                    call.request.queryParameters["limit"]
+                        ?.toIntOrNull()
+                        ?.coerceIn(1, 100) ?: 50
+                val institutionId =
+                    call.request.queryParameters["institutionId"]
+                        ?.trim()
+                        ?.takeIf { it.isNotEmpty() }
+                        ?.also {
+                            if (!it.matches(Regex("[A-Za-z0-9_-]{1,128}"))) {
+                                throw ApiException.Validation("Invalid institution filter")
+                            }
+                        }
+                val items =
+                    invitations
+                        .listRecent(limit = limit, institutionId = institutionId)
+                        .map { record ->
+                            RegistrationInvitationSummary(
+                                invitationId = record.id,
+                                recipient = record.recipient,
+                                institutionId = record.institutionId,
+                                profile = record.profile.name,
+                                status = record.status.name,
+                                createdAtEpochSeconds = record.createdAt.epochSecond,
+                                expiresAtEpochSeconds = record.expiresAt.epochSecond,
+                                acceptedAtEpochSeconds = record.acceptedAt?.epochSecond,
+                                revokedAtEpochSeconds = record.revokedAt?.epochSecond,
+                            )
+                        }
+                call.respond(ApiResponse(items, call.requestId()))
+            }
             post("/prepare") {
                 val actor = call.nativeActor()
                 issuerLimiter.acquire(actor.id, call.clientAddress())?.let {

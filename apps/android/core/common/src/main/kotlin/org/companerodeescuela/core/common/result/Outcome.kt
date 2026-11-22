@@ -45,6 +45,7 @@ sealed interface AppError {
         val requestId: String? = null,
     ) : AppError {
         override val userMessage: String = when (status) {
+            400 -> "Revisa los datos enviados e inténtalo nuevamente."
             401 -> "Tu sesión expiró. Inicia sesión nuevamente."
             403 -> "No tienes permiso para ver esta información."
             404 -> "No encontramos la información que buscas."
@@ -57,18 +58,24 @@ sealed interface AppError {
     }
 
     /** The response arrived but did not match the agreed contract. */
-    data class Serialization(override val technicalDetail: String? = null) : AppError {
+    data class Serialization(
+        override val technicalDetail: String? = null,
+    ) : AppError {
         override val userMessage: String =
             "Recibimos una respuesta que no pudimos interpretar."
     }
 
     /** Secure device storage/keystore could not persist the authenticated session. */
-    data class Storage(override val technicalDetail: String? = null) : AppError {
+    data class Storage(
+        override val technicalDetail: String? = null,
+    ) : AppError {
         override val userMessage: String =
             "No pudimos guardar tu sesión de forma segura. Inténtalo nuevamente."
     }
 
-    data class Unknown(override val technicalDetail: String? = null) : AppError {
+    data class Unknown(
+        override val technicalDetail: String? = null,
+    ) : AppError {
         override val userMessage: String =
             "No pudimos completar la operación. Inténtalo nuevamente."
     }

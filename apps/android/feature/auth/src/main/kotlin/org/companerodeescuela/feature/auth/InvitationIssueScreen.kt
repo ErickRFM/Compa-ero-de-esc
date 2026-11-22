@@ -174,11 +174,12 @@ fun InvitationIssueScreen(
                     Modifier.testTag("invite_send"),
                     "Validando...",
                 )
-                state.failure?.let {
+                state.failureMessage?.let { detail ->
                     StatusNotice(
-                        title = "No se pudo enviar",
-                        message = it.userMessage,
+                        title = state.failureTitle ?: "No se pudo enviar",
+                        message = detail,
                         tone = NoticeTone.ERROR,
+                        modifier = Modifier.testTag("invite_error"),
                     )
                 }
                 state.delivery?.let { delivery ->

@@ -570,7 +570,7 @@ internal fun adminUserDirectory(
     }
 }
 
-@Composable private fun tutorApprovalDialog(
+@Composable internal fun tutorApprovalDialog(
     groups: List<AcademicGroupSummary>,
     failure: AppError?,
     onDismiss: () -> Unit,

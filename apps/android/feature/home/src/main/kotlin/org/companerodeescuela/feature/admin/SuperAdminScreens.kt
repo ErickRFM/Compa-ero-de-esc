@@ -50,6 +50,8 @@ import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.feature.home.R
 import org.companerodeescuela.shared.contracts.AdminUserSummary
+import org.companerodeescuela.shared.contracts.RegistrationInvitationSummary
+import org.companerodeescuela.shared.contracts.StaffApplication
 import org.companerodeescuela.shared.contracts.StaffApplicationStatus
 import org.companerodeescuela.shared.contracts.StaffRole
 import java.time.Instant
@@ -72,6 +74,8 @@ fun superAdminAccountsScreen(
     var directoryFilter by rememberSaveable(state.ownerKey) { mutableStateOf(AdminDirectoryFilter.ALL) }
     var linkTarget by remember(state.ownerKey) { mutableStateOf<AdminUserSummary?>(null) }
     var externalReference by remember(state.ownerKey, linkTarget?.user?.id) { mutableStateOf("") }
+    var tutorSelection by remember(state.ownerKey) { mutableStateOf<Pair<AdminUserSummary, StaffApplication>?>(null) }
+    var revokeTarget by remember(state.ownerKey) { mutableStateOf<RegistrationInvitationSummary?>(null) }
 
     Column(
         modifier
@@ -136,7 +140,7 @@ fun superAdminAccountsScreen(
                     )
                     if (invitation.status == "SENT" || invitation.status == "CREATED") {
                         TextButton(
-                            onClick = { viewModel.revokeInvitation(invitation.invitationId) },
+                            onClick = { revokeTarget = invitation },
                             enabled = !state.working,
                             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
                         ) { Text(stringResource(R.string.super_admin_invitation_revoke)) }
@@ -161,14 +165,19 @@ fun superAdminAccountsScreen(
                                 ),
                             )
                             Text(stringResource(R.string.admin_identity, application.identityReference))
-                            if (application.role == StaffRole.TEACHER) {
-                                V8RedPrimaryButton(
-                                    text = stringResource(R.string.admin_approve),
-                                    onClick = { viewModel.prepareApprovalWithValidity(user.user.id, application.id, emptySet(), null) },
-                                    enabled = !state.loading && !state.working && user.user.emailVerified,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                            }
+                            application.preferredGroup?.let { Text(stringResource(R.string.admin_preference, it)) }
+                            V8RedPrimaryButton(
+                                text = stringResource(R.string.admin_approve),
+                                onClick = {
+                                    if (application.role == StaffRole.TUTOR) {
+                                        tutorSelection = user to application
+                                    } else {
+                                        viewModel.prepareApprovalWithValidity(user.user.id, application.id, emptySet(), null)
+                                    }
+                                },
+                                enabled = !state.loading && !state.working && user.user.emailVerified,
+                                modifier = Modifier.fillMaxWidth().testTag("super_admin_approve_${application.id}"),
+                            )
                         }
                     }
                 }
@@ -214,6 +223,34 @@ fun superAdminAccountsScreen(
                 ) { Text(stringResource(R.string.admin_link_siii)) }
             },
             dismissButton = { TextButton({ linkTarget = null }) { Text(stringResource(R.string.admin_cancel)) } },
+        )
+    }
+    revokeTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { revokeTarget = null },
+            title = { Text(stringResource(R.string.super_admin_invitation_revoke)) },
+            text = { Text(stringResource(R.string.super_admin_invitation_revoke_confirm, target.recipient)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.revokeInvitation(target.invitationId)
+                        revokeTarget = null
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) { Text(stringResource(R.string.super_admin_invitation_revoke)) }
+            },
+            dismissButton = { TextButton({ revokeTarget = null }) { Text(stringResource(R.string.admin_cancel)) } },
+        )
+    }
+    tutorSelection?.let { (user, application) ->
+        tutorApprovalDialog(
+            state.groups.filter { it.institutionId == application.requestedInstitutionId },
+            state.groupFailure,
+            { tutorSelection = null },
+            { ids, days ->
+                tutorSelection = null
+                viewModel.prepareApprovalWithValidity(user.user.id, application.id, ids, days)
+            },
         )
     }
     state.operation?.let { operation ->
@@ -469,7 +506,7 @@ private fun auditActionLabel(action: String): String =
         "ACCOUNT_STUDENT_AFFILIATION" -> "Afiliación escolar"
         "ACCOUNT_LIFECYCLE" -> "Cambio de estado de cuenta"
         "INVITATION_PREPARE" -> "Preparación de invitación"
-        "INVITATION_SEND" -> "Envío de invitación"
+        "INVITATION_DISPATCH", "INVITATION_SEND" -> "Envío de invitación"
         "INVITATION_RETRY" -> "Reenvío de invitación"
         "INVITATION_REVOKE" -> "Revocación de invitación"
         "INVITATION_ACCEPT" -> "Invitación aceptada"

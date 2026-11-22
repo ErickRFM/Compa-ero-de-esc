@@ -103,6 +103,7 @@
 <string name="super_admin_invitations_title">Invitaciones enviadas</string>
 <string name="super_admin_invitations_empty">Aún no se han emitido invitaciones recientes.</string>
 <string name="super_admin_invitation_revoke">Revocar invitación</string>
+<string name="super_admin_invitation_revoke_confirm">¿Revocar la invitación enviada a %1$s? El código dejará de funcionar de inmediato.</string>
 <string name="super_admin_academic_title">Operación académica</string>
 <string name="super_admin_academic_description">Horarios, clases, canal de avisos, tutorías y estado de conexión con SIII.</string>
 <string name="super_admin_siii_card_title">Sincronización con SIII</string>

@@ -78,7 +78,25 @@ internal fun Route.invitationRoutes(
                     !settings.hasVerificationEmail ||
                     settings.mfaEncryptionKey == null
             )
-    if (!settings.hasAuthentication || productionBlocked) return
+    if (!settings.hasAuthentication || productionBlocked) {
+        val disabledMessage =
+            if (!settings.hasAuthentication) {
+                "Authentication is not configured"
+            } else {
+                "Invitations are disabled in this environment"
+            }
+        route("/admin/invitations") {
+            get { throw ApiException.DependencyUnavailable(disabledMessage) }
+            post { throw ApiException.DependencyUnavailable(disabledMessage) }
+            for (path in listOf("/prepare", "/retry", "/revoke")) {
+                post(path) { throw ApiException.DependencyUnavailable(disabledMessage) }
+            }
+        }
+        post("/auth/invitations/accept") {
+            throw ApiException.DependencyUnavailable(disabledMessage)
+        }
+        return
+    }
     val resolver = NativeActorResolver(accounts, sessions, AuthTokenService(settings), identity)
     val issuerLimiter = LoginAttemptLimiter(maxAttempts = 5, store = rateLimitStore)
     val acceptanceLimiter = LoginAttemptLimiter(maxAttempts = 10, store = rateLimitStore)
@@ -257,6 +275,13 @@ internal fun Route.invitationRoutes(
             }
             post("/revoke") {
                 val actor = call.nativeActor()
+                if (actor.accountStatus != AccountStatus.ACTIVE ||
+                    actor.emailVerifiedAt == null ||
+                    actor.emailVerifiedAt > clock.instant() ||
+                    UserRole.SUPER_ADMIN !in actor.roles
+                ) {
+                    throw ApiException.Forbidden("Verified super administrator is required to revoke invitations")
+                }
                 issuerLimiter.acquire(actor.id, call.clientAddress())?.let {
                     call.response.header(HttpHeaders.RetryAfter, it.toString())
                     throw ApiException.RateLimited()

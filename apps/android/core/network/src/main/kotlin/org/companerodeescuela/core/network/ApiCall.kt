@@ -1,6 +1,9 @@
 package org.companerodeescuela.core.network
 
 import io.ktor.client.call.body
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.decodeFromString
+import org.companerodeescuela.shared.contracts.ApiError
 import io.ktor.client.plugins.ResponseException
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
@@ -50,6 +53,8 @@ private fun ResponseException.toAppError(): AppError {
     return AppError.Http(status = response.status.value, technicalDetail = detail, requestId = response.safeRequestId())
 }
 
+private val wireErrorJson = Json { ignoreUnknownKeys = true }
+
 /** Longest error body kept for the log. Error bodies are never shown to users. */
 const val MAX_ERROR_BODY: Int = 512
 
@@ -58,11 +63,20 @@ suspend inline fun <reified T> HttpResponse.requireBody(): Outcome<T> =
     if (status.value in 200..299) {
         apiCall { Outcome.Success(body<T>()) }
     } else {
+        // Decode the complete bounded payload before truncating its diagnostic copy;
+        // decoding a truncated JSON document would silently discard the wire code.
+        val raw = runCatching { bodyAsText() }.getOrNull()
+        val parsed = raw?.takeIf { it.length <= 16_384 }?.let { body ->
+            runCatching { wireErrorJson.decodeFromString<ApiError>(body) }.getOrNull()
+        }
         Outcome.Failure(
             AppError.Http(
                 status = status.value,
-                technicalDetail = runCatching { bodyAsText() }.getOrNull()?.take(MAX_ERROR_BODY),
-                requestId = safeRequestId(),
+                technicalDetail = raw?.take(MAX_ERROR_BODY),
+                requestId = safeRequestId() ?: parsed?.requestId?.takeIf { id ->
+                    id.length in 1..80 && id.all { (it.isLetterOrDigit() && it.code < 128) || it == '-' }
+                },
+                apiCode = parsed?.code?.name,
             ),
         )
     }

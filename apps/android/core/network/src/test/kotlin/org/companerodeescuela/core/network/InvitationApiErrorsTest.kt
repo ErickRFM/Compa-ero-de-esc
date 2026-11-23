@@ -1,5 +1,6 @@
 package org.companerodeescuela.core.network
 
+import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.request.get
@@ -50,6 +51,68 @@ class InvitationApiErrorsTest {
             assertEquals(400, error.status)
             assertEquals(null, error.apiCode)
             assertFalse(error.userMessage.contains("secret"))
+        } finally {
+            client.close()
+        }
+    }
+
+
+    @Test
+    fun responseExceptionAlsoRetainsTypedError() = runTest {
+        val client =
+            HttpClient(
+                MockEngine {
+                    respond(
+                        """{"code":"mfa_enrollment_required","message":"private details","requestId":"req-456"}""",
+                        HttpStatusCode.Forbidden,
+                        headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                    )
+                },
+            ) {
+                expectSuccess = true
+            }
+        try {
+            val error =
+                assertIs<AppError.Http>(
+                    assertIs<Outcome.Failure>(
+                        apiCall { client.get("auth/mfa/step-up").requireBody<Probe>() },
+                    ).error,
+                )
+            assertEquals(403, error.status)
+            assertEquals("MFA_ENROLLMENT_REQUIRED", error.apiCode)
+            assertEquals("req-456", error.requestId)
+            assertFalse(error.userMessage.contains("private details"))
+        } finally {
+            client.close()
+        }
+    }
+
+    @Test
+    fun oversizedErrorFallsBackWithoutTrustingUnboundedJson() = runTest {
+        val hugeError =
+            """{"code":"mfa_code_invalid","message":"${"x".repeat(17_000)}"}"""
+        val client =
+            createApiClient(
+                ApiEnvironment.Emulator,
+                MockEngine {
+                    respond(
+                        hugeError,
+                        HttpStatusCode.BadRequest,
+                        headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                    )
+                },
+            )
+        try {
+            val error =
+                assertIs<AppError.Http>(
+                    assertIs<Outcome.Failure>(
+                        apiCall { client.get("admin/invitations/prepare").requireBody<Probe>() },
+                    ).error,
+                )
+            assertEquals(400, error.status)
+            assertEquals(null, error.apiCode)
+            assertEquals(MAX_ERROR_BODY, error.technicalDetail?.length)
+            assertFalse(error.userMessage.contains("mfa_code_invalid"))
         } finally {
             client.close()
         }

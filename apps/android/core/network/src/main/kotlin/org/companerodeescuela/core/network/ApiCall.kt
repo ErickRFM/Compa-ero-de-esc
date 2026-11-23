@@ -1,98 +1,98 @@
 package org.companerodeescuela.core.network
 
 import io.ktor.client.call.body
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.decodeFromString
-import org.companerodeescuela.shared.contracts.ApiError
 import io.ktor.client.plugins.ResponseException
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.common.result.Outcome
+import org.companerodeescuela.shared.contracts.ApiError
 
 /**
- * Runs a request that already reports its own outcome, and converts any
- * transport-level exception into an [Outcome] failure.
- *
- * The block is expected to return an [Outcome] (see [requireBody] and
- * [requireUnit]) rather than a raw value, so a protocol-level failure and a
- * connection-level failure arrive at the caller as the same type. Wrapping a
- * raw value here instead would nest one `Outcome` inside another and turn
- * every HTTP error into a success.
+ * Unifies HTTP and transport failures. Never render untrusted server error text.
  */
-suspend fun <T> apiCall(block: suspend () -> Outcome<T>): Outcome<T> = try {
-    block()
-} catch (e: kotlinx.coroutines.CancellationException) {
-    throw e
-} catch (e: ResponseException) {
-    Outcome.Failure(e.toAppError())
-} catch (e: java.io.IOException) {
-    Outcome.Failure(AppError.Network(e.message))
-} catch (e: kotlinx.serialization.SerializationException) {
-    Outcome.Failure(AppError.Serialization(e.message))
-} catch (e: io.ktor.serialization.ContentConvertException) {
-    // Ktor wraps a JSON mismatch in its own type, which is not a
-    // kotlinx SerializationException, so it has to be caught separately.
-    Outcome.Failure(AppError.Serialization(e.message))
-} catch (e: IllegalStateException) {
-    // Ktor reports a malformed or empty body this way.
-    Outcome.Failure(AppError.Serialization(e.message))
-} catch (e: Exception) {
-    Outcome.Failure(AppError.Unknown(e.message))
+suspend fun <T> apiCall(block: suspend () -> Outcome<T>): Outcome<T> {
+    return try {
+        block()
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: ResponseException) {
+        Outcome.Failure(e.response.errorFromResponse())
+    } catch (e: java.io.IOException) {
+        Outcome.Failure(AppError.Network(e.message))
+    } catch (e: kotlinx.serialization.SerializationException) {
+        Outcome.Failure(AppError.Serialization(e.message))
+    } catch (e: io.ktor.serialization.ContentConvertException) {
+        Outcome.Failure(AppError.Serialization(e.message))
+    } catch (e: IllegalStateException) {
+        Outcome.Failure(AppError.Serialization(e.message))
+    } catch (e: Exception) {
+        Outcome.Failure(AppError.Unknown(e.message))
+    }
 }
 
 /** Only preserve bounded printable server correlation IDs. */
 @PublishedApi
-internal fun HttpResponse.safeRequestId(): String? =
-    headers["X-Request-Id"]?.takeIf { value ->
+internal fun HttpResponse.safeRequestId(): String? = headers["X-Request-Id"].safeCorrelationId()
+
+private fun String?.safeCorrelationId(): String? =
+    this?.takeIf { value ->
         value.length in 1..80 && value.all { (it.isLetterOrDigit() && it.code < 128) || it == '-' }
     }
-
-private fun ResponseException.toAppError(): AppError {
-    val detail = runCatching { response.status.description }.getOrNull()
-    return AppError.Http(status = response.status.value, technicalDetail = detail, requestId = response.safeRequestId())
-}
 
 @PublishedApi
 internal val wireErrorJson = Json { ignoreUnknownKeys = true }
 
-/** Longest error body kept for the log. Error bodies are never shown to users. */
+/** Longest error body retained for diagnostics; never shown directly to users. */
 const val MAX_ERROR_BODY: Int = 512
 
-/** Reads a successful body, or reports the status as a failure. */
+/** Upper bound for decoding untrusted error JSON into a structured wire contract. */
+private const val MAX_PARSED_ERROR_BODY: Int = 16_384
+
+/** Parse non-success responses in one place, including Ktor ResponseException. */
+@PublishedApi
+internal suspend fun HttpResponse.errorFromResponse(): AppError.Http {
+    val raw = runCatching { bodyAsText() }.getOrNull()
+    val parsed =
+        raw?.takeIf { it.length <= MAX_PARSED_ERROR_BODY }?.let { rawBody ->
+            runCatching { wireErrorJson.decodeFromString<ApiError>(rawBody) }.getOrNull()
+        }
+    return AppError.Http(
+        status = status.value,
+        technicalDetail = raw?.take(MAX_ERROR_BODY),
+        requestId = safeRequestId() ?: parsed?.requestId.safeCorrelationId(),
+        apiCode = parsed?.code?.name,
+    )
+}
+
+/** Reads a successful body, or reports a structured HTTP failure. */
 suspend inline fun <reified T> HttpResponse.requireBody(): Outcome<T> =
     if (status.value in 200..299) {
         apiCall { Outcome.Success(body<T>()) }
     } else {
-        // Decode the complete bounded payload before truncating its diagnostic copy;
-        // decoding a truncated JSON document would silently discard the wire code.
-        val raw = runCatching { bodyAsText() }.getOrNull()
-        val parsed = raw?.takeIf { it.length <= 16_384 }?.let { body ->
-            runCatching { wireErrorJson.decodeFromString<ApiError>(body) }.getOrNull()
-        }
-        Outcome.Failure(
-            AppError.Http(
-                status = status.value,
-                technicalDetail = raw?.take(MAX_ERROR_BODY),
-                requestId = safeRequestId() ?: parsed?.requestId?.takeIf { id ->
-                    id.length in 1..80 && id.all { (it.isLetterOrDigit() && it.code < 128) || it == '-' }
-                },
-                apiCode = parsed?.code?.name,
-            ),
-        )
+        Outcome.Failure(errorFromResponse())
     }
 
-/** Convenience for endpoints whose success payload is empty. */
+/**
+ * Convenience for empty-success endpoints; deliberately does not read error bodies.
+ * This preserves the existing no-error-body diagnostic contract.
+ */
 suspend fun HttpResponse.requireUnit(): Outcome<Unit> =
-    if (status.value in 200..299) Outcome.Success(Unit)
-    else Outcome.Failure(AppError.Http(status.value, status.description, safeRequestId()))
+    if (status.value in 200..299) {
+        Outcome.Success(Unit)
+    } else {
+        Outcome.Failure(AppError.Http(status.value, status.description, safeRequestId()))
+    }
 
 /** True when the caller must re-authenticate. */
 fun AppError.isUnauthorized(): Boolean = this is AppError.Http && status == 401
 
 /** True when retrying the same request could plausibly succeed. */
-fun AppError.isRetryable(): Boolean = when (this) {
-    is AppError.Network -> true
-    is AppError.Http -> status >= 500
-    is AppError.Serialization, is AppError.Storage, is AppError.Unknown -> false
-}
+fun AppError.isRetryable(): Boolean =
+    when (this) {
+        is AppError.Network -> true
+        is AppError.Http -> status >= 500
+        is AppError.Serialization, is AppError.Storage, is AppError.Unknown -> false
+    }

@@ -5,6 +5,7 @@ import org.companerodeescuela.api.auth.PlatformAccount
 import org.companerodeescuela.api.auth.PlatformAccountRepository
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.shared.contracts.AccountStatus
+import org.companerodeescuela.shared.contracts.ApiErrorCode
 import org.companerodeescuela.shared.contracts.MfaEnrollment
 import org.companerodeescuela.shared.contracts.MfaStatus
 import org.companerodeescuela.shared.contracts.StepUpAction
@@ -102,12 +103,20 @@ class MfaService(
         reauthenticate(current, password)
         val now = clock.instant()
         val factor =
-            repository.findFactor(current.id) ?: throw ApiException.Forbidden("An enrolled MFA factor is required")
-        if (factor.confirmedAt == null || factor.confirmedAt > now) throw ApiException.Forbidden("An enrolled MFA factor is required")
+            repository.findFactor(current.id) ?: throw ApiException.Forbidden(
+                "An enrolled MFA factor is required",
+                ApiErrorCode.MFA_ENROLLMENT_REQUIRED,
+            )
+        if (factor.confirmedAt == null || factor.confirmedAt > now) {
+            throw ApiException.Forbidden("An enrolled MFA factor is required", ApiErrorCode.MFA_ENROLLMENT_REQUIRED)
+        }
         val secret = readSecret(encryption, factor)
         try {
-            val step = Totp.matchingStep(secret, otp, now) ?: throw ApiException.Forbidden("MFA code is invalid")
-            if (!repository.consumeStep(current.id, factor.id, step, now)) throw ApiException.Forbidden("MFA code was already used")
+            val step = Totp.matchingStep(secret, otp, now)
+                ?: throw ApiException.Forbidden("MFA code is invalid", ApiErrorCode.MFA_CODE_INVALID)
+            if (!repository.consumeStep(current.id, factor.id, step, now)) {
+                throw ApiException.Forbidden("MFA code was already used", ApiErrorCode.MFA_CODE_REUSED)
+            }
             val token = Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(32).also(random::nextBytes))
             val binding = StepUpBinding(current.id, current.authRevision, action, resourceId, operationId, payloadDigest)
             val proof = MfaProofRecord(hash(token), binding, now, now.plusSeconds(300))
@@ -176,7 +185,7 @@ class MfaService(
             password.any(Char::isISOControl) ||
             !hasher.verifyAsync(password, actor.passwordHash)
         ) {
-            throw ApiException.Forbidden("Reauthentication is required")
+            throw ApiException.Forbidden("Reauthentication is required", ApiErrorCode.MFA_REAUTHENTICATION_FAILED)
         }
     }
 

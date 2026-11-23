@@ -43,6 +43,8 @@ sealed interface AppError {
         override val technicalDetail: String? = null,
         /** Opaque safe server correlation identifier, not a response body or credential. */
         val requestId: String? = null,
+        /** Allowlisted machine-readable API code; server message is never rendered. */
+        val apiCode: String? = null,
     ) : AppError {
         override val userMessage: String = when (status) {
             400 -> "Revisa los datos enviados e inténtalo nuevamente."

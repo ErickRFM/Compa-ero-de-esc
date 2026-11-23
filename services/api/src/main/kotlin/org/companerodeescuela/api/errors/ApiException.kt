@@ -19,9 +19,10 @@ sealed class ApiException(
     class Validation(
         message: String,
         val fieldErrors: List<org.companerodeescuela.shared.contracts.ApiFieldError> = emptyList(),
+        code: ApiErrorCode = ApiErrorCode.VALIDATION_ERROR,
     ) : ApiException(
             httpStatus = HttpStatusCode.BadRequest,
-            errorCode = ApiErrorCode.VALIDATION_ERROR,
+            errorCode = code,
             userMessage = message,
         )
 
@@ -35,9 +36,10 @@ sealed class ApiException(
 
     class Forbidden(
         message: String = "You are not allowed to perform this action",
+        code: ApiErrorCode = ApiErrorCode.FORBIDDEN,
     ) : ApiException(
             httpStatus = HttpStatusCode.Forbidden,
-            errorCode = ApiErrorCode.FORBIDDEN,
+            errorCode = code,
             userMessage = message,
         )
 

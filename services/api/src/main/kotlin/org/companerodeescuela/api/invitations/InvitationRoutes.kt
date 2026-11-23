@@ -76,6 +76,8 @@ internal fun Route.invitationRoutes(
             )
     if (!settings.hasAuthentication || productionBlocked) return
     val resolver = NativeActorResolver(accounts, sessions, AuthTokenService(settings), identity)
+    // Separate issuer buckets: prepare and dispatch are two HTTP calls for one invitation.
+    // Keep five dispatch attempts / five minutes without charging MFA preparation to it.
     val issuerLimiter = LoginAttemptLimiter(maxAttempts = 5, store = rateLimitStore)
     val acceptanceLimiter = LoginAttemptLimiter(maxAttempts = 10, store = rateLimitStore)
     val acceptance = InvitationAcceptanceService(accounts, invitations, clock)
@@ -117,7 +119,7 @@ internal fun Route.invitationRoutes(
         route("/admin/invitations") {
             post("/prepare") {
                 val actor = call.nativeActor()
-                issuerLimiter.acquire(actor.id, call.clientAddress())?.let {
+                issuerLimiter.acquire("prepare:" + actor.id, call.clientAddress())?.let {
                     call.response.header(HttpHeaders.RetryAfter, it.toString())
                     throw ApiException.RateLimited()
                 }
@@ -144,7 +146,7 @@ internal fun Route.invitationRoutes(
             }
             post {
                 val actor = call.nativeActor()
-                issuerLimiter.acquire(actor.id, call.clientAddress())?.let {
+                issuerLimiter.acquire("dispatch:" + actor.id, call.clientAddress())?.let {
                     call.response.header(HttpHeaders.RetryAfter, it.toString())
                     throw ApiException.RateLimited()
                 }
@@ -177,7 +179,7 @@ internal fun Route.invitationRoutes(
             }
             post("/retry") {
                 val actor = call.nativeActor()
-                issuerLimiter.acquire(actor.id, call.clientAddress())?.let {
+                issuerLimiter.acquire("manage:" + actor.id, call.clientAddress())?.let {
                     call.response.header(HttpHeaders.RetryAfter, it.toString())
                     throw ApiException.RateLimited()
                 }
@@ -214,7 +216,7 @@ internal fun Route.invitationRoutes(
             }
             post("/revoke") {
                 val actor = call.nativeActor()
-                issuerLimiter.acquire(actor.id, call.clientAddress())?.let {
+                issuerLimiter.acquire("manage:" + actor.id, call.clientAddress())?.let {
                     call.response.header(HttpHeaders.RetryAfter, it.toString())
                     throw ApiException.RateLimited()
                 }

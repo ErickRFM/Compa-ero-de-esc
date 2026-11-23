@@ -131,7 +131,10 @@ fun InvitationIssueScreen(
                 state.failure?.let {
                     StatusNotice(
                         title = "No se pudo enviar",
-                        message = it.userMessage,
+                        message = invitationFailureMessage(it, state.failureStage) +
+                            ((it as? org.companerodeescuela.core.common.result.AppError.Http)?.requestId?.let { id ->
+                                "\\nReferencia: $id"
+                            } ?: ""),
                         tone = NoticeTone.ERROR,
                     )
                 }

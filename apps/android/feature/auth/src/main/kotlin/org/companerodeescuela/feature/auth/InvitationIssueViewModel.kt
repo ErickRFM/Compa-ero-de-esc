@@ -17,10 +17,13 @@ import org.companerodeescuela.shared.contracts.VerificationDeliveryStatus
 import java.util.UUID
 import javax.inject.Inject
 
+enum class InvitationStage { PREPARE, MFA, DISPATCH }
+
 data class InvitationIssueState(
     val working: Boolean = false,
     val delivery: VerificationDeliveryStatus? = null,
     val failure: AppError? = null,
+    val failureStage: InvitationStage? = null,
 )
 
 @HiltViewModel
@@ -53,7 +56,7 @@ class InvitationIssueViewModel
             viewModelScope.launch {
                 val prepared = auth.prepareRegistrationInvitation(request)
                 if (prepared is Outcome.Failure) {
-                    mutable.value = InvitationIssueState(failure = prepared.error)
+                    mutable.value = InvitationIssueState(failure = prepared.error, failureStage = InvitationStage.PREPARE)
                     return@launch
                 }
                 val scope = (prepared as Outcome.Success).value
@@ -69,14 +72,14 @@ class InvitationIssueViewModel
                         ),
                     )
                 if (proof is Outcome.Failure) {
-                    mutable.value = InvitationIssueState(failure = proof.error)
+                    mutable.value = InvitationIssueState(failure = proof.error, failureStage = InvitationStage.MFA)
                     return@launch
                 }
                 val result = auth.sendRegistrationInvitation(request.copy(proof = (proof as Outcome.Success).value.proof))
                 mutable.value =
                     when (result) {
                         is Outcome.Success -> InvitationIssueState(delivery = result.value.delivery)
-                        is Outcome.Failure -> InvitationIssueState(failure = result.error)
+                        is Outcome.Failure -> InvitationIssueState(failure = result.error, failureStage = InvitationStage.DISPATCH)
                     }
             }
         }

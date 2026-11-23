@@ -56,6 +56,13 @@ require(appVersionName.matches(Regex("[0-9]+\\.[0-9]+\\.[0-9]+(?:-[a-zA-Z0-9.-]+
     "COMPANERO_VERSION_NAME must be a valid version name"
 }
 
+// ML Kit ships one OCR pipeline per ABI, so an unsplit APK carries all four pipelines.
+// x86_64 stays included so emulators install the same artifacts as phones. Per-ABI splits and
+// resource shrinking leave the bundle task with one shrunk-resources file per ABI, which AGP
+// cannot resolve (b/402800800), so bundle builds opt out of the splits.
+val apkAbiSplits = providers.gradleProperty("companero.apkSplits").orElse("true").get()
+require(apkAbiSplits in setOf("true", "false")) { "companero.apkSplits must be true or false" }
+
 fun validateApiBaseUrl(
     name: String,
     value: String,
@@ -168,6 +175,17 @@ android {
             buildConfigField("String", "FIREBASE_PROJECT_ID", "\"$managementFirebaseProjectId\"")
             buildConfigField("String", "FIREBASE_SENDER_ID", "\"$managementFirebaseSenderId\"")
             buildConfigField("String", "FIREBASE_API_KEY", "\"$managementFirebaseApiKey\"")
+        }
+    }
+
+    if (apkAbiSplits == "true") {
+        splits {
+            abi {
+                isEnable = true
+                reset()
+                include("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
+                isUniversalApk = true
+            }
         }
     }
 

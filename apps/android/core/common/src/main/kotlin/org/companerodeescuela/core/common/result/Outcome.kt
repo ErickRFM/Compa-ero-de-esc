@@ -43,8 +43,11 @@ sealed interface AppError {
         override val technicalDetail: String? = null,
         /** Opaque safe server correlation identifier, not a response body or credential. */
         val requestId: String? = null,
+        /** Safe wire code only; server-provided human-readable text remains private. */
+        val apiCode: String? = null,
     ) : AppError {
         override val userMessage: String = when (status) {
+            400 -> "Revisa los datos ingresados e inténtalo nuevamente."
             401 -> "Tu sesión expiró. Inicia sesión nuevamente."
             403 -> "No tienes permiso para ver esta información."
             404 -> "No encontramos la información que buscas."

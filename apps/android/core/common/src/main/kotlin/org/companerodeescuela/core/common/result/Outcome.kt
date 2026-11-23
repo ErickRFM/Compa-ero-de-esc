@@ -48,16 +48,16 @@ sealed interface AppError {
     ) : AppError {
         override val userMessage: String =
             when (status) {
-            400 -> "Revisa los datos ingresados e inténtalo nuevamente."
-            401 -> "Tu sesión expiró. Inicia sesión nuevamente."
-            403 -> "No tienes permiso para ver esta información."
-            404 -> "No encontramos la información que buscas."
-            409 -> "La operación entra en conflicto con el estado actual."
-            422 -> "Revisa la información enviada e inténtalo nuevamente."
-            429 -> "Demasiados intentos. Espera un momento e inténtalo de nuevo."
-            in 500..599 -> "El servicio no está disponible en este momento."
-            else -> "No pudimos completar la solicitud."
-        }
+                400 -> "Revisa los datos ingresados e inténtalo nuevamente."
+                401 -> "Tu sesión expiró. Inicia sesión nuevamente."
+                403 -> "No tienes permiso para ver esta información."
+                404 -> "No encontramos la información que buscas."
+                409 -> "La operación entra en conflicto con el estado actual."
+                422 -> "Revisa la información enviada e inténtalo nuevamente."
+                429 -> "Demasiados intentos. Espera un momento e inténtalo de nuevo."
+                in 500..599 -> "El servicio no está disponible en este momento."
+                else -> "No pudimos completar la solicitud."
+            }
     }
 
     /** The response arrived but did not match the agreed contract. */

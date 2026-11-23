@@ -53,7 +53,8 @@ private fun ResponseException.toAppError(): AppError {
     return AppError.Http(status = response.status.value, technicalDetail = detail, requestId = response.safeRequestId())
 }
 
-private val wireErrorJson = Json { ignoreUnknownKeys = true }
+@PublishedApi
+internal val wireErrorJson = Json { ignoreUnknownKeys = true }
 
 /** Longest error body kept for the log. Error bodies are never shown to users. */
 const val MAX_ERROR_BODY: Int = 512

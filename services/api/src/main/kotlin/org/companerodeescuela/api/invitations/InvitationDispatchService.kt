@@ -1,6 +1,5 @@
 package org.companerodeescuela.api.invitations
 
-import io.ktor.http.HttpStatusCode
 import org.companerodeescuela.api.auth.PlatformAccount
 import org.companerodeescuela.api.auth.PlatformAccountRepository
 import org.companerodeescuela.api.auth.authenticationDependency

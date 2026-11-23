@@ -1,5 +1,6 @@
 package org.companerodeescuela.api.invitations
 
+import io.ktor.http.HttpStatusCode
 import org.companerodeescuela.api.auth.PlatformAccount
 import org.companerodeescuela.api.auth.PlatformAccountRepository
 import org.companerodeescuela.api.auth.authenticationDependency
@@ -7,6 +8,7 @@ import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.institutions.InstitutionRepository
 import org.companerodeescuela.api.security.MfaService
 import org.companerodeescuela.shared.contracts.AccountStatus
+import org.companerodeescuela.shared.contracts.ApiErrorCode
 import org.companerodeescuela.shared.contracts.StepUpAction
 import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.VerificationDeliveryStatus
@@ -312,7 +314,10 @@ internal class InvitationDispatchService(
 
     private suspend fun requireInstitution(command: InvitationDispatchCommand) {
         if (authenticationDependency { institutions.findEnabled(command.institutionId) } == null) {
-            throw ApiException.Validation("Institution does not accept new registrations")
+            throw ApiException.Validation(
+                "Institution does not accept new registrations",
+                code = ApiErrorCode.INVITATION_INSTITUTION_UNAVAILABLE,
+            )
         }
     }
 

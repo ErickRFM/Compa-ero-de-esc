@@ -75,3 +75,6 @@ xcuserdata/
 # Local Firebase project configuration; CI supplies the four existing settings.
 **/google-services.json
 **/google-services-management.json
+
+# Atlas/local operator secrets (never commit)
+/.secrets/

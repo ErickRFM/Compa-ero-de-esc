@@ -15,7 +15,8 @@ val debugApiBaseUrl =
 val releaseApiBaseUrl =
     providers
         .environmentVariable("COMPANERO_RELEASE_API_BASE_URL")
-        .orElse(debugApiBaseUrl)
+        // Release must never silently inherit a debug/development API endpoint.
+        .orElse("https://invalid.invalid/")
         .get()
 
 // Debug-signed internal test builds remain explicit. Only an opt-in

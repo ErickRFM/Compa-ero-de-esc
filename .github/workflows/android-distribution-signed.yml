@@ -84,8 +84,8 @@ jobs:
           test -n "$expected" || { echo "::error::Pinned release certificate missing"; exit 1; }
           mkdir -p dist/distribution
           for flavor in academic management; do
-            release="apps/android/app/build/outputs/apk/$flavor/release/app-$flavor-release.apk"
-            debug="apps/android/app/build/outputs/apk/$flavor/debug/app-$flavor-debug.apk"
+            release="apps/android/app/build/outputs/apk/$flavor/release/app-$flavor-universal-release.apk"
+            debug="apps/android/app/build/outputs/apk/$flavor/debug/app-$flavor-universal-debug.apk"
             test -f "$release" && test -f "$debug" || { echo "::error::Missing $flavor APK"; exit 1; }
             "$signer" verify --verbose --print-certs "$release"
             "$signer" verify --verbose --print-certs "$debug"

@@ -41,3 +41,18 @@ data class RegistrationInvitationDispatchReceipt(
     val delivery: VerificationDeliveryStatus,
     val expiresAtEpochSeconds: Long,
 )
+
+@Serializable
+data class RegistrationInvitationSummary(
+    val invitationId: String,
+    val recipient: String,
+    val institutionId: String,
+    val profile: String,
+    val status: String,
+    val createdAtEpochSeconds: Long,
+    val expiresAtEpochSeconds: Long,
+    val acceptedAtEpochSeconds: Long? = null,
+    val revokedAtEpochSeconds: Long? = null,
+) {
+    override fun toString() = "RegistrationInvitationSummary(id=$invitationId, profile=$profile, status=$status)"
+}

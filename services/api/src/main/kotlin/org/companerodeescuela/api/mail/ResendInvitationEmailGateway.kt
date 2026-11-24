@@ -12,6 +12,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.companerodeescuela.api.invitations.InvitationEmailGateway
+import org.companerodeescuela.api.invitations.InvitationEmailKind
 import org.companerodeescuela.shared.contracts.VerificationDeliveryStatus
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
@@ -44,24 +45,57 @@ internal class ResendInvitationEmailGateway(
         code: String,
         invitationId: String,
         expiresAt: Instant,
+    ): VerificationDeliveryStatus = sendWithKind(recipient, code, invitationId, expiresAt, InvitationEmailKind.REGISTRATION)
+
+    override suspend fun sendOwnerBootstrap(
+        recipient: String,
+        code: String,
+        invitationId: String,
+        expiresAt: Instant,
+    ): VerificationDeliveryStatus = sendWithKind(recipient, code, invitationId, expiresAt, InvitationEmailKind.OWNER_BOOTSTRAP)
+
+    private suspend fun sendWithKind(
+        recipient: String,
+        code: String,
+        invitationId: String,
+        expiresAt: Instant,
+        kind: InvitationEmailKind,
     ): VerificationDeliveryStatus {
         if (!Regex("[A-Za-z0-9_-]{43}").matches(code) ||
             !Regex("[A-Za-z0-9_-]{43}").matches(invitationId)
         ) {
             return VerificationDeliveryStatus.FAILED
         }
+        val ownerBootstrap = kind == InvitationEmailKind.OWNER_BOOTSTRAP
+        val subject =
+            if (ownerBootstrap) {
+                "Invitación de propietario a Compañero de Clase"
+            } else {
+                "Invitación a Compañero de Clase"
+            }
+        val category = if (ownerBootstrap) "companero_owner_invitation" else "companero_invitation"
+        val introduction =
+            if (ownerBootstrap) {
+                "Recibiste una invitación única para convertir tu cuenta existente en la cuenta propietaria de Compañero de Clase.\n\n" +
+                    "Abre la aplicación e inicia el registro OWNER_INVITED con este mismo correo y tu contraseña actual. " +
+                    "Tu cuenta verificada y su MFA se conservarán.\n\n"
+            } else {
+                "Te invitaron a Compañero de Clase.\n\n" +
+                    "Abre la aplicación y regístrate con este mismo correo. " +
+                    "Verifica tu dirección con el correo de confirmación.\n\n"
+            }
         val body =
             buildJsonObject {
                 put("from", "Compañero de Clase <$sender>")
                 put("to", buildJsonArray { add(recipient) })
-                put("subject", "Invitación a Compañero de Clase")
+                put("subject", subject)
                 put(
                     "tags",
                     buildJsonArray {
                         add(
                             buildJsonObject {
                                 put("name", "category")
-                                put("value", "companero_invitation")
+                                put("value", category)
                             },
                         )
                         add(
@@ -74,9 +108,7 @@ internal class ResendInvitationEmailGateway(
                 )
                 put(
                     "text",
-                    "Te invitaron a Compañero de Clase.\n\n" +
-                        "Abre la aplicación y regístrate con este mismo correo. " +
-                        "Verifica tu dirección con el correo de confirmación.\n\n" +
+                    introduction +
                         "Código de invitación: $code\n" +
                         "ID de invitación: $invitationId\n" +
                         "Caduca: $expiresAt (UTC)\n\n" +
@@ -84,7 +116,7 @@ internal class ResendInvitationEmailGateway(
                         "La invitación no concede permisos ni privilegios automáticamente. " +
                         "Si no esperabas este correo, ignóralo.",
                 )
-                put("html", html(code, invitationId, expiresAt))
+                put("html", html(code, invitationId, expiresAt, kind))
             }.toString().toByteArray(Charsets.UTF_8)
         return withContext(Dispatchers.IO) { attempt(body) }
     }
@@ -93,14 +125,15 @@ internal class ResendInvitationEmailGateway(
         code: String,
         id: String,
         expiresAt: Instant,
+        kind: InvitationEmailKind,
     ): String =
         """
         <!doctype html><html lang="es"><head><meta charset="utf-8"></head>
         <body style="background:#f5f5f7;margin:0;padding:32px 12px;font-family:Arial,sans-serif;color:#202024">
           <main style="max-width:540px;margin:auto;background:#fff;border-radius:22px;padding:32px">
             <p style="color:#8a1538;font-weight:700">COMPAÑERO DE CLASE</p>
-            <h1 style="font-size:26px">Tu invitación está lista</h1>
-            <p>Regístrate en la aplicación con este mismo correo y verifica tu cuenta.</p>
+            <h1 style="font-size:26px">${if (kind == InvitationEmailKind.OWNER_BOOTSTRAP) "Invitación de propietario" else "Tu invitación está lista"}</h1>
+            <p>${if (kind == InvitationEmailKind.OWNER_BOOTSTRAP) "Inicia el registro OWNER_INVITED con este mismo correo y tu contraseña actual. Tu cuenta verificada y su MFA se conservarán." else "Regístrate en la aplicación con este mismo correo y verifica tu cuenta."}</p>
             <p style="font-size:12px;color:#595961">CÓDIGO DE INVITACIÓN</p>
             <p style="font-size:20px;letter-spacing:1px;overflow-wrap:anywhere;font-weight:700">$code</p>
             <p style="font-size:12px;color:#595961">ID: $id</p>

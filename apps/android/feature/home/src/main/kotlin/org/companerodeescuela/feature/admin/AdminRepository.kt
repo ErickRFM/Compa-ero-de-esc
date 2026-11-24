@@ -15,6 +15,7 @@ import org.companerodeescuela.core.network.requireBody
 import org.companerodeescuela.core.security.SessionTokenStore
 import org.companerodeescuela.shared.contracts.AcademicGroupSummary
 import org.companerodeescuela.shared.contracts.AccountLifecycleRequest
+import org.companerodeescuela.shared.contracts.AdminAuditEntry
 import org.companerodeescuela.shared.contracts.AdminUserSummary
 import org.companerodeescuela.shared.contracts.AdministrationOverview
 import org.companerodeescuela.shared.contracts.ApiResponse
@@ -23,6 +24,8 @@ import org.companerodeescuela.shared.contracts.ApproveStudentAffiliationRequest
 import org.companerodeescuela.shared.contracts.InstitutionSummary
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkRequest
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkSummary
+import org.companerodeescuela.shared.contracts.RegistrationInvitationReceipt
+import org.companerodeescuela.shared.contracts.RegistrationInvitationSummary
 import org.companerodeescuela.shared.contracts.RevokeTutorAssignmentRequest
 import org.companerodeescuela.shared.contracts.TutorAssignmentSummary
 import org.companerodeescuela.shared.contracts.UserSummary
@@ -44,6 +47,14 @@ class AdminRepository(
     suspend fun approvalGroups(): Outcome<List<AcademicGroupSummary>> = get("admin/accounts/approval-groups")
 
     suspend fun assignments(): Outcome<List<TutorAssignmentSummary>> = get("tutoring/assignments")
+
+    suspend fun auditLog(limit: Int = 50): Outcome<List<AdminAuditEntry>> = get("admin/audit?limit=${limit.coerceIn(1, 100)}")
+
+    suspend fun invitations(limit: Int = 50): Outcome<List<RegistrationInvitationSummary>> =
+        get("admin/invitations?limit=${limit.coerceIn(1, 100)}")
+
+    suspend fun revokeInvitation(invitationId: String): Outcome<RegistrationInvitationReceipt> =
+        post("admin/invitations/revoke", mapOf("invitationId" to invitationId))
 
     suspend fun approve(
         target: String,

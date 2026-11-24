@@ -36,6 +36,22 @@ class MongoOwnerInvitationRepositoryTest {
                             .getInstance("SHA-256")
                             .digest(rawCode.toByteArray(Charsets.UTF_8))
                             .joinToString("") { "%02x".format(it) }
+                    val deliveryClaims =
+                        coroutineScope {
+                            (1..24)
+                                .map { index ->
+                                    async {
+                                        MongoOwnerInvitationRepository(database).claimDelivery(
+                                            digest,
+                                            "erik55509@hotmail.com",
+                                            expiresAt,
+                                            now,
+                                            "delivery-$index",
+                                        )
+                                    }
+                                }.awaitAll()
+                        }
+                    assertEquals(1, deliveryClaims.count { it })
                     val outcomes =
                         coroutineScope {
                             (1..24)
@@ -62,6 +78,7 @@ class MongoOwnerInvitationRepositoryTest {
                         )
                     assertEquals(digest, document.getString("_id"))
                     assertFalse(document.toJson().contains(rawCode))
+                    assertNotNull(document.getDate("deliveryAttemptedAt"))
                     assertNotNull(document.getDate("consumedAt"))
                     assertFalse(
                         MongoOwnerInvitationRepository(database).consume(

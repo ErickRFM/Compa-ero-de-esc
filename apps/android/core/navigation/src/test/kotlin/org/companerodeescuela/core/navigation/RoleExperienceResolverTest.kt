@@ -105,24 +105,33 @@ class RoleExperienceResolverTest {
     }
 
     @Test
-    fun `admin and superAdmin get admin workspace`() {
+    fun `admin and superAdmin get tailored management workspaces`() {
         val admin = RoleExperienceResolver.resolve(setOf(UserRole.ADMIN))
         val superAdmin = RoleExperienceResolver.resolve(setOf(UserRole.SUPER_ADMIN))
 
         assertEquals(AppExperience.ADMIN, admin.experience)
         assertEquals(Destination.AdminHome, admin.startDestination)
-
-        assertEquals(AppExperience.SUPER_ADMIN, superAdmin.experience)
-        assertEquals(Destination.AdminHome, superAdmin.startDestination)
-        val expected =
+        assertEquals(
             listOf(
                 TopLevelDestination.AdminHome,
                 TopLevelDestination.Schedule,
                 TopLevelDestination.Classrooms,
                 TopLevelDestination.Channel,
-            )
-        assertEquals(expected, admin.topLevelDestinations)
-        assertEquals(expected, superAdmin.topLevelDestinations)
+            ),
+            admin.topLevelDestinations,
+        )
+
+        assertEquals(AppExperience.SUPER_ADMIN, superAdmin.experience)
+        assertEquals(Destination.AdminHome, superAdmin.startDestination)
+        assertEquals(
+            listOf(
+                TopLevelDestination.AdminHome,
+                TopLevelDestination.AdminAccounts,
+                TopLevelDestination.AdminAcademic,
+                TopLevelDestination.AdminHistory,
+            ),
+            superAdmin.topLevelDestinations,
+        )
     }
 
     @Test

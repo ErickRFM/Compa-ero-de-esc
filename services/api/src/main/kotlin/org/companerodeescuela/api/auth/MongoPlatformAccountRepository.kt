@@ -208,27 +208,52 @@ class MongoPlatformAccountRepository(
                 eq("authRevision", expectedRevision)
             }
         val statusFilter = or(eq("accountStatus", current.accountStatus.name), exists("accountStatus", false))
+        val filters =
+            mutableListOf<org.bson.conversions.Bson>(
+                eq("_id", accountId),
+                revisionFilter,
+                statusFilter,
+                eq("active", current.active),
+                applicationRevisionFilter(current.applicationRevision),
+            )
+        if (change.registrationIntent != null) {
+            filters += eq("registrationIntent.profile", RegistrationAccountType.STUDENT.name)
+            val verifiedStudentOwnerInvite =
+                change.registrationIntent.profile == RegistrationAccountType.OWNER_INVITED &&
+                    current.accountStatus == AccountStatus.ACTIVE &&
+                    current.emailVerifiedAt != null &&
+                    current.roles == setOf(UserRole.STUDENT)
+            if (verifiedStudentOwnerInvite) {
+                // The active-student owner-invite path preserves the verified account and STUDENT role.
+                // Keep the Mongo compare-and-set bound to the same verified state read above.
+                filters += eq("emailVerifiedAt", Date.from(requireNotNull(current.emailVerifiedAt)))
+                filters += eq("roles", listOf(UserRole.STUDENT.name))
+                filters += eq("institutionId", null)
+                filters += eq("roleApplicationsJson", Json.encodeToString(current.roleApplications))
+                filters += eq("adminCapabilities", current.adminCapabilities.map(AdminCapability::name))
+            } else {
+                filters += eq("emailVerifiedAt", null)
+                filters += eq("roles", emptyList<String>())
+            }
+        }
+        val updates =
+            mutableListOf<org.bson.conversions.Bson>(
+                Updates.set("accountStatus", updated.accountStatus.name),
+                Updates.set("active", updated.active),
+                Updates.set("authRevision", updated.authRevision),
+                Updates.set("roles", updated.roles.map(UserRole::name)),
+                Updates.set("institutionId", updated.institutionId),
+                Updates.set("roleGenerations", updated.generationDocument()),
+                Updates.set("roleApplicationsJson", Json.encodeToString(updated.roleApplications)),
+                Updates.set("applicationRevision", updated.applicationRevision),
+                Updates.set("adminCapabilities", updated.adminCapabilities.map(AdminCapability::name)),
+                Updates.set("registrationIntent", updated.registrationIntent?.toDocument()),
+                Updates.push("identityAudit", updated.identityAudit.last().toDocument()),
+            )
         val result =
             accounts.findOneAndUpdate(
-                and(
-                    eq("_id", accountId),
-                    revisionFilter,
-                    statusFilter,
-                    eq("active", current.active),
-                    applicationRevisionFilter(current.applicationRevision),
-                ),
-                Updates.combine(
-                    Updates.set("accountStatus", updated.accountStatus.name),
-                    Updates.set("active", updated.active),
-                    Updates.set("authRevision", updated.authRevision),
-                    Updates.set("roles", updated.roles.map(UserRole::name)),
-                    Updates.set("institutionId", updated.institutionId),
-                    Updates.set("roleGenerations", updated.generationDocument()),
-                    Updates.set("roleApplicationsJson", Json.encodeToString(updated.roleApplications)),
-                    Updates.set("applicationRevision", updated.applicationRevision),
-                    Updates.set("adminCapabilities", updated.adminCapabilities.map(AdminCapability::name)),
-                    Updates.push("identityAudit", updated.identityAudit.last().toDocument()),
-                ),
+                and(*filters.toTypedArray()),
+                Updates.combine(*updates.toTypedArray()),
                 FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER),
             )
         if (result != null) return result.toAccount()
@@ -365,6 +390,8 @@ class MongoPlatformAccountRepository(
             .append("scopeDigest", scopeDigest)
             .append("approvedApplicationId", approvedApplicationId)
             .append("capabilitiesAfter", capabilitiesAfter.map(AdminCapability::name))
+            .append("registrationProfileBefore", registrationProfileBefore?.name)
+            .append("registrationProfileAfter", registrationProfileAfter?.name)
 
     private fun Document.toIdentityAudit(): AccountIdentityAudit =
         AccountIdentityAudit(
@@ -382,6 +409,8 @@ class MongoPlatformAccountRepository(
             scopeDigest = getString("scopeDigest"),
             approvedApplicationId = getString("approvedApplicationId"),
             capabilitiesAfter = getList("capabilitiesAfter", String::class.java).orEmpty().map(AdminCapability::valueOf).toSet(),
+            registrationProfileBefore = getString("registrationProfileBefore")?.let(RegistrationAccountType::valueOf),
+            registrationProfileAfter = getString("registrationProfileAfter")?.let(RegistrationAccountType::valueOf),
         )
 
     private fun applicationRevisionFilter(revision: Long) =

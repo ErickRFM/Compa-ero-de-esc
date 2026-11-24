@@ -51,7 +51,16 @@ internal fun interface InvitationEmailGateway {
         invitationId: String,
         expiresAt: Instant,
     ): VerificationDeliveryStatus
+
+    suspend fun sendOwnerBootstrap(
+        recipient: String,
+        code: String,
+        invitationId: String,
+        expiresAt: Instant,
+    ): VerificationDeliveryStatus = send(recipient, code, invitationId, expiresAt)
 }
+
+internal enum class InvitationEmailKind { REGISTRATION, OWNER_BOOTSTRAP }
 
 internal object UnavailableInvitationEmailGateway : InvitationEmailGateway {
     override suspend fun send(

@@ -1,64 +1,26 @@
-# Compañero — ingreso de Súper Admin con correo independiente
+# Primera cuenta `SUPER_ADMIN` de Compañero
 
-**Cuenta designada exclusivamente para Compañero:** `erik55509@hotmail.com`.
+## Arquitectura de operación
 
-Este documento **no es una concesión de permisos** y su presencia no autoriza
-roles por coincidencia de correo. Nunca convertir la cuenta existente
-`erik55509@gmail.com` ni reenviar credenciales de otro perfil.
+Compañero usa una API productiva, las aplicaciones Académica y Gestión y la base existente `companero_dev`. QA ya no forma parte de los flujos desplegables. No crear otra cuenta ni modificar roles para hacer avanzar el alta.
 
-## Estado confirmado al 3-nov-2026
+Producción está desplegada desde el commit `904d48c17e9428475bc4be2f818010197d2d2041`. La API responde `/ready` con MongoDB `up`; el usuario de Render tiene `readWrite` únicamente en `companero_dev`. El operador omitió el respaldo para esta operación.
 
-- La cuenta Hotmail no estaba registrada en las colecciones consultadas de
-  `companero_dev` ni `companero_qa`. No hay evidencia aquí sobre la
-  base efectiva del entorno productivo de Render.
-- La invitación V26 de Resend existe como plantilla publicada y el remitente
-  de `companero.manecomb.com` está verificado. La plantilla necesita un enlace
-  real, personal y con expiración; no usar URL ficticia ni sustituirla por
-  la página principal.
-- La implementación de invitaciones en Ktor es aún prototipo no expuesto:
-  aceptación no equivale a promoción administrativa.
-- `OwnerBootstrap` está cableado para **QA aislado** con correo verificado,
-  MFA, prueba de autorización de vigencia corta, CAS, auditoría y reserva
-  persistente única. Rechaza explícitamente producción.
-- **Ningún mensaje de invitación se ha enviado ni se ha concedido Súper Admin.**
+## Secuencia autorizada
 
-## Orden de habilitación (obligatorio)
+1. Confirmar que el servicio de Render responde desde el commit aprobado, usa `APP_ENV=production` y `MONGODB_DATABASE=companero_dev`.
+2. Generar un código de invitación de 32 bytes, su SHA-256 y un token de despacho temporal de 32 bytes. Configurar temporalmente `OWNER_INVITE_CODE` y `OWNER_INVITE_DISPATCH_TOKEN` junto con `OWNER_INVITE_EMAIL`, `OWNER_INVITE_CODE_SHA256`, `OWNER_INVITE_EXPIRES_AT` y `PROD_OWNER_ISOLATION_CERTIFIED=true`. El endpoint `/internal/owner-invitation/send` manda el código al correo fijo con el emisor Resend existente. La entrega se reserva una sola vez en `owner_registration_invitations`; una respuesta HTTP 202 significa que Resend aceptó el mensaje, no confirma que llegó al buzón.
+3. Tras recibir HTTP 202, borrar del entorno `OWNER_INVITE_CODE` y `OWNER_INVITE_DISPATCH_TOKEN`; conservar el hash, destinatario y caducidad hasta completar el registro. Si el envío falla, no reutilizar el mismo intento; generar otro código, hash, token y caducidad.
+4. El titular inicia el registro `OWNER_INVITED` con el mismo correo y la contraseña actual, e ingresa el código de invitación de un solo uso recibido por correo. Para una cuenta `PENDING_VERIFICATION` sin roles, el servicio cambia la intención de registro y vuelve a emitir la verificación. Para una cuenta activa, verificada y sin alcance académico, la conversión conserva el ID, el hash de contraseña, la verificación, el MFA y el rol `STUDENT`; ambas rutas revocan sesiones previas. No se admiten cuentas con institución, solicitudes de rol ni privilegios administrativos.
+5. La cuenta pendiente verifica el correo desde el mensaje nuevo y recibe `WORKSHOP_PARTICIPANT`. La cuenta activa ya verificada no requiere otra verificación y conserva `STUDENT`. Ninguna ruta concede `SUPER_ADMIN` en el registro.
+6. MFA del titular debe seguir activo. El bootstrap requiere prueba MFA nueva y firma Ed25519 del operador, limita la autorización a 15 minutos y guarda auditoría/reserva atómica. Para la conversión de una cuenta activa, añade `SUPER_ADMIN` y conserva `STUDENT`.
+7. Ejecutar el bootstrap de producción mediante las variables `PROD_OWNER_BOOTSTRAP_*`; retirar todas las variables temporales y verificar login nuevo, rol efectivo, auditoría y revocación de sesiones previas.
 
-1. Terminar flujo de administradores por carrera, selector Android y
-   sincronización firmada de grants, revocaciones, horarios y QR; no asumir
-   que la capa de política Ktor por sí sola constituye integración completa.
-2. Obtener CI obligatorio verde de SIII, Ktor y Android; incorporar los PR
-   con resolución de conflictos y probar despliegues y reingreso de sesión.
-3. Verificar que el servicio productivo usa una base MongoDB de producción
-   distinta de desarrollo y QA, y que la autoridad HMAC de SIII coincide.
-4. Finalizar API de invitaciones: creación autorizada, entrega persistente,
-   token de un solo uso, verificación de destinatario, expiración, aceptación
-   autenticada y auditoría. La plantilla de Resend no se invoca hasta ese punto.
-5. Crear la cuenta Hotmail desde el registro real de la aplicación; confirmar
-   propiedad del correo e inscribir MFA del dispositivo del titular.
-6. En QA, ejecutar `OwnerBootstrap` únicamente con los datos **reales** de
-   cuenta y revisión: `QA_OWNER_BOOTSTRAP_ENABLED=true`,
-   `QA_OWNER_BOOTSTRAP_ACCOUNT_ID`, `QA_OWNER_BOOTSTRAP_EMAIL` con
-   el destinatario indicado, `QA_OWNER_BOOTSTRAP_EXPECTED_REVISION`,
-   `QA_OWNER_BOOTSTRAP_OPERATION_ID`, `QA_OWNER_BOOTSTRAP_OPERATOR`,
-   `QA_OWNER_BOOTSTRAP_REASON`, `QA_OWNER_BOOTSTRAP_EXPIRES_AT`
-   y `QA_OWNER_BOOTSTRAP_PROOF` emitido mediante MFA para el digest exacto.
-   Aplicar solo durante el arranque controlado, auditar e inmediatamente
-   deshabilitar el flag. No escribir códigos, contraseñas ni prueba MFA en Git.
-7. Para producción, establecer un proceso separado de designación propietaria
-   con autorización demostrable y auditoría. Nunca modificar la restricción
-   de `OwnerBootstrap` para permitir producción ni asignar `SUPER_ADMIN`
-   mediante actualización directa de MongoDB.
-8. Emitir invitación sólo cuando exista un enlace real y comprobado y la
-   promoción segura esté disponible. Comprobar aceptación de proveedor,
-   entrega cuando haya webhook validado, registro, autenticación, MFA,
-   alcance institucional y revocación.
-9. Verificar en una cuenta estudiante separada que no se filtra navegación ni
-   privilegios de Súper Admin. No reutilizar el QR Wi-Fi como asistencia.
+Una invitación por correo no concede roles. El nombre o coincidencia de una dirección tampoco concede privilegios. No enviar códigos, pruebas MFA, claves ni secretos por GitHub, logs o chat.
 
-## Señales de bloqueo
+## Estado operativo
 
-No se cumple el gate de envío si CI está pendiente, hay PR sin merge,
-un despliegue no está verificado, no hay usuario Hotmail verificado,
-el enlace de invitación no existe, no hay promoción segura en producción,
-o las concesiones de carrera no han pasado E2E con dos instituciones.
+- La credencial de MongoDB de Render está limitada a `companero_dev` y `/ready` confirmó conectividad.
+- El servicio QA de Render todavía existe y se debe borrar desde el dashboard.
+- El titular debe completar registro con la invitación recibida, contraseña actual y MFA. Aún no se ha concedido `SUPER_ADMIN`.
+- No registrar `SUPER_ADMIN` manualmente ni alterar contraseña, MFA o roles para adelantar el flujo.

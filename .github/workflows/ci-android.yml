@@ -238,7 +238,15 @@ jobs:
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
 
       - name: Prepare native emulator signal diagnostics
-        run: sudo apt-get install -y strace gdb
+        # The runner's apt mirror intermittently 404s on libc6-dbg (gdb
+        # dependency), which used to fail every instrumentation job before
+        # the emulator even started. Diagnostics are optional by design:
+        # run-v10-instrumentation.sh guards on `command -v strace`. Never
+        # let a missing diagnostic binary mask a real test result.
+        run: |
+          sudo apt-get install -y strace gdb \
+            || sudo apt-get install -y strace \
+            || echo "::warning::strace/gdb unavailable from apt; native crash diagnostics are degraded"
 
       - name: Enable KVM
         run: |

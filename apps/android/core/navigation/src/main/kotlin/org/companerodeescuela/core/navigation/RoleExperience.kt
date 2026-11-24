@@ -121,9 +121,7 @@ object RoleExperienceResolver {
                             TopLevelDestination.Schedule,
                         ),
                 )
-            AppExperience.ADMIN,
-            AppExperience.SUPER_ADMIN,
-            ->
+            AppExperience.ADMIN ->
                 RoleExperienceConfig(
                     experience = selected,
                     startDestination = Destination.AdminHome,
@@ -133,6 +131,18 @@ object RoleExperienceResolver {
                             TopLevelDestination.Schedule,
                             TopLevelDestination.Classrooms,
                             TopLevelDestination.Channel,
+                        ),
+                )
+            AppExperience.SUPER_ADMIN ->
+                RoleExperienceConfig(
+                    experience = selected,
+                    startDestination = Destination.AdminHome,
+                    topLevelDestinations =
+                        listOf(
+                            TopLevelDestination.AdminHome,
+                            TopLevelDestination.AdminAccounts,
+                            TopLevelDestination.AdminAcademic,
+                            TopLevelDestination.AdminHistory,
                         ),
                 )
             AppExperience.GUEST ->

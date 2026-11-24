@@ -117,18 +117,6 @@ if (firebaseConfigured) {
 validateApiBaseUrl("COMPANERO_API_BASE_URL", debugApiBaseUrl)
 validateApiBaseUrl("COMPANERO_RELEASE_API_BASE_URL", releaseApiBaseUrl, requireHttps = true)
 
-// QA registration APK is an intentionally separate Android app. This opt-in is only
-// supplied by the QA CI workflow; normal debug/release builds retain their IDs.
-val qaIsolatedApp = providers.environmentVariable("COMPANERO_QA_ISOLATED_APP").orElse("false").get()
-require(qaIsolatedApp in setOf("true", "false")) {
-    "COMPANERO_QA_ISOLATED_APP must be true or false"
-}
-if (qaIsolatedApp == "true") {
-    require(signingMode == "internal" && debugApiBaseUrl == "https://companero-qa-univ-v25.onrender.com/") {
-        "An isolated QA registration APK requires internal signing and the verified QA backend"
-    }
-}
-
 android {
     namespace = "org.companerodeescuela"
     compileSdk =
@@ -197,9 +185,6 @@ android {
     buildTypes {
         debug {
             isMinifyEnabled = false
-            if (qaIsolatedApp == "true") {
-                applicationIdSuffix = ".qa"
-            }
             buildConfigField("String", "API_BASE_URL", "\"$debugApiBaseUrl\"")
         }
         release {

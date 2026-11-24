@@ -133,7 +133,7 @@ class UniversalRegistrationRoutesTest {
         val env =
             mapOf(
                 "APP_ENV" to "PRODUCTION",
-                "MONGODB_DATABASE" to "companero_prod",
+                "MONGODB_DATABASE" to "companero_dev",
                 "PROD_OWNER_ISOLATION_CERTIFIED" to "true",
                 "OWNER_INVITE_EMAIL" to "owner@example.test",
                 "OWNER_INVITE_CODE_SHA256" to hash,
@@ -176,7 +176,7 @@ class UniversalRegistrationRoutesTest {
         val env =
             mapOf(
                 "APP_ENV" to " PRODUCTION ",
-                "MONGODB_DATABASE" to "companero_prod ",
+                "MONGODB_DATABASE" to "companero_dev ",
                 "PROD_OWNER_ISOLATION_CERTIFIED" to "true",
                 "OWNER_INVITE_EMAIL" to " OWNER@EXAMPLE.TEST ",
                 "OWNER_INVITE_CODE_SHA256" to " $digest ",
@@ -193,7 +193,7 @@ class UniversalRegistrationRoutesTest {
         }
     }
 
-    @Test fun `owner invitation does not consume its code when an existing unverified student identity blocks enrollment`() {
+    @Test fun `owner invitation converts only the matching pending student and preserves credentials`() {
         val code = "r".repeat(43)
         val digest =
             MessageDigest
@@ -204,7 +204,7 @@ class UniversalRegistrationRoutesTest {
         val env =
             mapOf(
                 "APP_ENV" to "production",
-                "MONGODB_DATABASE" to "companero_prod",
+                "MONGODB_DATABASE" to "companero_dev",
                 "PROD_OWNER_ISOLATION_CERTIFIED" to "true",
                 "OWNER_INVITE_EMAIL" to "owner@example.test",
                 "OWNER_INVITE_CODE_SHA256" to digest,
@@ -212,7 +212,35 @@ class UniversalRegistrationRoutesTest {
             )
 
         scenario(env) { f ->
+            register("owner@example.test", "STUDENT")
+            val wrongPassword =
+                post(
+                    "/auth/register",
+                    registrationBody(
+                        "owner@example.test",
+                        "OWNER_INVITED",
+                        ",\"ownerInvitationCode\":\"$code\"",
+                        password = "different-password",
+                    ),
+                )
+            assertEquals(HttpStatusCode.Conflict, wrongPassword.status)
+            assertTrue(
+                f.ownerInvitations.consume(
+                    digest,
+                    "owner@example.test",
+                    Instant.ofEpochSecond(expiresAt),
+                    f.clock.instant(),
+                    "wrong-password-probe",
+                ),
+                "A wrong existing-account password must leave the owner invitation unused",
+            )
+        }
+
+        scenario(env) { f ->
             val existing = register("owner@example.test", "STUDENT")
+            val storedBefore = assertNotNull(f.accounts.findByIdentifier("owner@example.test"))
+            val oldVerificationToken = assertNotNull(f.mail.tokens["owner@example.test"])
+            f.clock.advance(120)
             val response =
                 post(
                     "/auth/register",
@@ -222,21 +250,33 @@ class UniversalRegistrationRoutesTest {
                         ",\"ownerInvitationCode\":\"$code\"",
                     ),
                 )
-
-            assertEquals(HttpStatusCode.Conflict, response.status)
+            assertEquals(HttpStatusCode.Created, response.status, response.bodyAsText())
+            val converted = json.decodeFromString<ApiResponse<LoginResponse>>(response.bodyAsText()).data
             val stored = assertNotNull(f.accounts.findByIdentifier("owner@example.test"))
             assertEquals(existing.user.id, stored.id)
-            assertEquals(RegistrationAccountType.STUDENT, stored.registrationIntent?.profile)
+            assertEquals(storedBefore.passwordHash, stored.passwordHash)
+            assertEquals("QA User", stored.displayName)
+            assertEquals(RegistrationAccountType.OWNER_INVITED, stored.registrationIntent?.profile)
+            assertTrue(stored.roles.isEmpty())
             assertNull(stored.emailVerifiedAt)
+            assertEquals(AccountStatus.PENDING_VERIFICATION, stored.accountStatus)
+            assertEquals(1L, stored.authRevision)
+            assertEquals(RegistrationAccountType.STUDENT, stored.identityAudit.single().registrationProfileBefore)
+            assertEquals(RegistrationAccountType.OWNER_INVITED, stored.identityAudit.single().registrationProfileAfter)
+            assertEquals(HttpStatusCode.Unauthorized, confirmResponse(existing, oldVerificationToken).status)
+            val verified = confirm(converted, assertNotNull(f.mail.tokens["owner@example.test"]))
+            assertEquals(AccountStatus.ACTIVE, verified.user.accountStatus)
+            assertEquals(setOf(UserRole.WORKSHOP_PARTICIPANT), verified.user.roles)
+            assertFalse(UserRole.SUPER_ADMIN in verified.user.roles)
             assertTrue(
-                f.ownerInvitations.consume(
+                !f.ownerInvitations.consume(
                     digest,
                     "owner@example.test",
                     Instant.ofEpochSecond(expiresAt),
                     f.clock.instant(),
                     "collision-probe",
                 ),
-                "A duplicate-account rejection must happen before the one-time invitation is consumed",
+                "The invitation is consumed once and bound to the existing account identity",
             )
         }
     }
@@ -255,6 +295,59 @@ class UniversalRegistrationRoutesTest {
             assertEquals(HttpStatusCode.Forbidden, result.status)
             assertNull(f.accounts.findByIdentifier("owner@example.test"))
         }
+
+    @Test fun `owner invitation converts verified student without changing identity password role or verification`() {
+        val code = "v".repeat(43)
+        val digest =
+            MessageDigest
+                .getInstance("SHA-256")
+                .digest(code.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+        val expiresAt = Instant.now().epochSecond + 3600
+        val env =
+            mapOf(
+                "APP_ENV" to "production",
+                "MONGODB_DATABASE" to "companero_dev",
+                "PROD_OWNER_ISOLATION_CERTIFIED" to "true",
+                "OWNER_INVITE_EMAIL" to "owner@example.test",
+                "OWNER_INVITE_CODE_SHA256" to digest,
+                "OWNER_INVITE_EXPIRES_AT" to expiresAt.toString(),
+            )
+
+        scenario(env) { f ->
+            val pending = register("owner@example.test", "STUDENT")
+            val verified = confirm(pending, assertNotNull(f.mail.tokens["owner@example.test"]))
+            val before = assertNotNull(f.accounts.findById(verified.user.id))
+            val oldVerificationToken = f.mail.tokens["owner@example.test"]
+            f.clock.advance(61)
+
+            val response =
+                post(
+                    "/auth/register",
+                    registrationBody(
+                        "owner@example.test",
+                        "OWNER_INVITED",
+                        ",\"ownerInvitationCode\":\"$code\"",
+                    ),
+                )
+            assertEquals(HttpStatusCode.Created, response.status, response.bodyAsText())
+            val converted = json.decodeFromString<ApiResponse<LoginResponse>>(response.bodyAsText()).data
+            val after = assertNotNull(f.accounts.findById(verified.user.id))
+
+            assertEquals(before.id, after.id)
+            assertEquals(before.passwordHash, after.passwordHash)
+            assertEquals(before.roles, after.roles)
+            assertEquals(setOf(UserRole.STUDENT), after.roles)
+            assertEquals(before.emailVerifiedAt, after.emailVerifiedAt)
+            assertEquals(RegistrationAccountType.OWNER_INVITED, after.registrationIntent?.profile)
+            assertTrue(converted.user.emailVerified)
+            assertEquals(setOf(UserRole.STUDENT), converted.user.roles)
+            assertEquals(2L, after.authRevision)
+            assertEquals(HttpStatusCode.Unauthorized, get("/auth/me", verified).status)
+            assertEquals(oldVerificationToken, f.mail.tokens["owner@example.test"])
+            assertFalse(UserRole.SUPER_ADMIN in after.roles)
+        }
+    }
 
     @Test fun `public privileged profile and unknown requested institutions are rejected`() =
         scenario { _ ->
@@ -415,7 +508,8 @@ class UniversalRegistrationRoutesTest {
         email: String,
         profile: String = "STUDENT",
         extra: String = "",
-    ) = """{"displayName":"QA User","email":"$email","password":"test-password","accountType":"$profile"$extra}"""
+        password: String = "test-password",
+    ) = """{"displayName":"QA User","email":"$email","password":"$password","accountType":"$profile"$extra}"""
 
     private suspend fun ApplicationTestBuilder.register(
         email: String,

@@ -8,7 +8,8 @@ import android.content.ContextWrapper
 import android.view.WindowManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.FilterChip
@@ -17,6 +18,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,18 +36,41 @@ import org.companerodeescuela.core.ui.component.NoticeTone
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.VerificationDeliveryStatus
 
+private data class InvitationProfileOption(
+    val code: String,
+    val label: String,
+)
+
+private val INVITATION_PROFILES =
+    listOf(
+        InvitationProfileOption("INSTITUTION_ADMIN", "Administrador"),
+        InvitationProfileOption("TEACHER", "Docente"),
+        InvitationProfileOption("TUTOR", "Tutor"),
+        InvitationProfileOption("STUDENT", "Alumno"),
+    )
+
+@OptIn(ExperimentalLayoutApi::class)
 @Suppress("ktlint:standard:function-naming")
 @Composable
 fun InvitationIssueScreen(
     onBack: () -> Unit,
+    defaultInstitutionId: String? = null,
     viewModel: InvitationIssueViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var recipient by remember { mutableStateOf("") }
-    var institutionId by remember { mutableStateOf("") }
-    var profile by remember { mutableStateOf("STUDENT") }
+    var institutionId by remember(defaultInstitutionId) { mutableStateOf(defaultInstitutionId.orEmpty()) }
+    var profile by remember { mutableStateOf("TEACHER") }
     var password by remember { mutableStateOf("") }
     var otp by remember { mutableStateOf("") }
+    LaunchedEffect(state.institutions, defaultInstitutionId) {
+        if (institutionId.isBlank()) {
+            val matched =
+                defaultInstitutionId?.takeIf { id -> state.institutions.any { it.id == id } }
+                    ?: state.institutions.singleOrNull()?.id
+            if (matched != null) institutionId = matched
+        }
+    }
     val context = LocalView.current.context
     DisposableEffect(context) {
         val window = context.findActivity()?.window
@@ -57,9 +82,9 @@ fun InvitationIssueScreen(
         }
     }
     AuthV8Layout(themeAware = true) {
-        Text("Invitar persona", style = MaterialTheme.typography.headlineMedium, color = authInk())
+        Text("Invitar al equipo", style = MaterialTheme.typography.headlineMedium, color = authInk())
         Text(
-            "Envía una invitación desde tu cuenta autorizada. Se requiere MFA y el destinatario debe confirmar su correo.",
+            "Envía una invitación de un solo uso para docentes, administradores, tutores o alumnos de tu carrera. Requiere MFA y confirmación de correo.",
             color = authMuted(),
         )
         V8FrostedGlassPanel(Modifier.fillMaxWidth(), themeAware = true) {
@@ -75,6 +100,23 @@ fun InvitationIssueScreen(
                     singleLine = true,
                     enabled = !state.working,
                 )
+                if (state.institutions.isNotEmpty()) {
+                    Text("Institución / carrera conectada a SIII", color = authInk())
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        state.institutions.forEach { institution ->
+                            FilterChip(
+                                selected = institutionId == institution.id,
+                                onClick = { institutionId = institution.id },
+                                label = { Text(institution.displayName) },
+                                enabled = !state.working,
+                                modifier = Modifier.testTag("invite_institution_${institution.id}"),
+                            )
+                        }
+                    }
+                }
                 OutlinedTextField(
                     value = institutionId,
                     onValueChange = { institutionId = it.trim().take(128) },
@@ -83,14 +125,18 @@ fun InvitationIssueScreen(
                     singleLine = true,
                     enabled = !state.working,
                 )
-                Text("Perfil solicitado", color = authInk())
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("STUDENT", "TEACHER", "TUTOR").forEach { option ->
+                Text("Perfil que recibirá", color = authInk())
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    INVITATION_PROFILES.forEach { option ->
                         FilterChip(
-                            selected = profile == option,
-                            onClick = { profile = option },
-                            label = { Text(option.lowercase().replaceFirstChar { it.uppercase() }) },
+                            selected = profile == option.code,
+                            onClick = { profile = option.code },
+                            label = { Text(option.label) },
                             enabled = !state.working,
+                            modifier = Modifier.testTag("invite_profile_${option.code}"),
                         )
                     }
                 }
@@ -128,24 +174,46 @@ fun InvitationIssueScreen(
                     Modifier.testTag("invite_send"),
                     "Validando...",
                 )
-                state.failure?.let {
+                state.failureMessage?.let { detail ->
                     StatusNotice(
-                        title = "No se pudo enviar",
-                        message = it.userMessage,
+                        title = state.failureTitle ?: "No se pudo enviar",
+                        message = detail,
                         tone = NoticeTone.ERROR,
+                        modifier = Modifier.testTag("invite_error"),
                     )
                 }
-                state.delivery?.let {
-                    Text(
-                        when (it) {
-                            VerificationDeliveryStatus.ACCEPTED -> "Proveedor aceptó el correo; la entrega final debe verificarse."
-                            VerificationDeliveryStatus.DELIVERED -> "Correo entregado (confirmado por webhook firmado)."
-                            VerificationDeliveryStatus.UNCONFIRMED -> "No se confirmó la entrega del correo."
-                            VerificationDeliveryStatus.FAILED -> "Falló el envío."
-                            VerificationDeliveryStatus.UNAVAILABLE -> "El correo no está configurado."
-                            VerificationDeliveryStatus.PENDING -> "Entrega en proceso."
-                        },
-                        color = authMuted(),
+                state.delivery?.let { delivery ->
+                    val (tone, title, detail) =
+                        when (delivery) {
+                            VerificationDeliveryStatus.ACCEPTED ->
+                                Triple(
+                                    NoticeTone.SUCCESS,
+                                    "Invitación enviada",
+                                    "El proveedor aceptó el correo; la entrega final al buzón debe verificarse.",
+                                )
+                            VerificationDeliveryStatus.DELIVERED ->
+                                Triple(
+                                    NoticeTone.SUCCESS,
+                                    "Invitación entregada",
+                                    "Correo entregado y confirmado por webhook firmado.",
+                                )
+                            VerificationDeliveryStatus.UNCONFIRMED ->
+                                Triple(
+                                    NoticeTone.WARNING,
+                                    "Entrega sin confirmar",
+                                    "No se confirmó la entrega del correo. Puedes reintentar desde el historial.",
+                                )
+                            VerificationDeliveryStatus.FAILED ->
+                                Triple(NoticeTone.ERROR, "Falló el envío", "El proveedor rechazó el envío.")
+                            VerificationDeliveryStatus.UNAVAILABLE ->
+                                Triple(NoticeTone.ERROR, "Correo no disponible", "El servicio de correo no está configurado.")
+                            VerificationDeliveryStatus.PENDING ->
+                                Triple(NoticeTone.WARNING, "Entrega en proceso", "La invitación está en cola de envío.")
+                        }
+                    StatusNotice(
+                        title = title,
+                        message = detail,
+                        tone = tone,
                         modifier = Modifier.testTag("invite_delivery"),
                     )
                 }

@@ -2,16 +2,19 @@ package org.companerodeescuela.api.invitations
 
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.companerodeescuela.api.audit.InMemoryPlatformAuditLog
 import org.companerodeescuela.api.auth.AuthTokenService
 import org.companerodeescuela.api.auth.InMemoryPlatformAccountRepository
 import org.companerodeescuela.api.auth.InMemoryRefreshSessionRepository
@@ -50,7 +53,9 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class InvitationRoutesTest {
@@ -508,5 +513,184 @@ class InvitationRoutesTest {
                 }
             assertEquals(HttpStatusCode.OK, validAccept.status)
             assertEquals(setOf(UserRole.STUDENT), accounts.findById(recipient.id)?.roles)
+        }
+
+    @Test
+    fun `invitation list enforces strict bounds, no-store header, read rate limits, and PII-free audit trail`() =
+        testApplication {
+            val settings =
+                TestFixtures.settings().copy(
+                    environment = Environment.LOCAL,
+                    jwtSecret = "0123456789abcdef0123456789abcdef".toCharArray(),
+                    mfaEncryptionKey = ByteArray(32) { it.toByte() },
+                )
+            val accounts = InMemoryPlatformAccountRepository()
+            val sessions = InMemoryRefreshSessionRepository()
+            val invitations = InMemoryInvitationRepository()
+            val institutions = InMemoryInstitutionRepository(listOf(InstitutionSummary("UPTLAX", "UPTLAX")))
+            val identity = MockIdentityProvider()
+            val auditLog = InMemoryPlatformAuditLog()
+            val mfa = MfaService(accounts, InMemoryMfaRepository(), MfaSecretCipher(ByteArray(32) { it.toByte() }), clock)
+            val service =
+                InvitationDispatchService(
+                    accounts = accounts,
+                    mfa = mfa,
+                    repository = invitations,
+                    email = InvitationEmailGateway { _, _, _, _ -> VerificationDeliveryStatus.ACCEPTED },
+                    institutions = institutions,
+                    clock = clock,
+                )
+            val tokens = AuthTokenService(settings)
+
+            val owner =
+                PlatformAccount(
+                    id = "owner-audit-1",
+                    displayName = "Owner Audit",
+                    email = "owner.audit@example.test",
+                    passwordHash = "unused-hash",
+                    roles = setOf(UserRole.SUPER_ADMIN),
+                    accountStatus = AccountStatus.ACTIVE,
+                    emailVerifiedAt = now.minusSeconds(60),
+                    institutionId = "UPTLAX",
+                )
+            val recipient =
+                PlatformAccount(
+                    id = "student-audit-1",
+                    displayName = "Student Audit",
+                    email = "secret.recipient@example.test",
+                    passwordHash = "unused-hash",
+                    roles = setOf(UserRole.STUDENT),
+                    accountStatus = AccountStatus.ACTIVE,
+                    emailVerifiedAt = now.minusSeconds(60),
+                )
+            accounts.create(owner)
+            accounts.create(recipient)
+            val ownerUser = owner.toUserSummary()
+            val recipientUser = recipient.toUserSummary()
+            sessions.create(
+                RefreshSession(
+                    id = "session-owner-audit",
+                    tokenHash = "hash-owner-audit",
+                    user = ownerUser,
+                    createdAt = now,
+                    expiresAt = now.plusSeconds(3600),
+                    identitySource = SessionIdentitySource.NATIVE,
+                ),
+            )
+            sessions.create(
+                RefreshSession(
+                    id = "session-student-audit",
+                    tokenHash = "hash-student-audit",
+                    user = recipientUser,
+                    createdAt = now,
+                    expiresAt = now.plusSeconds(3600),
+                    identitySource = SessionIdentitySource.NATIVE,
+                ),
+            )
+
+            val secretToken = InvitationToken.generate()
+            val invitationId = InvitationToken.generate().value
+            assertTrue(
+                invitations.create(
+                    InvitationRecord(
+                        id = invitationId,
+                        recipient = "secret.recipient@example.test",
+                        institutionId = "UPTLAX",
+                        profile = InvitationProfile.TEACHER,
+                        issuerId = owner.id,
+                        createdAt = now,
+                        expiresAt = now.plusSeconds(3600),
+                        status = InvitationStatus.SENT,
+                        tokenHash = secretToken.hash,
+                    ),
+                ),
+            )
+
+            application {
+                configurePlugins(settings, sessions, PlatformSessionAuthority(accounts, identity))
+                routing {
+                    invitationRoutes(
+                        settings = settings,
+                        identity = identity,
+                        sessions = sessions,
+                        accounts = accounts,
+                        service = service,
+                        invitations = invitations,
+                        clock = clock,
+                        auditLog = auditLog,
+                    )
+                }
+            }
+
+            val ownerToken = tokens.issue(ownerUser, "session-owner-audit").value
+            val recipientToken = tokens.issue(recipientUser, "session-student-audit").value
+
+            // Invalid limits are rejected explicitly with 400 (consume 3 read tokens)
+            for (badLimit in listOf("0", "51", "abc")) {
+                val badResp =
+                    client.get("/admin/invitations?limit=$badLimit") {
+                        bearerAuth(ownerToken)
+                    }
+                assertEquals(HttpStatusCode.BadRequest, badResp.status, "Expected 400 for limit=$badLimit")
+                assertEquals("no-store", badResp.headers[HttpHeaders.CacheControl])
+            }
+
+            // Dotted X-Request-Id still succeeds cleanly without crashing PlatformAuditEvent validation
+            val filteredResp =
+                client.get("/admin/invitations?limit=10&institutionId=UPTLAX") {
+                    bearerAuth(ownerToken)
+                    header("X-Request-Id", "req.with.dots.123")
+                }
+            assertEquals(HttpStatusCode.OK, filteredResp.status)
+            assertEquals("no-store", filteredResp.headers[HttpHeaders.CacheControl])
+
+            // Failed mutations record STARTED + FAILED without leaking PII or raw tokens
+            val failedRevoke =
+                client.post("/admin/invitations/revoke") {
+                    bearerAuth(ownerToken)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"invitationId":"missing-inv-999"}""")
+                }
+            assertEquals(HttpStatusCode.BadRequest, failedRevoke.status)
+
+            val wrongToken = InvitationToken.generate().value
+            val failedAccept =
+                client.post("/auth/invitations/accept") {
+                    bearerAuth(recipientToken)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        Json.encodeToString(
+                            AcceptRegistrationInvitationRequest(invitationId, wrongToken, "accept-fail-op-1"),
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.BadRequest, failedAccept.status)
+
+            val events = auditLog.listRecent(limit = 50)
+            val listEvent = events.firstOrNull { it.action == "INVITATION_LIST" }
+            assertNotNull(listEvent)
+            assertEquals("INVITATION_DIRECTORY", listEvent.resourceType)
+            assertEquals("UPTLAX", listEvent.resourceId)
+            assertEquals("SUCCEEDED", listEvent.outcome)
+
+            assertTrue(events.any { it.action == "INVITATION_REVOKE" && it.outcome == "STARTED" })
+            assertTrue(events.any { it.action == "INVITATION_REVOKE" && it.outcome == "FAILED" })
+            assertTrue(events.any { it.action == "INVITATION_ACCEPT" && it.outcome == "STARTED" })
+            assertTrue(events.any { it.action == "INVITATION_ACCEPT" && it.outcome == "FAILED" })
+
+            // Zero PII or raw tokens in audit trail
+            val serializedAudit = events.joinToString("\n")
+            assertFalse(serializedAudit.contains("secret.recipient@example.test"))
+            assertFalse(serializedAudit.contains(secretToken.value))
+            assertFalse(serializedAudit.contains(wrongToken))
+
+            // Exhaust remaining 26 read tokens (4 already used) -> 31st call returns 429 with Retry-After
+            repeat(26) {
+                val ok = client.get("/admin/invitations?limit=1") { bearerAuth(ownerToken) }
+                assertEquals(HttpStatusCode.OK, ok.status)
+            }
+            val rateLimited = client.get("/admin/invitations?limit=1") { bearerAuth(ownerToken) }
+            assertEquals(HttpStatusCode.TooManyRequests, rateLimited.status)
+            assertNotNull(rateLimited.headers[HttpHeaders.RetryAfter])
         }
 }

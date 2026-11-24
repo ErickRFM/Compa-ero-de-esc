@@ -56,7 +56,7 @@ class AdminRepository(
     suspend fun auditLog(limit: Int = 50): Outcome<List<AdminAuditEntry>> = get("admin/audit?limit=${limit.coerceIn(1, 100)}")
 
     suspend fun invitations(limit: Int = 50): Outcome<List<RegistrationInvitationSummary>> =
-        get("admin/invitations?limit=${limit.coerceIn(1, 100)}")
+        get("admin/invitations?limit=${limit.coerceIn(1, 50)}")
 
     suspend fun prepareInvitationRetry(request: PrepareRegistrationInvitationRetryRequest): Outcome<RegistrationInvitationPreparation> =
         post("admin/invitations/retry/prepare", request)

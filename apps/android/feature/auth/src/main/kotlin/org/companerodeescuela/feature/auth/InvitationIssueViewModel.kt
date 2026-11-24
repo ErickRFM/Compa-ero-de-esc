@@ -31,7 +31,14 @@ data class InvitationIssueState(
     val failureStep: InvitationIssueStep? = null,
     val institutions: List<InstitutionSummary> = emptyList(),
     val institutionsLoading: Boolean = false,
+    val institutionsFailure: AppError? = null,
 ) {
+    val institutionsErrorMessage: String?
+        get() =
+            institutionsFailure?.let { err ->
+                val requestId = (err as? AppError.Http)?.requestId
+                if (requestId != null) "${err.userMessage}\nReferencia: $requestId" else err.userMessage
+            }
     val failureTitle: String?
         get() =
             if (failure == null) {
@@ -150,18 +157,22 @@ class InvitationIssueViewModel
 
         fun loadInstitutions() {
             if (mutable.value.institutionsLoading) return
-            mutable.value = mutable.value.copy(institutionsLoading = true)
+            mutable.value = mutable.value.copy(institutionsLoading = true, institutionsFailure = null)
             viewModelScope.launch {
-                val loaded =
-                    when (val result = auth.institutions()) {
-                        is Outcome.Success -> result.value
-                        is Outcome.Failure -> emptyList()
-                    }
                 mutable.value =
-                    mutable.value.copy(
-                        institutions = loaded,
-                        institutionsLoading = false,
-                    )
+                    when (val result = auth.institutions()) {
+                        is Outcome.Success ->
+                            mutable.value.copy(
+                                institutions = result.value,
+                                institutionsLoading = false,
+                                institutionsFailure = null,
+                            )
+                        is Outcome.Failure ->
+                            mutable.value.copy(
+                                institutionsLoading = false,
+                                institutionsFailure = result.error,
+                            )
+                    }
             }
         }
 

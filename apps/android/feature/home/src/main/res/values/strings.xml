@@ -90,6 +90,7 @@
 <string name="admin_confirm_revoke">Acción irreversible: vas a revocar permanentemente el acceso de %1$s y cerrar todas sus sesiones. Confirma con tu contraseña y código MFA.</string>
 <string name="admin_confirm_reactivate">Vas a reactivar la cuenta suspendida de %1$s. Confirma con tu contraseña y código MFA.</string>
 <string name="admin_confirm_revoke_assignment">Vas a revocar la asignación de tutoría de %1$s. Confirma con tu contraseña y código MFA.</string>
+<string name="admin_confirm_retry_invitation">Vas a generar un nuevo código de invitación y reenviar el correo a %1$s (el código anterior quedará invalidado). Confirma con tu contraseña y código MFA.</string>
 <string name="admin_role_super_admin">Súper Admin</string>
 <string name="admin_role_admin">Administrador</string>
 <string name="admin_role_coordinator">Coordinación</string>
@@ -103,6 +104,7 @@
 <string name="super_admin_invitations_title">Invitaciones enviadas</string>
 <string name="super_admin_invitations_empty">Aún no se han emitido invitaciones recientes.</string>
 <string name="super_admin_invitation_revoke">Revocar invitación</string>
+<string name="super_admin_invitation_retry">Reintentar envío</string>
 <string name="super_admin_invitation_revoke_confirm">¿Revocar la invitación enviada a %1$s? El código dejará de funcionar de inmediato.</string>
 <string name="super_admin_academic_title">Operación académica</string>
 <string name="super_admin_academic_description">Horarios, clases, canal de avisos, tutorías y estado de conexión con SIII.</string>

@@ -43,6 +43,21 @@ data class RegistrationInvitationDispatchReceipt(
 )
 
 @Serializable
+data class PrepareRegistrationInvitationRetryRequest(
+    val invitationId: String,
+    val operationId: String,
+)
+
+@Serializable
+data class RetryRegistrationInvitationRequest(
+    val invitationId: String,
+    val operationId: String,
+    val proof: String,
+) {
+    override fun toString() = "RetryRegistrationInvitationRequest(invitationId=$invitationId, operationId=$operationId, proof=[redacted])"
+}
+
+@Serializable
 data class RegistrationInvitationSummary(
     val invitationId: String,
     val recipient: String,
@@ -53,6 +68,10 @@ data class RegistrationInvitationSummary(
     val expiresAtEpochSeconds: Long,
     val acceptedAtEpochSeconds: Long? = null,
     val revokedAtEpochSeconds: Long? = null,
+    val deliveryStatus: String = "PENDING",
+    val deliveryUpdatedAtEpochSeconds: Long? = null,
+    val acceptedByAccountId: String? = null,
 ) {
-    override fun toString() = "RegistrationInvitationSummary(id=$invitationId, profile=$profile, status=$status)"
+    override fun toString() =
+        "RegistrationInvitationSummary(id=$invitationId, profile=$profile, status=$status, deliveryStatus=$deliveryStatus)"
 }

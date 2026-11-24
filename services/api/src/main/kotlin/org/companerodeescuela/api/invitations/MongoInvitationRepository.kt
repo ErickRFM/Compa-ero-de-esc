@@ -3,6 +3,7 @@ package org.companerodeescuela.api.invitations
 import com.mongodb.MongoWriteException
 import com.mongodb.client.model.Filters.and
 import com.mongodb.client.model.Filters.eq
+import com.mongodb.client.model.Filters.exists
 import com.mongodb.client.model.Filters.gt
 import com.mongodb.client.model.Filters.`in`
 import com.mongodb.client.model.Filters.lte
@@ -97,17 +98,52 @@ internal class MongoInvitationRepository(
         id: String,
         newTokenHash: String,
         now: Instant,
+        operationId: String?,
+    ): Boolean {
+        if (!newTokenHash.matches(Regex("[A-Za-z0-9_-]{43}"))) return false
+        val baseFilters =
+            mutableListOf(
+                eq("_id", id),
+                `in`("status", InvitationStatus.FAILED.name, InvitationStatus.SENT.name),
+                gt("expiresAt", Date.from(now)),
+            )
+        if (operationId != null) {
+            baseFilters += nin("retryOperations", operationId)
+        }
+        val updates =
+            mutableListOf(
+                Updates.set("status", InvitationStatus.SENT.name),
+                Updates.set("tokenHash", newTokenHash),
+                Updates.unset("deliveryStatus"),
+                Updates.unset("deliveryUpdatedAt"),
+                Updates.unset("deliveryEventAt"),
+                Updates.unset("deliveryEventType"),
+                Updates.unset("providerEmailId"),
+            )
+        if (operationId != null) {
+            updates += Updates.addToSet("retryOperations", operationId)
+        }
+        return try {
+            records.updateOne(and(baseFilters), Updates.combine(updates)).matchedCount == 1L
+        } catch (error: MongoWriteException) {
+            if (error.error.code == 11000) false else throw error
+        }
+    }
+
+    override suspend fun updateDeliveryStatus(
+        id: String,
+        deliveryStatus: String,
+        updatedAt: Instant,
     ): Boolean =
         records
             .updateOne(
                 and(
                     eq("_id", id),
-                    `in`("status", InvitationStatus.FAILED.name, InvitationStatus.SENT.name),
-                    gt("expiresAt", Date.from(now)),
+                    exists("deliveryEventAt", false),
                 ),
                 Updates.combine(
-                    Updates.set("status", InvitationStatus.SENT.name),
-                    Updates.set("tokenHash", newTokenHash),
+                    Updates.set("deliveryStatus", deliveryStatus),
+                    Updates.set("deliveryUpdatedAt", Date.from(updatedAt)),
                 ),
             ).matchedCount == 1L
 
@@ -176,6 +212,11 @@ internal class MongoInvitationRepository(
             .append("expiresAt", Date.from(expiresAt))
             .append("status", status.name)
             .append("tokenHash", tokenHash)
+            .also { doc ->
+                if (deliveryStatus != null) doc.append("deliveryStatus", deliveryStatus)
+                if (deliveryUpdatedAt != null) doc.append("deliveryUpdatedAt", Date.from(deliveryUpdatedAt))
+                if (retryOperations.isNotEmpty()) doc.append("retryOperations", retryOperations.toList())
+            }
 
     private fun Document.toInvitation(): InvitationRecord =
         InvitationRecord(
@@ -192,5 +233,8 @@ internal class MongoInvitationRepository(
             getString("acceptedOperation"),
             getDate("acceptedAt")?.toInstant(),
             getDate("revokedAt")?.toInstant(),
+            getString("deliveryStatus"),
+            (getDate("deliveryEventAt") ?: getDate("deliveryUpdatedAt"))?.toInstant(),
+            getList("retryOperations", String::class.java)?.toSet().orEmpty(),
         )
 }

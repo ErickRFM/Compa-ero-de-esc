@@ -187,9 +187,9 @@ fun InvitationIssueScreen(
                         when (delivery) {
                             VerificationDeliveryStatus.ACCEPTED ->
                                 Triple(
-                                    NoticeTone.SUCCESS,
-                                    "Invitación enviada",
-                                    "El proveedor aceptó el correo; la entrega final al buzón debe verificarse.",
+                                    NoticeTone.INFO,
+                                    "Aceptada por proveedor (entrega pendiente)",
+                                    "Resend aceptó la solicitud de envío; la entrega al buzón del destinatario aún debe confirmarse por webhook.",
                                 )
                             VerificationDeliveryStatus.DELIVERED ->
                                 Triple(

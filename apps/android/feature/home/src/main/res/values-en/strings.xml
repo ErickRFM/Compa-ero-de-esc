@@ -90,6 +90,7 @@
 <string name="admin_confirm_revoke">Irreversible action: you are permanently revoking access for %1$s and closing all sessions. Confirm with your password and MFA code.</string>
 <string name="admin_confirm_reactivate">You are reactivating the suspended account of %1$s. Confirm with your password and MFA code.</string>
 <string name="admin_confirm_revoke_assignment">You are revoking the tutor assignment for %1$s. Confirm with your password and MFA code.</string>
+<string name="admin_confirm_retry_invitation">You are rotating the invitation code and re-sending the email to %1$s (the previous code will be invalidated). Confirm with your password and MFA code.</string>
 <string name="admin_role_super_admin">Super Admin</string>
 <string name="admin_role_admin">Admin</string>
 <string name="admin_role_coordinator">Coordinator</string>
@@ -103,6 +104,7 @@
 <string name="super_admin_invitations_title">Sent invitations</string>
 <string name="super_admin_invitations_empty">No recent invitations have been issued yet.</string>
 <string name="super_admin_invitation_revoke">Revoke invitation</string>
+<string name="super_admin_invitation_retry">Retry send</string>
 <string name="super_admin_invitation_revoke_confirm">Revoke the invitation sent to %1$s? Its code will stop working immediately.</string>
 <string name="super_admin_academic_title">Academic operations</string>
 <string name="super_admin_academic_description">Schedules, classes, announcement channel, tutoring, and SIII connection status.</string>

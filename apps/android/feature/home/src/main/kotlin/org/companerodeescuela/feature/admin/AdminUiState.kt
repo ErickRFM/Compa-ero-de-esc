@@ -11,6 +11,7 @@ enum class AdminOperationKind {
     REVOKE_ACCOUNT,
     REACTIVATE_ACCOUNT,
     REVOKE_TUTOR_ASSIGNMENT,
+    RETRY_INVITATION,
     OTHER,
 }
 

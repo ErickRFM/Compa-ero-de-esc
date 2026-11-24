@@ -34,10 +34,12 @@ import org.companerodeescuela.shared.contracts.AcceptRegistrationInvitationReque
 import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.PrepareRegistrationInvitationRequest
+import org.companerodeescuela.shared.contracts.PrepareRegistrationInvitationRetryRequest
 import org.companerodeescuela.shared.contracts.RegistrationInvitationDispatchReceipt
 import org.companerodeescuela.shared.contracts.RegistrationInvitationPreparation
 import org.companerodeescuela.shared.contracts.RegistrationInvitationReceipt
 import org.companerodeescuela.shared.contracts.RegistrationInvitationSummary
+import org.companerodeescuela.shared.contracts.RetryRegistrationInvitationRequest
 import org.companerodeescuela.shared.contracts.UserRole
 import java.time.Clock
 import java.util.UUID
@@ -46,12 +48,6 @@ import java.util.UUID
  * One wire contract with Android (`shared/contracts/RegistrationInvitationContracts.kt`):
  * this route intentionally does not re-declare invitation payloads.
  */
-
-@Serializable
-internal data class InvitationRetryBody(
-    val invitationId: String,
-    val proof: String,
-)
 
 @Serializable
 internal data class InvitationRevokeBody(
@@ -88,7 +84,7 @@ internal fun Route.invitationRoutes(
         route("/admin/invitations") {
             get { throw ApiException.DependencyUnavailable(disabledMessage) }
             post { throw ApiException.DependencyUnavailable(disabledMessage) }
-            for (path in listOf("/prepare", "/retry", "/revoke")) {
+            for (path in listOf("/prepare", "/retry/prepare", "/retry", "/revoke")) {
                 post(path) { throw ApiException.DependencyUnavailable(disabledMessage) }
             }
         }
@@ -173,6 +169,9 @@ internal fun Route.invitationRoutes(
                                 expiresAtEpochSeconds = record.expiresAt.epochSecond,
                                 acceptedAtEpochSeconds = record.acceptedAt?.epochSecond,
                                 revokedAtEpochSeconds = record.revokedAt?.epochSecond,
+                                deliveryStatus = record.deliveryStatus ?: defaultDeliveryStatus(record.status),
+                                deliveryUpdatedAtEpochSeconds = record.deliveryUpdatedAt?.epochSecond,
+                                acceptedByAccountId = record.acceptedBy,
                             )
                         }
                 call.respond(ApiResponse(items, call.requestId()))
@@ -237,34 +236,61 @@ internal fun Route.invitationRoutes(
                     ),
                 )
             }
+            post("/retry/prepare") {
+                val actor = call.nativeActor()
+                issuerLimiter.acquire("prepare:" + actor.id, call.clientAddress())?.let {
+                    call.response.header(HttpHeaders.RetryAfter, it.toString())
+                    throw ApiException.RateLimited()
+                }
+                val body = call.boundedBody(PrepareRegistrationInvitationRetryRequest.serializer(), AUTH_BODY_MAX_BYTES)
+                val prepared = service.prepareRetry(actor, body.invitationId, body.operationId)
+                recordAudit(
+                    actor.id,
+                    "INVITATION_RETRY_PREPARE",
+                    "INVITATION",
+                    body.invitationId,
+                    prepared.operationId,
+                    "SUCCEEDED",
+                )
+                call.respond(
+                    ApiResponse(
+                        RegistrationInvitationPreparation(
+                            prepared.operationId,
+                            prepared.resourceId,
+                            prepared.payloadDigest,
+                        ),
+                        call.requestId(),
+                    ),
+                )
+            }
             post("/retry") {
                 val actor = call.nativeActor()
                 issuerLimiter.acquire("manage:" + actor.id, call.clientAddress())?.let {
                     call.response.header(HttpHeaders.RetryAfter, it.toString())
                     throw ApiException.RateLimited()
                 }
-                val body = call.boundedBody(InvitationRetryBody.serializer(), AUTH_BODY_MAX_BYTES)
+                val body = call.boundedBody(RetryRegistrationInvitationRequest.serializer(), AUTH_BODY_MAX_BYTES)
                 if (!Regex("[A-Za-z0-9_-]{43}").matches(body.invitationId) ||
+                    !Regex("[A-Za-z0-9_-]{8,128}").matches(body.operationId) ||
                     !Regex("[A-Za-z0-9_-]{43}").matches(body.proof)
                 ) {
-                    throw ApiException.Validation("Invitation or proof is invalid")
+                    throw ApiException.Validation("Invitation, operation, or proof is invalid")
                 }
-                val auditOperationId = UUID.randomUUID().toString()
                 recordAudit(
                     actor.id,
                     "INVITATION_RETRY",
                     "INVITATION",
                     body.invitationId,
-                    auditOperationId,
+                    body.operationId,
                     "STARTED",
                 )
-                val result = service.retry(actor, body.invitationId, body.proof)
+                val result = service.retry(actor, body.invitationId, body.operationId, body.proof)
                 recordAudit(
                     actor.id,
                     "INVITATION_RETRY",
                     "INVITATION",
                     result.invitationId,
-                    auditOperationId,
+                    body.operationId,
                     "SUCCEEDED",
                 )
                 call.respond(
@@ -358,3 +384,11 @@ internal fun Route.invitationRoutes(
         }
     }
 }
+
+private fun defaultDeliveryStatus(status: InvitationStatus): String =
+    when (status) {
+        InvitationStatus.FAILED -> "FAILED"
+        InvitationStatus.CREATED, InvitationStatus.SENT -> "PENDING"
+        InvitationStatus.ACCEPTED, InvitationStatus.ACTIVE -> "ACCEPTED"
+        InvitationStatus.EXPIRED, InvitationStatus.REVOKED -> "UNCONFIRMED"
+    }

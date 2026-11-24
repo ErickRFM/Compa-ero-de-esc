@@ -124,29 +124,15 @@ fun superAdminAccountsScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        val nowEpoch = Instant.now().epochSecond
         state.invitations.forEach { invitation ->
-            V8GlassCard(Modifier.fillMaxWidth().testTag("invitation_item_${invitation.invitationId}")) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(invitation.recipient, style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "${invitationProfileLabel(invitation.profile)} · ${invitationStatusLabel(invitation.status)}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        "${invitation.institutionId} · ${formatLocalDateTime(invitation.createdAtEpochSeconds)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (invitation.status == "SENT" || invitation.status == "CREATED") {
-                        TextButton(
-                            onClick = { revokeTarget = invitation },
-                            enabled = !state.working,
-                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                        ) { Text(stringResource(R.string.super_admin_invitation_revoke)) }
-                    }
-                }
-            }
+            invitationSummaryCard(
+                invitation = invitation,
+                nowEpochSeconds = nowEpoch,
+                working = state.working,
+                onRetry = { viewModel.prepareInvitationRetry(invitation.invitationId, invitation.recipient) },
+                onRevoke = { revokeTarget = invitation },
+            )
         }
         state.overview?.let { overview ->
             val pending =
@@ -364,13 +350,18 @@ fun superAdminHistoryScreen(
     viewModel: AdminViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    LaunchedEffect(viewModel) { viewModel.refreshAudit() }
+    LaunchedEffect(viewModel) {
+        viewModel.refreshAudit()
+        viewModel.refreshInvitations()
+    }
+    DisposableEffect(viewModel) { onDispose { viewModel.cancelOperation() } }
     var filter by rememberSaveable(state.ownerKey) { mutableStateOf(AuditFilter.ALL) }
+    var revokeTarget by remember(state.ownerKey) { mutableStateOf<RegistrationInvitationSummary?>(null) }
     val filtered =
         state.auditEntries.filter { entry ->
             when (filter) {
                 AuditFilter.ALL -> true
-                AuditFilter.INVITATIONS -> entry.action.startsWith("INVITATION")
+                AuditFilter.INVITATIONS -> entry.action.startsWith("INVITATION") || entry.action.startsWith("EMAIL_")
                 AuditFilter.ACCOUNTS -> entry.action.startsWith("ACCOUNT") || entry.action.startsWith("STAFF")
             }
         }
@@ -390,10 +381,20 @@ fun superAdminHistoryScreen(
             )
         }
         OutlinedButton(
-            onClick = { viewModel.refreshAudit() },
-            enabled = !state.auditLoading,
+            onClick = {
+                viewModel.refreshAudit()
+                viewModel.refreshInvitations()
+            },
+            enabled = !state.auditLoading && !state.invitationsLoading && !state.working,
             modifier = Modifier.testTag("super_admin_history_refresh"),
         ) { Text(stringResource(R.string.admin_refresh)) }
+        if (state.completedOperationId != null) {
+            StatusNotice(
+                title = stringResource(R.string.admin_done_title),
+                message = stringResource(R.string.admin_done),
+                tone = NoticeTone.SUCCESS,
+            )
+        }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(
                 selected = filter == AuditFilter.ALL,
@@ -410,6 +411,22 @@ fun superAdminHistoryScreen(
                 onClick = { filter = AuditFilter.ACCOUNTS },
                 label = { Text(stringResource(R.string.super_admin_history_accounts)) },
             )
+        }
+        if (filter != AuditFilter.ACCOUNTS) {
+            state.invitationsFailure?.let { adminFailure(it) }
+            if (state.invitations.isNotEmpty()) {
+                Text(stringResource(R.string.super_admin_invitations_title), style = MaterialTheme.typography.titleLarge)
+                val nowEpoch = Instant.now().epochSecond
+                state.invitations.forEach { invitation ->
+                    invitationSummaryCard(
+                        invitation = invitation,
+                        nowEpochSeconds = nowEpoch,
+                        working = state.working,
+                        onRetry = { viewModel.prepareInvitationRetry(invitation.invitationId, invitation.recipient) },
+                        onRevoke = { revokeTarget = invitation },
+                    )
+                }
+            }
         }
         if (state.auditLoading) CircularProgressIndicator(Modifier.testTag("super_admin_history_loading"))
         state.auditFailure?.let { adminFailure(it) }
@@ -447,7 +464,137 @@ fun superAdminHistoryScreen(
             }
         }
     }
+    revokeTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { revokeTarget = null },
+            title = { Text(stringResource(R.string.super_admin_invitation_revoke)) },
+            text = { Text(stringResource(R.string.super_admin_invitation_revoke_confirm, target.recipient)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.revokeInvitation(target.invitationId)
+                        revokeTarget = null
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) { Text(stringResource(R.string.super_admin_invitation_revoke)) }
+            },
+            dismissButton = { TextButton({ revokeTarget = null }) { Text(stringResource(R.string.admin_cancel)) } },
+        )
+    }
+    state.operation?.let { operation ->
+        protectedAdminDialog(operation, state.working, state.failure, viewModel::cancelOperation, viewModel::authorize)
+    }
 }
+
+@Composable
+internal fun invitationSummaryCard(
+    invitation: RegistrationInvitationSummary,
+    nowEpochSeconds: Long,
+    working: Boolean,
+    onRetry: () -> Unit,
+    onRevoke: () -> Unit,
+    onAuthorize: (() -> Unit)? = null,
+) {
+    val canRetry =
+        (invitation.status == "SENT" || invitation.status == "FAILED") &&
+            invitation.expiresAtEpochSeconds > nowEpochSeconds
+    val canRevoke = invitation.status == "SENT" || invitation.status == "CREATED"
+    val (deliveryTone, deliveryTitle, deliveryDetail) = invitationDeliveryPresentation(invitation.deliveryStatus)
+    V8GlassCard(Modifier.fillMaxWidth().testTag("invitation_item_${invitation.invitationId}")) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(invitation.recipient, style = MaterialTheme.typography.titleMedium)
+            Text(
+                "${invitationProfileLabel(invitation.profile)} · ${invitationStatusLabel(invitation.status)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "${invitation.institutionId} · ${formatLocalDateTime(invitation.createdAtEpochSeconds)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            StatusNotice(
+                title = deliveryTitle,
+                message = deliveryDetail,
+                tone = deliveryTone,
+                modifier = Modifier.testTag("invitation_delivery_${invitation.invitationId}"),
+            )
+            if (invitation.status == "ACCEPTED" && onAuthorize != null) {
+                V8RedPrimaryButton(
+                    text = "Autorizar perfil invitado",
+                    onClick = onAuthorize,
+                    enabled = !working,
+                    modifier = Modifier.fillMaxWidth().testTag("invitation_authorize_${invitation.invitationId}"),
+                )
+            }
+            if (canRetry || canRevoke) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    if (canRetry) {
+                        OutlinedButton(
+                            onClick = onRetry,
+                            enabled = !working,
+                            modifier = Modifier.testTag("invitation_retry_${invitation.invitationId}"),
+                        ) { Text(stringResource(R.string.super_admin_invitation_retry)) }
+                    }
+                    if (canRevoke) {
+                        TextButton(
+                            onClick = onRevoke,
+                            enabled = !working,
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                            modifier = Modifier.testTag("invitation_revoke_${invitation.invitationId}"),
+                        ) { Text(stringResource(R.string.super_admin_invitation_revoke)) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+internal fun invitationDeliveryPresentation(deliveryStatus: String): Triple<NoticeTone, String, String> =
+    when (deliveryStatus) {
+        "DELIVERED" ->
+            Triple(
+                NoticeTone.SUCCESS,
+                "Correo entregado al buzón",
+                "Entrega confirmada por webhook firmado del proveedor.",
+            )
+        "ACCEPTED" ->
+            Triple(
+                NoticeTone.INFO,
+                "Aceptado por proveedor (entrega pendiente)",
+                "El proveedor aceptó la solicitud de envío, pero aún no confirma la llegada al buzón del destinatario.",
+            )
+        "BOUNCED" ->
+            Triple(
+                NoticeTone.ERROR,
+                "Correo rebotado",
+                "El buzón de destino rechazó el mensaje. Verifica la dirección o reintenta el envío.",
+            )
+        "FAILED", "SUPPRESSED", "UNAVAILABLE" ->
+            Triple(
+                NoticeTone.ERROR,
+                "Envío fallido ($deliveryStatus)",
+                "El proveedor no pudo entregar el correo. Puedes reintentar con un código nuevo.",
+            )
+        "DELAYED" ->
+            Triple(
+                NoticeTone.WARNING,
+                "Entrega demorada",
+                "El proveedor reportó demora temporal en tránsito y continúa intentando entregar.",
+            )
+        "COMPLAINED" ->
+            Triple(
+                NoticeTone.WARNING,
+                "Reportado como spam",
+                "El destinatario marcó el correo como no deseado.",
+            )
+        else ->
+            Triple(
+                NoticeTone.WARNING,
+                "Entrega sin confirmar",
+                "Pendiente de confirmación de envío o webhook del proveedor.",
+            )
+    }
 
 @Composable
 private fun superAdminModuleTile(
@@ -493,7 +640,8 @@ private fun invitationStatusLabel(status: String): String =
     when (status) {
         "SENT" -> "Enviada"
         "CREATED" -> "Creada"
-        "ACCEPTED" -> "Aceptada"
+        "ACCEPTED" -> "Aceptada · pendiente de autorización"
+        "ACTIVE" -> "Autorizada y activa"
         "REVOKED" -> "Revocada"
         "EXPIRED" -> "Expirada"
         "FAILED" -> "Fallida"
@@ -504,12 +652,22 @@ private fun auditActionLabel(action: String): String =
     when (action) {
         "ACCOUNT_STAFF_APPROVAL" -> "Aprobación de personal"
         "ACCOUNT_STUDENT_AFFILIATION" -> "Afiliación escolar"
+        "ACCOUNT_INVITATION_AUTHORIZATION" -> "Autorización de invitación aceptada"
         "ACCOUNT_LIFECYCLE" -> "Cambio de estado de cuenta"
+        "INVITATION_LIST" -> "Consulta de invitaciones"
         "INVITATION_PREPARE" -> "Preparación de invitación"
         "INVITATION_DISPATCH", "INVITATION_SEND" -> "Envío de invitación"
+        "INVITATION_RETRY_PREPARE" -> "Preparación de reenvío"
         "INVITATION_RETRY" -> "Reenvío de invitación"
         "INVITATION_REVOKE" -> "Revocación de invitación"
         "INVITATION_ACCEPT" -> "Invitación aceptada"
+        "EMAIL_SENT" -> "Correo aceptado por proveedor"
+        "EMAIL_DELIVERED" -> "Correo entregado al buzón"
+        "EMAIL_DELIVERY_DELAYED" -> "Entrega de correo demorada"
+        "EMAIL_BOUNCED" -> "Correo rebotado"
+        "EMAIL_FAILED" -> "Fallo de envío de correo"
+        "EMAIL_SUPPRESSED" -> "Correo suprimido"
+        "EMAIL_COMPLAINED" -> "Reporte de spam"
         "INSTITUTION_PROVISION" -> "Alta institucional"
         "STAFF_APPLICATION_TEACHER" -> "Solicitud docente"
         "STAFF_APPLICATION_TUTOR" -> "Solicitud tutoría"

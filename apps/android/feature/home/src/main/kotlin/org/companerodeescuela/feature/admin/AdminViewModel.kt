@@ -19,8 +19,10 @@ import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkDigest
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkRequest
 import org.companerodeescuela.shared.contracts.MfaStepUpRequest
+import org.companerodeescuela.shared.contracts.PrepareRegistrationInvitationRetryRequest
 import org.companerodeescuela.shared.contracts.PrivilegedCommandDigests
 import org.companerodeescuela.shared.contracts.RegistrationAccountType
+import org.companerodeescuela.shared.contracts.RetryRegistrationInvitationRequest
 import org.companerodeescuela.shared.contracts.RevokeTutorAssignmentRequest
 import org.companerodeescuela.shared.contracts.StaffApplicationStatus
 import org.companerodeescuela.shared.contracts.StaffRole
@@ -101,6 +103,15 @@ class AdminViewModel
                 override val action = StepUpAction.MANAGE_ACADEMICS
                 override val digest get() = PrivilegedCommandDigests.tutorRevocation(target, body)
             }
+
+            data class InvitationRetry(
+                override val target: String,
+                override val operationId: String,
+                override val resourceId: String,
+                override val digest: String,
+            ) : Command {
+                override val action = StepUpAction.ADMIN_INVITE
+            }
         }
 
         init {
@@ -180,6 +191,7 @@ class AdminViewModel
                     is Command.Affiliation -> AdminOperationKind.AFFILIATE_STUDENT
                     is Command.IdentityLink -> AdminOperationKind.LINK_SIII
                     is Command.Revocation -> AdminOperationKind.REVOKE_TUTOR_ASSIGNMENT
+                    is Command.InvitationRetry -> AdminOperationKind.RETRY_INVITATION
                     is Command.Lifecycle ->
                         when (next.body.status) {
                             AccountStatus.SUSPENDED -> AdminOperationKind.SUSPEND_ACCOUNT
@@ -362,8 +374,14 @@ class AdminViewModel
             password: String,
             otp: String,
         ) {
-            if (!ready()) return
             val pending = command ?: return
+            val canExecute =
+                if (pending is Command.InvitationRetry) {
+                    !mutable.value.working && owner != null
+                } else {
+                    ready()
+                }
+            if (!canExecute) return
             val cached = proof?.takeIf { it.expiresAtEpochSeconds > clock.instant().epochSecond }
             if (cached == null && (password.length !in 1..128 || otp.length != 6 || otp.any { it !in '0'..'9' })) return invalid()
             val captured = generation
@@ -394,28 +412,48 @@ class AdminViewModel
                         return@launch
                     }
                     proof = actual
-                    val result =
+                    val result: Outcome<Any> =
                         when (pending) {
                             is Command.Affiliation -> repository.affiliateStudent(pending.target, pending.body.copy(proof = actual.proof))
                             is Command.IdentityLink -> repository.linkInstitutionalIdentity(pending.body.copy(proof = actual.proof))
                             is Command.Approval -> repository.approve(pending.target, pending.body.copy(proof = actual.proof))
                             is Command.Lifecycle -> repository.lifecycle(pending.target, pending.body.copy(proof = actual.proof))
                             is Command.Revocation -> repository.revokeAssignment(pending.target, pending.body.copy(proof = actual.proof))
+                            is Command.InvitationRetry ->
+                                repository.retryInvitation(
+                                    RetryRegistrationInvitationRequest(
+                                        invitationId = pending.target,
+                                        operationId = pending.operationId,
+                                        proof = actual.proof,
+                                    ),
+                                )
                         }
                     if (!current(captured, capturedOwner) || command !== pending) return@launch
                     when (result) {
                         is Outcome.Success -> {
                             command = null
                             proof = null
-                            mutable.value =
-                                mutable.value.copy(
-                                    loading = true,
-                                    working = false,
-                                    operation = null,
-                                    failure = null,
-                                    completedOperationId = pending.operationId,
-                                )
-                            refresh()
+                            if (pending is Command.InvitationRetry) {
+                                mutable.value =
+                                    mutable.value.copy(
+                                        working = false,
+                                        operation = null,
+                                        failure = null,
+                                        completedOperationId = pending.operationId,
+                                    )
+                                refreshInvitations()
+                                refreshAudit()
+                            } else {
+                                mutable.value =
+                                    mutable.value.copy(
+                                        loading = true,
+                                        working = false,
+                                        operation = null,
+                                        failure = null,
+                                        completedOperationId = pending.operationId,
+                                    )
+                                refresh()
+                            }
                         }
                         is Outcome.Failure -> {
                             // Keep evidence only for an uncertain transport/server result of this exact immutable command.
@@ -472,6 +510,45 @@ class AdminViewModel
                             )
                     }
             }
+        }
+
+        fun prepareInvitationRetry(
+            invitationId: String,
+            recipient: String,
+        ) {
+            val capturedOwner = owner ?: return
+            val captured = generation
+            if (mutable.value.working || command != null) return
+            val operationId = UUID.randomUUID().toString()
+            mutable.value = mutable.value.copy(working = true, invitationsFailure = null, failure = null, completedOperationId = null)
+            actionJob =
+                viewModelScope.launch {
+                    val prepared =
+                        repository.prepareInvitationRetry(
+                            PrepareRegistrationInvitationRetryRequest(
+                                invitationId = invitationId,
+                                operationId = operationId,
+                            ),
+                        )
+                    if (!current(captured, capturedOwner)) return@launch
+                    when (prepared) {
+                        is Outcome.Success -> {
+                            mutable.value = mutable.value.copy(working = false)
+                            prepare(
+                                Command.InvitationRetry(
+                                    target = invitationId,
+                                    operationId = prepared.value.operationId,
+                                    resourceId = prepared.value.resourceId,
+                                    digest = prepared.value.payloadDigest,
+                                ),
+                                recipient,
+                            )
+                        }
+                        is Outcome.Failure -> {
+                            mutable.value = mutable.value.copy(working = false, invitationsFailure = prepared.error)
+                        }
+                    }
+                }
         }
 
         fun revokeInvitation(invitationId: String) {

@@ -75,6 +75,7 @@ fun superAdminAccountsScreen(
     var linkTarget by remember(state.ownerKey) { mutableStateOf<AdminUserSummary?>(null) }
     var externalReference by remember(state.ownerKey, linkTarget?.user?.id) { mutableStateOf("") }
     var tutorSelection by remember(state.ownerKey) { mutableStateOf<Pair<AdminUserSummary, StaffApplication>?>(null) }
+    var invitedTutorTarget by remember(state.ownerKey) { mutableStateOf<RegistrationInvitationSummary?>(null) }
     var revokeTarget by remember(state.ownerKey) { mutableStateOf<RegistrationInvitationSummary?>(null) }
 
     Column(
@@ -132,6 +133,18 @@ fun superAdminAccountsScreen(
                 working = state.working,
                 onRetry = { viewModel.prepareInvitationRetry(invitation.invitationId, invitation.recipient) },
                 onRevoke = { revokeTarget = invitation },
+                onAuthorize =
+                    if (invitation.status == "ACCEPTED" && invitation.acceptedByAccountId != null) {
+                        {
+                            if (invitation.profile == "TUTOR") {
+                                invitedTutorTarget = invitation
+                            } else {
+                                viewModel.prepareInvitationAuthorization(invitation)
+                            }
+                        }
+                    } else {
+                        null
+                    },
             )
         }
         state.overview?.let { overview ->
@@ -236,6 +249,17 @@ fun superAdminAccountsScreen(
             { ids, days ->
                 tutorSelection = null
                 viewModel.prepareApprovalWithValidity(user.user.id, application.id, ids, days)
+            },
+        )
+    }
+    invitedTutorTarget?.let { targetInvite ->
+        tutorApprovalDialog(
+            state.groups.filter { it.institutionId == targetInvite.institutionId },
+            state.groupFailure,
+            { invitedTutorTarget = null },
+            { ids, days ->
+                invitedTutorTarget = null
+                viewModel.prepareInvitationAuthorization(targetInvite, ids, days)
             },
         )
     }
@@ -351,12 +375,14 @@ fun superAdminHistoryScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(viewModel) {
+        viewModel.refresh()
         viewModel.refreshAudit()
         viewModel.refreshInvitations()
     }
     DisposableEffect(viewModel) { onDispose { viewModel.cancelOperation() } }
     var filter by rememberSaveable(state.ownerKey) { mutableStateOf(AuditFilter.ALL) }
     var revokeTarget by remember(state.ownerKey) { mutableStateOf<RegistrationInvitationSummary?>(null) }
+    var invitedTutorTarget by remember(state.ownerKey) { mutableStateOf<RegistrationInvitationSummary?>(null) }
     val filtered =
         state.auditEntries.filter { entry ->
             when (filter) {
@@ -424,6 +450,18 @@ fun superAdminHistoryScreen(
                         working = state.working,
                         onRetry = { viewModel.prepareInvitationRetry(invitation.invitationId, invitation.recipient) },
                         onRevoke = { revokeTarget = invitation },
+                        onAuthorize =
+                            if (invitation.status == "ACCEPTED" && invitation.acceptedByAccountId != null) {
+                                {
+                                    if (invitation.profile == "TUTOR") {
+                                        invitedTutorTarget = invitation
+                                    } else {
+                                        viewModel.prepareInvitationAuthorization(invitation)
+                                    }
+                                }
+                            } else {
+                                null
+                            },
                     )
                 }
             }
@@ -479,6 +517,17 @@ fun superAdminHistoryScreen(
                 ) { Text(stringResource(R.string.super_admin_invitation_revoke)) }
             },
             dismissButton = { TextButton({ revokeTarget = null }) { Text(stringResource(R.string.admin_cancel)) } },
+        )
+    }
+    invitedTutorTarget?.let { targetInvite ->
+        tutorApprovalDialog(
+            state.groups.filter { it.institutionId == targetInvite.institutionId },
+            state.groupFailure,
+            { invitedTutorTarget = null },
+            { ids, days ->
+                invitedTutorTarget = null
+                viewModel.prepareInvitationAuthorization(targetInvite, ids, days)
+            },
         )
     }
     state.operation?.let { operation ->

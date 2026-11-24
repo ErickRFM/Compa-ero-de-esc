@@ -91,6 +91,7 @@
 <string name="admin_confirm_reactivate">Vas a reactivar la cuenta suspendida de %1$s. Confirma con tu contraseña y código MFA.</string>
 <string name="admin_confirm_revoke_assignment">Vas a revocar la asignación de tutoría de %1$s. Confirma con tu contraseña y código MFA.</string>
 <string name="admin_confirm_retry_invitation">Vas a generar un nuevo código de invitación y reenviar el correo a %1$s (el código anterior quedará invalidado). Confirma con tu contraseña y código MFA.</string>
+<string name="admin_confirm_authorize_invitation">Vas a autorizar el perfil institucional invitado para %1$s. Confirma con tu contraseña y código MFA.</string>
 <string name="admin_role_super_admin">Súper Admin</string>
 <string name="admin_role_admin">Administrador</string>
 <string name="admin_role_coordinator">Coordinación</string>

@@ -743,6 +743,7 @@ private fun operationDescriptionResource(kind: AdminOperationKind): Int =
         AdminOperationKind.REACTIVATE_ACCOUNT -> R.string.admin_confirm_reactivate
         AdminOperationKind.REVOKE_TUTOR_ASSIGNMENT -> R.string.admin_confirm_revoke_assignment
         AdminOperationKind.RETRY_INVITATION -> R.string.admin_confirm_retry_invitation
+        AdminOperationKind.AUTHORIZE_INVITATION -> R.string.admin_confirm_authorize_invitation
         AdminOperationKind.OTHER -> R.string.admin_confirm_description
     }
 

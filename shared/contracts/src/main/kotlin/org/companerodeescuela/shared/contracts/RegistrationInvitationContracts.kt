@@ -58,6 +58,21 @@ data class RetryRegistrationInvitationRequest(
 }
 
 @Serializable
+data class AuthorizeRegistrationInvitationRequest(
+    val operationId: String,
+    val invitationId: String,
+    val expectedAuthRevision: Long,
+    val institutionId: String,
+    val profile: String,
+    val capabilities: Set<AdminCapability> = emptySet(),
+    val tutorScopes: List<TutorApprovalScope> = emptyList(),
+    val proof: String,
+) {
+    override fun toString() =
+        "AuthorizeRegistrationInvitationRequest(operationId=$operationId, invitationId=$invitationId, profile=$profile, proof=[redacted])"
+}
+
+@Serializable
 data class RegistrationInvitationSummary(
     val invitationId: String,
     val recipient: String,

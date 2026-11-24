@@ -189,6 +189,12 @@ fun Application.module(
         }
     val institutionalPushService =
         institutionalPushRepository?.let { repository -> InstitutionalPushService(repository) }
+    val invitationRepository =
+        if (settings.hasAuthentication && settings.mongo.isConfigured) {
+            MongoInvitationRepository(mongoConnection.database())
+        } else {
+            InMemoryInvitationRepository()
+        }
     val administrationService =
         AccountAdministrationService(
             identityGraph.accounts,
@@ -196,6 +202,7 @@ fun Application.module(
             academicGraph.groupRepository,
             academicGraph.tutoringService,
             identityGraph.mfa,
+            invitations = invitationRepository,
         )
     val institutionalIdentityLinkRepository =
         if (settings.hasAuthentication && settings.mongo.isConfigured) {
@@ -418,12 +425,6 @@ fun Application.module(
             MongoPlatformAuditLog(mongoConnection.database())
         } else {
             InMemoryPlatformAuditLog()
-        }
-    val invitationRepository =
-        if (settings.hasAuthentication && settings.mongo.isConfigured) {
-            MongoInvitationRepository(mongoConnection.database())
-        } else {
-            InMemoryInvitationRepository()
         }
     val invitationOutbox =
         if (settings.hasAuthentication && settings.mongo.isConfigured && settings.mfaEncryptionKey != null) {

@@ -21,6 +21,7 @@ import org.companerodeescuela.shared.contracts.AdministrationOverview
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.ApproveStaffRequest
 import org.companerodeescuela.shared.contracts.ApproveStudentAffiliationRequest
+import org.companerodeescuela.shared.contracts.AuthorizeRegistrationInvitationRequest
 import org.companerodeescuela.shared.contracts.InstitutionSummary
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkRequest
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkSummary
@@ -62,6 +63,9 @@ class AdminRepository(
 
     suspend fun retryInvitation(request: RetryRegistrationInvitationRequest): Outcome<RegistrationInvitationDispatchReceipt> =
         post("admin/invitations/retry", request)
+
+    suspend fun authorizeInvitation(request: AuthorizeRegistrationInvitationRequest): Outcome<AdminUserSummary> =
+        post("admin/accounts/invitation-authorization", request)
 
     suspend fun revokeInvitation(invitationId: String): Outcome<RegistrationInvitationReceipt> =
         post("admin/invitations/revoke", mapOf("invitationId" to invitationId))

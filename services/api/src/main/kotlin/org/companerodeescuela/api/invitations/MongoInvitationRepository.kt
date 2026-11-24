@@ -147,6 +147,21 @@ internal class MongoInvitationRepository(
                 ),
             ).matchedCount == 1L
 
+    override suspend fun markAuthorized(
+        id: String,
+        now: Instant,
+    ): Boolean =
+        records
+            .updateOne(
+                and(
+                    eq("_id", id),
+                    lte("createdAt", Date.from(now)),
+                    eq("status", InvitationStatus.ACCEPTED.name),
+                    exists("acceptedBy", true),
+                ),
+                Updates.set("status", InvitationStatus.ACTIVE.name),
+            ).matchedCount == 1L
+
     override suspend fun accept(
         id: String,
         tokenHash: String,

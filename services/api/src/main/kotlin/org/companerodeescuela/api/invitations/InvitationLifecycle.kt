@@ -145,6 +145,11 @@ internal interface InvitationRepository {
         updatedAt: Instant,
     ): Boolean = false
 
+    suspend fun markAuthorized(
+        id: String,
+        now: Instant,
+    ): Boolean = false
+
     suspend fun listRecent(
         limit: Int = 50,
         institutionId: String? = null,
@@ -254,6 +259,23 @@ internal class InMemoryInvitationRepository : InvitationRepository {
                     deliveryStatus = deliveryStatus,
                     deliveryUpdatedAt = timestamp,
                 )
+            true
+        }
+
+    override suspend fun markAuthorized(
+        id: String,
+        now: Instant,
+    ): Boolean =
+        mutex.withLock {
+            val current = records[id] ?: return@withLock false
+            val timestamp = now.truncatedTo(ChronoUnit.MILLIS)
+            if (timestamp < current.createdAt ||
+                current.status != InvitationStatus.ACCEPTED ||
+                current.acceptedBy.isNullOrBlank()
+            ) {
+                return@withLock false
+            }
+            records[id] = current.copy(status = InvitationStatus.ACTIVE)
             true
         }
 

@@ -91,6 +91,7 @@
 <string name="admin_confirm_reactivate">You are reactivating the suspended account of %1$s. Confirm with your password and MFA code.</string>
 <string name="admin_confirm_revoke_assignment">You are revoking the tutor assignment for %1$s. Confirm with your password and MFA code.</string>
 <string name="admin_confirm_retry_invitation">You are rotating the invitation code and re-sending the email to %1$s (the previous code will be invalidated). Confirm with your password and MFA code.</string>
+<string name="admin_confirm_authorize_invitation">You are authorizing the invited institutional profile for %1$s. Confirm with your password and MFA code.</string>
 <string name="admin_role_super_admin">Super Admin</string>
 <string name="admin_role_admin">Admin</string>
 <string name="admin_role_coordinator">Coordinator</string>

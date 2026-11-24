@@ -33,22 +33,26 @@ internal class MongoInvitationRepository(
 
     private suspend fun ensureIndexes() {
         if (indexesReady) return
-        records.createIndex(
-            Indexes.ascending("tokenHash"),
-            IndexOptions().name("invitation_tokenHash_unique").unique(true),
-        )
-        records.createIndex(
-            Indexes.descending("createdAt"),
-            IndexOptions().name("invitation_createdAt_desc_idx"),
-        )
-        records.createIndex(
-            Indexes.compoundIndex(Indexes.ascending("institutionId"), Indexes.descending("createdAt")),
-            IndexOptions().name("invitation_institution_createdAt_idx"),
-        )
-        records.createIndex(
-            Indexes.ascending("status", "expiresAt"),
-            IndexOptions().name("invitation_status_expiresAt_idx"),
-        )
+        try {
+            records.createIndex(
+                Indexes.ascending("tokenHash"),
+                IndexOptions().name("invitation_tokenHash_unique").unique(true),
+            )
+            records.createIndex(
+                Indexes.descending("createdAt"),
+                IndexOptions().name("invitation_createdAt_desc_idx"),
+            )
+            records.createIndex(
+                Indexes.compoundIndex(Indexes.ascending("institutionId"), Indexes.descending("createdAt")),
+                IndexOptions().name("invitation_institution_createdAt_idx"),
+            )
+            records.createIndex(
+                Indexes.ascending("status", "expiresAt"),
+                IndexOptions().name("invitation_status_expiresAt_idx"),
+            )
+        } catch (_: com.mongodb.MongoCommandException) {
+            // Indexes already exist; safe to ignore
+        }
         indexesReady = true
     }
 

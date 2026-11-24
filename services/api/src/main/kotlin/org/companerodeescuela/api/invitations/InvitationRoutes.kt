@@ -13,6 +13,7 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 import org.companerodeescuela.api.audit.PlatformAuditEvent
 import org.companerodeescuela.api.audit.PlatformAuditLog
@@ -96,8 +97,10 @@ internal fun Route.invitationRoutes(
     val resolver = NativeActorResolver(accounts, sessions, AuthTokenService(settings), identity)
     // A single invitation uses prepare and dispatch: keep independent abuse buckets.
     val issuerLimiter = LoginAttemptLimiter(maxAttempts = 5, store = rateLimitStore)
+    val readLimiter = LoginAttemptLimiter(maxAttempts = 30, store = rateLimitStore)
     val acceptanceLimiter = LoginAttemptLimiter(maxAttempts = 10, store = rateLimitStore)
     val acceptance = InvitationAcceptanceService(accounts, invitations, clock)
+    val auditOperationPattern = Regex("[A-Za-z0-9_-]{1,128}")
 
     suspend fun recordAudit(
         actorId: String,
@@ -120,10 +123,37 @@ internal fun Route.invitationRoutes(
         )
     }
 
+    suspend fun <T> auditedMutation(
+        actorId: String,
+        action: String,
+        startResourceType: String,
+        startResourceId: String,
+        operationId: String,
+        successResourceType: String = startResourceType,
+        successResourceId: (T) -> String = { startResourceId },
+        block: suspend () -> T,
+    ): T {
+        recordAudit(actorId, action, startResourceType, startResourceId, operationId, "STARTED")
+        val result =
+            try {
+                block()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Throwable) {
+                recordAudit(actorId, action, startResourceType, startResourceId, operationId, "FAILED")
+                throw failure
+            }
+        recordAudit(actorId, action, successResourceType, successResourceId(result), operationId, "SUCCEEDED")
+        return result
+    }
+
     suspend fun ApplicationCall.nativeActor() =
-        resolver.resolve(
-            principal<JWTPrincipal>()?.payload ?: throw ApiException.Unauthorized(),
-        )
+        resolver
+            .resolve(
+                principal<JWTPrincipal>()?.payload ?: throw ApiException.Unauthorized(),
+            ).also {
+                response.header(HttpHeaders.CacheControl, "no-store")
+            }
 
     fun toCommand(body: PrepareRegistrationInvitationRequest): InvitationDispatchCommand {
         val profile =
@@ -138,14 +168,26 @@ internal fun Route.invitationRoutes(
                 val actor = call.nativeActor()
                 if (actor.accountStatus != AccountStatus.ACTIVE ||
                     actor.emailVerifiedAt == null ||
+                    actor.emailVerifiedAt > clock.instant() ||
                     UserRole.SUPER_ADMIN !in actor.roles
                 ) {
                     throw ApiException.Forbidden("Verified super administrator is required to list invitations")
                 }
+                readLimiter.acquire("read:" + actor.id, call.clientAddress())?.let {
+                    call.response.header(HttpHeaders.RetryAfter, it.toString())
+                    throw ApiException.RateLimited()
+                }
+                val rawLimit = call.request.queryParameters["limit"]?.trim()
                 val limit =
-                    call.request.queryParameters["limit"]
-                        ?.toIntOrNull()
-                        ?.coerceIn(1, 100) ?: 50
+                    if (rawLimit.isNullOrEmpty()) {
+                        50
+                    } else {
+                        val parsed = rawLimit.toIntOrNull()
+                        if (parsed == null || parsed !in 1..50) {
+                            throw ApiException.Validation("Invitation limit must be between 1 and 50")
+                        }
+                        parsed
+                    }
                 val institutionId =
                     call.request.queryParameters["institutionId"]
                         ?.trim()
@@ -174,6 +216,16 @@ internal fun Route.invitationRoutes(
                                 acceptedByAccountId = record.acceptedBy,
                             )
                         }
+                val readOperationId =
+                    call.requestId()?.takeIf { auditOperationPattern.matches(it) } ?: UUID.randomUUID().toString()
+                recordAudit(
+                    actor.id,
+                    "INVITATION_LIST",
+                    "INVITATION_DIRECTORY",
+                    institutionId ?: "ALL",
+                    readOperationId,
+                    "SUCCEEDED",
+                )
                 call.respond(ApiResponse(items, call.requestId()))
             }
             post("/prepare") {
@@ -210,24 +262,23 @@ internal fun Route.invitationRoutes(
                     throw ApiException.RateLimited()
                 }
                 val body = call.boundedBody(PrepareRegistrationInvitationRequest.serializer(), AUTH_BODY_MAX_BYTES)
+                if (!Regex("[A-Za-z0-9_-]{8,128}").matches(body.operationId)) {
+                    throw ApiException.Validation("Operation identifier is invalid")
+                }
                 val proof = body.proof ?: throw ApiException.Forbidden("Scoped MFA proof is required")
-                recordAudit(
-                    actor.id,
-                    "INVITATION_DISPATCH",
-                    "INVITATION_OPERATION",
-                    body.operationId,
-                    body.operationId,
-                    "STARTED",
-                )
-                val result = service.dispatch(actor, toCommand(body), proof)
-                recordAudit(
-                    actor.id,
-                    "INVITATION_DISPATCH",
-                    "INVITATION",
-                    result.invitationId,
-                    body.operationId,
-                    "SUCCEEDED",
-                )
+                val command = toCommand(body)
+                val result =
+                    auditedMutation(
+                        actorId = actor.id,
+                        action = "INVITATION_DISPATCH",
+                        startResourceType = "INVITATION_OPERATION",
+                        startResourceId = body.operationId,
+                        operationId = body.operationId,
+                        successResourceType = "INVITATION",
+                        successResourceId = { it.invitationId },
+                    ) {
+                        service.dispatch(actor, command, proof)
+                    }
                 call.respond(
                     HttpStatusCode.Created,
                     ApiResponse(
@@ -276,23 +327,17 @@ internal fun Route.invitationRoutes(
                 ) {
                     throw ApiException.Validation("Invitation, operation, or proof is invalid")
                 }
-                recordAudit(
-                    actor.id,
-                    "INVITATION_RETRY",
-                    "INVITATION",
-                    body.invitationId,
-                    body.operationId,
-                    "STARTED",
-                )
-                val result = service.retry(actor, body.invitationId, body.operationId, body.proof)
-                recordAudit(
-                    actor.id,
-                    "INVITATION_RETRY",
-                    "INVITATION",
-                    result.invitationId,
-                    body.operationId,
-                    "SUCCEEDED",
-                )
+                val result =
+                    auditedMutation(
+                        actorId = actor.id,
+                        action = "INVITATION_RETRY",
+                        startResourceType = "INVITATION",
+                        startResourceId = body.invitationId,
+                        operationId = body.operationId,
+                        successResourceId = { it.invitationId },
+                    ) {
+                        service.retry(actor, body.invitationId, body.operationId, body.proof)
+                    }
                 call.respond(
                     ApiResponse(
                         RegistrationInvitationDispatchReceipt(result.invitationId, result.delivery, result.expiresAtEpochSeconds),
@@ -318,24 +363,16 @@ internal fun Route.invitationRoutes(
                     throw ApiException.Validation("Invitation is invalid")
                 }
                 val auditOperationId = UUID.randomUUID().toString()
-                recordAudit(
-                    actor.id,
-                    "INVITATION_REVOKE",
-                    "INVITATION",
-                    body.invitationId,
-                    auditOperationId,
-                    "STARTED",
-                )
-                val revoked = invitations.revoke(body.invitationId, clock.instant())
-                if (!revoked) throw ApiException.Validation("Invitation cannot be revoked")
-                recordAudit(
-                    actor.id,
-                    "INVITATION_REVOKE",
-                    "INVITATION",
-                    body.invitationId,
-                    auditOperationId,
-                    "SUCCEEDED",
-                )
+                auditedMutation(
+                    actorId = actor.id,
+                    action = "INVITATION_REVOKE",
+                    startResourceType = "INVITATION",
+                    startResourceId = body.invitationId,
+                    operationId = auditOperationId,
+                ) {
+                    val revoked = invitations.revoke(body.invitationId, clock.instant())
+                    if (!revoked) throw ApiException.Validation("Invitation cannot be revoked")
+                }
                 call.respond(
                     ApiResponse(
                         RegistrationInvitationReceipt(body.invitationId, "REVOKED"),
@@ -363,23 +400,17 @@ internal fun Route.invitationRoutes(
             ) {
                 throw ApiException.Validation("Invitation is invalid or unavailable")
             }
-            recordAudit(
-                actor.id,
-                "INVITATION_ACCEPT",
-                "INVITATION",
-                body.invitationId,
-                body.operationId,
-                "STARTED",
-            )
-            val accepted = acceptance.accept(actor, body.invitationId, body.code, body.operationId)
-            recordAudit(
-                actor.id,
-                "INVITATION_ACCEPT",
-                "INVITATION",
-                accepted.invitationId,
-                body.operationId,
-                "SUCCEEDED",
-            )
+            val accepted =
+                auditedMutation(
+                    actorId = actor.id,
+                    action = "INVITATION_ACCEPT",
+                    startResourceType = "INVITATION",
+                    startResourceId = body.invitationId,
+                    operationId = body.operationId,
+                    successResourceId = { it.invitationId },
+                ) {
+                    acceptance.accept(actor, body.invitationId, body.code, body.operationId)
+                }
             call.respond(ApiResponse(RegistrationInvitationReceipt(accepted.invitationId, accepted.status.name), call.requestId()))
         }
     }

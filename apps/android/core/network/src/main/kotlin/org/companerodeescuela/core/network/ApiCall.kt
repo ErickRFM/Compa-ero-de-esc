@@ -13,8 +13,8 @@ import org.companerodeescuela.shared.contracts.ApiError
 /**
  * Unifies HTTP and transport failures. Never render untrusted server error text.
  */
-suspend fun <T> apiCall(block: suspend () -> Outcome<T>): Outcome<T> {
-    return try {
+suspend fun <T> apiCall(block: suspend () -> Outcome<T>): Outcome<T> =
+    try {
         block()
     } catch (e: kotlinx.coroutines.CancellationException) {
         throw e
@@ -31,7 +31,6 @@ suspend fun <T> apiCall(block: suspend () -> Outcome<T>): Outcome<T> {
     } catch (e: Exception) {
         Outcome.Failure(AppError.Unknown(e.message))
     }
-}
 
 /** Only preserve bounded printable server correlation IDs. */
 @PublishedApi

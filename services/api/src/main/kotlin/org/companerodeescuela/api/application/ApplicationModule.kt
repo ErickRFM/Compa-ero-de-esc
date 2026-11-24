@@ -189,6 +189,12 @@ fun Application.module(
         }
     val institutionalPushService =
         institutionalPushRepository?.let { repository -> InstitutionalPushService(repository) }
+    val invitationRepository =
+        if (settings.hasAuthentication && settings.mongo.isConfigured) {
+            MongoInvitationRepository(mongoConnection.database())
+        } else {
+            InMemoryInvitationRepository()
+        }
     val administrationService =
         AccountAdministrationService(
             identityGraph.accounts,
@@ -196,6 +202,7 @@ fun Application.module(
             academicGraph.groupRepository,
             academicGraph.tutoringService,
             identityGraph.mfa,
+            invitations = invitationRepository,
         )
     val institutionalIdentityLinkRepository =
         if (settings.hasAuthentication && settings.mongo.isConfigured) {
@@ -419,12 +426,6 @@ fun Application.module(
         } else {
             InMemoryPlatformAuditLog()
         }
-    val invitationRepository =
-        if (settings.hasAuthentication && settings.mongo.isConfigured) {
-            MongoInvitationRepository(mongoConnection.database())
-        } else {
-            InMemoryInvitationRepository()
-        }
     val invitationOutbox =
         if (settings.hasAuthentication && settings.mongo.isConfigured && settings.mfaEncryptionKey != null) {
             MongoInvitationOutbox(mongoConnection.database(), MfaSecretCipher(settings.mfaEncryptionKey))
@@ -504,20 +505,19 @@ fun Application.module(
             sessionAuthority = sessionAuthority,
             ownerInvitationRepository = ownerInvitationRepository,
         )
-        val maticaIntegrationSecret = System.getenv("MATICA_COMPANION_INTEGRATION_SECRET")
-        val maticaApiBaseUrl = System.getenv("MATICA_API_BASE_URL")
+        val maticaDatabase =
+            if (settings.mongo.isConfigured && settings.hasMaticaIntegration) {
+                mongoConnection.database()
+            } else {
+                null
+            }
         maticaProgressRoutes(
             settings = settings,
             accounts = identityGraph.accounts,
             sessions = identityGraph.refreshSessions,
-            database =
-                if (settings.mongo.isConfigured && !maticaIntegrationSecret.isNullOrBlank() && !maticaApiBaseUrl.isNullOrBlank()) {
-                    mongoConnection.database()
-                } else {
-                    null
-                },
-            sharedSecret = maticaIntegrationSecret,
-            apiBaseUrl = maticaApiBaseUrl,
+            database = maticaDatabase,
+            sharedSecret = settings.maticaCompanionIntegrationSecret?.concatToString(),
+            apiBaseUrl = settings.maticaApiBaseUrl,
         )
         mfaRoutes(settings, providerRegistry.identity, identityGraph.refreshSessions, identityGraph.accounts, identityGraph.mfa)
         accountAdministrationRoutes(

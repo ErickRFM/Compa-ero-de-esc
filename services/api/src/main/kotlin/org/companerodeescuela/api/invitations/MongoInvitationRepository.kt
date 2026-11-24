@@ -3,6 +3,7 @@ package org.companerodeescuela.api.invitations
 import com.mongodb.MongoWriteException
 import com.mongodb.client.model.Filters.and
 import com.mongodb.client.model.Filters.eq
+import com.mongodb.client.model.Filters.exists
 import com.mongodb.client.model.Filters.gt
 import com.mongodb.client.model.Filters.`in`
 import com.mongodb.client.model.Filters.lte
@@ -28,19 +29,33 @@ internal class MongoInvitationRepository(
     private val records = database.getCollection<Document>("platform_invitations")
 
     @Volatile
-    private var tokenHashIndexReady = false
+    private var indexesReady = false
+
+    private suspend fun ensureIndexes() {
+        if (indexesReady) return
+        records.createIndex(
+            Indexes.ascending("tokenHash"),
+            IndexOptions().name("invitation_tokenHash_unique").unique(true),
+        )
+        records.createIndex(
+            Indexes.descending("createdAt"),
+            IndexOptions().name("invitation_createdAt_desc_idx"),
+        )
+        records.createIndex(
+            Indexes.compoundIndex(Indexes.ascending("institutionId"), Indexes.descending("createdAt")),
+            IndexOptions().name("invitation_institution_createdAt_idx"),
+        )
+        records.createIndex(
+            Indexes.ascending("status", "expiresAt"),
+            IndexOptions().name("invitation_status_expiresAt_idx"),
+        )
+        indexesReady = true
+    }
 
     override suspend fun create(record: InvitationRecord): Boolean {
         val canonical = record.canonicalForStorage()
         if (!canonical.validForCreation()) return false
-        if (!tokenHashIndexReady) {
-            try {
-                records.createIndex(Indexes.ascending("tokenHash"), IndexOptions().name("invitation_tokenHash_unique").unique(true))
-            } catch (_: com.mongodb.MongoCommandException) {
-                // Index already exists; safe to ignore
-            }
-            tokenHashIndexReady = true
-        }
+        ensureIndexes()
         return try {
             records.insertOne(canonical.toDocument())
             true
@@ -55,6 +70,7 @@ internal class MongoInvitationRepository(
         limit: Int,
         institutionId: String?,
     ): List<InvitationRecord> {
+        ensureIndexes()
         val cursor =
             if (institutionId != null) {
                 records.find(eq("institutionId", institutionId))
@@ -63,7 +79,7 @@ internal class MongoInvitationRepository(
             }
         return cursor
             .sort(Sorts.descending("createdAt"))
-            .limit(limit.coerceIn(1, 100))
+            .limit(limit.coerceIn(1, 50))
             .toList()
             .map { it.toInvitation() }
     }
@@ -97,18 +113,68 @@ internal class MongoInvitationRepository(
         id: String,
         newTokenHash: String,
         now: Instant,
+        operationId: String?,
+    ): Boolean {
+        if (!newTokenHash.matches(Regex("[A-Za-z0-9_-]{43}"))) return false
+        val baseFilters =
+            mutableListOf(
+                eq("_id", id),
+                `in`("status", InvitationStatus.FAILED.name, InvitationStatus.SENT.name),
+                gt("expiresAt", Date.from(now)),
+            )
+        if (operationId != null) {
+            baseFilters += nin("retryOperations", operationId)
+        }
+        val updates =
+            mutableListOf(
+                Updates.set("status", InvitationStatus.SENT.name),
+                Updates.set("tokenHash", newTokenHash),
+                Updates.unset("deliveryStatus"),
+                Updates.unset("deliveryUpdatedAt"),
+                Updates.unset("deliveryEventAt"),
+                Updates.unset("deliveryEventType"),
+                Updates.unset("providerEmailId"),
+            )
+        if (operationId != null) {
+            updates += Updates.addToSet("retryOperations", operationId)
+        }
+        return try {
+            records.updateOne(and(baseFilters), Updates.combine(updates)).matchedCount == 1L
+        } catch (error: MongoWriteException) {
+            if (error.error.code == 11000) false else throw error
+        }
+    }
+
+    override suspend fun updateDeliveryStatus(
+        id: String,
+        deliveryStatus: String,
+        updatedAt: Instant,
     ): Boolean =
         records
             .updateOne(
                 and(
                     eq("_id", id),
-                    `in`("status", InvitationStatus.FAILED.name, InvitationStatus.SENT.name),
-                    gt("expiresAt", Date.from(now)),
+                    exists("deliveryEventAt", false),
                 ),
                 Updates.combine(
-                    Updates.set("status", InvitationStatus.SENT.name),
-                    Updates.set("tokenHash", newTokenHash),
+                    Updates.set("deliveryStatus", deliveryStatus),
+                    Updates.set("deliveryUpdatedAt", Date.from(updatedAt)),
                 ),
+            ).matchedCount == 1L
+
+    override suspend fun markAuthorized(
+        id: String,
+        now: Instant,
+    ): Boolean =
+        records
+            .updateOne(
+                and(
+                    eq("_id", id),
+                    lte("createdAt", Date.from(now)),
+                    eq("status", InvitationStatus.ACCEPTED.name),
+                    exists("acceptedBy", true),
+                ),
+                Updates.set("status", InvitationStatus.ACTIVE.name),
             ).matchedCount == 1L
 
     override suspend fun accept(
@@ -176,6 +242,11 @@ internal class MongoInvitationRepository(
             .append("expiresAt", Date.from(expiresAt))
             .append("status", status.name)
             .append("tokenHash", tokenHash)
+            .also { doc ->
+                if (deliveryStatus != null) doc.append("deliveryStatus", deliveryStatus)
+                if (deliveryUpdatedAt != null) doc.append("deliveryUpdatedAt", Date.from(deliveryUpdatedAt))
+                if (retryOperations.isNotEmpty()) doc.append("retryOperations", retryOperations.toList())
+            }
 
     private fun Document.toInvitation(): InvitationRecord =
         InvitationRecord(
@@ -192,5 +263,8 @@ internal class MongoInvitationRepository(
             getString("acceptedOperation"),
             getDate("acceptedAt")?.toInstant(),
             getDate("revokedAt")?.toInstant(),
+            getString("deliveryStatus"),
+            (getDate("deliveryEventAt") ?: getDate("deliveryUpdatedAt"))?.toInstant(),
+            getList("retryOperations", String::class.java)?.toSet().orEmpty(),
         )
 }

@@ -15,12 +15,16 @@ import org.companerodeescuela.shared.contracts.AccountLifecycleRequest
 import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.ApproveStaffRequest
 import org.companerodeescuela.shared.contracts.ApproveStudentAffiliationRequest
+import org.companerodeescuela.shared.contracts.AuthorizeRegistrationInvitationRequest
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkDigest
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkRequest
 import org.companerodeescuela.shared.contracts.MfaStepUpRequest
+import org.companerodeescuela.shared.contracts.PrepareRegistrationInvitationRetryRequest
 import org.companerodeescuela.shared.contracts.PrivilegedCommandDigests
 import org.companerodeescuela.shared.contracts.RegistrationAccountType
+import org.companerodeescuela.shared.contracts.RegistrationInvitationSummary
+import org.companerodeescuela.shared.contracts.RetryRegistrationInvitationRequest
 import org.companerodeescuela.shared.contracts.RevokeTutorAssignmentRequest
 import org.companerodeescuela.shared.contracts.StaffApplicationStatus
 import org.companerodeescuela.shared.contracts.StaffRole
@@ -101,6 +105,24 @@ class AdminViewModel
                 override val action = StepUpAction.MANAGE_ACADEMICS
                 override val digest get() = PrivilegedCommandDigests.tutorRevocation(target, body)
             }
+
+            data class InvitationRetry(
+                override val target: String,
+                override val operationId: String,
+                override val resourceId: String,
+                override val digest: String,
+            ) : Command {
+                override val action = StepUpAction.ADMIN_INVITE
+            }
+
+            data class InvitationAuthorization(
+                override val target: String,
+                val body: AuthorizeRegistrationInvitationRequest,
+            ) : Command {
+                override val operationId get() = body.operationId
+                override val action = StepUpAction.ADMIN_AUTHORITY
+                override val digest get() = PrivilegedCommandDigests.invitationAuthorization(target, body)
+            }
         }
 
         init {
@@ -180,6 +202,8 @@ class AdminViewModel
                     is Command.Affiliation -> AdminOperationKind.AFFILIATE_STUDENT
                     is Command.IdentityLink -> AdminOperationKind.LINK_SIII
                     is Command.Revocation -> AdminOperationKind.REVOKE_TUTOR_ASSIGNMENT
+                    is Command.InvitationRetry -> AdminOperationKind.RETRY_INVITATION
+                    is Command.InvitationAuthorization -> AdminOperationKind.AUTHORIZE_INVITATION
                     is Command.Lifecycle ->
                         when (next.body.status) {
                             AccountStatus.SUSPENDED -> AdminOperationKind.SUSPEND_ACCOUNT
@@ -362,8 +386,14 @@ class AdminViewModel
             password: String,
             otp: String,
         ) {
-            if (!ready()) return
             val pending = command ?: return
+            val canExecute =
+                if (pending is Command.InvitationRetry || pending is Command.InvitationAuthorization) {
+                    !mutable.value.working && owner != null
+                } else {
+                    ready()
+                }
+            if (!canExecute) return
             val cached = proof?.takeIf { it.expiresAtEpochSeconds > clock.instant().epochSecond }
             if (cached == null && (password.length !in 1..128 || otp.length != 6 || otp.any { it !in '0'..'9' })) return invalid()
             val captured = generation
@@ -394,28 +424,62 @@ class AdminViewModel
                         return@launch
                     }
                     proof = actual
-                    val result =
+                    val result: Outcome<Any> =
                         when (pending) {
                             is Command.Affiliation -> repository.affiliateStudent(pending.target, pending.body.copy(proof = actual.proof))
                             is Command.IdentityLink -> repository.linkInstitutionalIdentity(pending.body.copy(proof = actual.proof))
                             is Command.Approval -> repository.approve(pending.target, pending.body.copy(proof = actual.proof))
                             is Command.Lifecycle -> repository.lifecycle(pending.target, pending.body.copy(proof = actual.proof))
                             is Command.Revocation -> repository.revokeAssignment(pending.target, pending.body.copy(proof = actual.proof))
+                            is Command.InvitationRetry ->
+                                repository.retryInvitation(
+                                    RetryRegistrationInvitationRequest(
+                                        invitationId = pending.target,
+                                        operationId = pending.operationId,
+                                        proof = actual.proof,
+                                    ),
+                                )
+                            is Command.InvitationAuthorization ->
+                                repository.authorizeInvitation(pending.body.copy(proof = actual.proof))
                         }
                     if (!current(captured, capturedOwner) || command !== pending) return@launch
                     when (result) {
                         is Outcome.Success -> {
                             command = null
                             proof = null
-                            mutable.value =
-                                mutable.value.copy(
-                                    loading = true,
-                                    working = false,
-                                    operation = null,
-                                    failure = null,
-                                    completedOperationId = pending.operationId,
-                                )
-                            refresh()
+                            if (pending is Command.InvitationRetry) {
+                                mutable.value =
+                                    mutable.value.copy(
+                                        working = false,
+                                        operation = null,
+                                        failure = null,
+                                        completedOperationId = pending.operationId,
+                                    )
+                                refreshInvitations()
+                                refreshAudit()
+                            } else if (pending is Command.InvitationAuthorization) {
+                                mutable.value =
+                                    mutable.value.copy(
+                                        loading = true,
+                                        working = false,
+                                        operation = null,
+                                        failure = null,
+                                        completedOperationId = pending.operationId,
+                                    )
+                                refresh()
+                                refreshInvitations()
+                                refreshAudit()
+                            } else {
+                                mutable.value =
+                                    mutable.value.copy(
+                                        loading = true,
+                                        working = false,
+                                        operation = null,
+                                        failure = null,
+                                        completedOperationId = pending.operationId,
+                                    )
+                                refresh()
+                            }
                         }
                         is Outcome.Failure -> {
                             // Keep evidence only for an uncertain transport/server result of this exact immutable command.
@@ -472,6 +536,136 @@ class AdminViewModel
                             )
                     }
             }
+        }
+
+        fun prepareInvitationRetry(
+            invitationId: String,
+            recipient: String,
+        ) {
+            val capturedOwner = owner ?: return
+            val captured = generation
+            if (mutable.value.working || command != null) return
+            val operationId = UUID.randomUUID().toString()
+            mutable.value = mutable.value.copy(working = true, invitationsFailure = null, failure = null, completedOperationId = null)
+            actionJob =
+                viewModelScope.launch {
+                    val prepared =
+                        repository.prepareInvitationRetry(
+                            PrepareRegistrationInvitationRetryRequest(
+                                invitationId = invitationId,
+                                operationId = operationId,
+                            ),
+                        )
+                    if (!current(captured, capturedOwner)) return@launch
+                    when (prepared) {
+                        is Outcome.Success -> {
+                            mutable.value = mutable.value.copy(working = false)
+                            prepare(
+                                Command.InvitationRetry(
+                                    target = invitationId,
+                                    operationId = prepared.value.operationId,
+                                    resourceId = prepared.value.resourceId,
+                                    digest = prepared.value.payloadDigest,
+                                ),
+                                recipient,
+                            )
+                        }
+                        is Outcome.Failure -> {
+                            mutable.value = mutable.value.copy(working = false, invitationsFailure = prepared.error)
+                        }
+                    }
+                }
+        }
+
+        fun prepareInvitationAuthorization(
+            invitation: RegistrationInvitationSummary,
+            groupIds: Set<String> = emptySet(),
+            validityDays: Int? = null,
+        ) {
+            val capturedOwner = owner ?: return
+            val captured = generation
+            if (mutable.value.working || command != null || invitation.status != "ACCEPTED") return
+            val targetId = invitation.acceptedByAccountId ?: return invalid()
+            if (validityDays != null && validityDays !in 1..36500) return invalid()
+
+            mutable.value = mutable.value.copy(working = true, invitationsFailure = null, failure = null, completedOperationId = null)
+            actionJob =
+                viewModelScope.launch {
+                    val currentOverview =
+                        mutable.value.overview ?: when (val loaded = repository.overview()) {
+                            is Outcome.Success -> loaded.value
+                            is Outcome.Failure -> {
+                                if (current(captured, capturedOwner)) {
+                                    mutable.value = mutable.value.copy(working = false, invitationsFailure = loaded.error)
+                                }
+                                return@launch
+                            }
+                        }
+                    val currentGroups =
+                        if (invitation.profile == "TUTOR" && mutable.value.groups.isEmpty()) {
+                            (repository.approvalGroups() as? Outcome.Success)?.value.orEmpty()
+                        } else {
+                            mutable.value.groups
+                        }
+                    if (!current(captured, capturedOwner)) return@launch
+
+                    val target = currentOverview.users.find { it.user.id == targetId }
+                    if (target == null || !target.user.emailVerified) {
+                        mutable.value = mutable.value.copy(working = false, invitationsFailure = AppError.Http(422))
+                        return@launch
+                    }
+
+                    val scopes = mutableListOf<TutorApprovalScope>()
+                    if (invitation.profile == "TUTOR") {
+                        if (groupIds.isEmpty() || groupIds.size > 20) {
+                            mutable.value = mutable.value.copy(working = false, invitationsFailure = AppError.Http(422))
+                            return@launch
+                        }
+                        for (id in groupIds.sorted()) {
+                            val group = currentGroups.find { it.id == id }
+                            val start = group?.startsAtEpochSeconds
+                            val end = group?.endsAtEpochSeconds
+                            val period = group?.periodId
+                            val validFrom = start?.let { maxOf(it, clock.instant().epochSecond) }
+                            if (group == null ||
+                                start == null ||
+                                end == null ||
+                                period.isNullOrBlank() ||
+                                validFrom == null ||
+                                !group.active ||
+                                group.institutionId != invitation.institutionId ||
+                                group.scopeRevision < 0 ||
+                                validFrom >= end
+                            ) {
+                                mutable.value = mutable.value.copy(working = false, invitationsFailure = AppError.Http(422))
+                                return@launch
+                            }
+                            val validUntil = validityDays?.let { minOf(end, validFrom + it * 86400L) } ?: end
+                            scopes += TutorApprovalScope(id, period, validFrom, validUntil, group.scopeRevision)
+                        }
+                    } else if (groupIds.isNotEmpty() || validityDays != null) {
+                        mutable.value = mutable.value.copy(working = false, invitationsFailure = AppError.Http(422))
+                        return@launch
+                    }
+
+                    mutable.value = mutable.value.copy(working = false, overview = currentOverview, groups = currentGroups)
+                    prepare(
+                        Command.InvitationAuthorization(
+                            target = invitation.invitationId,
+                            body =
+                                AuthorizeRegistrationInvitationRequest(
+                                    operationId = UUID.randomUUID().toString(),
+                                    invitationId = invitation.invitationId,
+                                    expectedAuthRevision = target.user.authRevision,
+                                    institutionId = invitation.institutionId,
+                                    profile = invitation.profile,
+                                    tutorScopes = scopes,
+                                    proof = "",
+                                ),
+                        ),
+                        "${target.user.displayName} (${invitation.recipient})",
+                    )
+                }
         }
 
         fun revokeInvitation(invitationId: String) {

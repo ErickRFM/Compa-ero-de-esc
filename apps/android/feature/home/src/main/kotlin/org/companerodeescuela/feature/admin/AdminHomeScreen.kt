@@ -714,9 +714,20 @@ internal fun adminUserDirectory(
                 }
             else -> R.string.admin_error_generic
         }
+    val typedMessage =
+        when ((error as? AppError.Http)?.apiCode) {
+            "MFA_ENROLLMENT_REQUIRED" -> "Debes activar y confirmar MFA en tu cuenta antes de autorizar esta operación."
+            "MFA_REAUTHENTICATION_FAILED" -> "La contraseña de confirmación es incorrecta."
+            "MFA_CODE_INVALID" -> "El código MFA es incorrecto o expiró. Genera uno nuevo."
+            "MFA_CODE_REUSED" -> "Ese código MFA ya se utilizó. Espera al siguiente código."
+            "INVITATION_INSTITUTION_UNAVAILABLE" -> "La institución indicada no está habilitada."
+            else -> null
+        }
+    val baseMessage = typedMessage ?: error.userMessage
+    val requestId = (error as? AppError.Http)?.requestId
     StatusNotice(
         title = stringResource(resource),
-        message = error.userMessage,
+        message = if (requestId != null) "$baseMessage\nReferencia: $requestId" else baseMessage,
         tone = NoticeTone.ERROR,
         modifier = Modifier.testTag("admin_error"),
     )
@@ -731,6 +742,8 @@ private fun operationDescriptionResource(kind: AdminOperationKind): Int =
         AdminOperationKind.REVOKE_ACCOUNT -> R.string.admin_confirm_revoke
         AdminOperationKind.REACTIVATE_ACCOUNT -> R.string.admin_confirm_reactivate
         AdminOperationKind.REVOKE_TUTOR_ASSIGNMENT -> R.string.admin_confirm_revoke_assignment
+        AdminOperationKind.RETRY_INVITATION -> R.string.admin_confirm_retry_invitation
+        AdminOperationKind.AUTHORIZE_INVITATION -> R.string.admin_confirm_authorize_invitation
         AdminOperationKind.OTHER -> R.string.admin_confirm_description
     }
 

@@ -12,8 +12,11 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -100,20 +103,59 @@ fun InvitationIssueScreen(
                     singleLine = true,
                     enabled = !state.working,
                 )
-                if (state.institutions.isNotEmpty()) {
-                    Text("Institución / carrera conectada a SIII", color = authInk())
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        state.institutions.forEach { institution ->
-                            FilterChip(
-                                selected = institutionId == institution.id,
-                                onClick = { institutionId = institution.id },
-                                label = { Text(institution.displayName) },
-                                enabled = !state.working,
-                                modifier = Modifier.testTag("invite_institution_${institution.id}"),
-                            )
+                Text("Institución / carrera conectada a SIII", color = authInk())
+                when {
+                    state.institutionsLoading -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp).testTag("invite_institutions_loading"),
+                            color = authAccent(),
+                        )
+                        Text("Consultando instituciones habilitadas…", color = authMuted())
+                    }
+                    state.institutionsErrorMessage != null -> {
+                        StatusNotice(
+                            title = "No se pudieron cargar las instituciones",
+                            message = state.institutionsErrorMessage.orEmpty(),
+                            tone = NoticeTone.ERROR,
+                            modifier = Modifier.testTag("invite_institutions_error"),
+                        )
+                        OutlinedButton(
+                            onClick = viewModel::loadInstitutions,
+                            enabled = !state.working && !state.institutionsLoading,
+                            modifier = Modifier.fillMaxWidth().testTag("invite_institutions_retry"),
+                        ) {
+                            Text("Reintentar carga de instituciones")
+                        }
+                    }
+                    state.institutions.isEmpty() -> {
+                        StatusNotice(
+                            title = "Sin instituciones habilitadas",
+                            message = "El directorio respondió vacío. Puedes reintentar o ingresar el ID manualmente.",
+                            tone = NoticeTone.WARNING,
+                            modifier = Modifier.testTag("invite_institutions_empty"),
+                        )
+                        OutlinedButton(
+                            onClick = viewModel::loadInstitutions,
+                            enabled = !state.working && !state.institutionsLoading,
+                            modifier = Modifier.fillMaxWidth().testTag("invite_institutions_retry"),
+                        ) {
+                            Text("Reintentar carga de instituciones")
+                        }
+                    }
+                    else -> {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            state.institutions.forEach { institution ->
+                                FilterChip(
+                                    selected = institutionId == institution.id,
+                                    onClick = { institutionId = institution.id },
+                                    label = { Text(institution.displayName) },
+                                    enabled = !state.working,
+                                    modifier = Modifier.testTag("invite_institution_${institution.id}"),
+                                )
+                            }
                         }
                     }
                 }
@@ -187,9 +229,9 @@ fun InvitationIssueScreen(
                         when (delivery) {
                             VerificationDeliveryStatus.ACCEPTED ->
                                 Triple(
-                                    NoticeTone.SUCCESS,
-                                    "Invitación enviada",
-                                    "El proveedor aceptó el correo; la entrega final al buzón debe verificarse.",
+                                    NoticeTone.INFO,
+                                    "Aceptada por proveedor (entrega pendiente)",
+                                    "Resend aceptó la solicitud de envío; la entrega al buzón del destinatario aún debe confirmarse por webhook.",
                                 )
                             VerificationDeliveryStatus.DELIVERED ->
                                 Triple(

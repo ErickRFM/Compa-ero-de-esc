@@ -21,11 +21,16 @@ import org.companerodeescuela.shared.contracts.AdministrationOverview
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.ApproveStaffRequest
 import org.companerodeescuela.shared.contracts.ApproveStudentAffiliationRequest
+import org.companerodeescuela.shared.contracts.AuthorizeRegistrationInvitationRequest
 import org.companerodeescuela.shared.contracts.InstitutionSummary
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkRequest
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkSummary
+import org.companerodeescuela.shared.contracts.PrepareRegistrationInvitationRetryRequest
+import org.companerodeescuela.shared.contracts.RegistrationInvitationDispatchReceipt
+import org.companerodeescuela.shared.contracts.RegistrationInvitationPreparation
 import org.companerodeescuela.shared.contracts.RegistrationInvitationReceipt
 import org.companerodeescuela.shared.contracts.RegistrationInvitationSummary
+import org.companerodeescuela.shared.contracts.RetryRegistrationInvitationRequest
 import org.companerodeescuela.shared.contracts.RevokeTutorAssignmentRequest
 import org.companerodeescuela.shared.contracts.TutorAssignmentSummary
 import org.companerodeescuela.shared.contracts.UserSummary
@@ -52,6 +57,15 @@ class AdminRepository(
 
     suspend fun invitations(limit: Int = 50): Outcome<List<RegistrationInvitationSummary>> =
         get("admin/invitations?limit=${limit.coerceIn(1, 100)}")
+
+    suspend fun prepareInvitationRetry(request: PrepareRegistrationInvitationRetryRequest): Outcome<RegistrationInvitationPreparation> =
+        post("admin/invitations/retry/prepare", request)
+
+    suspend fun retryInvitation(request: RetryRegistrationInvitationRequest): Outcome<RegistrationInvitationDispatchReceipt> =
+        post("admin/invitations/retry", request)
+
+    suspend fun authorizeInvitation(request: AuthorizeRegistrationInvitationRequest): Outcome<AdminUserSummary> =
+        post("admin/accounts/invitation-authorization", request)
 
     suspend fun revokeInvitation(invitationId: String): Outcome<RegistrationInvitationReceipt> =
         post("admin/invitations/revoke", mapOf("invitationId" to invitationId))

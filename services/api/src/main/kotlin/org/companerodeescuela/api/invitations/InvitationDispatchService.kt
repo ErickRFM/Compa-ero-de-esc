@@ -180,46 +180,86 @@ internal class InvitationDispatchService(
             VerificationDeliveryStatus.DELIVERED -> outbox?.markDelivered(id, clock.instant())
             else -> Unit
         }
+        authenticationDependency { repository.updateDeliveryStatus(id, delivery.name, clock.instant()) }
         return InvitationDispatchResult(id, delivery, expiresAt.epochSecond)
     }
 
     /**
-     * Retries delivery of an existing invitation that was sent but delivery
-     * was UNCONFIRMED. Generates a fresh token for replay protection, requires
-     * a new MFA proof bound to the retry operation, and re-sends the email.
+     * Prepares a reproducible, command-bound MFA scope for retrying an existing invitation.
+     * The returned operationId and payloadDigest do not depend on server wall-clock time.
+     */
+    suspend fun prepareRetry(
+        actor: PlatformAccount,
+        invitationId: String,
+        operationId: String,
+    ): InvitationPreparation {
+        if (!Regex("[A-Za-z0-9_-]{43}").matches(invitationId) ||
+            !Regex("[A-Za-z0-9_-]{8,128}").matches(operationId)
+        ) {
+            throw ApiException.Validation("Invitation retry details are invalid")
+        }
+        val current = authorizedIssuer(actor)
+        val existing =
+            authenticationDependency { repository.find(invitationId) }
+                ?: throw ApiException.Validation("Invitation is invalid or unavailable")
+        if (existing.issuerId != current.id) throw ApiException.Forbidden("Only the original issuer can retry")
+        requireInstitutionId(existing.institutionId)
+        val now = clock.instant()
+        if (now >= existing.expiresAt) throw ApiException.Validation("Invitation has expired")
+        if (existing.status !in setOf(InvitationStatus.SENT, InvitationStatus.FAILED)) {
+            throw ApiException.Conflict("Invitation cannot be retried in its current state")
+        }
+        if (operationId in existing.retryOperations) {
+            throw ApiException.Conflict("This invitation retry operation was already processed")
+        }
+        return InvitationPreparation(
+            operationId = operationId,
+            resourceId = RESOURCE_ID,
+            payloadDigest = retryDigest(current.id, existing.id, operationId),
+        )
+    }
+
+    /**
+     * Retries delivery of an existing invitation. Generates a fresh token for replay
+     * protection, consumes a single-use MFA proof bound to the client-prepared operationId,
+     * prevents operationId replay, and re-sends the email.
      */
     suspend fun retry(
         actor: PlatformAccount,
         invitationId: String,
+        operationId: String,
         scopedProof: String,
     ): InvitationDispatchResult {
         val current = authorizedIssuer(actor)
-        if (!Regex("[A-Za-z0-9_-]{43}").matches(invitationId)) throw ApiException.Validation("Invitation is invalid")
+        if (!Regex("[A-Za-z0-9_-]{43}").matches(invitationId) ||
+            !Regex("[A-Za-z0-9_-]{8,128}").matches(operationId)
+        ) {
+            throw ApiException.Validation("Invitation retry details are invalid")
+        }
         if (!Regex("[A-Za-z0-9_-]{43}").matches(scopedProof)) throw ApiException.Forbidden("MFA proof is required")
         val existing =
             authenticationDependency { repository.find(invitationId) }
                 ?: throw ApiException.Validation("Invitation is invalid or unavailable")
         if (existing.issuerId != current.id) throw ApiException.Forbidden("Only the original issuer can retry")
-        val retryOperationId = "${existing.id}-retry-${clock.instant().epochSecond}"
-        val digest =
-            MessageDigest
-                .getInstance("SHA-256")
-                .digest("companero.invitation.retry.v1\n${current.id}\n${existing.id}".toByteArray(Charsets.UTF_8))
-                .joinToString("") { "%02x".format(it) }
+        requireInstitutionId(existing.institutionId)
+        if (operationId in existing.retryOperations) {
+            throw ApiException.Conflict("This invitation retry operation was already processed")
+        }
+        val digest = retryDigest(current.id, existing.id, operationId)
         authenticationDependency {
             mfa.requireStepUp(
                 current,
                 scopedProof,
                 StepUpAction.ADMIN_INVITE,
                 RESOURCE_ID,
-                retryOperationId,
+                operationId,
                 digest,
             )
         }
         val now = clock.instant()
         if (now >= existing.expiresAt) throw ApiException.Validation("Invitation has expired")
         val newToken = InvitationToken.generate()
-        if (!authenticationDependency { repository.retry(invitationId, newToken.hash, now) }) {
+        if (!authenticationDependency { repository.retry(invitationId, newToken.hash, now, operationId) }) {
             throw ApiException.Conflict("Invitation cannot be retried in its current state")
         }
         if (outbox != null) {
@@ -258,6 +298,7 @@ internal class InvitationDispatchService(
             VerificationDeliveryStatus.DELIVERED -> outbox?.markDelivered(invitationId, clock.instant())
             else -> Unit
         }
+        authenticationDependency { repository.updateDeliveryStatus(invitationId, delivery.name, clock.instant()) }
         return InvitationDispatchResult(invitationId, delivery, existing.expiresAt.epochSecond)
     }
 
@@ -307,18 +348,34 @@ internal class InvitationDispatchService(
                     }
                 }
             }
+            authenticationDependency { repository.updateDeliveryStatus(entry.invitationId, status.name, clock.instant()) }
         }
         return pending.size
     }
 
-    private suspend fun requireInstitution(command: InvitationDispatchCommand) {
-        if (authenticationDependency { institutions.findEnabled(command.institutionId) } == null) {
+    private suspend fun requireInstitution(command: InvitationDispatchCommand) = requireInstitutionId(command.institutionId)
+
+    private suspend fun requireInstitutionId(institutionId: String) {
+        if (authenticationDependency { institutions.findEnabled(institutionId) } == null) {
             throw ApiException.Validation(
                 "Institution does not accept new registrations",
                 code = ApiErrorCode.INVITATION_INSTITUTION_UNAVAILABLE,
             )
         }
     }
+
+    private fun retryDigest(
+        actorId: String,
+        invitationId: String,
+        operationId: String,
+    ): String =
+        MessageDigest
+            .getInstance("SHA-256")
+            .digest(
+                listOf("companero.invitation.retry.v2", actorId, invitationId, operationId)
+                    .joinToString("\n")
+                    .toByteArray(Charsets.UTF_8),
+            ).joinToString("") { "%02x".format(it) }
 
     private suspend fun authorizedIssuer(actor: PlatformAccount): PlatformAccount {
         val current = authenticationDependency { accounts.findById(actor.id) } ?: throw ApiException.Unauthorized()

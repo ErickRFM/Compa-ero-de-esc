@@ -4,9 +4,13 @@ import org.companerodeescuela.api.academic.groups.AcademicGroupRepository
 import org.companerodeescuela.api.auth.AccountIdentityChange
 import org.companerodeescuela.api.auth.PlatformAccount
 import org.companerodeescuela.api.auth.PlatformAccountRepository
+import org.companerodeescuela.api.auth.isExactIdentityRetry
 import org.companerodeescuela.api.auth.staffApplications
 import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.institutions.InstitutionRepository
+import org.companerodeescuela.api.invitations.InvitationProfile
+import org.companerodeescuela.api.invitations.InvitationRepository
+import org.companerodeescuela.api.invitations.InvitationStatus
 import org.companerodeescuela.api.security.MfaService
 import org.companerodeescuela.api.tutoring.TutorAssignmentService
 import org.companerodeescuela.shared.contracts.AcademicGroupSummary
@@ -17,6 +21,7 @@ import org.companerodeescuela.shared.contracts.AdminUserSummary
 import org.companerodeescuela.shared.contracts.AdministrationMetrics
 import org.companerodeescuela.shared.contracts.AdministrationOverview
 import org.companerodeescuela.shared.contracts.ApproveStaffRequest
+import org.companerodeescuela.shared.contracts.AuthorizeRegistrationInvitationRequest
 import org.companerodeescuela.shared.contracts.PrivilegedCommandDigests
 import org.companerodeescuela.shared.contracts.StaffApplication
 import org.companerodeescuela.shared.contracts.StaffApplicationStatus
@@ -31,13 +36,14 @@ import java.time.Clock
 import java.time.Instant
 
 /** Approval updates one account atomically; deterministic assignment continuation never implies a multi-document transaction. */
-class AccountAdministrationService(
+internal class AccountAdministrationService(
     private val accounts: PlatformAccountRepository,
     private val institutions: InstitutionRepository,
     private val groups: AcademicGroupRepository,
     private val tutoring: TutorAssignmentService,
     private val mfa: MfaService,
     private val clock: Clock = Clock.systemUTC(),
+    private val invitations: InvitationRepository? = null,
 ) {
     private val policy = InstitutionScopePolicy(accounts, clock)
 
@@ -485,6 +491,191 @@ class AccountAdministrationService(
             )
                 ?: throw ApiException.Conflict("Account changed concurrently")
         return summary(changed)
+    }
+
+    /**
+     * Explicit post-acceptance authorization for an invited profile.
+     * Accepting an invitation never grants roles or institutional scope; a verified
+     * SUPER_ADMIN must confirm this command with scoped MFA (ADMIN_AUTHORITY).
+     */
+    suspend fun authorizeInvitation(
+        actor: PlatformAccount,
+        request: AuthorizeRegistrationInvitationRequest,
+    ): AdminUserSummary {
+        val invitationDirectory = invitations ?: throw ApiException.DependencyUnavailable("Invitation directory is unavailable")
+        identifier(request.operationId)
+        identifier(request.invitationId)
+        identifier(request.institutionId)
+        val currentActor = policy.live(actor.toUserSummary())
+        if (currentActor.accountStatus != AccountStatus.ACTIVE ||
+            currentActor.emailVerifiedAt == null ||
+            currentActor.emailVerifiedAt > clock.instant() ||
+            UserRole.SUPER_ADMIN !in currentActor.roles
+        ) {
+            throw ApiException.Forbidden("Verified super administrator is required to authorize invited accounts")
+        }
+        val invitation = invitationDirectory.find(request.invitationId) ?: throw ApiException.NotFound("Invitation was not found")
+        if (invitation.institutionId != request.institutionId || invitation.profile.name != request.profile) {
+            throw ApiException.Validation("Invitation authorization does not match invitation scope")
+        }
+        if (institutions.findEnabled(request.institutionId) == null) {
+            throw ApiException.Validation("Authorization institution must be enabled")
+        }
+        if (invitation.status !in setOf(InvitationStatus.ACCEPTED, InvitationStatus.ACTIVE)) {
+            throw ApiException.Conflict("Invitation must be accepted by the recipient before authorization")
+        }
+        val targetId = invitation.acceptedBy ?: throw ApiException.Conflict("Invitation has not been accepted")
+        val target = accounts.findById(targetId) ?: throw ApiException.NotFound("Invited account was not found")
+        if (target.id == currentActor.id) {
+            throw ApiException.Forbidden("Self-authorization is prohibited")
+        }
+        if (UserRole.SUPER_ADMIN in target.roles) {
+            throw ApiException.Forbidden("Super administrator accounts cannot be modified through invitation authorization")
+        }
+        if (target.email != invitation.recipient) {
+            throw ApiException.Forbidden("Invited account email does not match invitation recipient")
+        }
+        if (target.institutionId != null && target.institutionId != request.institutionId) {
+            throw ApiException.Forbidden("Invited account belongs to another institution")
+        }
+        if (!target.permitsSession ||
+            target.accountStatus !in setOf(AccountStatus.PENDING_APPROVAL, AccountStatus.ACTIVE) ||
+            target.emailVerifiedAt == null ||
+            target.emailVerifiedAt > clock.instant()
+        ) {
+            throw ApiException.Conflict("Invited account must be active and verified")
+        }
+
+        val digest = PrivilegedCommandDigests.invitationAuthorization(request.invitationId, request)
+        mfa.requireStepUp(currentActor, request.proof, StepUpAction.ADMIN_AUTHORITY, request.invitationId, request.operationId, digest)
+
+        val unaffiliatedDefaultStudent = target.roles == setOf(UserRole.STUDENT) && target.institutionId == null
+        val retainedBaseRoles = if (unaffiliatedDefaultStudent) emptySet() else target.roles
+        val defaultAdminCapabilities =
+            setOf(
+                AdminCapability.APPROVE_STAFF,
+                AdminCapability.MANAGE_USERS,
+                AdminCapability.MANAGE_ACADEMICS,
+                AdminCapability.DIRECTIVE_SUPERVISION,
+                AdminCapability.VIEW_AUDIT,
+            )
+
+        val rolesAfter: Set<UserRole>
+        val capabilitiesAfter: Set<AdminCapability>?
+        var approvedApplicationId: String? = null
+
+        when (invitation.profile) {
+            InvitationProfile.INSTITUTION_ADMIN -> {
+                if (request.tutorScopes.isNotEmpty()) {
+                    throw ApiException.Validation("Administrator authorization cannot include tutor group scopes")
+                }
+                val requestedCaps = request.capabilities.ifEmpty { defaultAdminCapabilities }
+                rolesAfter = retainedBaseRoles + UserRole.ADMIN
+                capabilitiesAfter = requestedCaps
+            }
+            InvitationProfile.TEACHER -> {
+                if (request.capabilities.isNotEmpty() || request.tutorScopes.isNotEmpty()) {
+                    throw ApiException.Validation("Teacher authorization cannot include admin capabilities or tutor scopes")
+                }
+                rolesAfter = (retainedBaseRoles - UserRole.TEACHER_PENDING) + UserRole.TEACHER
+                capabilitiesAfter = null
+                approvedApplicationId =
+                    target
+                        .staffApplications()
+                        .firstOrNull {
+                            it.role == StaffRole.TEACHER &&
+                                it.status == StaffApplicationStatus.PENDING &&
+                                it.requestedInstitutionId == request.institutionId
+                        }?.id
+            }
+            InvitationProfile.TUTOR -> {
+                if (request.capabilities.isNotEmpty()) {
+                    throw ApiException.Validation("Tutor authorization cannot include admin capabilities")
+                }
+                if (request.tutorScopes.isEmpty() ||
+                    request.tutorScopes.size > 20 ||
+                    request.tutorScopes
+                        .map { it.academicGroupId }
+                        .distinct()
+                        .size != request.tutorScopes.size
+                ) {
+                    throw ApiException.Validation("One to twenty distinct approved groups are required")
+                }
+                for (scope in request.tutorScopes) {
+                    identifier(scope.academicGroupId)
+                    identifier(scope.periodId)
+                    tutoring.validateApprovalScope(
+                        currentActor,
+                        target.id,
+                        request.institutionId,
+                        scope,
+                        assignmentId(target.id, invitation.id, request.operationId, scope.academicGroupId),
+                        null,
+                    )
+                }
+                rolesAfter = retainedBaseRoles + UserRole.TUTOR
+                capabilitiesAfter = null
+                approvedApplicationId =
+                    target
+                        .staffApplications()
+                        .firstOrNull {
+                            it.role == StaffRole.TUTOR &&
+                                it.status == StaffApplicationStatus.PENDING &&
+                                it.requestedInstitutionId == request.institutionId
+                        }?.id
+            }
+            InvitationProfile.STUDENT -> {
+                if (request.capabilities.isNotEmpty() || request.tutorScopes.isNotEmpty()) {
+                    throw ApiException.Validation("Student authorization cannot include admin capabilities or tutor scopes")
+                }
+                rolesAfter = target.roles + UserRole.STUDENT
+                capabilitiesAfter = null
+            }
+            InvitationProfile.PARTICIPANT, InvitationProfile.EXTERNAL_GUEST -> {
+                if (request.capabilities.isNotEmpty() || request.tutorScopes.isNotEmpty()) {
+                    throw ApiException.Validation("Guest authorization cannot include admin capabilities or tutor scopes")
+                }
+                rolesAfter = retainedBaseRoles + UserRole.GUEST
+                capabilitiesAfter = null
+            }
+        }
+
+        val now = clock.instant()
+        val change =
+            AccountIdentityChange(
+                operationId = request.operationId,
+                actorId = currentActor.id,
+                accountStatus = AccountStatus.ACTIVE,
+                roles = rolesAfter,
+                institutionId = request.institutionId,
+                occurredAt = now,
+                scopeDigest = digest,
+                approvedApplicationId = approvedApplicationId,
+                capabilities = capabilitiesAfter,
+            )
+
+        if (target.isExactIdentityRetry(request.expectedAuthRevision, change)) {
+            invitationDirectory.markAuthorized(invitation.id, now)
+            return summary(target)
+        }
+        if (invitation.status != InvitationStatus.ACCEPTED || target.authRevision != request.expectedAuthRevision) {
+            throw ApiException.Conflict("Invitation or account state changed; reload before authorizing")
+        }
+        val approved =
+            accounts.changeIdentity(target.id, request.expectedAuthRevision, change)
+                ?: throw ApiException.Conflict("Invited account changed concurrently")
+        for (scope in request.tutorScopes) {
+            tutoring.createApproved(
+                currentActor,
+                approved,
+                request.institutionId,
+                scope,
+                assignmentId(target.id, invitation.id, request.operationId, scope.academicGroupId),
+                now,
+            )
+        }
+        invitationDirectory.markAuthorized(invitation.id, now)
+        return summary(approved)
     }
 
     private fun summary(account: PlatformAccount) =

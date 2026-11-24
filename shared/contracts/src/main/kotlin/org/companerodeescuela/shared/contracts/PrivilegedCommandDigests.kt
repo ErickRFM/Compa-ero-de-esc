@@ -92,6 +92,11 @@ object PrivilegedCommandDigests {
         request: AcademicOperationRequest,
     ): String = digest("academic-event-cancel-v1", id, json.encodeToJsonElement(request.copy(proof = "")))
 
+    fun invitationAuthorization(
+        invitationId: String,
+        request: AuthorizeRegistrationInvitationRequest,
+    ): String = digest("invitation-authorization-v1", invitationId, json.encodeToJsonElement(request.copy(proof = "")))
+
     private fun digest(
         kind: String,
         targetId: String,

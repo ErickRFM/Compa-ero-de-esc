@@ -52,6 +52,9 @@ internal data class InvitationRecord(
     val acceptedOperation: String? = null,
     val acceptedAt: Instant? = null,
     val revokedAt: Instant? = null,
+    val deliveryStatus: String? = null,
+    val deliveryUpdatedAt: Instant? = null,
+    val retryOperations: Set<String> = emptySet(),
 ) {
     override fun toString() = "InvitationRecord(id=$id, profile=$profile, status=$status, recipient=[redacted], token=[redacted])"
 }
@@ -133,6 +136,18 @@ internal interface InvitationRepository {
         id: String,
         newTokenHash: String,
         now: Instant,
+        operationId: String? = null,
+    ): Boolean = false
+
+    suspend fun updateDeliveryStatus(
+        id: String,
+        deliveryStatus: String,
+        updatedAt: Instant,
+    ): Boolean = false
+
+    suspend fun markAuthorized(
+        id: String,
+        now: Instant,
     ): Boolean = false
 
     suspend fun listRecent(
@@ -166,7 +181,7 @@ internal class InMemoryInvitationRepository : InvitationRepository {
                 .asSequence()
                 .filter { institutionId == null || it.institutionId == institutionId }
                 .sortedByDescending { it.createdAt }
-                .take(limit.coerceIn(1, 100))
+                .take(limit.coerceIn(1, 50))
                 .toList()
         }
 
@@ -204,17 +219,63 @@ internal class InMemoryInvitationRepository : InvitationRepository {
         id: String,
         newTokenHash: String,
         now: Instant,
+        operationId: String?,
     ): Boolean =
         mutex.withLock {
             val current = records[id] ?: return@withLock false
             val timestamp = now.truncatedTo(ChronoUnit.MILLIS)
             if (timestamp < current.createdAt ||
                 current.status !in setOf(InvitationStatus.FAILED, InvitationStatus.SENT) ||
-                timestamp >= current.expiresAt
+                timestamp >= current.expiresAt ||
+                !newTokenHash.matches(Regex("[A-Za-z0-9_-]{43}")) ||
+                records.values.any { it.id != id && it.tokenHash == newTokenHash } ||
+                (operationId != null && operationId in current.retryOperations)
             ) {
                 return@withLock false
             }
-            records[id] = current.copy(status = InvitationStatus.SENT, tokenHash = newTokenHash)
+            val updatedOperations =
+                if (operationId != null) current.retryOperations + operationId else current.retryOperations
+            records[id] =
+                current.copy(
+                    status = InvitationStatus.SENT,
+                    tokenHash = newTokenHash,
+                    deliveryStatus = null,
+                    deliveryUpdatedAt = null,
+                    retryOperations = updatedOperations,
+                )
+            true
+        }
+
+    override suspend fun updateDeliveryStatus(
+        id: String,
+        deliveryStatus: String,
+        updatedAt: Instant,
+    ): Boolean =
+        mutex.withLock {
+            val current = records[id] ?: return@withLock false
+            val timestamp = updatedAt.truncatedTo(ChronoUnit.MILLIS)
+            records[id] =
+                current.copy(
+                    deliveryStatus = deliveryStatus,
+                    deliveryUpdatedAt = timestamp,
+                )
+            true
+        }
+
+    override suspend fun markAuthorized(
+        id: String,
+        now: Instant,
+    ): Boolean =
+        mutex.withLock {
+            val current = records[id] ?: return@withLock false
+            val timestamp = now.truncatedTo(ChronoUnit.MILLIS)
+            if (timestamp < current.createdAt ||
+                current.status != InvitationStatus.ACCEPTED ||
+                current.acceptedBy.isNullOrBlank()
+            ) {
+                return@withLock false
+            }
+            records[id] = current.copy(status = InvitationStatus.ACTIVE)
             true
         }
 

@@ -36,6 +36,7 @@ import org.companerodeescuela.shared.contracts.AdminCapability
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.ApproveStaffRequest
 import org.companerodeescuela.shared.contracts.ApproveStudentAffiliationRequest
+import org.companerodeescuela.shared.contracts.AuthorizeRegistrationInvitationRequest
 import org.companerodeescuela.shared.contracts.TeacherApplicationRequest
 import org.companerodeescuela.shared.contracts.TutorApplicationRequest
 import org.companerodeescuela.shared.contracts.UserRole
@@ -142,6 +143,28 @@ internal fun Route.accountAdministrationRoutes(
                 val result = service.approveStudentAffiliation(actor, id, request)
                 recordAudit(actor.id, "ACCOUNT_STUDENT_AFFILIATION", "ACCOUNT", id, operationId, "SUCCEEDED")
                 call.respond(ApiResponse(result, operationId))
+            }
+            post("/invitation-authorization") {
+                val actor = call.actor(true)
+                val request = call.administrationRequest(AuthorizeRegistrationInvitationRequest.serializer())
+                recordAudit(
+                    actor.id,
+                    "ACCOUNT_INVITATION_AUTHORIZATION",
+                    "INVITATION",
+                    request.invitationId,
+                    request.operationId,
+                    "STARTED",
+                )
+                val result = service.authorizeInvitation(actor, request)
+                recordAudit(
+                    actor.id,
+                    "ACCOUNT_INVITATION_AUTHORIZATION",
+                    "ACCOUNT",
+                    result.user.id,
+                    request.operationId,
+                    "SUCCEEDED",
+                )
+                call.respond(ApiResponse(result, request.operationId))
             }
             post("/{accountId}/lifecycle") {
                 val actor = call.actor(true)

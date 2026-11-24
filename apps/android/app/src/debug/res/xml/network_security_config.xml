@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Cleartext is allowed only for the loopback and private-range addresses a
-  developer machine uses. Everything else, including anything that could be a
-  production host, must use HTTPS and will fail without it.
+  Debug only: cleartext remains reachable for the loopback and emulator host
+  addresses a developer machine uses. Release has no cleartext exception.
 -->
 <network-security-config>
     <domain-config cleartextTrafficPermitted="true">

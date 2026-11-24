@@ -57,14 +57,23 @@ internal class MongoResendWebhookAuditRepository(
             )
         }
 
+        val outcome =
+            if (status in setOf("BOUNCED", "FAILED", "SUPPRESSED")) {
+                "FAILED"
+            } else {
+                "SUCCEEDED"
+            }
         val audit =
             Document("_id", event.messageId)
                 .append("source", "RESEND_WEBHOOK")
+                .append("actorId", "RESEND_WEBHOOK")
                 .append("action", event.type.uppercase().replace('.', '_'))
                 .append("resourceType", if (event.invitationId == null) "EMAIL" else "INVITATION")
                 .append("resourceId", event.invitationId ?: event.emailId)
                 .append("providerEmailId", event.emailId)
+                .append("outcome", outcome)
                 .append("eventAt", Date.from(event.createdAt))
+                .append("createdAt", Date.from(event.createdAt))
                 .append("receivedAt", Date.from(event.receivedAt))
                 .append("processed", true)
 

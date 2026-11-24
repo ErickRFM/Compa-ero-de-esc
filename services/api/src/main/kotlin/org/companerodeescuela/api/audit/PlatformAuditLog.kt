@@ -89,6 +89,14 @@ internal class MongoPlatformAuditLog(
         if (indexesReady) return
         try {
             events.createIndex(
+                Indexes.descending("createdAt"),
+                IndexOptions().name("audit_created_desc_idx"),
+            )
+            events.createIndex(
+                Indexes.compoundIndex(Indexes.ascending("action"), Indexes.descending("createdAt")),
+                IndexOptions().name("audit_action_created_idx"),
+            )
+            events.createIndex(
                 Indexes.ascending("actorId", "createdAt"),
                 IndexOptions().name("audit_actor_created_idx"),
             )

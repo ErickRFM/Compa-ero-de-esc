@@ -11,9 +11,11 @@ import com.mongodb.client.model.FindOneAndUpdateOptions
 import com.mongodb.client.model.IndexOptions
 import com.mongodb.client.model.Indexes
 import com.mongodb.client.model.ReturnDocument
+import com.mongodb.client.model.Sorts
 import com.mongodb.client.model.Updates
 import com.mongodb.kotlin.client.coroutine.MongoDatabase
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.toList
 import org.bson.Document
 import java.time.Instant
 import java.util.Date
@@ -48,6 +50,23 @@ internal class MongoInvitationRepository(
     }
 
     override suspend fun find(id: String): InvitationRecord? = records.find(eq("_id", id)).firstOrNull()?.toInvitation()
+
+    override suspend fun listRecent(
+        limit: Int,
+        institutionId: String?,
+    ): List<InvitationRecord> {
+        val cursor =
+            if (institutionId != null) {
+                records.find(eq("institutionId", institutionId))
+            } else {
+                records.find()
+            }
+        return cursor
+            .sort(Sorts.descending("createdAt"))
+            .limit(limit.coerceIn(1, 100))
+            .toList()
+            .map { it.toInvitation() }
+    }
 
     override suspend fun markSent(
         id: String,

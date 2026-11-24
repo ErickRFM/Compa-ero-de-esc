@@ -121,3 +121,14 @@ import kotlinx.serialization.Serializable
     val users: List<AdminUserSummary>,
     val metrics: AdministrationMetrics,
 )
+
+@Serializable data class AdminAuditEntry(
+    val id: String,
+    val actorId: String,
+    val action: String,
+    val resourceType: String,
+    val resourceId: String,
+    val operationId: String? = null,
+    val outcome: String,
+    val createdAtEpochSeconds: Long,
+)

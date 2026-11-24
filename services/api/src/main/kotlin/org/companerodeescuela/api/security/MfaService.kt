@@ -112,8 +112,9 @@ class MfaService(
         }
         val secret = readSecret(encryption, factor)
         try {
-            val step = Totp.matchingStep(secret, otp, now)
-                ?: throw ApiException.Forbidden("MFA code is invalid", ApiErrorCode.MFA_CODE_INVALID)
+            val step =
+                Totp.matchingStep(secret, otp, now)
+                    ?: throw ApiException.Forbidden("MFA code is invalid", ApiErrorCode.MFA_CODE_INVALID)
             if (!repository.consumeStep(current.id, factor.id, step, now)) {
                 throw ApiException.Forbidden("MFA code was already used", ApiErrorCode.MFA_CODE_REUSED)
             }

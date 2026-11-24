@@ -1,9 +1,9 @@
 package org.companerodeescuela.feature.auth
 
+import org.companerodeescuela.core.common.result.AppError
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertFalse
-import org.companerodeescuela.core.common.result.AppError
 
 class InvitationTypedErrorTest {
     @Test

@@ -53,6 +53,11 @@ internal fun formatInvitationFailure(
     step: InvitationIssueStep?,
     error: AppError,
 ): String {
+    val mappedDetail = invitationTypedError(error)
+    if (mappedDetail != null) {
+        val requestId = (error as? AppError.Http)?.requestId
+        return if (requestId == null) mappedDetail else "$mappedDetail\nReferencia: $requestId"
+    }
     val detail =
         when (error) {
             is AppError.Network ->

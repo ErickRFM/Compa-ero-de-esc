@@ -705,7 +705,7 @@ internal fun adminUserDirectory(
                     401 -> R.string.admin_error_session
                     403 -> R.string.admin_error_denied
                     409 -> R.string.admin_error_conflict
-                    422 -> R.string.admin_error_validation
+                    400, 422 -> R.string.admin_error_validation
                     429 -> R.string.admin_error_rate
                     in
                     500..599,

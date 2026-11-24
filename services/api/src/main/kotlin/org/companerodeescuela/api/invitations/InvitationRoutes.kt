@@ -98,6 +98,7 @@ internal fun Route.invitationRoutes(
         return
     }
     val resolver = NativeActorResolver(accounts, sessions, AuthTokenService(settings), identity)
+    // A single invitation uses prepare and dispatch: keep independent abuse buckets.
     val issuerLimiter = LoginAttemptLimiter(maxAttempts = 5, store = rateLimitStore)
     val acceptanceLimiter = LoginAttemptLimiter(maxAttempts = 10, store = rateLimitStore)
     val acceptance = InvitationAcceptanceService(accounts, invitations, clock)
@@ -178,7 +179,7 @@ internal fun Route.invitationRoutes(
             }
             post("/prepare") {
                 val actor = call.nativeActor()
-                issuerLimiter.acquire(actor.id, call.clientAddress())?.let {
+                issuerLimiter.acquire("prepare:" + actor.id, call.clientAddress())?.let {
                     call.response.header(HttpHeaders.RetryAfter, it.toString())
                     throw ApiException.RateLimited()
                 }
@@ -205,7 +206,7 @@ internal fun Route.invitationRoutes(
             }
             post {
                 val actor = call.nativeActor()
-                issuerLimiter.acquire(actor.id, call.clientAddress())?.let {
+                issuerLimiter.acquire("dispatch:" + actor.id, call.clientAddress())?.let {
                     call.response.header(HttpHeaders.RetryAfter, it.toString())
                     throw ApiException.RateLimited()
                 }
@@ -238,7 +239,7 @@ internal fun Route.invitationRoutes(
             }
             post("/retry") {
                 val actor = call.nativeActor()
-                issuerLimiter.acquire(actor.id, call.clientAddress())?.let {
+                issuerLimiter.acquire("manage:" + actor.id, call.clientAddress())?.let {
                     call.response.header(HttpHeaders.RetryAfter, it.toString())
                     throw ApiException.RateLimited()
                 }
@@ -282,7 +283,7 @@ internal fun Route.invitationRoutes(
                 ) {
                     throw ApiException.Forbidden("Verified super administrator is required to revoke invitations")
                 }
-                issuerLimiter.acquire(actor.id, call.clientAddress())?.let {
+                issuerLimiter.acquire("manage:" + actor.id, call.clientAddress())?.let {
                     call.response.header(HttpHeaders.RetryAfter, it.toString())
                     throw ApiException.RateLimited()
                 }

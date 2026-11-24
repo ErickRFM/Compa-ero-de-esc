@@ -40,6 +40,10 @@ out/
 captures/
 .externalNativeBuild/
 release/
+# The rule above means the IDE's `release/` output folder, but it also hides the
+# Android `src/release/` source set, so release-only resources silently never get committed.
+!**/src/release/
+!**/src/release/**
 
 # ---------------------------------------------------------------------------
 # OS noise

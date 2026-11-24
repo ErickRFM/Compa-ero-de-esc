@@ -29,19 +29,33 @@ internal class MongoInvitationRepository(
     private val records = database.getCollection<Document>("platform_invitations")
 
     @Volatile
-    private var tokenHashIndexReady = false
+    private var indexesReady = false
+
+    private suspend fun ensureIndexes() {
+        if (indexesReady) return
+        records.createIndex(
+            Indexes.ascending("tokenHash"),
+            IndexOptions().name("invitation_tokenHash_unique").unique(true),
+        )
+        records.createIndex(
+            Indexes.descending("createdAt"),
+            IndexOptions().name("invitation_createdAt_desc_idx"),
+        )
+        records.createIndex(
+            Indexes.compoundIndex(Indexes.ascending("institutionId"), Indexes.descending("createdAt")),
+            IndexOptions().name("invitation_institution_createdAt_idx"),
+        )
+        records.createIndex(
+            Indexes.ascending("status", "expiresAt"),
+            IndexOptions().name("invitation_status_expiresAt_idx"),
+        )
+        indexesReady = true
+    }
 
     override suspend fun create(record: InvitationRecord): Boolean {
         val canonical = record.canonicalForStorage()
         if (!canonical.validForCreation()) return false
-        if (!tokenHashIndexReady) {
-            try {
-                records.createIndex(Indexes.ascending("tokenHash"), IndexOptions().name("invitation_tokenHash_unique").unique(true))
-            } catch (_: com.mongodb.MongoCommandException) {
-                // Index already exists; safe to ignore
-            }
-            tokenHashIndexReady = true
-        }
+        ensureIndexes()
         return try {
             records.insertOne(canonical.toDocument())
             true
@@ -56,6 +70,7 @@ internal class MongoInvitationRepository(
         limit: Int,
         institutionId: String?,
     ): List<InvitationRecord> {
+        ensureIndexes()
         val cursor =
             if (institutionId != null) {
                 records.find(eq("institutionId", institutionId))
@@ -64,7 +79,7 @@ internal class MongoInvitationRepository(
             }
         return cursor
             .sort(Sorts.descending("createdAt"))
-            .limit(limit.coerceIn(1, 100))
+            .limit(limit.coerceIn(1, 50))
             .toList()
             .map { it.toInvitation() }
     }

@@ -181,7 +181,7 @@ internal class InMemoryInvitationRepository : InvitationRepository {
                 .asSequence()
                 .filter { institutionId == null || it.institutionId == institutionId }
                 .sortedByDescending { it.createdAt }
-                .take(limit.coerceIn(1, 100))
+                .take(limit.coerceIn(1, 50))
                 .toList()
         }
 

@@ -8,17 +8,23 @@ package org.companerodeescuela.core.common.result
  * to carry a message that is safe to show to a student.
  */
 sealed interface Outcome<out T> {
-    data class Success<out T>(val value: T) : Outcome<T>
-    data class Failure(val error: AppError) : Outcome<Nothing>
+    data class Success<out T>(
+        val value: T,
+    ) : Outcome<T>
+
+    data class Failure(
+        val error: AppError,
+    ) : Outcome<Nothing>
 
     val isSuccess: Boolean get() = this is Success
 
     fun valueOrNull(): T? = (this as? Success)?.value
 
-    fun <R> map(transform: (T) -> R): Outcome<R> = when (this) {
-        is Success -> Success(transform(value))
-        is Failure -> this
-    }
+    fun <R> map(transform: (T) -> R): Outcome<R> =
+        when (this) {
+            is Success -> Success(transform(value))
+            is Failure -> this
+        }
 }
 
 /**
@@ -32,7 +38,9 @@ sealed interface AppError {
     val technicalDetail: String?
 
     /** The request never reached the server, or the connection dropped. */
-    data class Network(override val technicalDetail: String? = null) : AppError {
+    data class Network(
+        override val technicalDetail: String? = null,
+    ) : AppError {
         override val userMessage: String =
             "No pudimos conectar. Revisa tu conexión a internet e inténtalo de nuevo."
     }
@@ -43,18 +51,21 @@ sealed interface AppError {
         override val technicalDetail: String? = null,
         /** Opaque safe server correlation identifier, not a response body or credential. */
         val requestId: String? = null,
+        /** Allowlisted machine-readable API code; server message is never rendered. */
+        val apiCode: String? = null,
     ) : AppError {
-        override val userMessage: String = when (status) {
-            400 -> "Revisa los datos enviados e inténtalo nuevamente."
-            401 -> "Tu sesión expiró. Inicia sesión nuevamente."
-            403 -> "No tienes permiso para ver esta información."
-            404 -> "No encontramos la información que buscas."
-            409 -> "La operación entra en conflicto con el estado actual."
-            422 -> "Revisa la información enviada e inténtalo nuevamente."
-            429 -> "Demasiados intentos. Espera un momento e inténtalo de nuevo."
-            in 500..599 -> "El servicio no está disponible en este momento."
-            else -> "No pudimos completar la solicitud."
-        }
+        override val userMessage: String =
+            when (status) {
+                400 -> "Revisa los datos enviados e inténtalo nuevamente."
+                401 -> "Tu sesión expiró. Inicia sesión nuevamente."
+                403 -> "No tienes permiso para ver esta información."
+                404 -> "No encontramos la información que buscas."
+                409 -> "La operación entra en conflicto con el estado actual."
+                422 -> "Revisa la información enviada e inténtalo nuevamente."
+                429 -> "Demasiados intentos. Espera un momento e inténtalo de nuevo."
+                in 500..599 -> "El servicio no está disponible en este momento."
+                else -> "No pudimos completar la solicitud."
+            }
     }
 
     /** The response arrived but did not match the agreed contract. */

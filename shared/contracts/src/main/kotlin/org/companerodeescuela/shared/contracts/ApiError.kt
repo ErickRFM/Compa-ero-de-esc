@@ -43,6 +43,22 @@ enum class ApiErrorCode {
 
     @SerialName("internal_error")
     INTERNAL_ERROR,
+
+    // Append-only codes for localized invitation/MFA guidance.
+    @SerialName("invitation_institution_unavailable")
+    INVITATION_INSTITUTION_UNAVAILABLE,
+
+    @SerialName("mfa_enrollment_required")
+    MFA_ENROLLMENT_REQUIRED,
+
+    @SerialName("mfa_reauthentication_failed")
+    MFA_REAUTHENTICATION_FAILED,
+
+    @SerialName("mfa_code_invalid")
+    MFA_CODE_INVALID,
+
+    @SerialName("mfa_code_reused")
+    MFA_CODE_REUSED,
 }
 
 /**

@@ -395,8 +395,8 @@ class SettingsLoader(
             env("RESEND_WEBHOOK_SECRET")?.trim()?.takeIf { it.isNotEmpty() }?.also { secret ->
                 val encoded = secret.removePrefix("whsec_")
                 val decoded = runCatching { Base64.getDecoder().decode(encoded) }.getOrNull()
-                if (!secret.startsWith("whsec_") || decoded?.size != 32) {
-                    throw ConfigurationException("RESEND_WEBHOOK_SECRET must be a Resend whsec_ secret containing 32 bytes")
+                if (!secret.startsWith("whsec_") || decoded?.size !in setOf(24, 32)) {
+                    throw ConfigurationException("RESEND_WEBHOOK_SECRET must be a Resend whsec_ secret containing 24 or 32 bytes")
                 }
             }
 

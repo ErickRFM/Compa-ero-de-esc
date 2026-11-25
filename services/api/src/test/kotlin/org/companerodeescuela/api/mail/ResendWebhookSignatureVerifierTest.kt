@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 class ResendWebhookSignatureVerifierTest {
     private val now = Instant.parse("2026-11-09T22:00:00Z")
     private val clock = Clock.fixed(now, ZoneOffset.UTC)
-    private val key = ByteArray(32) { it.toByte() }
+    private val key = ByteArray(24) { it.toByte() }
     private val secret = "whsec_" + Base64.getEncoder().encodeToString(key)
     private val messageId = "msg_123456789"
     private val timestamp = now.epochSecond.toString()

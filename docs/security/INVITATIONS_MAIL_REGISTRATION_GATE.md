@@ -43,6 +43,6 @@ La implementación del webhook y su procedimiento de activación están descrito
 
 ## Variables productivas
 
-- `PRODUCTION_INVITATIONS_ENABLED=true` sólo se acepta si también existen `MONGODB_URI`, `JWT_SECRET`, `VERIFICATION_EMAIL_API_KEY`, `VERIFICATION_EMAIL_SENDER`, `MFA_ENCRYPTION_KEY` y `RESEND_WEBHOOK_SECRET` válido (`whsec_`, 32 bytes decodificados).
+- `PRODUCTION_INVITATIONS_ENABLED=true` sólo se acepta si también existen `MONGODB_URI`, `JWT_SECRET`, `VERIFICATION_EMAIL_API_KEY`, `VERIFICATION_EMAIL_SENDER`, `MFA_ENCRYPTION_KEY` y `RESEND_WEBHOOK_SECRET` válido (`whsec_`, 24 o 32 bytes decodificados).
 - No activar este flag hasta desplegar el endpoint `POST /webhooks/resend` y probar un ciclo completo de correo en QA.
 - Runbook de Resend: `docs/operations/RESEND_WEBHOOK_SETUP.md`.

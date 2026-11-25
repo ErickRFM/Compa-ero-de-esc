@@ -390,7 +390,7 @@ class SettingsLoaderTest {
         val jwt = "j".repeat(40)
         val mfa = "A".repeat(43)
         val webhookEncoder = java.util.Base64.getEncoder()
-        val webhookSecret = "whsec_" + webhookEncoder.encodeToString(ByteArray(32) { it.toByte() })
+        val webhookSecret = "whsec_" + webhookEncoder.encodeToString(ByteArray(24) { it.toByte() })
         val common =
             listOf(
                 "APP_ENV" to "production",

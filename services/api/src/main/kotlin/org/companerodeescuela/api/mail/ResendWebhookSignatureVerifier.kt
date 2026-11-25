@@ -82,7 +82,7 @@ internal class ResendWebhookSignatureVerifier(
             val decoded =
                 runCatching { Base64.getDecoder().decode(secret.removePrefix("whsec_")) }.getOrNull()
                     ?: throw IllegalArgumentException("Invalid Resend webhook signing secret")
-            require(decoded.size == 32) { "Invalid Resend webhook signing secret" }
+            require(decoded.size in setOf(24, 32)) { "Invalid Resend webhook signing secret" }
             return decoded
         }
     }

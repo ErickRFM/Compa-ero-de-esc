@@ -31,7 +31,7 @@ hilt = "2.57.2"
 
 # Kotlin ecosystem
 coroutines = "1.10.2"
-serializationJson = "1.9.0"
+serializationJson = "1.13.0"
 
 # Backend
 ktor = "3.3.3"

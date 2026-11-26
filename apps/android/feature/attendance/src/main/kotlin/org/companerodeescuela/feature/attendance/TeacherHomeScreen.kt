@@ -23,7 +23,6 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -44,6 +43,7 @@ import org.companerodeescuela.core.designsystem.v8.V8DailyClassRow
 import org.companerodeescuela.core.designsystem.v8.V8DashboardStat
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8IconTile
+import org.companerodeescuela.core.designsystem.v8.V8LoadingCard
 import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
@@ -107,7 +107,7 @@ fun TeacherHomeScreen(
             }
 
             if (state.mode == AttendanceMode.LOADING || state.loading && state.occurrences.isEmpty()) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                V8LoadingCard("Cargando tus clases de hoy…")
             } else if (state.mode != AttendanceMode.TEACHER) {
                 StatusNotice(
                     title = "Acceso docente pendiente",

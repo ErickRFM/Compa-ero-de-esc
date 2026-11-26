@@ -51,6 +51,7 @@ import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8InlineLoading
 import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
@@ -146,7 +147,7 @@ fun adminHomeScreenContent(
             enabled = !state.working,
             modifier = Modifier.testTag("admin_refresh"),
         ) { Text(stringResource(R.string.admin_refresh)) }
-        if (state.loading) CircularProgressIndicator(Modifier.testTag("admin_loading"))
+        if (state.loading) V8InlineLoading("Cargando panel administrativo…", Modifier.testTag("admin_loading"))
         state.failure?.let { adminFailure(it) }
         if (state.completedOperationId != null) {
             StatusNotice(

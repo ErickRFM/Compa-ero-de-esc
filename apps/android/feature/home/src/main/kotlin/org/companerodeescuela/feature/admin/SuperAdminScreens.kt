@@ -15,7 +15,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -43,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8InlineLoading
 import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
@@ -108,7 +108,7 @@ fun superAdminAccountsScreen(
                 modifier = Modifier.weight(1f).testTag("super_admin_accounts_invite"),
             )
         }
-        if (state.loading || state.invitationsLoading) CircularProgressIndicator()
+        if (state.loading || state.invitationsLoading) V8InlineLoading("Cargando cuentas e invitaciones…")
         state.failure?.let { adminFailure(it) }
         if (state.completedOperationId != null) {
             StatusNotice(
@@ -466,7 +466,7 @@ fun superAdminHistoryScreen(
                 }
             }
         }
-        if (state.auditLoading) CircularProgressIndicator(Modifier.testTag("super_admin_history_loading"))
+        if (state.auditLoading) V8InlineLoading("Cargando historial auditado…", Modifier.testTag("super_admin_history_loading"))
         state.auditFailure?.let { adminFailure(it) }
         if (!state.auditLoading && filtered.isEmpty() && state.auditFailure == null) {
             Text(

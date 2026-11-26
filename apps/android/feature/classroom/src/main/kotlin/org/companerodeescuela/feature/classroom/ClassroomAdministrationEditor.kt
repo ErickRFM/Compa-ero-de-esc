@@ -19,7 +19,9 @@ import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8InlineLoading
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
+import org.companerodeescuela.core.motion.CompaneroExpandableVisibility
 import org.companerodeescuela.feature.admin.AdminOperation
 import org.companerodeescuela.feature.admin.protectedAdminDialog
 import org.companerodeescuela.shared.contracts.*
@@ -125,7 +127,7 @@ fun ClassroomAdministrationEditor(
                 )
             }
         }
-        if (state.loading) CircularProgressIndicator(Modifier.testTag("academic_admin_loading"))
+        if (state.loading) V8InlineLoading("Cargando grupos y horarios…", Modifier.testTag("academic_admin_loading"))
         state.failure?.let { AcademicFailure(it) }
         if (state.completed) Text(stringResource(R.string.academic_admin_done), modifier = Modifier.testTag("academic_admin_done"))
         OutlinedButton(
@@ -181,14 +183,16 @@ fun ClassroomAdministrationEditor(
                         enabled,
                     )
                     AcademicField(period, { period = it.take(128) }, R.string.academic_admin_period, "academic_period", enabled)
+                    val today = LocalDate.now(ZoneOffset.UTC)
+                    val (startError, endError) = groupDatesIssueText(groupDatesIssue(starts, ends, today))
                     AcademicField(starts, {
                         starts = it.take(10)
                         invalidDate = false
-                    }, R.string.academic_admin_start, "academic_start", enabled)
+                    }, R.string.academic_admin_start, "academic_start", enabled, startError)
                     AcademicField(ends, {
                         ends = it.take(10)
                         invalidDate = false
-                    }, R.string.academic_admin_end, "academic_end", enabled)
+                    }, R.string.academic_admin_end, "academic_end", enabled, endError)
                     if (invalidDate) Text(stringResource(R.string.academic_admin_invalid), color = MaterialTheme.colorScheme.error)
                     Button(
                         {
@@ -211,8 +215,7 @@ fun ClassroomAdministrationEditor(
                                 groupName.isNotBlank() &&
                                 institution.isNotBlank() &&
                                 period.isNotBlank() &&
-                                starts.length == 10 &&
-                                ends.length == 10,
+                                groupDatesReady(starts, ends, today),
                         modifier = Modifier.testTag("academic_group_prepare"),
                     ) { Text(stringResource(R.string.academic_admin_prepare)) }
                 }
@@ -314,23 +317,47 @@ fun ClassroomAdministrationEditor(
                             untilTime = to
                         },
                     )
-                    AcademicField(fromTime, { fromTime = it.take(5) }, R.string.academic_admin_time_start, "academic_time_start", enabled)
-                    AcademicField(untilTime, { untilTime = it.take(5) }, R.string.academic_admin_time_end, "academic_time_end", enabled)
+                    val (startError, endError) = scheduleIssueText(scheduleDraftIssue(fromTime, untilTime))
+                    AcademicField(
+                        fromTime,
+                        { fromTime = it.take(5) },
+                        R.string.academic_admin_time_start,
+                        "academic_time_start",
+                        enabled,
+                        startError,
+                    )
+                    AcademicField(
+                        untilTime,
+                        { untilTime = it.take(5) },
+                        R.string.academic_admin_time_end,
+                        "academic_time_end",
+                        enabled,
+                        endError,
+                    )
+                    val chosenClass = state.classrooms.find { it.id == selectedClass && it.status == ClassroomStatus.ACTIVE }
+                    val slotReady = day.isNotBlank() && scheduleDraftReady(fromTime, untilTime)
+                    CompaneroExpandableVisibility(visible = chosenClass != null && slotReady) {
+                        if (chosenClass != null && slotReady) AcademicScheduleSummary(chosenClass, day, fromTime, untilTime)
+                    }
                     Button(
                         { onSchedule(selectedClass, day, fromTime, untilTime) },
-                        enabled =
-                            enabled && selectedClass.isNotBlank() && day.isNotBlank() && fromTime.length == 5 && untilTime.length == 5,
+                        enabled = enabled && chosenClass != null && slotReady,
                         modifier = Modifier.testTag("academic_schedule_prepare"),
                     ) { Text(stringResource(R.string.academic_admin_prepare)) }
                 }
             }
             if (tab == AcademicWorkspaceTab.GROUPS) {
                 Text(stringResource(R.string.academic_admin_groups), style = MaterialTheme.typography.titleLarge)
-                state.groups.forEach { group ->
-                    V8GlassCard(Modifier.fillMaxWidth()) {
-                        Text(group.name + " · " + group.periodId.orEmpty(), style = MaterialTheme.typography.bodyMedium)
-                    }
+                if (state.groups.isEmpty() && !state.loading) {
+                    Text(
+                        stringResource(R.string.academic_groups_empty),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
+                state.groups
+                    .sortedWith(compareByDescending<AcademicGroupSummary> { it.active }.thenBy { it.name })
+                    .forEach { group -> AcademicGroupCard(group, state.classrooms.count { it.groupId == group.id }) }
             }
             if (tab == AcademicWorkspaceTab.CLASSES) {
                 state.activeInvite?.let { invite ->
@@ -378,10 +405,18 @@ fun ClassroomAdministrationEditor(
     label: Int,
     tag: String,
     enabled: Boolean,
+    error: String? = null,
 ) {
-    OutlinedTextField(value, change, modifier = Modifier.fillMaxWidth().testTag(tag), singleLine = true, enabled = enabled, label = {
-        Text(stringResource(label))
-    })
+    OutlinedTextField(
+        value,
+        change,
+        modifier = Modifier.fillMaxWidth().testTag(tag),
+        singleLine = true,
+        enabled = enabled,
+        label = { Text(stringResource(label)) },
+        isError = error != null,
+        supportingText = error?.let { message -> { Text(message, modifier = Modifier.testTag(tag + "_error")) } },
+    )
 }
 
 @Composable private fun AcademicPicker(

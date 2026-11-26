@@ -201,7 +201,7 @@ fun ProfileScreen(
                         )
                     }
                     if (canRequestTutor) {
-                        if (onSecurity != null) GroupDivider()
+                        if (onSecurity != null || onInvitation != null || onInvitationIssue != null) GroupDivider()
                         ProfileRow(
                             title = stringResource(R.string.profile_tutor_request),
                             icon = Icons.Outlined.PersonAdd,

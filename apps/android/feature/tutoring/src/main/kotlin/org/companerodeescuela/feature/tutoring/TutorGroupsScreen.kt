@@ -36,6 +36,7 @@ import org.companerodeescuela.core.designsystem.v8.V8LoadingCard
 import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
+import org.companerodeescuela.core.motion.CompaneroExpandableVisibility
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.RepresentativePosition
 
@@ -93,7 +94,7 @@ private fun TutorGroupsContent(
                 description = "Alumnos asignados, nombramiento de representantes y seguimiento académico.",
             )
         }
-        if (state.loading) V8LoadingCard(title = "Cargando grupos…")
+        CompaneroExpandableVisibility(visible = state.loading) { V8LoadingCard(title = "Cargando grupos…") }
         state.error?.let { StatusNotice(title = "No pudimos actualizar", message = it) }
         state.notice?.let { StatusNotice(title = "Tutorías", message = it) }
         if (!state.loading && state.groups.isEmpty()) {
@@ -156,7 +157,7 @@ private fun TutorGroupsContent(
             }
         }
 
-        if (state.rosterLoading) V8LoadingCard(title = "Cargando alumnos…")
+        CompaneroExpandableVisibility(visible = state.rosterLoading) { V8LoadingCard(title = "Cargando alumnos…") }
         if (groupId != null && !state.rosterLoading && state.roster.isEmpty()) {
             StatusNotice(title = "Sin alumnos registrados", message = "No hay miembros disponibles para este grupo.")
         }

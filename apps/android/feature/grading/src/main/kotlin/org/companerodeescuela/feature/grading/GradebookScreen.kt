@@ -20,7 +20,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -54,11 +53,13 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8GlassFilterChip
+import org.companerodeescuela.core.designsystem.v8.V8InlineLoading
 import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
+import org.companerodeescuela.core.motion.CompaneroExpandableVisibility
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.TeacherClassContext
 import java.io.IOException
@@ -174,7 +175,9 @@ fun GradebookScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {
                     TeacherGradingSectionTitle(number = "01", title = "Materia y periodo")
                     Text("Tus clases asignadas", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                    if (state.loadingClassrooms) CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    CompaneroExpandableVisibility(visible = state.loadingClassrooms) {
+                        V8InlineLoading("Cargando tus clases asignadas…")
+                    }
                     if (state.classroomLoadError != null) {
                         StatusNotice(title = "Sin datos de clases", message = state.classroomLoadError!!)
                     }

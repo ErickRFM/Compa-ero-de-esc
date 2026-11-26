@@ -24,6 +24,7 @@ import org.companerodeescuela.core.designsystem.v8.V8LoadingCard
 import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
+import org.companerodeescuela.core.motion.CompaneroExpandableVisibility
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ExcuseStatus
 
@@ -50,7 +51,7 @@ fun TutorHomeScreen(
         V8ScreenHeader {
             V8PageTitle(title = "Tutorías", description = "Acompañamiento académico de tus grupos asignados.")
         }
-        if (state.loading) V8LoadingCard(title = "Cargando tutorías…")
+        CompaneroExpandableVisibility(visible = state.loading) { V8LoadingCard(title = "Cargando tutorías…") }
         state.error?.let { StatusNotice(title = "No pudimos actualizar", message = it) }
         state.notice?.let { StatusNotice(title = "Tutorías", message = it) }
         V8GlassCard(

@@ -36,6 +36,7 @@ import org.companerodeescuela.core.designsystem.v8.V8LoadingCard
 import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
+import org.companerodeescuela.core.motion.CompaneroExpandableVisibility
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ExcuseRequestSummary
 import org.companerodeescuela.shared.contracts.ExcuseStatus
@@ -75,7 +76,7 @@ private fun TutorRequestsContent(
                 description = "Revisa las solicitudes de tus grupos. Una justificación no cambia la presencia verificada por QR.",
             )
         }
-        if (state.loading) V8LoadingCard(title = "Cargando solicitudes…")
+        CompaneroExpandableVisibility(visible = state.loading) { V8LoadingCard(title = "Cargando solicitudes…") }
         state.error?.let { StatusNotice(title = "No pudimos cargar solicitudes", message = it) }
         state.notice?.let { StatusNotice(title = "Solicitud", message = it) }
         if (!state.loading && state.error == null && state.requests.isEmpty()) {

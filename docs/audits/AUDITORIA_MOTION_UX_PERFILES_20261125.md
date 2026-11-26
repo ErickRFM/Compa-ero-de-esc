@@ -45,8 +45,12 @@ Sin cambios de API, navegación, permisos, roles ni resolución de experiencias.
 | `ktlintCheck` fuente principal de los cinco módulos | OK |
 | `ktlintCheck` test de `core:designsystem` | Falla previa en `ColorContrastTest.kt` (existe en `HEAD`, no tocado) |
 | Instrumentadas API 31/35, 360/390/430 dp, 200 % de texto, TalkBack | **Pendiente**: no había emulador ni dispositivo conectado |
-| APK Académica/Gestión | **Pendiente** de CI |
+| `assembleAcademicDebug` + `assembleManagementDebug` (local) | OK, ambas APK |
+| `testDebugUnitTest` de todo Android (local) | 309 casos, 0 fallos, 0 omitidos |
+| `lintAcademicDebug` (local) | OK |
+| `ktlintMainSourceSetCheck` global | Fallas previas en `shared:models`, `shared:validation`, `core:attendance`, `core:database`, `core:network`; ninguno modificado en esta rama |
 
-## 5. Dependencia de trabajo no confirmado
+## 5. Commits
 
-`CompaneroExpandableVisibility` vive en `core/motion/.../ContentMotion.kt`, que en esta copia está **sin seguimiento en Git** junto con otros cambios locales sin confirmar (Inicio, Asistencia, Ajustes, rediseño de Perfil, `ProfileComponents.kt`, `V8PreferenceGroup.kt`) que no forman parte de esta auditoría. Estos cambios deben confirmarse antes, o incluirse junto con ellos, para que la rama compile en CI.
+1. `f2ce251e` — trabajo local previo del autor: `ContentMotion.kt` (`CompaneroExpandableVisibility`, `animateCompaneroProgressAsState`), `V8PreferenceGroup`, extracción de `ProfileComponents.kt` y uso en Inicio, Asistencia y Ajustes.
+2. `464ba371` — esta auditoría, que se apoya en `CompaneroExpandableVisibility` del commit anterior.

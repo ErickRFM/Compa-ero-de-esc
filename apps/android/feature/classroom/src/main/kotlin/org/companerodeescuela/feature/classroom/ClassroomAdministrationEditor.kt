@@ -19,6 +19,7 @@ import org.companerodeescuela.core.common.result.AppError
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8InlineLoading
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.feature.admin.AdminOperation
 import org.companerodeescuela.feature.admin.protectedAdminDialog
@@ -125,7 +126,7 @@ fun ClassroomAdministrationEditor(
                 )
             }
         }
-        if (state.loading) CircularProgressIndicator(Modifier.testTag("academic_admin_loading"))
+        if (state.loading) V8InlineLoading("Cargando grupos y horarios…", Modifier.testTag("academic_admin_loading"))
         state.failure?.let { AcademicFailure(it) }
         if (state.completed) Text(stringResource(R.string.academic_admin_done), modifier = Modifier.testTag("academic_admin_done"))
         OutlinedButton(

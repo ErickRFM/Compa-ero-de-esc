@@ -43,6 +43,8 @@ import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8PreferenceGroup
 import org.companerodeescuela.core.navigation.AppDistribution
 import org.companerodeescuela.core.navigation.AppExperience
+import org.companerodeescuela.core.navigation.ExperienceAccess
+import org.companerodeescuela.core.navigation.ExperiencePresentation
 import org.companerodeescuela.core.navigation.RoleExperienceResolver
 import org.companerodeescuela.shared.contracts.UserRole
 
@@ -84,14 +86,9 @@ fun ProfileScreen(
         } else {
             activeExperience.takeIf(availableExperiences::contains) ?: AppExperience.UNSUPPORTED
         }
-    val administrativeExperience =
-        managementExperience &&
-            (experience == AppExperience.ADMIN || experience == AppExperience.SUPER_ADMIN)
-    val canRequestTutor =
-        experience == AppExperience.TEACHER &&
-            onTutorRequest != null &&
-            UserRole.TEACHER in roles &&
-            UserRole.TUTOR !in roles
+    val access = ExperienceAccess.of(experience, roles, distribution)
+    val administrativeExperience = access.administrativeProfileShortcuts
+    val canRequestTutor = onTutorRequest != null && access.canRequestTutorRole(roles)
     Box(modifier = modifier.fillMaxSize()) {
         if (!org.companerodeescuela.core.designsystem.v8.LocalV8GlassEnabled.current &&
             MaterialTheme.colorScheme.background.luminance() < 0.5f &&
@@ -112,7 +109,7 @@ fun ProfileScreen(
         ) {
             ProfileIdentityCard(
                 displayName = displayName,
-                activeLabel = "Perfil activo · ${experienceLabel(experience, roles)}",
+                activeLabel = "Perfil activo · ${ExperiencePresentation.experienceName(experience, roles)}",
                 managementExperience = managementExperience,
             )
 
@@ -128,7 +125,17 @@ fun ProfileScreen(
                     onClick = onIntegrations,
                 )
                 GroupDivider()
-                ProfileRow(title = "Roles de la cuenta", detail = roleSummary(roles), icon = Icons.Outlined.Badge)
+                ProfileRow(
+                    title = "Roles de la cuenta",
+                    detail = ExperiencePresentation.roleSummary(roles),
+                    icon = Icons.Outlined.Badge,
+                )
+                GroupDivider()
+                ProfileRow(
+                    title = if (access.teacherPending) "Validación pendiente" else "Qué puedes hacer",
+                    detail = ExperiencePresentation.scopeSummary(access),
+                    icon = Icons.Outlined.Info,
+                )
             }
 
             if (administrativeExperience &&
@@ -143,7 +150,7 @@ fun ProfileScreen(
                         ProfileRow(
                             title = "Panel administrativo",
                             icon = Icons.Outlined.Dashboard,
-                            detail = "",
+                            detail = "Solicitudes, directorio y métricas de cuentas.",
                             onClick = action,
                         )
                     }
@@ -161,7 +168,7 @@ fun ProfileScreen(
                         ProfileRow(
                             title = "Clases y canales",
                             icon = Icons.Outlined.School,
-                            detail = "",
+                            detail = "Asignación de docentes, alumnos y canales de clase.",
                             onClick = action,
                         )
                     }
@@ -278,40 +285,6 @@ fun ProfileScreen(
         }
     }
 }
-
-private fun roleSummary(roles: Set<UserRole>): String =
-    roles
-        .sortedBy(UserRole::ordinal)
-        .joinToString(" · ") { role ->
-            when (role) {
-                UserRole.STUDENT -> "Estudiante"
-                UserRole.WORKSHOP_PARTICIPANT -> "Participante"
-                UserRole.GUEST -> "Invitado"
-                UserRole.TEACHER_PENDING -> "Docente pendiente"
-                UserRole.TEACHER -> "Docente"
-                UserRole.TUTOR -> "Tutoría"
-                UserRole.PRINCIPAL -> "Dirección"
-                UserRole.COORDINATOR -> "Coordinación"
-                UserRole.ADMIN -> "Administración"
-                UserRole.SUPER_ADMIN -> "Administración general"
-            }
-        }.ifBlank { "Rol no disponible" }
-
-private fun experienceLabel(
-    experience: AppExperience,
-    roles: Set<UserRole>,
-): String =
-    when (experience) {
-        AppExperience.STUDENT -> "Estudiante"
-        AppExperience.TEACHER -> if (UserRole.TEACHER in roles) "Docente" else "Docente pendiente"
-        AppExperience.TUTOR -> "Tutoría"
-        AppExperience.PRINCIPAL -> "Dirección"
-        AppExperience.COORDINATOR -> "Coordinación"
-        AppExperience.ADMIN -> "Administración"
-        AppExperience.SUPER_ADMIN -> "Administración general"
-        AppExperience.GUEST -> if (UserRole.WORKSHOP_PARTICIPANT in roles) "Participante" else "Invitado"
-        AppExperience.UNSUPPORTED -> "No disponible"
-    }
 
 @Preview(showBackground = true)
 @Composable

@@ -83,6 +83,7 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassAssistChip
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8GlassFilterChip
+import org.companerodeescuela.core.designsystem.v8.V8InlineLoading
 import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
@@ -293,7 +294,7 @@ fun ChannelScreen(
                 if (selected == null) {
                     item {
                         if (state.loading) {
-                            CircularProgressIndicator()
+                            V8InlineLoading("Cargando canales…")
                         } else {
                             StatusNotice(
                                 title =

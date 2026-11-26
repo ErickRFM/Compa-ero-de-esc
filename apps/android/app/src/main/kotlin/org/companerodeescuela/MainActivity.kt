@@ -52,7 +52,10 @@ import org.companerodeescuela.core.navigation.AppDistribution
 import org.companerodeescuela.core.navigation.AppExperience
 import org.companerodeescuela.core.navigation.CompaneroScaffold
 import org.companerodeescuela.core.navigation.Destination
+import org.companerodeescuela.core.navigation.ExperienceAccess
+import org.companerodeescuela.core.navigation.ExperiencePresentation
 import org.companerodeescuela.core.navigation.RoleExperienceResolver
+import org.companerodeescuela.core.navigation.authorizedComposable
 import org.companerodeescuela.feature.admin.adminHomeScreen
 import org.companerodeescuela.feature.admin.superAdminAcademicScreen
 import org.companerodeescuela.feature.admin.superAdminAccountsScreen
@@ -297,6 +300,23 @@ class MainActivity : AppCompatActivity() {
                                             )
                                         }
                                     val navController = key(userId, roleConfig.experience, session.roles) { rememberNavController() }
+                                    val access =
+                                        remember(session.roles, roleConfig.experience, session.emailVerified) {
+                                            ExperienceAccess.of(
+                                                experience = roleConfig.experience,
+                                                roles = session.roles,
+                                                distribution = appDistribution,
+                                                emailVerified = session.emailVerified,
+                                            )
+                                        }
+                                    val denied: @androidx.compose.runtime.Composable () -> Unit = {
+                                        RoleUnavailableScreen(
+                                            roleConfig.experience,
+                                            session.roles,
+                                            onLogout = sessionViewModel::logout,
+                                            onBack = { navController.popBackStack() },
+                                        )
+                                    }
                                     var channelTabRequest by rememberSaveable(userId, roleConfig.experience) { mutableIntStateOf(-1) }
                                     var channelIdRequest by rememberSaveable(
                                         userId,
@@ -360,7 +380,7 @@ class MainActivity : AppCompatActivity() {
                                         highContrast = appearance.highContrast,
                                         campusBackdropEnabled = appearance.campusBackdropEnabled,
                                     ) {
-                                        composable(Destination.Home.route) {
+                                        authorizedComposable(Destination.Home, access, denied) {
                                             HomeScreen(
                                                 displayName = session.displayName,
                                                 onOpenAttendance = {
@@ -390,7 +410,7 @@ class MainActivity : AppCompatActivity() {
                                                 },
                                             )
                                         }
-                                        composable(Destination.TeacherHome.route) {
+                                        authorizedComposable(Destination.TeacherHome, access, denied) {
                                             TeacherHomeScreen(
                                                 onOpenAttendance = {
                                                     navController.navigate(Destination.Attendance.route) {
@@ -427,7 +447,7 @@ class MainActivity : AppCompatActivity() {
                                                 displayName = session.displayName,
                                             )
                                         }
-                                        composable(Destination.TutorHome.route) {
+                                        authorizedComposable(Destination.TutorHome, access, denied) {
                                             TutorHomeScreen(
                                                 onOpenRequests = {
                                                     navController.navigate(Destination.TutorRequests.route) {
@@ -436,26 +456,18 @@ class MainActivity : AppCompatActivity() {
                                                 },
                                             )
                                         }
-                                        composable(Destination.TutorGroups.route) {
+                                        authorizedComposable(Destination.TutorGroups, access, denied) {
                                             TutorGroupsScreen()
                                         }
-                                        composable(Destination.TutorRequests.route) {
+                                        authorizedComposable(Destination.TutorRequests, access, denied) {
                                             TutorRequestsScreen()
                                         }
-                                        composable(Destination.RepresentativeInvitations.route) {
-                                            if (AcademicRoutePolicy.studentActions(roleConfig.experience, session.roles)) {
-                                                StudentRepresentativesScreen()
-                                            } else {
-                                                RoleUnavailableScreen(
-                                                    AppExperience.UNSUPPORTED,
-                                                    onLogout = sessionViewModel::logout,
-                                                    onBack = { navController.popBackStack() },
-                                                )
-                                            }
+                                        authorizedComposable(Destination.RepresentativeInvitations, access, denied) {
+                                            StudentRepresentativesScreen()
                                         }
-                                        composable(Destination.CoordinatorHome.route) {
+                                        authorizedComposable(Destination.CoordinatorHome, access, denied) {
                                             coordinatorHomeScreen(
-                                                directionExperience = roleConfig.experience == AppExperience.PRINCIPAL,
+                                                directionExperience = access.experience == AppExperience.PRINCIPAL,
                                                 onOpenSchedule = {
                                                     navController.navigate(Destination.Schedule.route) {
                                                         launchSingleTop = true
@@ -463,11 +475,7 @@ class MainActivity : AppCompatActivity() {
                                                 },
                                             )
                                         }
-                                        composable(Destination.AdminHome.route) {
-                                            val canIssueInvitations =
-                                                appDistribution == AppDistribution.MANAGEMENT &&
-                                                    roleConfig.experience == AppExperience.SUPER_ADMIN &&
-                                                    org.companerodeescuela.shared.contracts.UserRole.SUPER_ADMIN in session.roles
+                                        authorizedComposable(Destination.AdminHome, access, denied) {
                                             adminHomeScreen(
                                                 onOpenSecurity = { navController.navigate(Destination.Mfa.route) },
                                                 onOpenSchedule = {
@@ -486,85 +494,49 @@ class MainActivity : AppCompatActivity() {
                                                         launchSingleTop = true
                                                     }
                                                 },
-                                                isSuperAdmin = roleConfig.experience == AppExperience.SUPER_ADMIN,
+                                                isSuperAdmin = access.superAdministration,
                                                 onOpenInvitations =
-                                                    if (canIssueInvitations) {
+                                                    if (access.canOpen(Destination.InvitationIssue)) {
                                                         { navController.navigate(Destination.InvitationIssue.route) }
                                                     } else {
                                                         null
                                                     },
                                             )
                                         }
-                                        composable(Destination.AdminAccounts.route) {
-                                            if (appDistribution == AppDistribution.MANAGEMENT &&
-                                                roleConfig.experience == AppExperience.SUPER_ADMIN &&
-                                                org.companerodeescuela.shared.contracts.UserRole.SUPER_ADMIN in session.roles
-                                            ) {
-                                                superAdminAccountsScreen(
-                                                    onOpenInvitations = {
-                                                        navController.navigate(Destination.InvitationIssue.route)
-                                                    },
-                                                )
-                                            } else {
-                                                RoleUnavailableScreen(
-                                                    roleConfig.experience,
-                                                    onLogout = sessionViewModel::logout,
-                                                    onBack = { navController.popBackStack() },
-                                                )
-                                            }
+                                        authorizedComposable(Destination.AdminAccounts, access, denied) {
+                                            superAdminAccountsScreen(
+                                                onOpenInvitations = {
+                                                    navController.navigate(Destination.InvitationIssue.route)
+                                                },
+                                            )
                                         }
-                                        composable(Destination.AdminAcademic.route) {
-                                            if (appDistribution == AppDistribution.MANAGEMENT &&
-                                                roleConfig.experience == AppExperience.SUPER_ADMIN &&
-                                                org.companerodeescuela.shared.contracts.UserRole.SUPER_ADMIN in session.roles
-                                            ) {
-                                                superAdminAcademicScreen(
-                                                    onOpenSchedule = {
-                                                        navController.navigate(Destination.Schedule.route) {
-                                                            launchSingleTop = true
-                                                        }
-                                                    },
-                                                    onOpenClassrooms = {
-                                                        navController.navigate(Destination.Classrooms.route) {
-                                                            launchSingleTop = true
-                                                        }
-                                                    },
-                                                    onOpenChannel = {
-                                                        navController.navigate(Destination.Channel.route) {
-                                                            launchSingleTop = true
-                                                        }
-                                                    },
-                                                    onOpenIntegrations = {
-                                                        navController.navigate(Destination.IntegrationSettings.route)
-                                                    },
-                                                )
-                                            } else {
-                                                RoleUnavailableScreen(
-                                                    roleConfig.experience,
-                                                    onLogout = sessionViewModel::logout,
-                                                    onBack = { navController.popBackStack() },
-                                                )
-                                            }
+                                        authorizedComposable(Destination.AdminAcademic, access, denied) {
+                                            superAdminAcademicScreen(
+                                                onOpenSchedule = {
+                                                    navController.navigate(Destination.Schedule.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                                onOpenClassrooms = {
+                                                    navController.navigate(Destination.Classrooms.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                                onOpenChannel = {
+                                                    navController.navigate(Destination.Channel.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                                onOpenIntegrations = {
+                                                    navController.navigate(Destination.IntegrationSettings.route)
+                                                },
+                                            )
                                         }
-                                        composable(Destination.AdminHistory.route) {
-                                            if (appDistribution == AppDistribution.MANAGEMENT &&
-                                                roleConfig.experience == AppExperience.SUPER_ADMIN &&
-                                                org.companerodeescuela.shared.contracts.UserRole.SUPER_ADMIN in session.roles
-                                            ) {
-                                                superAdminHistoryScreen()
-                                            } else {
-                                                RoleUnavailableScreen(
-                                                    roleConfig.experience,
-                                                    onLogout = sessionViewModel::logout,
-                                                    onBack = { navController.popBackStack() },
-                                                )
-                                            }
+                                        authorizedComposable(Destination.AdminHistory, access, denied) {
+                                            superAdminHistoryScreen()
                                         }
-                                        composable(Destination.Schedule.route) {
-                                            if (
-                                                roleConfig.experience == AppExperience.ADMIN ||
-                                                roleConfig.experience == AppExperience.SUPER_ADMIN
-                                            ) {
+                                        authorizedComposable(Destination.Schedule, access, denied) {
+                                            if (access.academicAdministration) {
                                                 ClassroomAdministrationEditor(
                                                     onOpenChannel = {
                                                         navController.navigate(Destination.Channel.route) { launchSingleTop = true }
@@ -575,18 +547,12 @@ class MainActivity : AppCompatActivity() {
                                                 ScheduleScreen()
                                             }
                                         }
-                                        composable(Destination.Classrooms.route) {
+                                        authorizedComposable(Destination.Classrooms, access, denied) {
                                             ClassroomScreen(
                                                 roles = session.roles,
-                                                studentExperience =
-                                                    AcademicRoutePolicy.studentActions(
-                                                        roleConfig.experience,
-                                                        session.roles,
-                                                    ),
-                                                teacherExperience = roleConfig.experience == AppExperience.TEACHER,
-                                                administrativeExperience =
-                                                    roleConfig.experience == AppExperience.ADMIN ||
-                                                        roleConfig.experience == AppExperience.SUPER_ADMIN,
+                                                studentExperience = access.studentTools,
+                                                teacherExperience = access.teacherTools,
+                                                administrativeExperience = access.academicAdministration,
                                                 teacherUserId = session.userId,
                                                 onOpenAttendance = { classroom ->
                                                     navController.navigate(Destination.Attendance.route) { launchSingleTop = true }
@@ -618,41 +584,29 @@ class MainActivity : AppCompatActivity() {
                                                 },
                                             )
                                         }
-                                        composable(Destination.Grading.route) { entry ->
+                                        authorizedComposable(Destination.Grading, access, denied) { entry ->
                                             val selection by
                                                 entry.savedStateHandle
                                                     .getStateFlow<TeacherClassContext?>(
                                                         TeacherClassContext.STATE_KEY,
                                                         null,
                                                     ).collectAsStateWithLifecycle()
-                                            when {
-                                                AcademicRoutePolicy.studentActions(roleConfig.experience, session.roles) ->
-                                                    StudentGradesScreen()
-                                                AcademicRoutePolicy.teacherActions(roleConfig.experience, session.roles) ->
-                                                    GradebookScreen(requestedClassroom = selection)
-                                                else ->
-                                                    RoleUnavailableScreen(
-                                                        roleConfig.experience,
-                                                        onLogout = sessionViewModel::logout,
-                                                        onBack = { navController.popBackStack() },
-                                                    )
+                                            if (access.studentTools) {
+                                                StudentGradesScreen()
+                                            } else {
+                                                GradebookScreen(requestedClassroom = selection)
                                             }
                                         }
-                                        composable(Destination.Channel.route) { entry ->
+                                        authorizedComposable(Destination.Channel, access, denied) { entry ->
                                             val selection by
                                                 entry.savedStateHandle
                                                     .getStateFlow<TeacherClassContext?>(
                                                         TeacherClassContext.STATE_KEY,
                                                         null,
                                                     ).collectAsStateWithLifecycle()
-                                            val isAdministrative =
-                                                roleConfig.experience == AppExperience.ADMIN ||
-                                                    roleConfig.experience == AppExperience.SUPER_ADMIN ||
-                                                    roleConfig.experience == AppExperience.COORDINATOR ||
-                                                    roleConfig.experience == AppExperience.PRINCIPAL
                                             ChannelScreen(
                                                 requestedClassroom = selection,
-                                                isAdministrativeSession = isAdministrative,
+                                                isAdministrativeSession = access.administrativeChannelSession,
                                                 requestedTab = channelTabRequest,
                                                 requestedChannelId = channelIdRequest,
                                                 onConsumeRequestedTab = {
@@ -661,7 +615,7 @@ class MainActivity : AppCompatActivity() {
                                                 },
                                             )
                                         }
-                                        composable(Destination.Attendance.route) { entry ->
+                                        authorizedComposable(Destination.Attendance, access, denied) { entry ->
                                             val selection by
                                                 entry.savedStateHandle
                                                     .getStateFlow<TeacherClassContext?>(
@@ -671,43 +625,25 @@ class MainActivity : AppCompatActivity() {
                                             val requestedSessionId by entry.savedStateHandle
                                                 .getStateFlow<String?>(AttendancePushContract.SESSION_ID, null)
                                                 .collectAsStateWithLifecycle()
-                                            if (AcademicRoutePolicy.studentActions(roleConfig.experience, session.roles) ||
-                                                AcademicRoutePolicy.teacherActions(roleConfig.experience, session.roles)
-                                            ) {
-                                                attendanceScreen(
-                                                    requestedClassroom = selection,
-                                                    requestedSessionId = requestedSessionId,
-                                                    onConsumeRequestedSession = {
-                                                        entry.savedStateHandle.remove<String>(AttendancePushContract.SESSION_ID)
+                                            attendanceScreen(
+                                                requestedClassroom = selection,
+                                                requestedSessionId = requestedSessionId,
+                                                onConsumeRequestedSession = {
+                                                    entry.savedStateHandle.remove<String>(AttendancePushContract.SESSION_ID)
+                                                },
+                                                requestedMode =
+                                                    when (roleConfig.experience) {
+                                                        AppExperience.STUDENT -> AttendanceMode.STUDENT
+                                                        AppExperience.TEACHER -> AttendanceMode.TEACHER
+                                                        else -> null
                                                     },
-                                                    requestedMode =
-                                                        when (roleConfig.experience) {
-                                                            AppExperience.STUDENT -> AttendanceMode.STUDENT
-                                                            AppExperience.TEACHER -> AttendanceMode.TEACHER
-                                                            else -> null
-                                                        },
-                                                )
-                                            } else {
-                                                RoleUnavailableScreen(
-                                                    roleConfig.experience,
-                                                    onLogout = sessionViewModel::logout,
-                                                    onBack = { navController.popBackStack() },
-                                                )
-                                            }
-                                        }
-                                        composable(Destination.RoleUnavailable.route) {
-                                            RoleUnavailableScreen(
-                                                roleConfig.experience,
-                                                onLogout = sessionViewModel::logout,
-                                                onBack = { navController.popBackStack() },
                                             )
                                         }
+                                        composable(Destination.RoleUnavailable.route) {
+                                            denied()
+                                        }
                                         composable(Destination.Profile.route) {
-                                            val adminExperience =
-                                                roleConfig.experience == AppExperience.ADMIN ||
-                                                    roleConfig.experience == AppExperience.SUPER_ADMIN
-                                            val adminProfile =
-                                                appDistribution == AppDistribution.MANAGEMENT && adminExperience
+                                            val adminProfile = access.administrativeProfileShortcuts
                                             ProfileScreen(
                                                 displayName = session.displayName,
                                                 appVersion = BuildConfig.VERSION_NAME,
@@ -762,16 +698,13 @@ class MainActivity : AppCompatActivity() {
                                                 },
                                                 onSecurity = { navController.navigate(Destination.Mfa.route) },
                                                 onInvitation =
-                                                    if (session.emailVerified) {
+                                                    if (access.canOpen(Destination.InvitationAcceptance)) {
                                                         { navController.navigate(Destination.InvitationAcceptance.route) }
                                                     } else {
                                                         null
                                                     },
                                                 onInvitationIssue =
-                                                    if (appDistribution == AppDistribution.MANAGEMENT &&
-                                                        roleConfig.experience == AppExperience.SUPER_ADMIN &&
-                                                        org.companerodeescuela.shared.contracts.UserRole.SUPER_ADMIN in session.roles
-                                                    ) {
+                                                    if (access.canOpen(Destination.InvitationIssue)) {
                                                         { navController.navigate(Destination.InvitationIssue.route) }
                                                     } else {
                                                         null
@@ -818,34 +751,15 @@ class MainActivity : AppCompatActivity() {
                                                 },
                                             )
                                         }
-                                        composable(Destination.InvitationIssue.route) {
-                                            if (appDistribution == AppDistribution.MANAGEMENT &&
-                                                roleConfig.experience == AppExperience.SUPER_ADMIN &&
-                                                org.companerodeescuela.shared.contracts.UserRole.SUPER_ADMIN in session.roles
-                                            ) {
-                                                InvitationIssueScreen(onBack = { navController.popBackStack() })
-                                            } else {
-                                                RoleUnavailableScreen(
-                                                    roleConfig.experience,
-                                                    onLogout = sessionViewModel::logout,
-                                                    onBack = { navController.popBackStack() },
-                                                )
-                                            }
+                                        authorizedComposable(Destination.InvitationIssue, access, denied) {
+                                            InvitationIssueScreen(onBack = { navController.popBackStack() })
                                         }
-                                        composable(Destination.InvitationAcceptance.route) {
-                                            if (session.emailVerified) {
-                                                InvitationAcceptanceScreen(
-                                                    state = session,
-                                                    onAccept = sessionViewModel::acceptRegistrationInvitation,
-                                                    onBack = { navController.popBackStack() },
-                                                )
-                                            } else {
-                                                RoleUnavailableScreen(
-                                                    roleConfig.experience,
-                                                    onLogout = sessionViewModel::logout,
-                                                    onBack = { navController.popBackStack() },
-                                                )
-                                            }
+                                        authorizedComposable(Destination.InvitationAcceptance, access, denied) {
+                                            InvitationAcceptanceScreen(
+                                                state = session,
+                                                onAccept = sessionViewModel::acceptRegistrationInvitation,
+                                                onBack = { navController.popBackStack() },
+                                            )
                                         }
                                         composable(Destination.Mfa.route) {
                                             MfaScreen(onBack = { navController.popBackStack() })
@@ -940,20 +854,15 @@ class MainActivity : AppCompatActivity() {
 @androidx.compose.runtime.Composable
 private fun RoleUnavailableScreen(
     experience: AppExperience,
+    roles: Set<UserRole>,
     onLogout: () -> Unit,
     onBack: (() -> Unit)? = null,
 ) {
     val title =
-        when (experience) {
-            AppExperience.PRINCIPAL -> "Dirección"
-            AppExperience.COORDINATOR -> "Coordinación"
-            AppExperience.ADMIN -> "Administración"
-            AppExperience.SUPER_ADMIN -> "Administración general"
-            AppExperience.GUEST -> "Invitado"
-            AppExperience.UNSUPPORTED -> "Acceso no disponible"
-            AppExperience.STUDENT -> "Estudiante"
-            AppExperience.TEACHER -> "Docente"
-            AppExperience.TUTOR -> "Tutor académico"
+        if (experience == AppExperience.UNSUPPORTED) {
+            "Acceso no disponible"
+        } else {
+            ExperiencePresentation.experienceName(experience, roles)
         }
     Column(
         modifier =

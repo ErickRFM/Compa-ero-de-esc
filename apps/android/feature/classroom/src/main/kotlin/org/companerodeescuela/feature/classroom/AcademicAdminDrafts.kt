@@ -73,8 +73,7 @@ internal fun groupDatesIssue(
 
 private val ISO_DATE = Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
-private fun isoDate(value: String): LocalDate? =
-    value.takeIf(ISO_DATE::matches)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+private fun isoDate(value: String): LocalDate? = value.takeIf(ISO_DATE::matches)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
 
 internal fun groupDatesReady(
     starts: String,
@@ -156,7 +155,14 @@ internal fun AcademicGroupCard(
     val locale = LocalConfiguration.current.locales[0]
     val dates = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
 
-    fun day(epoch: Long?) = epoch?.let { Instant.ofEpochSecond(it).atZone(ZoneOffset.UTC).toLocalDate().format(dates) }
+    fun day(epoch: Long?) =
+        epoch?.let {
+            Instant
+                .ofEpochSecond(it)
+                .atZone(ZoneOffset.UTC)
+                .toLocalDate()
+                .format(dates)
+        }
     V8GlassCard(Modifier.fillMaxWidth().testTag("academic_group_card_" + group.id)) {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

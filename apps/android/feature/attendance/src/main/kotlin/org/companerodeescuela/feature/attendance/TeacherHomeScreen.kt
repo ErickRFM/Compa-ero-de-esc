@@ -2,16 +2,8 @@
 
 package org.companerodeescuela.feature.attendance
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -57,8 +49,10 @@ import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedColors
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
+import org.companerodeescuela.core.motion.CompaneroExpandableVisibility
 import org.companerodeescuela.core.motion.CompaneroMotion
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
+import org.companerodeescuela.core.motion.animateCompaneroProgressAsState
 import org.companerodeescuela.core.ui.component.StatusNotice
 import java.time.LocalDate
 
@@ -122,22 +116,8 @@ fun TeacherHomeScreen(
                 )
             } else {
                 val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
-                AnimatedVisibility(
+                CompaneroExpandableVisibility(
                     visible = state.errorMessage != null,
-                    enter =
-                        if (reducedMotion) {
-                            EnterTransition.None
-                        } else {
-                            fadeIn(animationSpec = CompaneroMotion.standard()) +
-                                expandVertically(animationSpec = CompaneroMotion.standard())
-                        },
-                    exit =
-                        if (reducedMotion) {
-                            ExitTransition.None
-                        } else {
-                            fadeOut(animationSpec = CompaneroMotion.standard()) +
-                                shrinkVertically(animationSpec = CompaneroMotion.standard())
-                        },
                 ) {
                     state.errorMessage?.let {
                         StatusNotice(title = "Datos académicos no actualizados", message = it)
@@ -179,9 +159,8 @@ fun TeacherHomeScreen(
                             val elapsedSeconds =
                                 ((System.currentTimeMillis() / 1000) - active.openedAtEpochSeconds).coerceIn(0, totalSeconds)
                             val rawProgress = elapsedSeconds.toFloat() / totalSeconds.toFloat()
-                            val progress by animateFloatAsState(
+                            val progress by animateCompaneroProgressAsState(
                                 targetValue = rawProgress,
-                                animationSpec = if (reducedMotion) snap() else CompaneroMotion.standard(),
                                 label = "TeacherSessionProgress",
                             )
                             LinearProgressIndicator(

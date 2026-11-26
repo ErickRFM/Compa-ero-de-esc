@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -34,9 +33,11 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8GlassFilterChip
 import org.companerodeescuela.core.designsystem.v8.V8HeroTitle
+import org.companerodeescuela.core.designsystem.v8.V8InlineLoading
 import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
+import org.companerodeescuela.core.motion.CompaneroExpandableVisibility
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.GradebookSnapshot
 import java.time.Instant
@@ -93,7 +94,9 @@ fun StudentGradesScreen(viewModel: StudentGradesViewModel = hiltViewModel()) {
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
-                        if (state.loadingClassrooms) CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        CompaneroExpandableVisibility(visible = state.loadingClassrooms) {
+                            V8InlineLoading("Cargando tus materias…")
+                        }
                         state.classroomError?.let { StatusNotice(title = "No se pudieron cargar tus materias", message = it) }
                         if (state.classrooms.isEmpty() && !state.loadingClassrooms && state.classroomError == null) {
                             StatusNotice(title = "Aún no tienes materias", message = "Cuando Control Escolar te inscriba, aparecerán aquí.")

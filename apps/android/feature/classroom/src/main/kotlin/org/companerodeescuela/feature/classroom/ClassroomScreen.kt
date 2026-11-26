@@ -24,7 +24,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -55,10 +54,13 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8IconTile
+import org.companerodeescuela.core.designsystem.v8.V8InlineLoading
+import org.companerodeescuela.core.designsystem.v8.V8LoadingCard
 import org.companerodeescuela.core.designsystem.v8.V8MatteBackdrop
 import org.companerodeescuela.core.designsystem.v8.V8PageTitle
 import org.companerodeescuela.core.designsystem.v8.V8RedPrimaryButton
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
+import org.companerodeescuela.core.motion.CompaneroExpandableVisibility
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.ClassInvite
 import org.companerodeescuela.shared.contracts.ClassroomStatus
@@ -192,8 +194,8 @@ fun ClassroomScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
-                if (state.loading && state.classrooms.isEmpty()) {
-                    CircularProgressIndicator()
+                CompaneroExpandableVisibility(visible = state.loading && state.classrooms.isEmpty()) {
+                    V8LoadingCard(title = "Cargando tus clases…")
                 }
 
                 state.errorMessage?.let {
@@ -421,7 +423,7 @@ private fun TeacherAssignedClassrooms(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (state.loading) CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                CompaneroExpandableVisibility(visible = state.loading) { V8InlineLoading("Actualizando espacios…") }
                 state.errorMessage?.let { StatusNotice(title = "Datos sin actualizar", message = it) }
                 state.successMessage?.let { StatusNotice(title = "Listo", message = it) }
                 state.activeInvite?.let { invite ->
@@ -600,10 +602,7 @@ private fun TeacherAssignedClassrooms(
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
-                                    if (importLoading) {
-                                        CircularProgressIndicator()
-                                        Text("Leyendo lista de alumnos…", style = MaterialTheme.typography.bodySmall)
-                                    }
+                                    CompaneroExpandableVisibility(visible = importLoading) { V8InlineLoading("Leyendo lista de alumnos…") }
                                     importError?.let {
                                         StatusNotice(
                                             title = "No se pudo leer la lista",
@@ -657,7 +656,7 @@ private fun TeacherAssignedClassrooms(
                     verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
                 ) {
                     when {
-                        members == null -> CircularProgressIndicator()
+                        members == null -> V8InlineLoading("Cargando participantes…")
                         members.isEmpty() -> Text("No hay cuentas vinculadas a esta clase.")
                         else -> {
                             Text(
@@ -681,7 +680,7 @@ private fun TeacherAssignedClassrooms(
 
 @Composable
 internal fun InstitutionalSections(state: ClassroomUiState) {
-    if (state.institutionalLoading) CircularProgressIndicator()
+    CompaneroExpandableVisibility(visible = state.institutionalLoading) { V8InlineLoading("Cargando materias institucionales…") }
     state.institutionalErrorMessage?.let {
         StatusNotice(title = "Datos institucionales sin actualizar", message = it)
     }

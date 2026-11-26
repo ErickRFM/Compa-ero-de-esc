@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -128,6 +129,31 @@ fun V8LoadingCard(
                 Box(Modifier.fillMaxWidth(0.5f).height(12.dp).background(line, RoundedCornerShape(4.dp)))
             }
         }
+    }
+}
+
+/**
+ * Inline progress for a section that already sits inside a card. It avoids a
+ * card-within-card, announces its label once and honors product reduced motion.
+ */
+@Composable
+fun V8InlineLoading(
+    title: String,
+    modifier: Modifier = Modifier,
+) {
+    val reduced = LocalCompaneroMotionPreferences.current.reducedMotion
+    Row(
+        modifier = modifier.fillMaxWidth().heightIn(min = 48.dp).loadingSemantics(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        LoadingActivity(reduced)
+        Text(
+            title,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 

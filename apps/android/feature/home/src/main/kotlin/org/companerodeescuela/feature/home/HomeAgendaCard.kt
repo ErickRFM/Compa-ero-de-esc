@@ -3,7 +3,6 @@
 package org.companerodeescuela.feature.home
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -31,9 +30,9 @@ import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.LocalCompaneroHighContrast
 import org.companerodeescuela.core.designsystem.theme.companeroAccentSurfaceColors
 import org.companerodeescuela.core.designsystem.v8.V8LoadingCard
-import org.companerodeescuela.core.motion.CompaneroMotion
 import org.companerodeescuela.core.motion.CompaneroMotionDuration
 import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
+import org.companerodeescuela.core.motion.animateCompaneroProgressAsState
 
 /** Presentation only: attendance still requires the verified institutional state. */
 @Composable
@@ -67,7 +66,6 @@ private fun HomeAgendaContent(
     // Crossfade's outgoing branch receives the latest state during an error retry.
     // Stop presenting an empty agenda before the incoming loading branch takes over.
     if (state.loading && state.overview == null) return
-    val reduced = LocalCompaneroMotionPreferences.current.reducedMotion
     val overview = state.overview
     val accent = companeroAccentSurfaceColors()
     Surface(
@@ -116,9 +114,8 @@ private fun HomeAgendaContent(
                 val currentClass = overview?.current
                 if (currentClass != null) {
                     val rawProgress = classProgress(currentClass)
-                    val animatedProgress by animateFloatAsState(
+                    val animatedProgress by animateCompaneroProgressAsState(
                         targetValue = rawProgress,
-                        animationSpec = if (reduced) snap() else CompaneroMotion.standard(),
                         label = "homeClassProgress",
                     )
                     LinearProgressIndicator(

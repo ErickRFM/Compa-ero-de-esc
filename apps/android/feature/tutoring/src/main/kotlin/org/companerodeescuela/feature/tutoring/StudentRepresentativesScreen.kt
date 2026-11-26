@@ -27,6 +27,7 @@ import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8LoadingCard
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
+import org.companerodeescuela.core.motion.CompaneroExpandableVisibility
 import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.RepresentativePosition
 import org.companerodeescuela.shared.contracts.RepresentativeStatus
@@ -66,7 +67,7 @@ internal fun StudentRepresentativesContent(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        if (state.loading) V8LoadingCard(title = "Cargando invitaciones…")
+        CompaneroExpandableVisibility(visible = state.loading) { V8LoadingCard(title = "Cargando invitaciones…") }
         state.error?.let { StatusNotice(title = "No se pudieron cargar las invitaciones", message = it) }
         state.notice?.let { StatusNotice(title = "Representantes", message = it) }
         if (!state.loading && state.assignments.isEmpty()) {

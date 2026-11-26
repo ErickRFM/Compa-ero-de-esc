@@ -62,6 +62,7 @@ fun IntegrationSettingsScreen(
             title =
                 when {
                     state.loading -> "Comprobando integración"
+                    state.institutionalAccessDenied -> "Vinculación escolar pendiente"
                     state.fromCache -> "Usando información guardada"
                     state.errorMessage != null -> "Integración no disponible"
                     else -> "Integración disponible"
@@ -69,6 +70,7 @@ fun IntegrationSettingsScreen(
             message =
                 when {
                     state.loading -> "Estamos comprobando si hay datos académicos disponibles."
+                    state.institutionalAccessDenied -> state.syncMessage ?: "Vincula tu cuenta con SIII para ver tu horario oficial."
                     state.fromCache ->
                         state.syncMessage
                             ?: "La agenda local sigue disponible aunque la integración no responda."
@@ -79,7 +81,7 @@ fun IntegrationSettingsScreen(
             tone =
                 when {
                     state.loading -> NoticeTone.INFO
-                    state.fromCache || state.errorMessage != null -> NoticeTone.WARNING
+                    state.institutionalAccessDenied || state.fromCache || state.errorMessage != null -> NoticeTone.WARNING
                     else -> NoticeTone.SUCCESS
                 },
         )

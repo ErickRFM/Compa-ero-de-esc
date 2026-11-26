@@ -2,14 +2,6 @@
 
 package org.companerodeescuela.feature.home
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -60,8 +52,8 @@ import org.companerodeescuela.core.designsystem.v8.V8DashboardStat
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
 import org.companerodeescuela.core.designsystem.v8.V8ScreenHeader
 import org.companerodeescuela.core.designsystem.v8.V8SectionTitle
+import org.companerodeescuela.core.motion.CompaneroExpandableVisibility
 import org.companerodeescuela.core.motion.CompaneroMotionDuration
-import org.companerodeescuela.core.motion.LocalCompaneroMotionPreferences
 import org.companerodeescuela.core.ui.component.AcademicSyncStatusCard
 import org.companerodeescuela.shared.contracts.ScheduleEntry
 import java.time.Instant
@@ -91,7 +83,6 @@ fun HomeScreen(
     }
 
     val overview = state.overview
-    val reducedMotion = LocalCompaneroMotionPreferences.current.reducedMotion
     val haptic = LocalHapticFeedback.current
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val splitLayout = maxWidth >= CompaneroWindowBreakpoints.medium
@@ -160,22 +151,9 @@ fun HomeScreen(
                     onRefresh = viewModel::refreshMaticaProgress,
                 )
 
-                AnimatedVisibility(
+                CompaneroExpandableVisibility(
                     visible = state.fromCache || state.personalOnly || state.errorMessage != null,
-                    enter =
-                        if (reducedMotion) {
-                            EnterTransition.None
-                        } else {
-                            fadeIn(tween(CompaneroMotionDuration.STANDARD)) +
-                                expandVertically(tween(CompaneroMotionDuration.STANDARD))
-                        },
-                    exit =
-                        if (reducedMotion) {
-                            ExitTransition.None
-                        } else {
-                            fadeOut(tween(CompaneroMotionDuration.FAST)) +
-                                shrinkVertically(tween(CompaneroMotionDuration.FAST))
-                        },
+                    exitDurationMillis = CompaneroMotionDuration.FAST,
                 ) {
                     AcademicSyncStatusCard(
                         title =

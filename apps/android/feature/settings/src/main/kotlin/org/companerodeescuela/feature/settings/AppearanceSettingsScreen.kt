@@ -7,10 +7,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,14 +33,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.CompaneroAccentPalette
 import org.companerodeescuela.core.designsystem.theme.CompaneroSize
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8GlassCard
+import org.companerodeescuela.core.designsystem.v8.V8PreferenceGroup
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
@@ -78,7 +75,7 @@ fun AppearanceSettingsScreen(
             ) {
                 LiveAppearancePreviewCard()
 
-                SettingsGroup(title = "Visualización") {
+                V8PreferenceGroup(title = "Visualización") {
                     SettingsContentRow(
                         title = "Tema",
                     ) {
@@ -151,7 +148,7 @@ fun AppearanceSettingsScreen(
                     }
                 }
 
-                SettingsGroup(title = "Color y fondo") {
+                V8PreferenceGroup(title = "Color y fondo") {
                     SettingsContentRow(
                         title = "Color de acento",
                     ) {
@@ -203,7 +200,7 @@ fun AppearanceSettingsScreen(
                     )
                 }
 
-                SettingsGroup(title = "Accesibilidad") {
+                V8PreferenceGroup(title = "Accesibilidad") {
                     ToggleRow(
                         title = "Reducir animaciones",
                         supporting = "Sin desplazamientos ni efectos de escala.",
@@ -221,7 +218,7 @@ fun AppearanceSettingsScreen(
                 }
 
                 onOpenDebugCatalog?.let { openCatalog ->
-                    SettingsGroup(title = "Desarrollo") {
+                    V8PreferenceGroup(title = "Desarrollo") {
                         SettingsContentRow(
                             title = "Sistema visual",
                             supporting = "Catálogo disponible únicamente en builds DEBUG.",
@@ -236,33 +233,6 @@ fun AppearanceSettingsScreen(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun SettingsGroup(
-    title: String,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.xs),
-    ) {
-        Text(
-            title,
-            color = MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.titleMedium,
-            modifier =
-                Modifier
-                    .semantics {
-                        heading()
-                    },
-        )
-        V8GlassCard(
-            modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(horizontal = CompaneroSpacing.md, vertical = CompaneroSpacing.xxs),
-        ) {
-            Column(content = content)
         }
     }
 }

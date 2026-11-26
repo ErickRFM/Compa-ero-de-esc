@@ -49,6 +49,7 @@ Perfil y `MainActivity` usan estas piezas. Agregar una ruta implica añadirla a 
 |---|---|
 | `ExperienceAccessTest` (11 casos: toda pestaña de cada perfil se puede abrir, docente pendiente, APK cruzadas, Admin vs Súper Admin, supervisión, tutoría, invitado, vocabulario) | OK |
 | Compilación Academic + Management y módulos afectados | OK |
-| Pruebas unitarias Android completas + `lintAcademicDebug` | ver §5 |
+| Pruebas unitarias Android completas (Debug, Academic, Management) | 375 casos, 0 fallos |
+| `lintAcademicDebug` | OK |
 | `ktlintCheck` de los módulos modificados | OK |
 | Pruebas instrumentadas (`ProfileConsistencyUiTest`, `V14RoleNavigationUiTest`, …) | **Pendiente**: no hay emulador conectado |

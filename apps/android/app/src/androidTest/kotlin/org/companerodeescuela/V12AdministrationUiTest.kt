@@ -622,6 +622,30 @@ class V12AdministrationUiTest {
         }
     }
 
+    @Test fun managementScheduleExplainsInvalidTimesBeforePreparing() {
+        val f = Fixture()
+        try {
+            compose.setContent {
+                AuthTestLocale {
+                    CompaneroTheme { ClassroomAdministrationEditor({}, viewModel = f.academic, startOnSchedule = true) }
+                }
+            }
+            compose.waitUntil(10000) { !f.academic.state.value.loading }
+            compose.onNodeWithTag("academic_time_start").performScrollTo().performTextInput("25:00")
+            compose.onNodeWithTag("academic_time_start_error", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
+            compose.onNodeWithTag("academic_time_start").performTextClearance()
+            compose.onNodeWithTag("academic_time_start").performTextInput("10:00")
+            compose.onNodeWithTag("academic_time_end").performScrollTo().performTextInput("09:00")
+            compose.onNodeWithTag("academic_time_end_error", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
+            compose.onNodeWithTag("academic_schedule_summary").assertDoesNotExist()
+            compose.onNodeWithTag("academic_schedule_prepare").performScrollTo().assertIsNotEnabled()
+            assertNull(f.academic.state.value.operationId)
+            assertTrue(f.proofs.isEmpty())
+        } finally {
+            compose.runOnIdle { f.close() }
+        }
+    }
+
     @Test fun academicEditorLinksActualStudentWithCurrentGroupRevisionAndScopedMfa() {
         val f = Fixture()
         try {

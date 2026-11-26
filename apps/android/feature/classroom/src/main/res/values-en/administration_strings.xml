@@ -48,4 +48,21 @@
 <string name="academic_pick_duration">3 · Duration</string>
 <string name="academic_pick_preview">Selected slot: %1$s · %2$s–%3$s</string>
 <string name="academic_pick_unselected">Select a day and start time</string>
+<string name="academic_issue_time_format">Use 24-hour HH:MM, for example 08:30.</string>
+<string name="academic_issue_time_order">The end time must be after the start time.</string>
+<string name="academic_issue_date_format">Use YYYY-MM-DD, for example 2027-01-15.</string>
+<string name="academic_issue_date_order">The end date must be after the start date.</string>
+<string name="academic_issue_date_past">The end date has passed; the group must still be current.</string>
+<string name="academic_summary_title">This block will be saved as</string>
+<string name="academic_summary_slot">%1$s · %2$s–%3$s (%4$d min)</string>
+<string name="academic_summary_group">Group: %1$s</string>
+<string name="academic_summary_teacher">Teacher: %1$s</string>
+<string name="academic_summary_room">Room: %1$s</string>
+<string name="academic_group_active">Active</string>
+<string name="academic_group_inactive">Inactive</string>
+<string name="academic_group_period">Period %1$s</string>
+<string name="academic_group_dates">From %1$s to %2$s</string>
+<string name="academic_group_one_class">1 assigned class</string>
+<string name="academic_group_classes">%1$d assigned classes</string>
+<string name="academic_groups_empty">No groups yet. Create the first one with the form above.</string>
 </resources>

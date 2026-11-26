@@ -48,4 +48,21 @@
 <string name="academic_pick_duration">3 · Duración</string>
 <string name="academic_pick_preview">Franja elegida: %1$s · %2$s–%3$s</string>
 <string name="academic_pick_unselected">Selecciona un día y una hora de inicio</string>
+<string name="academic_issue_time_format">Usa el formato HH:MM de 24 horas, por ejemplo 08:30.</string>
+<string name="academic_issue_time_order">La hora final debe ser posterior a la inicial.</string>
+<string name="academic_issue_date_format">Usa el formato AAAA-MM-DD, por ejemplo 2027-01-15.</string>
+<string name="academic_issue_date_order">La fecha límite debe ser posterior a la inicial.</string>
+<string name="academic_issue_date_past">La fecha límite ya pasó; el grupo debe seguir vigente.</string>
+<string name="academic_summary_title">Así se guardará el bloque</string>
+<string name="academic_summary_slot">%1$s · %2$s–%3$s (%4$d min)</string>
+<string name="academic_summary_group">Grupo: %1$s</string>
+<string name="academic_summary_teacher">Docente: %1$s</string>
+<string name="academic_summary_room">Aula: %1$s</string>
+<string name="academic_group_active">Activo</string>
+<string name="academic_group_inactive">Inactivo</string>
+<string name="academic_group_period">Periodo %1$s</string>
+<string name="academic_group_dates">Del %1$s al %2$s</string>
+<string name="academic_group_one_class">1 clase asignada</string>
+<string name="academic_group_classes">%1$d clases asignadas</string>
+<string name="academic_groups_empty">Aún no hay grupos. Crea el primero con el formulario de arriba.</string>
 </resources>

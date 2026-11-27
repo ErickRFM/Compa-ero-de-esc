@@ -113,7 +113,7 @@ class InstitutionalClassesUiTest {
             compose.runOnIdle { f.model.refresh() }
             compose.waitUntil(30000) { !f.model.state.value.institutionalLoading && f.model.state.value.institutionalErrorMessage != null }
             assertTrue(compose.onAllNodesWithTag("institutional_sections").fetchSemanticsNodes().isEmpty())
-            compose.onNodeWithText("Datos institucionales sin actualizar").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("Acceso institucional retirado").performScrollTo().assertIsDisplayed()
             capture("v19-institutional-revoked")
         } finally {
             compose.runOnIdle { f.close() }

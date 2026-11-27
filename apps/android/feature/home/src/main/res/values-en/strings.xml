@@ -65,6 +65,10 @@
 <string name="admin_directory_next">Next</string>
 <string name="admin_student_affiliation">Approve school affiliation</string>
 <string name="admin_link_siii">Link with SIII</string>
+<string name="admin_unlink_siii">Unlink from SIII</string>
+<string name="admin_unlink_reason">Reason for unlinking</string>
+<string name="admin_unlink_help">If the link is wrong, enter the same identifier and a reason to remove it.</string>
+<string name="admin_confirm_unlink_siii">You are removing the SIII link of %1$s. Their institutional classes will no longer be shown. Confirm with your password and verification code.</string>
 <string name="admin_link_reference">Student or teacher identifier</string>
 <string name="admin_link_reference_help">Enter the student or teacher identifier recorded in SIII.</string>
 <string name="admin_shortcut_schedule">Paint time slots</string>

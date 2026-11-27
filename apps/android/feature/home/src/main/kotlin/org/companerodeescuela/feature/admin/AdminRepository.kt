@@ -24,6 +24,7 @@ import org.companerodeescuela.shared.contracts.ApproveStudentAffiliationRequest
 import org.companerodeescuela.shared.contracts.AuthorizeRegistrationInvitationRequest
 import org.companerodeescuela.shared.contracts.InstitutionSummary
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkRequest
+import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkRevokeRequest
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkSummary
 import org.companerodeescuela.shared.contracts.PrepareRegistrationInvitationRetryRequest
 import org.companerodeescuela.shared.contracts.RegistrationInvitationDispatchReceipt
@@ -86,6 +87,9 @@ class AdminRepository(
 
     suspend fun linkInstitutionalIdentity(request: InstitutionalIdentityLinkRequest): Outcome<InstitutionalIdentityLinkSummary> =
         post("admin/accounts/institutional-identity-links", request)
+
+    suspend fun revokeInstitutionalIdentity(request: InstitutionalIdentityLinkRevokeRequest): Outcome<InstitutionalIdentityLinkSummary> =
+        post("admin/accounts/institutional-identity-links/revoke", request)
 
     suspend fun lifecycle(
         target: String,

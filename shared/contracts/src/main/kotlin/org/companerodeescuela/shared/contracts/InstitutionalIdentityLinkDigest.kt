@@ -22,4 +22,16 @@ object InstitutionalIdentityLinkDigest {
         val digest = MessageDigest.getInstance("SHA-256").digest(canonicalPayload)
         return digest.joinToString("") { "%02x".format(it.toInt() and 0xff) }
     }
+
+    fun revoke(request: InstitutionalIdentityLinkRevokeRequest): String {
+        val envelope =
+            buildJsonObject {
+                put("kind", "institutional-identity-link-revoke-v1")
+                put("targetId", request.institutionId)
+                put("command", json.encodeToJsonElement(request.copy(proof = "")))
+            }
+        val canonicalPayload = json.encodeToString(envelope).toByteArray(Charsets.UTF_8)
+        val digest = MessageDigest.getInstance("SHA-256").digest(canonicalPayload)
+        return digest.joinToString("") { "%02x".format(it.toInt() and 0xff) }
+    }
 }

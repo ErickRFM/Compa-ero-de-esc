@@ -24,6 +24,7 @@ import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.api.security.NativeActorResolver
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkRequest
+import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkRevokeRequest
 
 fun Route.institutionalIdentityLinkRoutes(
     settings: ApiSettings,
@@ -51,6 +52,24 @@ fun Route.institutionalIdentityLinkRoutes(
                     HttpStatusCode.Created,
                     ApiResponse(service.link(actor.toUserSummary(), request), call.requestId()),
                 )
+            }
+            post("/institutional-identity-links/revoke") {
+                call.response.header(HttpHeaders.CacheControl, "no-store")
+                val principal = call.principal<JWTPrincipal>() ?: throw ApiException.Unauthorized()
+                val actor = resolver.resolve(principal.payload)
+                limiter.acquire(actor.id, "native-administration")?.let { retryAfter ->
+                    call.response.header(HttpHeaders.RetryAfter, retryAfter.toString())
+                    throw ApiException.RateLimited()
+                }
+                val request =
+                    try {
+                        call.boundedAuthRequest(InstitutionalIdentityLinkRevokeRequest.serializer())
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        throw ApiException.Validation("Invalid institutional identity link revocation")
+                    }
+                call.respond(ApiResponse(service.revoke(actor.toUserSummary(), request), call.requestId()))
             }
         }
     }

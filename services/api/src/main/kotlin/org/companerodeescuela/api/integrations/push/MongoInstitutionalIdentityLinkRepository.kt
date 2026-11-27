@@ -16,6 +16,7 @@ class MongoInstitutionalIdentityLinkRepository(
     database: MongoDatabase,
 ) : InstitutionalIdentityLinkRepository {
     private val links: MongoCollection<Document> = database.getCollection(COLLECTION)
+    private val history: MongoCollection<Document> = database.getCollection(HISTORY_COLLECTION)
     private val indexMutex = Mutex()
 
     @Volatile
@@ -64,6 +65,38 @@ class MongoInstitutionalIdentityLinkRepository(
         }
     }
 
+    /**
+     * History first, then delete: a retried revocation is idempotent by operation, and the unique
+     * active-link indexes stay untouched so the identifier can be linked again correctly.
+     */
+    override suspend fun revoke(
+        institutionId: String,
+        entityType: InstitutionalIdentityKind,
+        externalId: String,
+        revocation: InstitutionalIdentityLinkRevocation,
+    ): InstitutionalIdentityLink? {
+        ensureIndexes()
+        val active = links.find(identityFilter(institutionId, entityType, externalId)).firstOrNull() ?: return null
+        val link = active.toRecord()
+        try {
+            history.insertOne(
+                link
+                    .toDocument()
+                    .append("revokedBy", revocation.revokedBy)
+                    .append("revocationReason", revocation.reason)
+                    .append("revocationOperationId", revocation.operationId)
+                    .append("revokedAt", Date.from(revocation.revokedAt)),
+            )
+        } catch (error: MongoException) {
+            if (error.code != DUPLICATE_KEY_CODE) throw error
+        }
+        val deleted =
+            links.deleteOne(
+                identityFilter(institutionId, entityType, externalId).append("nativeUserId", link.nativeUserId),
+            )
+        return if (deleted.deletedCount == 1L) link else null
+    }
+
     private suspend fun ensureIndexes() {
         if (indexesReady) return
         indexMutex.withLock {
@@ -80,6 +113,11 @@ class MongoInstitutionalIdentityLinkRepository(
                 Indexes.ascending("institutionId", "entityType", "operationId"),
                 IndexOptions().unique(true),
             )
+            history.createIndex(
+                Indexes.ascending("institutionId", "revocationOperationId"),
+                IndexOptions().unique(true),
+            )
+            history.createIndex(Indexes.ascending("institutionId", "entityType", "externalId", "revokedAt"))
             indexesReady = true
         }
     }
@@ -140,6 +178,7 @@ class MongoInstitutionalIdentityLinkRepository(
 
     private companion object {
         const val COLLECTION = "institutional_identity_links"
+        const val HISTORY_COLLECTION = "institutional_identity_link_revocations"
         const val DUPLICATE_KEY_CODE = 11000
     }
 }

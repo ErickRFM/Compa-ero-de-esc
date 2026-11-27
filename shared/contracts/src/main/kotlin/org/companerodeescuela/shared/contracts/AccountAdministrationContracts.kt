@@ -107,7 +107,11 @@ import kotlinx.serialization.Serializable
     val applications: List<StaffApplication>,
     val capabilities: Set<AdminCapability> = emptySet(),
     val requestedInstitutionId: String? = null,
-)
+    val identityReference: String? = null,
+) {
+    override fun toString() =
+        "AdminUserSummary(userId=${user.id}, applications=${applications.size}, institution=$requestedInstitutionId, ref=[redacted])"
+}
 
 @Serializable data class AdministrationMetrics(
     val totalUsers: Int,

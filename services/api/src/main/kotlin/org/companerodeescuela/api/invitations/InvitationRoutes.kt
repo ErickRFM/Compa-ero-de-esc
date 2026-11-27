@@ -197,25 +197,32 @@ internal fun Route.invitationRoutes(
                                 throw ApiException.Validation("Invalid institution filter")
                             }
                         }
+                val records = invitations.listRecent(limit = limit, institutionId = institutionId)
                 val items =
-                    invitations
-                        .listRecent(limit = limit, institutionId = institutionId)
-                        .map { record ->
-                            RegistrationInvitationSummary(
-                                invitationId = record.id,
-                                recipient = record.recipient,
-                                institutionId = record.institutionId,
-                                profile = record.profile.name,
-                                status = record.status.name,
-                                createdAtEpochSeconds = record.createdAt.epochSecond,
-                                expiresAtEpochSeconds = record.expiresAt.epochSecond,
-                                acceptedAtEpochSeconds = record.acceptedAt?.epochSecond,
-                                revokedAtEpochSeconds = record.revokedAt?.epochSecond,
-                                deliveryStatus = record.deliveryStatus ?: defaultDeliveryStatus(record.status),
-                                deliveryUpdatedAtEpochSeconds = record.deliveryUpdatedAt?.epochSecond,
-                                acceptedByAccountId = record.acceptedBy,
-                            )
-                        }
+                    records.map { record ->
+                        val acceptedReference =
+                            record.acceptedBy?.let { acceptedId ->
+                                accounts
+                                    .findById(acceptedId)
+                                    ?.registrationIntent
+                                    ?.identityReference
+                            }
+                        RegistrationInvitationSummary(
+                            invitationId = record.id,
+                            recipient = record.recipient,
+                            institutionId = record.institutionId,
+                            profile = record.profile.name,
+                            status = record.status.name,
+                            createdAtEpochSeconds = record.createdAt.epochSecond,
+                            expiresAtEpochSeconds = record.expiresAt.epochSecond,
+                            acceptedAtEpochSeconds = record.acceptedAt?.epochSecond,
+                            revokedAtEpochSeconds = record.revokedAt?.epochSecond,
+                            deliveryStatus = record.deliveryStatus ?: defaultDeliveryStatus(record.status),
+                            deliveryUpdatedAtEpochSeconds = record.deliveryUpdatedAt?.epochSecond,
+                            acceptedByAccountId = record.acceptedBy,
+                            acceptedIdentityReference = acceptedReference,
+                        )
+                    }
                 val readOperationId =
                     call.requestId()?.takeIf { auditOperationPattern.matches(it) } ?: UUID.randomUUID().toString()
                 recordAudit(

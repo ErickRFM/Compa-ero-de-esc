@@ -341,6 +341,8 @@ class MongoPlatformAccountRepository(
             .append("requestedInstitutionId", requestedInstitutionId)
             .append("identityReference", identityReference)
             .append("preferredGroup", preferredGroup)
+            .append("pendingInvitationId", pendingInvitationId)
+            .append("pendingInvitationTokenHash", pendingInvitationTokenHash)
 
     private fun Document.toRegistrationIntent(): RegistrationIntent? =
         runCatching {
@@ -349,6 +351,8 @@ class MongoPlatformAccountRepository(
                 getString("requestedInstitutionId"),
                 getString("identityReference"),
                 getString("preferredGroup"),
+                getString("pendingInvitationId"),
+                getString("pendingInvitationTokenHash"),
             )
         }.getOrNull()
 

@@ -22,6 +22,7 @@ data class UserSummary(
     val registrationAccountType: RegistrationAccountType? = null,
     val emailVerified: Boolean = false,
     val verificationDelivery: VerificationDeliveryStatus? = null,
+    val invitationAccepted: Boolean = false,
 ) {
     /**
      * True when the user holds at least one staff role. Convenience helper so

@@ -24,6 +24,7 @@ import org.companerodeescuela.api.auth.PlatformAccount
 import org.companerodeescuela.api.auth.PlatformSessionAuthority
 import org.companerodeescuela.api.auth.RefreshSession
 import org.companerodeescuela.api.auth.SessionIdentitySource
+import org.companerodeescuela.api.auth.authRoutes
 import org.companerodeescuela.api.config.Environment
 import org.companerodeescuela.api.institutions.InMemoryInstitutionRepository
 import org.companerodeescuela.api.integrations.mock.MockIdentityProvider
@@ -32,6 +33,7 @@ import org.companerodeescuela.api.invitations.InvitationDispatchService
 import org.companerodeescuela.api.invitations.InvitationEmailGateway
 import org.companerodeescuela.api.invitations.InvitationStatus
 import org.companerodeescuela.api.invitations.invitationRoutes
+import org.companerodeescuela.api.mail.VerificationEmailGateway
 import org.companerodeescuela.api.plugins.configurePlugins
 import org.companerodeescuela.api.security.InMemoryMfaRepository
 import org.companerodeescuela.api.security.MfaSecretCipher
@@ -48,16 +50,22 @@ import org.companerodeescuela.shared.contracts.AdminUserSummary
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.AuthorizeRegistrationInvitationRequest
 import org.companerodeescuela.shared.contracts.InstitutionSummary
+import org.companerodeescuela.shared.contracts.LoginResponse
 import org.companerodeescuela.shared.contracts.MfaStepUpRequest
 import org.companerodeescuela.shared.contracts.PrepareRegistrationInvitationRequest
 import org.companerodeescuela.shared.contracts.PrivilegedCommandDigests
+import org.companerodeescuela.shared.contracts.RegisterRequest
+import org.companerodeescuela.shared.contracts.RegistrationAccountType
 import org.companerodeescuela.shared.contracts.RegistrationInvitationDispatchReceipt
 import org.companerodeescuela.shared.contracts.RegistrationInvitationPreparation
+import org.companerodeescuela.shared.contracts.RegistrationInvitationSummary
 import org.companerodeescuela.shared.contracts.StepUpAction
 import org.companerodeescuela.shared.contracts.StepUpProof
 import org.companerodeescuela.shared.contracts.TutorApprovalScope
 import org.companerodeescuela.shared.contracts.UserRole
+import org.companerodeescuela.shared.contracts.UserSummary
 import org.companerodeescuela.shared.contracts.VerificationDeliveryStatus
+import org.companerodeescuela.shared.contracts.VerifyEmailRequest
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
@@ -111,6 +119,7 @@ class InvitationAuthorizationRoutesTest {
                 invitations = invitations,
             )
         val sentCodes = mutableMapOf<String, String>()
+        val verificationTokens = mutableMapOf<String, String>()
         val inviteService =
             InvitationDispatchService(
                 accounts = accounts,
@@ -177,8 +186,24 @@ class InvitationAuthorizationRoutesTest {
 
         fun mount(builder: ApplicationTestBuilder) {
             builder.application {
-                configurePlugins(settings, sessions, PlatformSessionAuthority(accounts, identity))
+                val sessionAuthority = PlatformSessionAuthority(accounts, identity, clock)
+                configurePlugins(settings, sessions, sessionAuthority)
                 routing {
+                    authRoutes(
+                        settings = settings,
+                        identityProvider = identity,
+                        sessions = sessions,
+                        accounts = accounts,
+                        institutions = institutions,
+                        verificationEmail =
+                            VerificationEmailGateway { email, token, _ ->
+                                verificationTokens[email] = token
+                                VerificationDeliveryStatus.ACCEPTED
+                            },
+                        verificationClock = clock,
+                        sessionAuthority = sessionAuthority,
+                        invitations = invitations,
+                    )
                     mfaRoutes(settings, identity, sessions, accounts, mfa)
                     invitationRoutes(
                         settings = settings,
@@ -535,5 +560,123 @@ class InvitationAuthorizationRoutesTest {
             assertEquals(setOf(UserRole.STUDENT), affiliatedStudent.roles)
             assertEquals("UPTLAX", affiliatedStudent.institutionId)
             assertEquals(InvitationStatus.ACTIVE, h.invitations.find(studentInvId)?.status)
+        }
+
+    @Test
+    fun `direct INVITED registration for admin and teacher auto-accepts on email verification without premature privileges`() =
+        testApplication {
+            val h = Harness()
+            h.bootstrapOwner()
+            h.mount(this)
+
+            val adminEmail = "nuevo.admin@uptlax.edu.mx"
+            val adminInvId = h.issueInvitation(this, adminEmail, "INSTITUTION_ADMIN", "direct-admin-01")
+            val adminCode = requireNotNull(h.sentCodes[adminEmail])
+
+            // Reject mismatched email or code
+            val wrongEmailResp =
+                client.post("/auth/register") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        json.encodeToString(
+                            RegisterRequest(
+                                displayName = "Otro Correo",
+                                email = "otro@uptlax.edu.mx",
+                                password = "secure-password-123",
+                                accountType = RegistrationAccountType.INVITED,
+                                invitationId = adminInvId,
+                                invitationCode = adminCode,
+                            ),
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.BadRequest, wrongEmailResp.status)
+
+            val regResp =
+                client.post("/auth/register") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        json.encodeToString(
+                            RegisterRequest(
+                                displayName = "Coordinadora UPTLAX",
+                                email = adminEmail,
+                                password = "secure-password-123",
+                                accountType = RegistrationAccountType.INVITED,
+                                identityReference = "ADM-UPTLAX-09",
+                                invitationId = adminInvId,
+                                invitationCode = adminCode,
+                            ),
+                        ),
+                    )
+                }
+            assertEquals(HttpStatusCode.Created, regResp.status)
+            val created = json.decodeFromString<ApiResponse<LoginResponse>>(regResp.bodyAsText()).data
+            assertEquals(AccountStatus.PENDING_VERIFICATION, created.user.accountStatus)
+            assertTrue(created.user.roles.isEmpty())
+            assertEquals(InvitationStatus.SENT, h.invitations.find(adminInvId)?.status)
+
+            // Verify email -> auto-accepts invitation and moves to PENDING_APPROVAL with ZERO roles
+            val verifyResp =
+                client.post("/auth/verification/confirm") {
+                    bearerAuth(created.accessToken)
+                    contentType(ContentType.Application.Json)
+                    setBody(json.encodeToString(VerifyEmailRequest(requireNotNull(h.verificationTokens[adminEmail]))))
+                }
+            assertEquals(HttpStatusCode.OK, verifyResp.status)
+            val verified = json.decodeFromString<ApiResponse<LoginResponse>>(verifyResp.bodyAsText()).data
+            assertEquals(AccountStatus.PENDING_APPROVAL, verified.user.accountStatus)
+            assertTrue(verified.user.roles.isEmpty())
+            assertTrue(verified.user.invitationAccepted)
+            assertEquals(InvitationStatus.ACCEPTED, h.invitations.find(adminInvId)?.status)
+
+            val meResp =
+                client.get("/auth/me") {
+                    bearerAuth(verified.accessToken)
+                }
+            assertEquals(HttpStatusCode.OK, meResp.status)
+            val meSummary = json.decodeFromString<ApiResponse<UserSummary>>(meResp.bodyAsText()).data
+            assertTrue(meSummary.invitationAccepted)
+            assertTrue(meSummary.roles.isEmpty())
+
+            val listResp =
+                client.get("/admin/invitations") {
+                    bearerAuth(h.ownerToken)
+                }
+            assertEquals(HttpStatusCode.OK, listResp.status)
+            val listed = json.decodeFromString<ApiResponse<List<RegistrationInvitationSummary>>>(listResp.bodyAsText()).data
+            val summaryItem = listed.first { it.invitationId == adminInvId }
+            assertEquals("ACCEPTED", summaryItem.status)
+            assertEquals("ADM-UPTLAX-09", summaryItem.acceptedIdentityReference)
+
+            // Explicit MFA authorization by SUPER_ADMIN grants ADMIN + UPTLAX
+            val authCmd =
+                AuthorizeRegistrationInvitationRequest(
+                    operationId = "auth-direct-admin-01",
+                    invitationId = adminInvId,
+                    expectedAuthRevision = verified.user.authRevision,
+                    institutionId = "UPTLAX",
+                    profile = "INSTITUTION_ADMIN",
+                    proof = "",
+                )
+            val authProof =
+                h.nextStepUpProof(
+                    this,
+                    StepUpAction.ADMIN_AUTHORITY,
+                    adminInvId,
+                    authCmd.operationId,
+                    PrivilegedCommandDigests.invitationAuthorization(adminInvId, authCmd),
+                )
+            val authorizeResp =
+                client.post("/admin/accounts/invitation-authorization") {
+                    bearerAuth(h.ownerToken)
+                    contentType(ContentType.Application.Json)
+                    setBody(json.encodeToString(authCmd.copy(proof = authProof)))
+                }
+            assertEquals(HttpStatusCode.OK, authorizeResp.status)
+            val authorizedSummary = json.decodeFromString<ApiResponse<AdminUserSummary>>(authorizeResp.bodyAsText()).data
+            assertEquals(setOf(UserRole.ADMIN), authorizedSummary.user.roles)
+            assertEquals(AccountStatus.ACTIVE, authorizedSummary.user.accountStatus)
+            assertEquals("UPTLAX", authorizedSummary.user.institutionId)
+            assertEquals("ADM-UPTLAX-09", authorizedSummary.identityReference)
         }
 }

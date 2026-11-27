@@ -154,6 +154,8 @@ internal interface InvitationRepository {
         limit: Int = 50,
         institutionId: String? = null,
     ): List<InvitationRecord> = emptyList()
+
+    suspend fun hasAcceptedForAccount(accountId: String): Boolean = false
 }
 
 internal class InMemoryInvitationRepository : InvitationRepository {
@@ -183,6 +185,14 @@ internal class InMemoryInvitationRepository : InvitationRepository {
                 .sortedByDescending { it.createdAt }
                 .take(limit.coerceIn(1, 50))
                 .toList()
+        }
+
+    override suspend fun hasAcceptedForAccount(accountId: String): Boolean =
+        mutex.withLock {
+            records.values.any {
+                it.acceptedBy == accountId &&
+                    it.status in setOf(InvitationStatus.ACCEPTED, InvitationStatus.ACTIVE)
+            }
         }
 
     override suspend fun markSent(

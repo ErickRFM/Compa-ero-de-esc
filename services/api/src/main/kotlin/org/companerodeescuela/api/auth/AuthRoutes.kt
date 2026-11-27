@@ -18,11 +18,13 @@ import org.companerodeescuela.api.errors.ApiException
 import org.companerodeescuela.api.institutions.InMemoryInstitutionRepository
 import org.companerodeescuela.api.institutions.InstitutionRepository
 import org.companerodeescuela.api.integrations.identity.IdentityProvider
+import org.companerodeescuela.api.invitations.InvitationRepository
 import org.companerodeescuela.api.mail.UnavailableVerificationEmailGateway
 import org.companerodeescuela.api.mail.VerificationEmailGateway
 import org.companerodeescuela.api.plugins.clientAddress
 import org.companerodeescuela.api.plugins.requestId
 import org.companerodeescuela.api.runCatchingCancellable
+import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.ApiResponse
 import org.companerodeescuela.shared.contracts.LoginRequest
 import org.companerodeescuela.shared.contracts.RefreshSessionRequest
@@ -36,7 +38,7 @@ import java.time.Clock
  * When JWT is not configured (allowed only for local foundation work), the
  * routes fail explicitly instead of silently minting an insecure token.
  */
-fun Route.authRoutes(
+internal fun Route.authRoutes(
     settings: ApiSettings,
     identityProvider: IdentityProvider,
     loginAttemptLimiter: LoginAttemptLimiter? = null,
@@ -48,6 +50,7 @@ fun Route.authRoutes(
     sessionAuthority: PlatformSessionAuthority? = null,
     ownerInviteEnvironment: (String) -> String? = System::getenv,
     ownerInvitationRepository: OwnerInvitationRepository = InMemoryOwnerInvitationRepository(),
+    invitations: InvitationRepository? = null,
 ) {
     val tokenService = settings.jwtSecret?.let { AuthTokenService(settings) }
     val verification = AccountVerificationService(accounts, verificationEmail, verificationClock)
@@ -76,7 +79,7 @@ fun Route.authRoutes(
                         refreshRotationGrace = java.time.Duration.ofSeconds(settings.refreshRotationGraceSeconds),
                         maximumRefreshSessionAge = java.time.Duration.ofDays(settings.maximumRefreshSessionAgeDays),
                         sessionAuthority = sessionAuthority,
-                    )
+                    ).withInvitations(invitations)
                 }
                     ?: throw ApiException.DependencyUnavailable(
                         "Authentication is not configured",
@@ -127,7 +130,7 @@ fun Route.authRoutes(
                         sessionAuthority = sessionAuthority,
                         ownerInviteEnvironment = ownerInviteEnvironment,
                         ownerInvitationRepository = ownerInvitationRepository,
-                    )
+                    ).withInvitations(invitations)
                 } ?: throw ApiException.DependencyUnavailable(
                     "Authentication is not configured",
                 )
@@ -171,7 +174,7 @@ fun Route.authRoutes(
                         refreshRotationGrace = java.time.Duration.ofSeconds(settings.refreshRotationGraceSeconds),
                         maximumRefreshSessionAge = java.time.Duration.ofDays(settings.maximumRefreshSessionAgeDays),
                         sessionAuthority = sessionAuthority,
-                    )
+                    ).withInvitations(invitations)
                 }
                     ?: throw ApiException.DependencyUnavailable("Authentication is not configured")
             val request =
@@ -203,7 +206,7 @@ fun Route.authRoutes(
                         refreshRotationGrace = java.time.Duration.ofSeconds(settings.refreshRotationGraceSeconds),
                         maximumRefreshSessionAge = java.time.Duration.ofDays(settings.maximumRefreshSessionAgeDays),
                         sessionAuthority = sessionAuthority,
-                    )
+                    ).withInvitations(invitations)
                 }
                     ?: throw ApiException.DependencyUnavailable("Authentication is not configured")
             val request =
@@ -256,7 +259,7 @@ fun Route.authRoutes(
                             verification = verification,
                             clock = verificationClock,
                             sessionAuthority = sessionAuthority,
-                        )
+                        ).withInvitations(invitations)
                     call.respond(ApiResponse(service.verifyEmail(user.id, request.token), call.requestId()))
                 }
                 get("/me") {
@@ -275,7 +278,12 @@ fun Route.authRoutes(
                             ) {
                                 throw ApiException.Unauthorized()
                             }
-                            live
+                            if (live.accountStatus == AccountStatus.PENDING_APPROVAL && invitations != null) {
+                                val accepted = authenticationDependency { invitations.hasAcceptedForAccount(account.id) }
+                                live.copy(invitationAccepted = accepted)
+                            } else {
+                                live
+                            }
                         } else {
                             // Institutional identity remains bound to the verified upstream session.
                             claimed

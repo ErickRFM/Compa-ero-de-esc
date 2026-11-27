@@ -13,6 +13,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.companerodeescuela.api.invitations.InvitationEmailGateway
 import org.companerodeescuela.api.invitations.InvitationEmailKind
+import org.companerodeescuela.api.invitations.InvitationProfile
 import org.companerodeescuela.shared.contracts.VerificationDeliveryStatus
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
@@ -45,14 +46,22 @@ internal class ResendInvitationEmailGateway(
         code: String,
         invitationId: String,
         expiresAt: Instant,
-    ): VerificationDeliveryStatus = sendWithKind(recipient, code, invitationId, expiresAt, InvitationEmailKind.REGISTRATION)
+    ): VerificationDeliveryStatus = sendWithKind(recipient, code, invitationId, expiresAt, InvitationEmailKind.REGISTRATION, null)
+
+    override suspend fun sendRegistration(
+        recipient: String,
+        code: String,
+        invitationId: String,
+        expiresAt: Instant,
+        profile: InvitationProfile?,
+    ): VerificationDeliveryStatus = sendWithKind(recipient, code, invitationId, expiresAt, InvitationEmailKind.REGISTRATION, profile)
 
     override suspend fun sendOwnerBootstrap(
         recipient: String,
         code: String,
         invitationId: String,
         expiresAt: Instant,
-    ): VerificationDeliveryStatus = sendWithKind(recipient, code, invitationId, expiresAt, InvitationEmailKind.OWNER_BOOTSTRAP)
+    ): VerificationDeliveryStatus = sendWithKind(recipient, code, invitationId, expiresAt, InvitationEmailKind.OWNER_BOOTSTRAP, null)
 
     private suspend fun sendWithKind(
         recipient: String,
@@ -60,6 +69,7 @@ internal class ResendInvitationEmailGateway(
         invitationId: String,
         expiresAt: Instant,
         kind: InvitationEmailKind,
+        profile: InvitationProfile?,
     ): VerificationDeliveryStatus {
         if (!Regex("[A-Za-z0-9_-]{43}").matches(code) ||
             !Regex("[A-Za-z0-9_-]{43}").matches(invitationId)
@@ -67,9 +77,13 @@ internal class ResendInvitationEmailGateway(
             return VerificationDeliveryStatus.FAILED
         }
         val ownerBootstrap = kind == InvitationEmailKind.OWNER_BOOTSTRAP
+        val profileLabel = profile?.spanishLabel()
+        val combinedKey = "$invitationId.$code"
         val subject =
             if (ownerBootstrap) {
                 "Invitación de propietario a Compañero de Clase"
+            } else if (profileLabel != null) {
+                "Invitación ($profileLabel) a Compañero de Clase"
             } else {
                 "Invitación a Compañero de Clase"
             }
@@ -80,9 +94,20 @@ internal class ResendInvitationEmailGateway(
                     "Abre la aplicación e inicia el registro OWNER_INVITED con este mismo correo y tu contraseña actual. " +
                     "Tu cuenta verificada y su MFA se conservarán.\n\n"
             } else {
-                "Te invitaron a Compañero de Clase.\n\n" +
-                    "Abre la aplicación y regístrate con este mismo correo. " +
-                    "Verifica tu dirección con el correo de confirmación.\n\n"
+                val roleNote = if (profileLabel != null) "Perfil invitado: $profileLabel.\n" else ""
+                "Te invitaron a Compañero de Clase.\n" +
+                    roleNote +
+                    "\nAbre la aplicación, entra en 'Crear cuenta / Tengo invitación' y regístrate con este mismo correo. " +
+                    "Copia y pega la clave completa de activación y verifica tu dirección con el correo de confirmación.\n\n"
+            }
+        val textKeys =
+            if (ownerBootstrap) {
+                "Código de invitación: $code\n" +
+                    "ID de invitación: $invitationId\n"
+            } else {
+                "Clave completa de activación (copiar y pegar): $combinedKey\n" +
+                    "Código de invitación: $code\n" +
+                    "ID de invitación: $invitationId\n"
             }
         val body =
             buildJsonObject {
@@ -109,14 +134,13 @@ internal class ResendInvitationEmailGateway(
                 put(
                     "text",
                     introduction +
-                        "Código de invitación: $code\n" +
-                        "ID de invitación: $invitationId\n" +
+                        textKeys +
                         "Caduca: $expiresAt (UTC)\n\n" +
                         "Conserva el código hasta aceptar la invitación en la aplicación. " +
                         "La invitación no concede permisos ni privilegios automáticamente. " +
                         "Si no esperabas este correo, ignóralo.",
                 )
-                put("html", html(code, invitationId, expiresAt, kind))
+                put("html", html(code, invitationId, combinedKey, expiresAt, kind, profileLabel))
             }.toString().toByteArray(Charsets.UTF_8)
         return withContext(Dispatchers.IO) { attempt(body) }
     }
@@ -124,28 +148,67 @@ internal class ResendInvitationEmailGateway(
     private fun html(
         code: String,
         id: String,
+        combinedKey: String,
         expiresAt: Instant,
         kind: InvitationEmailKind,
-    ): String =
-        """
-        <!doctype html><html lang="es"><head><meta charset="utf-8"></head>
-        <body style="background:#f5f5f7;margin:0;padding:32px 12px;font-family:Arial,sans-serif;color:#202024">
-          <main style="max-width:540px;margin:auto;background:#fff;border-radius:22px;padding:32px">
-            <p style="color:#8a1538;font-weight:700">COMPAÑERO DE CLASE</p>
-            <h1 style="font-size:26px">${if (kind == InvitationEmailKind.OWNER_BOOTSTRAP) "Invitación de propietario" else "Tu invitación está lista"}</h1>
-            <p>${if (kind == InvitationEmailKind.OWNER_BOOTSTRAP) "Inicia el registro OWNER_INVITED con este mismo correo y tu contraseña actual. Tu cuenta verificada y su MFA se conservarán." else "Regístrate en la aplicación con este mismo correo y verifica tu cuenta."}</p>
-            <p style="font-size:12px;color:#595961">CÓDIGO DE INVITACIÓN</p>
-            <p style="font-size:20px;letter-spacing:1px;overflow-wrap:anywhere;font-weight:700">$code</p>
-            <p style="font-size:12px;color:#595961">ID: $id</p>
-            <p style="color:#595961">Válida hasta $expiresAt UTC.</p>
-            <hr style="border:0;border-top:1px solid #e8e8eb">
-            <p style="font-size:13px;color:#595961">
-              Este código se acepta después de verificar el correo. No otorga roles ni permisos por sí solo.
-              Si no solicitaste una invitación, ignora este mensaje.
-            </p>
-          </main>
-        </body></html>
-        """.trimIndent()
+        profileLabel: String?,
+    ): String {
+        val ownerBootstrap = kind == InvitationEmailKind.OWNER_BOOTSTRAP
+        val roleBlock =
+            if (!ownerBootstrap && profileLabel != null) {
+                """
+                <p style="margin:8px 0 14px;padding:8px 12px;background:#f7edf0;border-radius:10px;color:#8a1538;font-weight:700;display:inline-block">
+                  Perfil invitado: $profileLabel
+                </p>
+                """.trimIndent()
+            } else {
+                ""
+            }
+        val keyBlock =
+            if (ownerBootstrap) {
+                """
+                <p style="font-size:12px;color:#595961">CÓDIGO DE INVITACIÓN</p>
+                <p style="font-size:20px;letter-spacing:1px;overflow-wrap:anywhere;font-weight:700">$code</p>
+                <p style="font-size:12px;color:#595961">ID: $id</p>
+                """.trimIndent()
+            } else {
+                """
+                <p style="font-size:12px;color:#595961;font-weight:700;margin-bottom:6px">CLAVE DE ACTIVACIÓN (COPIAR Y PEGAR EN LA APP)</p>
+                <p style="font-size:16px;padding:14px;background:#f5f5f7;border:1px solid #dcdce2;border-radius:12px;overflow-wrap:anywhere;font-family:monospace;font-weight:700">$combinedKey</p>
+                <p style="font-size:12px;color:#595961;margin-top:14px">Datos individuales (si los ingresas por separado):</p>
+                <p style="font-size:13px;color:#595961;overflow-wrap:anywhere;margin:4px 0">Código: <strong>$code</strong></p>
+                <p style="font-size:12px;color:#595961;overflow-wrap:anywhere;margin:4px 0">ID: $id</p>
+                """.trimIndent()
+            }
+        return """
+            <!doctype html><html lang="es"><head><meta charset="utf-8"></head>
+            <body style="background:#f5f5f7;margin:0;padding:32px 12px;font-family:Arial,sans-serif;color:#202024">
+              <main style="max-width:540px;margin:auto;background:#fff;border-radius:22px;padding:32px">
+                <p style="color:#8a1538;font-weight:700">COMPAÑERO DE CLASE</p>
+                <h1 style="font-size:26px">${if (ownerBootstrap) "Invitación de propietario" else "Tu invitación está lista"}</h1>
+                $roleBlock
+                <p>${if (ownerBootstrap) "Inicia el registro OWNER_INVITED con este mismo correo y tu contraseña actual. Tu cuenta verificada y su MFA se conservarán." else "Abre Compañero Gestión o Académica, toca «Tengo invitación», pega la clave de activación y regístrate con este mismo correo."}</p>
+                $keyBlock
+                <p style="color:#595961">Válida hasta $expiresAt UTC.</p>
+                <hr style="border:0;border-top:1px solid #e8e8eb">
+                <p style="font-size:13px;color:#595961">
+                  La invitación se valida al verificar tu correo y requiere autorización final del administrador. No otorga roles ni permisos por sí sola.
+                  Si no solicitaste una invitación, ignora este mensaje.
+                </p>
+              </main>
+            </body></html>
+            """.trimIndent()
+    }
+
+    private fun InvitationProfile.spanishLabel(): String =
+        when (this) {
+            InvitationProfile.INSTITUTION_ADMIN -> "Administrador institucional"
+            InvitationProfile.TEACHER -> "Docente"
+            InvitationProfile.TUTOR -> "Tutor"
+            InvitationProfile.STUDENT -> "Alumno"
+            InvitationProfile.PARTICIPANT -> "Participante"
+            InvitationProfile.EXTERNAL_GUEST -> "Invitado externo"
+        }
 
     private fun attempt(payload: ByteArray): VerificationDeliveryStatus {
         val connection = endpoint.toURL().openConnection() as HttpURLConnection

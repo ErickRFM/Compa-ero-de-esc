@@ -143,7 +143,17 @@ class MongoInvitationEndToEndCircuitTest {
                 sender = "invitaciones@example.test",
                 endpoint = URI("http://127.0.0.1:$mailPort/emails"),
             )
-        val dispatchService = InvitationDispatchService(accounts, mfa, invitations, resendGateway, institutions, clock = clock)
+        val outbox = MongoInvitationOutbox(db, MfaSecretCipher(mfaBytes), clock)
+        val dispatchService =
+            InvitationDispatchService(
+                accounts = accounts,
+                mfa = mfa,
+                repository = invitations,
+                email = resendGateway,
+                institutions = institutions,
+                outbox = outbox,
+                clock = clock,
+            )
         val tutoring = TutorAssignmentService(InMemoryTutorAssignmentRepository(), groups, clock, accounts)
         val adminService = AccountAdministrationService(accounts, institutions, groups, tutoring, mfa, clock, invitations)
         val authTokens = AuthTokenService(settings)
@@ -734,6 +744,96 @@ class MongoInvitationEndToEndCircuitTest {
                 } finally {
                     db.drop()
                 }
+            }
+        }
+
+    @Test
+    fun `real Mongo outbox encrypts short 6-byte, 19-byte, and long 88-byte emails without throwing 503`() =
+        testApplication {
+            val uri = requireNotNull(System.getenv("V12_TEST_MONGODB_URI"))
+            require(uri == "mongodb://127.0.0.1:27017")
+            val capturedEmails = CopyOnWriteArrayList<CapturedMail>()
+            val mailServer = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+            mailServer.createContext("/emails") { exchange ->
+                val payload = exchange.requestBody.readBytes().toString(Charsets.UTF_8)
+                capturedEmails += CapturedMail(exchange.requestHeaders.getFirst("Idempotency-Key"), payload)
+                exchange.sendResponseHeaders(503, -1)
+                exchange.close()
+            }
+            mailServer.start()
+
+            val mongoClient = MongoClient.create(uri)
+            val db = mongoClient.getDatabase("invite_outbox_len_" + UUID.randomUUID().toString().replace("-", ""))
+            try {
+                // Seed a legacy short-recipient document (< 20 bytes) to verify legacy migration in ensureIndexes() too
+                runBlocking {
+                    db.getCollection<Document>("platform_invitation_outbox").insertOne(
+                        Document("_id", "L".repeat(43))
+                            .append("recipient", "a@b.cd")
+                            .append("tokenValue", "T".repeat(43))
+                            .append("expiresAt", java.util.Date.from(Instant.now().plusSeconds(3600)))
+                            .append("attempts", 0)
+                            .append("nextAttemptAt", java.util.Date.from(Instant.now().minusSeconds(5)))
+                            .append("lastStatus", "PENDING")
+                            .append("createdAt", java.util.Date.from(Instant.now().minusSeconds(60))),
+                    )
+                }
+
+                val h = MongoHarness(db, mailServer.address.port)
+                val (owner, ownerBearer) =
+                    h.createBearer("owner-len", "owner.len@example.test", setOf(UserRole.SUPER_ADMIN), "UPTLAX")
+                val enroll = h.mfa.beginEnrollment(owner, ownerCred)
+                val ownerSecret = Totp.decodeSecret(enroll.secret)
+                h.mfa.confirmEnrollment(owner, enroll.enrollmentId, Totp.code(ownerSecret, h.clock.current.epochSecond))
+                h.mount(this)
+
+                val recipients =
+                    listOf(
+                        "a@b.cd",
+                        "erik55509@mail.test",
+                        "coordinacion.ingenieria.software.posgrado.2026@universidad-politecnica-tlaxcala.edu.test",
+                    )
+                for ((idx, recipient) in recipients.withIndex()) {
+                    h.clock.current = h.clock.current.plusSeconds(35)
+                    val opId = "len-op-000$idx-12345678"
+                    val req = PrepareRegistrationInvitationRequest(recipient, "UPTLAX", "TEACHER", opId)
+                    val prepResp =
+                        client.post("/admin/invitations/prepare") {
+                            bearerAuth(ownerBearer)
+                            contentType(ContentType.Application.Json)
+                            setBody(json.encodeToString(req))
+                        }
+                    assertEquals(HttpStatusCode.OK, prepResp.status)
+                    val prep = json.decodeFromString<ApiResponse<RegistrationInvitationPreparation>>(prepResp.bodyAsText()).data
+                    val proof =
+                        h.issueProof(
+                            client,
+                            ownerBearer,
+                            ownerSecret,
+                            StepUpAction.ADMIN_INVITE,
+                            prep.resourceId,
+                            prep.operationId,
+                            prep.payloadDigest,
+                        )
+                    val dispatchResp =
+                        client.post("/admin/invitations") {
+                            bearerAuth(ownerBearer)
+                            contentType(ContentType.Application.Json)
+                            setBody(json.encodeToString(req.copy(proof = proof)))
+                        }
+                    assertEquals(HttpStatusCode.Created, dispatchResp.status, "Expected 201 Created for recipient=$recipient")
+                }
+
+                // Because mailServer returned 503 -> UNCONFIRMED, all 3 entries + 1 migrated legacy entry remain decryptable in pending()!
+                val pending = h.outbox.pending(h.clock.current.plusSeconds(120))
+                val pendingRecipients = pending.map { it.recipient }.toSet()
+                for (expected in recipients) {
+                    assertTrue(expected in pendingRecipients, "Expected $expected in decrypted pending outbox")
+                }
+            } finally {
+                mailServer.stop(0)
+                runBlocking { db.drop() }
+                mongoClient.close()
             }
         }
 }

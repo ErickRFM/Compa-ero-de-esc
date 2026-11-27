@@ -170,13 +170,19 @@ class MainActivity : AppCompatActivity() {
                             enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
                         }
                         var activatingAccess by rememberSaveable { mutableStateOf(false) }
+                        var registrationInviteMode by rememberSaveable { mutableStateOf(false) }
+                        var rescueInvitationOpen by rememberSaveable { mutableStateOf(false) }
                         var loginExperienceName by rememberSaveable { mutableStateOf<String?>(null) }
 
                         LaunchedEffect(session.checking, session.authenticated, session.userId, session.accountStatus, session.roles) {
-                            if (!session.checking && !session.authenticated) authDraft.clearAll()
+                            if (!session.checking && !session.authenticated) {
+                                authDraft.clearAll()
+                                rescueInvitationOpen = false
+                            }
                             if (session.authenticated) authDraft.clearRegistration()
                             if (session.authenticated) {
                                 activatingAccess = false
+                                registrationInviteMode = false
                                 if (session.accountStatus == org.companerodeescuela.shared.contracts.AccountStatus.ACTIVE &&
                                     appDistribution == AppDistribution.ACADEMIC &&
                                     org.companerodeescuela.shared.contracts.UserRole.STUDENT in session.roles
@@ -212,7 +218,11 @@ class MainActivity : AppCompatActivity() {
                                         state = session,
                                         onRegister = { sessionViewModel.register(it) },
                                         onReloadInstitutions = sessionViewModel::loadRegistrationInstitutions,
-                                        onBackToLogin = { activatingAccess = false },
+                                        initialInviteMode = registrationInviteMode,
+                                        onBackToLogin = {
+                                            activatingAccess = false
+                                            registrationInviteMode = false
+                                        },
                                     )
                                 } else {
                                     LoginScreen(
@@ -228,9 +238,16 @@ class MainActivity : AppCompatActivity() {
                                         },
                                         onCreateAccount = {
                                             loginExperienceName = null
+                                            registrationInviteMode = false
                                             activatingAccess = true
                                             sessionViewModel.loadRegistrationInstitutions()
                                         },
+                                        onActivateInvitation = {
+                                            loginExperienceName = null
+                                            registrationInviteMode = true
+                                            activatingAccess = true
+                                        },
+                                        onDismissNotice = sessionViewModel::dismissNotice,
                                     )
                                 }
                             }
@@ -241,6 +258,7 @@ class MainActivity : AppCompatActivity() {
                                     sessionViewModel::resendVerification,
                                     sessionViewModel::refreshIdentity,
                                     sessionViewModel::logout,
+                                    onAcceptInvitation = sessionViewModel::acceptRegistrationInvitation,
                                 )
                             }
                             else -> {
@@ -310,12 +328,26 @@ class MainActivity : AppCompatActivity() {
                                             )
                                         }
                                     val denied: @androidx.compose.runtime.Composable () -> Unit = {
-                                        RoleUnavailableScreen(
-                                            roleConfig.experience,
-                                            session.roles,
-                                            onLogout = sessionViewModel::logout,
-                                            onBack = { navController.popBackStack() },
-                                        )
+                                        if (rescueInvitationOpen && session.emailVerified) {
+                                            InvitationAcceptanceScreen(
+                                                state = session,
+                                                onAccept = sessionViewModel::acceptRegistrationInvitation,
+                                                onBack = { rescueInvitationOpen = false },
+                                            )
+                                        } else {
+                                            RoleUnavailableScreen(
+                                                roleConfig.experience,
+                                                session.roles,
+                                                onLogout = sessionViewModel::logout,
+                                                onBack = { navController.popBackStack() },
+                                                onOpenInvitation =
+                                                    if (roleConfig.experience == AppExperience.UNSUPPORTED && session.emailVerified) {
+                                                        { rescueInvitationOpen = true }
+                                                    } else {
+                                                        null
+                                                    },
+                                            )
+                                        }
                                     }
                                     var channelTabRequest by rememberSaveable(userId, roleConfig.experience) { mutableIntStateOf(-1) }
                                     var channelIdRequest by rememberSaveable(
@@ -857,6 +889,7 @@ private fun RoleUnavailableScreen(
     roles: Set<UserRole>,
     onLogout: () -> Unit,
     onBack: (() -> Unit)? = null,
+    onOpenInvitation: (() -> Unit)? = null,
 ) {
     val title =
         if (experience == AppExperience.UNSUPPORTED) {
@@ -900,6 +933,14 @@ private fun RoleUnavailableScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (experience == AppExperience.UNSUPPORTED) {
+                    if (onOpenInvitation != null) {
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = onOpenInvitation,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Tengo una clave de invitación")
+                        }
+                    }
                     Button(
                         onClick = onLogout,
                         modifier = Modifier.fillMaxWidth(),

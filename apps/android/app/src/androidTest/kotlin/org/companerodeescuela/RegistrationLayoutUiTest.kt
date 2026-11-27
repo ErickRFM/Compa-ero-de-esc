@@ -25,6 +25,7 @@ class RegistrationLayoutUiTest {
         render(2f)
         assertWholeLabel("Alumno")
         assertWholeLabel("Docente")
+        assertWholeLabel("Participante")
         val student = compose.onNodeWithText("Alumno", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val teacher = compose.onNodeWithText("Docente", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertTrue("Large text options need separate rows", teacher.top > student.bottom)
@@ -41,6 +42,7 @@ class RegistrationLayoutUiTest {
         render(1f)
         assertWholeLabel("Alumno")
         assertWholeLabel("Docente")
+        assertWholeLabel("Participante")
         val student = compose.onNodeWithText("Alumno", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val teacher = compose.onNodeWithText("Docente", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertEquals(student.center.y, teacher.center.y, 1f)
@@ -49,12 +51,30 @@ class RegistrationLayoutUiTest {
     @Test fun universalRegistrationOffersTutorAndParticipantWithoutPrivilegedProfiles() {
         render(1f)
         compose.onNodeWithText("Tutor").performScrollTo().performClick()
-        compose.onNodeWithText("Identificación profesional o referencia").performScrollTo().assertExists()
+        compose.onNodeWithText("Clave docente SIII, nómina o cédula").performScrollTo().assertExists()
         compose.onNodeWithText("Grupo solicitado (preferencia)").performScrollTo().assertExists()
         compose.onNodeWithText("Participante").performScrollTo().performClick()
-        compose.onNodeWithText("Identificación profesional o referencia").assertDoesNotExist()
+        compose.onNodeWithText("Clave docente SIII, nómina o cédula").assertDoesNotExist()
         compose.onNodeWithText("Administrador").assertDoesNotExist()
         compose.onNodeWithText("Superadministrador").assertDoesNotExist()
+    }
+
+    @Test fun invitedRegistrationModeParsesCombinedKeyAndOptionalSiiiReferenceWithoutInstitutionSelector() {
+        var submitted: RegisterRequest? = null
+        val id = "dZdh8PeXUl9mtyYdQTNvw5CwivQpXs4i3sCepopjKKk"
+        val code = "BcmXYugjVh9yvYAkikbMkDUWN-kd6f3HvFRx442B44s"
+        render(1f, SessionUiState(checking = false)) { submitted = it }
+        compose.onNodeWithTag("registration_mode_invited").performScrollTo().performClick()
+        compose.onNodeWithTag("registration_invitation_key").performScrollTo().performTextInput("$id.$code")
+        compose.onNodeWithTag("registration_invitation_ready").performScrollTo().assertExists()
+        fillCredentials()
+        compose.onNodeWithTag("registration_siii_reference").performScrollTo().performTextInput("DOC-UPTLAX-77")
+        compose.onNodeWithTag("registration_submit").performScrollTo().performClick()
+        assertEquals(RegistrationAccountType.INVITED, submitted?.accountType)
+        assertEquals(id, submitted?.invitationId)
+        assertEquals(code, submitted?.invitationCode)
+        assertEquals("DOC-UPTLAX-77", submitted?.identityReference)
+        assertNull(submitted?.requestedInstitutionId)
     }
 
     @Test fun tutorRequiresActualInstitutionAndSendsPreferenceWithoutRoleGrant() {

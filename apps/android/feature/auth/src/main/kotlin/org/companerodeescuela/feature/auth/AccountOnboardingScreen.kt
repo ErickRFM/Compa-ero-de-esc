@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-naming")
+
 package org.companerodeescuela.feature.auth
 
 import androidx.compose.foundation.layout.*
@@ -12,6 +14,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.companerodeescuela.core.designsystem.v8.V8FrostedGlassPanel
+import org.companerodeescuela.core.ui.component.NoticeTone
+import org.companerodeescuela.core.ui.component.StatusNotice
 import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.VerificationDeliveryStatus
 
@@ -23,21 +27,40 @@ fun AccountOnboardingScreen(
     onResend: () -> Unit,
     onRefresh: () -> Unit,
     onLogout: () -> Unit,
+    onAcceptInvitation: (String, String) -> Unit = { _, _ -> },
     draft: AuthDraftViewModel = viewModel(),
 ) {
     var token by draft.verificationCode
-    LaunchedEffect(state.userId, state.accountStatus) { draft.bindVerificationAccount(state.userId, state.accountStatus) }
+    var showInvitationRescue by remember { mutableStateOf(false) }
+    var rescueKeyInput by remember { mutableStateOf("") }
+    var rescueId by remember { mutableStateOf("") }
+    var rescueCode by remember { mutableStateOf("") }
+    var rescueSeparate by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.userId, state.accountStatus) {
+        draft.bindVerificationAccount(state.userId, state.accountStatus)
+    }
+    LaunchedEffect(state.invitationAccepted) {
+        if (state.invitationAccepted) {
+            showInvitationRescue = false
+            rescueKeyInput = ""
+            rescueId = ""
+            rescueCode = ""
+        }
+    }
+
     val verification = state.accountStatus == AccountStatus.PENDING_VERIFICATION
     val approval = state.accountStatus == AccountStatus.PENDING_APPROVAL
+    val invitedConfirmed = approval && state.invitationAccepted
+
     AuthV8Layout(themeAware = true) {
         Text(
             stringResource(
-                if (verification) {
-                    R.string.verification_title
-                } else if (approval) {
-                    R.string.approval_title
-                } else {
-                    R.string.participant_title
+                when {
+                    verification -> R.string.verification_title
+                    invitedConfirmed -> R.string.approval_invited_title
+                    approval -> R.string.approval_title
+                    else -> R.string.participant_title
                 },
             ),
             color = authInk(),
@@ -49,12 +72,11 @@ fun AccountOnboardingScreen(
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     stringResource(
-                        if (verification) {
-                            R.string.verification_description
-                        } else if (approval) {
-                            R.string.approval_description
-                        } else {
-                            R.string.participant_description
+                        when {
+                            verification -> R.string.verification_description
+                            invitedConfirmed -> R.string.approval_invited_description
+                            approval -> R.string.approval_description
+                            else -> R.string.participant_description
                         },
                     ),
                     color = authMuted(),
@@ -95,7 +117,73 @@ fun AccountOnboardingScreen(
                     )
                     AuthV8SecondaryAction(stringResource(R.string.verification_resend), onResend, !state.submitting)
                 } else {
-                    AuthV8SecondaryAction(stringResource(R.string.approval_refresh), onRefresh, !state.submitting)
+                    if (invitedConfirmed) {
+                        StatusNotice(
+                            title = stringResource(R.string.approval_invited_title),
+                            message = "Invitación aceptada y pendiente de autorización final por Administración.",
+                            tone = NoticeTone.SUCCESS,
+                            modifier = Modifier.testTag("onboarding_invitation_confirmed"),
+                        )
+                    }
+                    AuthV8PrimaryAction(
+                        stringResource(R.string.approval_refresh),
+                        onRefresh,
+                        !state.submitting && !state.invitationWorking,
+                        state.submitting,
+                        Modifier.testTag("onboarding_refresh"),
+                    )
+                    if (approval && state.emailVerified && !state.invitationAccepted) {
+                        AuthV8SecondaryAction(
+                            stringResource(
+                                if (showInvitationRescue) {
+                                    R.string.onboarding_hide_invitation
+                                } else {
+                                    R.string.onboarding_have_invitation
+                                },
+                            ),
+                            { showInvitationRescue = !showInvitationRescue },
+                            !state.submitting && !state.invitationWorking,
+                            Modifier.testTag("onboarding_toggle_invitation"),
+                        )
+                        if (showInvitationRescue) {
+                            SmartInvitationKeySection(
+                                keyInput = rescueKeyInput,
+                                onKeyInputChange = { raw ->
+                                    rescueKeyInput = raw.take(512)
+                                    InvitationCredentialParser.parse(raw)?.let { parsed ->
+                                        rescueId = parsed.invitationId
+                                        rescueCode = parsed.code
+                                    }
+                                },
+                                invitationId = rescueId,
+                                onInvitationIdChange = { rescueId = it.filterNot(Char::isWhitespace).take(43) },
+                                invitationCode = rescueCode,
+                                onInvitationCodeChange = { rescueCode = it.filterNot(Char::isWhitespace).take(43) },
+                                separateFields = rescueSeparate,
+                                onToggleSeparateFields = { rescueSeparate = !rescueSeparate },
+                                enabled = !state.invitationWorking && !state.submitting,
+                                tagPrefix = "onboarding_invitation",
+                            )
+                            AuthV8PrimaryAction(
+                                "Aceptar invitación",
+                                { onAcceptInvitation(rescueId.trim(), rescueCode.trim()) },
+                                !state.invitationWorking &&
+                                    InvitationCredentialParser.isValidPart(rescueId) &&
+                                    InvitationCredentialParser.isValidPart(rescueCode),
+                                state.invitationWorking,
+                                Modifier.testTag("onboarding_invitation_submit"),
+                                "Validando...",
+                            )
+                            state.invitationFailure?.let { failure ->
+                                StatusNotice(
+                                    title = "Invitación no aceptada",
+                                    message = failure.userMessage,
+                                    tone = NoticeTone.ERROR,
+                                    modifier = Modifier.testTag("onboarding_invitation_error"),
+                                )
+                            }
+                        }
+                    }
                 }
                 if (state.verificationFailure != null) {
                     val error = state.verificationFailure
@@ -113,7 +201,7 @@ fun AccountOnboardingScreen(
                 AuthV8SecondaryAction(stringResource(R.string.registration_logout), {
                     draft.clearAll()
                     onLogout()
-                }, !state.submitting)
+                }, !state.submitting && !state.invitationWorking)
             }
         }
     }

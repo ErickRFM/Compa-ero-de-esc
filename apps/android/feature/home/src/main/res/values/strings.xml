@@ -65,6 +65,10 @@
 <string name="admin_directory_next">Siguiente</string>
 <string name="admin_student_affiliation">Autorizar afiliación escolar</string>
 <string name="admin_link_siii">Vincular con SIII</string>
+<string name="admin_unlink_siii">Desvincular de SIII</string>
+<string name="admin_unlink_reason">Motivo para desvincular</string>
+<string name="admin_unlink_help">Si el vínculo es incorrecto, escribe el mismo identificador y el motivo para retirarlo.</string>
+<string name="admin_confirm_unlink_siii">Vas a retirar el vínculo SIII de %1$s. Sus clases institucionales dejarán de mostrarse. Confirma con tu contraseña y tu código de verificación.</string>
 <string name="admin_link_reference">Matrícula o clave docente</string>
 <string name="admin_link_reference_help">Escribe la matrícula o clave docente que figura en SIII.</string>
 <string name="admin_shortcut_schedule">Pintar franjas</string>

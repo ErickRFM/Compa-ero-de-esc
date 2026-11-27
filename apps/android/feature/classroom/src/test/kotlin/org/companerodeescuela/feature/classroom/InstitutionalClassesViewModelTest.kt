@@ -116,6 +116,7 @@ class InstitutionalClassesViewModelTest {
                 val revoked = completed()
                 assertTrue(revoked.institutionalSections.isEmpty())
                 assertNotNull(revoked.institutionalErrorMessage)
+                assertEquals("Acceso institucional retirado", revoked.institutionalErrorTitle)
             } finally {
                 vm.viewModelScope.cancel()
                 client.close()

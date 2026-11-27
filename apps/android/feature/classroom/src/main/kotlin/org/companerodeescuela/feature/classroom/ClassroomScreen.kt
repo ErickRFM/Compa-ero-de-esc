@@ -682,7 +682,7 @@ private fun TeacherAssignedClassrooms(
 internal fun InstitutionalSections(state: ClassroomUiState) {
     CompaneroExpandableVisibility(visible = state.institutionalLoading) { V8InlineLoading("Cargando materias institucionales…") }
     state.institutionalErrorMessage?.let {
-        StatusNotice(title = "Datos institucionales sin actualizar", message = it)
+        StatusNotice(title = state.institutionalErrorTitle ?: "Datos institucionales sin actualizar", message = it)
     }
     if (state.institutionalSource != "SIII") return
     Column(Modifier.fillMaxWidth().testTag("institutional_sections"), verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm)) {

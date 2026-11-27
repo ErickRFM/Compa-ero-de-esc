@@ -7,6 +7,7 @@ enum class AdminOperationKind {
     APPROVE_STAFF,
     AFFILIATE_STUDENT,
     LINK_SIII,
+    UNLINK_SIII,
     SUSPEND_ACCOUNT,
     REVOKE_ACCOUNT,
     REACTIVATE_ACCOUNT,

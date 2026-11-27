@@ -19,6 +19,7 @@ import org.companerodeescuela.shared.contracts.AuthorizeRegistrationInvitationRe
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkDigest
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkRequest
+import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkRevokeRequest
 import org.companerodeescuela.shared.contracts.MfaStepUpRequest
 import org.companerodeescuela.shared.contracts.PrepareRegistrationInvitationRetryRequest
 import org.companerodeescuela.shared.contracts.PrivilegedCommandDigests
@@ -86,6 +87,16 @@ class AdminViewModel
                 override val action = StepUpAction.MANAGE_ACADEMICS
                 override val resourceId get() = body.institutionId
                 override val digest get() = InstitutionalIdentityLinkDigest.command(body)
+            }
+
+            data class IdentityUnlink(
+                override val target: String,
+                val body: InstitutionalIdentityLinkRevokeRequest,
+            ) : Command {
+                override val operationId get() = body.operationId
+                override val action = StepUpAction.MANAGE_ACADEMICS
+                override val resourceId get() = body.institutionId
+                override val digest get() = InstitutionalIdentityLinkDigest.revoke(body)
             }
 
             data class Lifecycle(
@@ -201,6 +212,7 @@ class AdminViewModel
                     is Command.Approval -> AdminOperationKind.APPROVE_STAFF
                     is Command.Affiliation -> AdminOperationKind.AFFILIATE_STUDENT
                     is Command.IdentityLink -> AdminOperationKind.LINK_SIII
+                    is Command.IdentityUnlink -> AdminOperationKind.UNLINK_SIII
                     is Command.Revocation -> AdminOperationKind.REVOKE_TUTOR_ASSIGNMENT
                     is Command.InvitationRetry -> AdminOperationKind.RETRY_INVITATION
                     is Command.InvitationAuthorization -> AdminOperationKind.AUTHORIZE_INVITATION
@@ -368,6 +380,37 @@ class AdminViewModel
             )
         }
 
+        /** Revokes a wrong SIII link (audit A3); the server checks the link, permission and step-up again. */
+        fun prepareInstitutionalUnlink(
+            userId: String,
+            externalId: String,
+            reason: String,
+        ) {
+            if (!ready() || command != null) return
+            val target =
+                mutable.value.overview
+                    ?.users
+                    ?.find { it.user.id == userId }
+                    ?.user ?: return invalid()
+            val institution = target.institutionId ?: return invalid()
+            val reference = externalId.trim().uppercase(java.util.Locale.ROOT)
+            val cleanReason = reason.trim()
+            if (!reference.matches(Regex("[A-Z0-9][A-Z0-9_-]{1,31}")) || cleanReason.length !in 3..500) return invalid()
+            val kind =
+                when {
+                    UserRole.TEACHER in target.roles -> InstitutionalIdentityKind.TEACHER
+                    UserRole.STUDENT in target.roles -> InstitutionalIdentityKind.STUDENT
+                    else -> return invalid()
+                }
+            prepare(
+                Command.IdentityUnlink(
+                    userId,
+                    InstitutionalIdentityLinkRevokeRequest(institution, kind, reference, cleanReason, UUID.randomUUID().toString(), ""),
+                ),
+                target.displayName + " · " + reference,
+            )
+        }
+
         fun prepareRevocation(id: String) {
             if (!ready() || command != null) return
             val assignment = mutable.value.assignments.find { it.id == id && it.active } ?: return invalid()
@@ -428,6 +471,7 @@ class AdminViewModel
                         when (pending) {
                             is Command.Affiliation -> repository.affiliateStudent(pending.target, pending.body.copy(proof = actual.proof))
                             is Command.IdentityLink -> repository.linkInstitutionalIdentity(pending.body.copy(proof = actual.proof))
+                            is Command.IdentityUnlink -> repository.revokeInstitutionalIdentity(pending.body.copy(proof = actual.proof))
                             is Command.Approval -> repository.approve(pending.target, pending.body.copy(proof = actual.proof))
                             is Command.Lifecycle -> repository.lifecycle(pending.target, pending.body.copy(proof = actual.proof))
                             is Command.Revocation -> repository.revokeAssignment(pending.target, pending.body.copy(proof = actual.proof))

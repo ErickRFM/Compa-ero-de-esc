@@ -11,6 +11,7 @@ import org.companerodeescuela.shared.contracts.AdminCapability
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkDigest
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkRequest
+import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkRevokeRequest
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkSummary
 import org.companerodeescuela.shared.contracts.StepUpAction
 import org.companerodeescuela.shared.contracts.UserRole
@@ -80,6 +81,51 @@ class InstitutionalIdentityLinkService(
             InstitutionalIdentityLinkAcceptance.CONFLICT ->
                 throw ApiException.Conflict("Institutional identity changed concurrently or is already linked")
         }
+    }
+
+    /**
+     * Revokes an active link (audit A3). A wrong link used to be permanent and blocked the right account;
+     * academic reads stop immediately because resolve() and the SIII authority both require an active link.
+     */
+    suspend fun revoke(
+        actor: UserSummary,
+        request: InstitutionalIdentityLinkRevokeRequest,
+    ): InstitutionalIdentityLinkSummary {
+        listOf(request.institutionId, request.operationId).forEach { value ->
+            if (value.isBlank() || value != value.trim() || value.length > 128 || value.any(Char::isISOControl)) {
+                throw ApiException.Validation("Bounded institution and operation identifiers are required")
+            }
+        }
+        if (request.externalId.isBlank() ||
+            request.externalId != request.externalId.trim() ||
+            request.externalId.length > 256 ||
+            request.externalId.any(Char::isISOControl)
+        ) {
+            throw ApiException.Validation("A bounded institutional identifier is required")
+        }
+        val reason = request.reason.trim()
+        if (reason.length !in 3..500 || reason.any { it.isISOControl() && it != '\n' }) {
+            throw ApiException.Validation("A revocation reason between 3 and 500 characters is required")
+        }
+        val current = policy.require(actor, AdminCapability.MANAGE_ACADEMICS, request.institutionId)
+        repository.findByExternalId(request.institutionId, request.entityType, request.externalId)
+            ?: throw ApiException.NotFound("Institutional identity link is not active")
+        mfa.requireStepUp(
+            current,
+            request.proof,
+            StepUpAction.MANAGE_ACADEMICS,
+            request.institutionId,
+            request.operationId,
+            InstitutionalIdentityLinkDigest.revoke(request),
+        )
+        val revoked =
+            repository.revoke(
+                request.institutionId,
+                request.entityType,
+                request.externalId,
+                InstitutionalIdentityLinkRevocation(current.id, reason, request.operationId, clock.instant()),
+            ) ?: throw ApiException.Conflict("Institutional identity link changed concurrently")
+        return revoked.toSummary()
     }
 
     /** Dedicated institution-owned archival export only; never authorizes mobile or live academic operations. */

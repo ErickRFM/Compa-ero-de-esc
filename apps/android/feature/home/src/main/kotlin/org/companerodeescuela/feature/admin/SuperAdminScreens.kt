@@ -74,6 +74,7 @@ fun superAdminAccountsScreen(
     var directoryFilter by rememberSaveable(state.ownerKey) { mutableStateOf(AdminDirectoryFilter.ALL) }
     var linkTarget by remember(state.ownerKey) { mutableStateOf<AdminUserSummary?>(null) }
     var externalReference by remember(state.ownerKey, linkTarget?.user?.id) { mutableStateOf("") }
+    var unlinkReason by remember(state.ownerKey, linkTarget?.user?.id) { mutableStateOf("") }
     var tutorSelection by remember(state.ownerKey) { mutableStateOf<Pair<AdminUserSummary, StaffApplication>?>(null) }
     var invitedTutorTarget by remember(state.ownerKey) { mutableStateOf<RegistrationInvitationSummary?>(null) }
     var revokeTarget by remember(state.ownerKey) { mutableStateOf<RegistrationInvitationSummary?>(null) }
@@ -210,6 +211,21 @@ fun superAdminAccountsScreen(
                         label = { Text(stringResource(R.string.admin_link_reference)) },
                         singleLine = true,
                     )
+                    Text(stringResource(R.string.admin_unlink_help))
+                    OutlinedTextField(
+                        unlinkReason,
+                        { unlinkReason = it.take(500) },
+                        label = { Text(stringResource(R.string.admin_unlink_reason)) },
+                    )
+                    TextButton(
+                        onClick = {
+                            viewModel.prepareInstitutionalUnlink(target.user.id, externalReference, unlinkReason)
+                            linkTarget = null
+                        },
+                        enabled =
+                            externalReference.trim().uppercase(Locale.ROOT).matches(Regex("[A-Z0-9][A-Z0-9_-]{1,31}")) &&
+                                unlinkReason.trim().length >= 3,
+                    ) { Text(stringResource(R.string.admin_unlink_siii)) }
                 }
             },
             confirmButton = {

@@ -15,6 +15,7 @@ import org.companerodeescuela.shared.contracts.InstitutionSummary
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityKind
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkDigest
 import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkRequest
+import org.companerodeescuela.shared.contracts.InstitutionalIdentityLinkRevokeRequest
 import org.companerodeescuela.shared.contracts.StepUpAction
 import org.companerodeescuela.shared.contracts.UserRole
 import java.time.Clock
@@ -151,5 +152,104 @@ class InstitutionalIdentityLinkServiceTest {
             val coordinatorLink = service.link(admin.toUserSummary(), coordinatorRequest.copy(proof = coordinatorProof.proof))
             assertEquals(coordinator.id, coordinatorLink.nativeUserId)
             assertEquals(coordinator.id, service.resolve("campus", InstitutionalIdentityKind.COORDINATOR, "siii-user-0001")?.id)
+        }
+
+    @Test
+    fun `revocation needs reason and step-up, frees the identifier and lets the right account link`() =
+        runBlocking {
+            val clock = TestClock()
+            val accounts = InMemoryPlatformAccountRepository()
+            val directory = InMemoryInstitutionRepository(listOf(InstitutionSummary("campus", "QA Campus")))
+            val mfa = MfaService(accounts, InMemoryMfaRepository(), MfaSecretCipher(ByteArray(32) { it.toByte() }), clock)
+            val service =
+                InstitutionalIdentityLinkService(accounts, directory, InMemoryInstitutionalIdentityLinkRepository(), mfa, clock)
+            val admin =
+                PlatformAccount(
+                    id = "admin",
+                    displayName = "QA Admin",
+                    email = "admin@example.test",
+                    passwordHash = PasswordHasher().hash("operator-test-password"),
+                    roles = setOf(UserRole.ADMIN),
+                    institutionId = "campus",
+                    emailVerifiedAt = clock.current,
+                    adminCapabilities = setOf(AdminCapability.MANAGE_ACADEMICS),
+                )
+
+            fun student(id: String) =
+                PlatformAccount(
+                    id = id,
+                    displayName = id,
+                    email = "$id@example.test",
+                    passwordHash = "already-hashed",
+                    roles = setOf(UserRole.STUDENT),
+                    institutionId = "campus",
+                    emailVerifiedAt = clock.current,
+                )
+            accounts.create(admin)
+            accounts.create(student("wrong-student"))
+            accounts.create(student("right-student"))
+            val enrollment = mfa.beginEnrollment(admin, "operator-test-password")
+            val seed = Totp.decodeSecret(enrollment.secret)
+            clock.current = clock.current.plusSeconds(30)
+            mfa.confirmEnrollment(admin, enrollment.enrollmentId, Totp.code(seed, clock.current.epochSecond))
+
+            suspend fun proof(
+                operationId: String,
+                digest: String,
+            ): String {
+                clock.current = clock.current.plusSeconds(30)
+                return mfa
+                    .issueStepUp(
+                        admin,
+                        "operator-test-password",
+                        Totp.code(seed, clock.current.epochSecond),
+                        StepUpAction.MANAGE_ACADEMICS,
+                        "campus",
+                        operationId,
+                        digest,
+                    ).proof
+            }
+
+            suspend fun link(
+                userId: String,
+                operationId: String,
+            ) {
+                val request =
+                    InstitutionalIdentityLinkRequest("campus", InstitutionalIdentityKind.STUDENT, "SIS-0420", userId, operationId, "")
+                service.link(
+                    admin.toUserSummary(),
+                    request.copy(proof = proof(operationId, InstitutionalIdentityLinkDigest.command(request))),
+                )
+            }
+            link("wrong-student", "link-wrong")
+            assertFailsWith<ApiException.Conflict> { link("right-student", "link-right-blocked") }
+
+            val revoke =
+                InstitutionalIdentityLinkRevokeRequest(
+                    "campus",
+                    InstitutionalIdentityKind.STUDENT,
+                    "SIS-0420",
+                    "Matrícula de otra persona",
+                    "revoke-0420",
+                    "",
+                )
+            assertFailsWith<ApiException.Validation> { service.revoke(admin.toUserSummary(), revoke.copy(reason = " x ")) }
+            assertFailsWith<ApiException> { service.revoke(admin.toUserSummary(), revoke.copy(proof = "invalid")) }
+            val stranger = student("stranger").copy(roles = setOf(UserRole.TEACHER))
+            accounts.create(stranger)
+            assertFailsWith<ApiException> { service.revoke(stranger.toUserSummary(), revoke) }
+            assertEquals("wrong-student", service.resolve("campus", InstitutionalIdentityKind.STUDENT, "SIS-0420")?.id)
+
+            val revoked =
+                service.revoke(
+                    admin.toUserSummary(),
+                    revoke.copy(proof = proof(revoke.operationId, InstitutionalIdentityLinkDigest.revoke(revoke))),
+                )
+            assertEquals("wrong-student", revoked.nativeUserId)
+            assertEquals(null, service.resolve("campus", InstitutionalIdentityKind.STUDENT, "SIS-0420"))
+            assertFailsWith<ApiException.NotFound> { service.revoke(admin.toUserSummary(), revoke.copy(operationId = "revoke-again")) }
+
+            link("right-student", "link-right")
+            assertEquals("right-student", service.resolve("campus", InstitutionalIdentityKind.STUDENT, "SIS-0420")?.id)
         }
 }

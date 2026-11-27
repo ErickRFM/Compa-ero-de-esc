@@ -26,6 +26,17 @@ data class InstitutionalIdentityLinkRequest(
     val proof: String,
 )
 
+/** Removes a wrong or obsolete institutional identifier link (audit A3); requires a reason and step-up. */
+@Serializable
+data class InstitutionalIdentityLinkRevokeRequest(
+    val institutionId: String,
+    val entityType: InstitutionalIdentityKind,
+    val externalId: String,
+    val reason: String,
+    val operationId: String,
+    val proof: String,
+)
+
 @Serializable
 data class InstitutionalIdentityLinkSummary(
     val institutionId: String,

@@ -106,6 +106,7 @@ fun adminHomeScreen(
         modifier,
         onStudentAffiliation = viewModel::prepareStudentAffiliation,
         onInstitutionalLink = viewModel::prepareInstitutionalLink,
+        onInstitutionalUnlink = viewModel::prepareInstitutionalUnlink,
         isSuperAdmin = isSuperAdmin,
         onOpenInvitations = onOpenInvitations,
     )
@@ -128,11 +129,13 @@ fun adminHomeScreenContent(
     modifier: Modifier = Modifier,
     onStudentAffiliation: (String, String) -> Unit = { _, _ -> },
     onInstitutionalLink: (String, String) -> Unit = { _, _ -> },
+    onInstitutionalUnlink: (String, String, String) -> Unit = { _, _, _ -> },
     isSuperAdmin: Boolean = false,
     onOpenInvitations: (() -> Unit)? = null,
 ) {
     var linkTarget by remember(state.ownerKey) { mutableStateOf<AdminUserSummary?>(null) }
     var externalReference by remember(state.ownerKey, linkTarget?.user?.id) { mutableStateOf("") }
+    var unlinkReason by remember(state.ownerKey, linkTarget?.user?.id) { mutableStateOf("") }
     var tutorSelection by remember(state.ownerKey) { mutableStateOf<Pair<AdminUserSummary, StaffApplication>?>(null) }
     var directoryFilter by rememberSaveable(state.ownerKey) { mutableStateOf(AdminDirectoryFilter.ALL) }
     Column(
@@ -346,6 +349,21 @@ fun adminHomeScreenContent(
                     OutlinedTextField(externalReference, {
                         externalReference = it.take(32)
                     }, label = { Text(stringResource(R.string.admin_link_reference)) }, singleLine = true)
+                    Text(stringResource(R.string.admin_unlink_help))
+                    OutlinedTextField(
+                        unlinkReason,
+                        { unlinkReason = it.take(500) },
+                        label = { Text(stringResource(R.string.admin_unlink_reason)) },
+                    )
+                    TextButton(
+                        onClick = {
+                            onInstitutionalUnlink(target.user.id, externalReference, unlinkReason)
+                            linkTarget = null
+                        },
+                        enabled =
+                            externalReference.trim().uppercase(java.util.Locale.ROOT).matches(Regex("[A-Z0-9][A-Z0-9_-]{1,31}")) &&
+                                unlinkReason.trim().length >= 3,
+                    ) { Text(stringResource(R.string.admin_unlink_siii)) }
                 }
             },
             confirmButton = {
@@ -766,6 +784,7 @@ private fun operationDescriptionResource(kind: AdminOperationKind): Int =
         AdminOperationKind.APPROVE_STAFF -> R.string.admin_confirm_approve_staff
         AdminOperationKind.AFFILIATE_STUDENT -> R.string.admin_confirm_affiliate_student
         AdminOperationKind.LINK_SIII -> R.string.admin_confirm_link_siii
+        AdminOperationKind.UNLINK_SIII -> R.string.admin_confirm_unlink_siii
         AdminOperationKind.SUSPEND_ACCOUNT -> R.string.admin_confirm_suspend
         AdminOperationKind.REVOKE_ACCOUNT -> R.string.admin_confirm_revoke
         AdminOperationKind.REACTIVATE_ACCOUNT -> R.string.admin_confirm_reactivate

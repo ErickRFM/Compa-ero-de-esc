@@ -37,7 +37,22 @@ interface InstitutionalIdentityLinkRepository {
     ): InstitutionalIdentityLink?
 
     suspend fun createIfAbsent(link: InstitutionalIdentityLink): InstitutionalIdentityLinkAcceptance
+
+    /** Removes the active link and keeps it in history; null when no active link exists. */
+    suspend fun revoke(
+        institutionId: String,
+        entityType: InstitutionalIdentityKind,
+        externalId: String,
+        revocation: InstitutionalIdentityLinkRevocation,
+    ): InstitutionalIdentityLink? = null
 }
+
+data class InstitutionalIdentityLinkRevocation(
+    val revokedBy: String,
+    val reason: String,
+    val operationId: String,
+    val revokedAt: Instant,
+)
 
 class InMemoryInstitutionalIdentityLinkRepository : InstitutionalIdentityLinkRepository {
     private val mutex = Mutex()
@@ -57,6 +72,13 @@ class InMemoryInstitutionalIdentityLinkRepository : InstitutionalIdentityLinkRep
         entityType: InstitutionalIdentityKind,
         externalId: String,
     ): InstitutionalIdentityLink? = links[key(institutionId, entityType, externalId)]
+
+    override suspend fun revoke(
+        institutionId: String,
+        entityType: InstitutionalIdentityKind,
+        externalId: String,
+        revocation: InstitutionalIdentityLinkRevocation,
+    ): InstitutionalIdentityLink? = mutex.withLock { links.remove(key(institutionId, entityType, externalId)) }
 
     override suspend fun createIfAbsent(link: InstitutionalIdentityLink): InstitutionalIdentityLinkAcceptance =
         mutex.withLock {

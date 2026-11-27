@@ -16,6 +16,7 @@
 <string name="auth_submit">Iniciar sesión  →</string>
 <string name="auth_submitting">Conectando…</string>
 <string name="auth_create_account">Crear cuenta</string>
+<string name="auth_activate_invitation">Activar invitación institucional</string>
 <string name="auth_or">O</string>
 <string name="auth_role_student">Alumno</string>
 <string name="auth_role_teacher">Docente</string>
@@ -75,7 +76,8 @@
 <string name="registration_directory_empty">No hay instituciones habilitadas para solicitudes.</string>
 <string name="registration_select_institution">Seleccionar institución</string>
 <string name="registration_retry">Volver a cargar</string>
-<string name="registration_identity">Identificación profesional o referencia</string>
+<string name="registration_identity">Clave docente SIII, nómina o cédula</string>
+<string name="registration_identity_help">Permite que tu institución identifique tu expediente en SIII o valide tu adscripción docente.</string>
 <string name="registration_group">Grupo solicitado (preferencia)</string>
 <string name="registration_preference_notice">La preferencia no concede acceso a un grupo. Administración determina las asignaciones.</string>
 <string name="registration_submitting">Creando cuenta…</string>
@@ -138,4 +140,24 @@
     <string name="registration_owner_invited">Propietario invitado</string>
     <string name="registration_owner_invitation_code">Código de invitación de propietario</string>
     <string name="verification_delivered">Correo entregado en el buzón (confirmado).</string>
+    <string name="registration_mode_standard">Sin invitación</string>
+    <string name="registration_mode_invited">Tengo invitación</string>
+    <string name="registration_invited_title">Activar invitación</string>
+    <string name="registration_invited_type">Con invitación</string>
+    <string name="registration_invited_notice">Válido para Administrador, Docente, Tutor o Alumno con invitación institucional. Tu institución y perfil se asignan automáticamente al autorizarte.</string>
+    <string name="registration_invitation_key">Clave de activación (ID.Código o texto del correo)</string>
+    <string name="registration_invitation_paste">Pegar</string>
+    <string name="registration_invitation_detected">Clave de invitación lista (ID y código detectados).</string>
+    <string name="registration_invitation_separate_toggle">Ingresar ID y código por separado</string>
+    <string name="registration_invitation_hide_separate">Usar un solo campo</string>
+    <string name="registration_invitation_id">ID de invitación</string>
+    <string name="registration_invitation_code">Código de invitación</string>
+    <string name="registration_siii_optional">Matrícula o clave SIII (opcional)</string>
+    <string name="registration_siii_optional_help">Si perteneces a SIII (docente o alumno), escríbela para agilizar la vinculación de tus clases y horarios.</string>
+    <string name="registration_owner_toggle">Configuración inicial de propietario del servidor</string>
+    <string name="registration_owner_cancel">Volver a registro estándar</string>
+    <string name="approval_invited_title">Invitación verificada</string>
+    <string name="approval_invited_description">Tu correo e invitación quedaron confirmados. Un administrador debe autorizar tu perfil institucional para activar tu acceso. Pulsa «Comprobar estado» cuando te confirmen.</string>
+    <string name="onboarding_have_invitation">Tengo una clave de invitación</string>
+    <string name="onboarding_hide_invitation">Ocultar captura de invitación</string>
 </resources>

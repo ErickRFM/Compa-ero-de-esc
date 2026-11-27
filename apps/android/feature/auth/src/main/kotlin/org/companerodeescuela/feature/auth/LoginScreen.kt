@@ -66,6 +66,8 @@ fun LoginScreen(
     modifier: Modifier = Modifier,
     distribution: AppDistribution = AppDistribution.LEGACY,
     onAutomaticLogin: ((String, String) -> Unit)? = null,
+    onActivateInvitation: (() -> Unit)? = null,
+    onDismissNotice: () -> Unit = {},
 ) {
     var username by rememberSaveable { mutableStateOf("") }
     // Passwords never enter saved instance state; paging keeps this one form mounted.
@@ -94,7 +96,12 @@ fun LoginScreen(
         if (onAutomaticLogin != null) onAutomaticLogin(username, password) else onLogin(username, password, access.experience)
     }
 
-    AuthV8Layout(modifier, themeAware = true) {
+    AuthV8Layout(
+        modifier = modifier,
+        themeAware = true,
+        balancedVerticalOffset = true,
+        compactContent = onAutomaticLogin != null,
+    ) {
         val heroLead = stringResource(R.string.auth_hero_title)
         val heroAccent = stringResource(R.string.auth_hero_accent)
         if (onAutomaticLogin != null) {
@@ -193,7 +200,10 @@ fun LoginScreen(
 
                 OutlinedTextField(
                     value = username,
-                    onValueChange = { username = InstitutionalCredentialValidator.sanitizeIdentifier(it) },
+                    onValueChange = {
+                        onDismissNotice()
+                        username = InstitutionalCredentialValidator.sanitizeIdentifier(it)
+                    },
                     modifier = Modifier.fillMaxWidth().testTag("login_username"),
                     enabled = !state.submitting,
                     singleLine = true,
@@ -234,7 +244,10 @@ fun LoginScreen(
 
                 OutlinedTextField(
                     value = password,
-                    onValueChange = { password = InstitutionalCredentialValidator.sanitizePassword(it) },
+                    onValueChange = {
+                        onDismissNotice()
+                        password = InstitutionalCredentialValidator.sanitizePassword(it)
+                    },
                     modifier = Modifier.fillMaxWidth().padding(top = 10.dp).testTag("login_password"),
                     enabled = !state.submitting,
                     singleLine = true,
@@ -344,11 +357,12 @@ fun LoginScreen(
                     submittingText = stringResource(R.string.auth_submitting),
                 )
 
-                if (onAutomaticLogin != null &&
-                    distribution != AppDistribution.MANAGEMENT ||
-                    onAutomaticLogin == null &&
-                    access.canRegister
-                ) {
+                val canCreateStandardAccount =
+                    onAutomaticLogin != null &&
+                        distribution != AppDistribution.MANAGEMENT ||
+                        onAutomaticLogin == null &&
+                        access.canRegister
+                if (canCreateStandardAccount) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -373,6 +387,39 @@ fun LoginScreen(
                         onClick = onCreateAccount,
                         enabled = !state.submitting,
                         modifier = Modifier.testTag("login_registration"),
+                    )
+                } else if (distribution == AppDistribution.MANAGEMENT && onActivateInvitation != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    ) {
+                        HorizontalDivider(
+                            modifier = Modifier.weight(1f),
+                            color = muted.copy(alpha = 0.2f),
+                        )
+                        Text(
+                            text = stringResource(R.string.auth_or),
+                            color = muted,
+                            fontSize = 12.sp,
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.weight(1f),
+                            color = muted.copy(alpha = 0.2f),
+                        )
+                    }
+
+                    AuthV8SecondaryAction(
+                        text = stringResource(R.string.auth_activate_invitation),
+                        onClick = onActivateInvitation,
+                        enabled = !state.submitting,
+                        modifier = Modifier.testTag("login_invite_registration"),
+                    )
+                    Text(
+                        text = stringResource(R.string.auth_managed_access),
+                        color = muted,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        modifier = Modifier.padding(top = 10.dp),
                     )
                 } else {
                     Text(

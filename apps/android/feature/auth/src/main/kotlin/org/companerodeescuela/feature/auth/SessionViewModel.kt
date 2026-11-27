@@ -104,10 +104,11 @@ class SessionViewModel
 
         /**
          * Do not interpret transport/5xx failures as a revoked session.
-         * Keep navigation locked until /auth/me verifies live roles, and recheck
-         * automatically while this token is still observed.
+         * Perform brief silent retries during cold start so a transient mobile/server
+         * wake-up does not flash a connection error banner over LoginScreen.
          */
         private suspend fun verifyRestoredSession(): Boolean {
+            var transientFailures = 0
             while (true) {
                 when (val verified = repository.currentUser()) {
                     is Outcome.Success -> {
@@ -120,10 +121,23 @@ class SessionViewModel
                             publishSignedOut(SessionNotice.EXPIRED)
                             return false
                         }
-                        publishSignedOut(SessionNotice.CONNECTION)
-                        delay(15_000L)
+                        transientFailures += 1
+                        if (transientFailures == 1) {
+                            delay(1_200L)
+                        } else if (transientFailures == 2) {
+                            delay(2_400L)
+                        } else {
+                            publishSignedOut(SessionNotice.CONNECTION)
+                            delay(15_000L)
+                        }
                     }
                 }
+            }
+        }
+
+        fun dismissNotice() {
+            if (_state.value.noticeReason != null || _state.value.noticeMessage != null) {
+                _state.update { it.copy(noticeReason = null, noticeMessage = null) }
             }
         }
 
@@ -146,7 +160,7 @@ class SessionViewModel
                     verificationDelivery = user.verificationDelivery,
                     verificationFailure = null,
                     invitationWorking = false,
-                    invitationAccepted = false,
+                    invitationAccepted = user.invitationAccepted,
                     invitationFailure = null,
                     failure = null,
                     noticeReason = null,

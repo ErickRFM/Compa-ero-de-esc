@@ -3,15 +3,29 @@
 package org.companerodeescuela.feature.auth
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.common.result.AppError
 
 @Composable internal fun SecurityFailure(error: AppError) {
@@ -42,6 +56,10 @@ import org.companerodeescuela.core.common.result.AppError
     password: Boolean = false,
     otp: Boolean = false,
 ) {
+    var passwordVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(value) {
+        if (value.isEmpty()) passwordVisible = false
+    }
     OutlinedTextField(
         value,
         onChange,
@@ -49,7 +67,34 @@ import org.companerodeescuela.core.common.result.AppError
         enabled = enabled,
         singleLine = true,
         label = { Text(stringResource(label)) },
-        visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
+        visualTransformation =
+            if (password && !passwordVisible) {
+                PasswordVisualTransformation()
+            } else {
+                VisualTransformation.None
+            },
+        trailingIcon =
+            if (password) {
+                {
+                    IconButton(
+                        onClick = { passwordVisible = !passwordVisible },
+                        enabled = enabled,
+                        modifier = Modifier.testTag("${tag}_toggle_visibility"),
+                    ) {
+                        Icon(
+                            imageVector = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                            contentDescription =
+                                stringResource(
+                                    if (passwordVisible) R.string.auth_hide_password else R.string.auth_show_password,
+                                ),
+                            tint = authMuted(),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            } else {
+                null
+            },
         keyboardOptions =
             KeyboardOptions(
                 keyboardType =

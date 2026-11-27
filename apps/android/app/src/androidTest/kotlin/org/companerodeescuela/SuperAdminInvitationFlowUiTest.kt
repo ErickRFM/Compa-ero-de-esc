@@ -261,9 +261,26 @@ class SuperAdminInvitationFlowUiTest {
             waitTag("invite_institution_UPTLAX")
             compose.onNodeWithTag("invite_institution_UPTLAX").performScrollTo().assertIsDisplayed()
 
-            // 3. Complete MFA-protected invitation dispatch -> shows provider acceptance (pending webhook delivery)
-            typeExactly("invite_recipient", "docente.qa@example.test")
+            // 3. Complete MFA-protected invitation dispatch -> verify password visibility toggle & provider acceptance
+            typeExactly("invite_recipient", "e5@x.test")
             typeExactly("invite_password", "test-only-cred-123")
+            val maskedBefore =
+                compose
+                    .onNodeWithTag("invite_password")
+                    .fetchSemanticsNode()
+                    .config[SemanticsProperties.EditableText]
+                    .text
+            assertTrue(maskedBefore.all { it == '\u2022' })
+            compose.onNodeWithTag("invite_password_toggle_visibility").performScrollTo().performClick()
+            compose.waitForIdle()
+            val visiblePassword =
+                compose
+                    .onNodeWithTag("invite_password")
+                    .fetchSemanticsNode()
+                    .config[SemanticsProperties.EditableText]
+                    .text
+            assertEquals("test-only-cred-123", visiblePassword)
+            compose.onNodeWithTag("invite_password_toggle_visibility").performScrollTo().performClick()
             typeExactly("invite_otp", "654321")
             compose.onNodeWithTag("invite_send").performScrollTo().performClick()
 
@@ -272,7 +289,7 @@ class SuperAdminInvitationFlowUiTest {
             assertEquals(1, stepUps.size)
             assertEquals(StepUpAction.ADMIN_INVITE, stepUps.single().action)
             assertEquals(1, dispatches.size)
-            assertEquals("docente.qa@example.test", dispatches.single().recipient)
+            assertEquals("e5@x.test", dispatches.single().recipient)
             assertEquals(validProof, dispatches.single().proof)
         } finally {
             viewModel.viewModelScope.cancel()
@@ -458,10 +475,21 @@ class SuperAdminInvitationFlowUiTest {
             compose.onNodeWithTag("invitation_delivery_$bouncedInviteId").performScrollTo().assertIsDisplayed()
             compose.onNodeWithTag("invitation_delivery_$acceptedInviteId").performScrollTo().assertIsDisplayed()
 
-            // 2. Retry bounced invitation with MFA step-up -> transitions badge to provider ACCEPTED (pending webhook)
+            // 2. Retry bounced invitation with MFA step-up -> verify dialog password toggle & provider ACCEPTED badge
             compose.onNodeWithTag("invitation_retry_$bouncedInviteId").performScrollTo().performClick()
             waitTag("admin_password")
             typeExactly("admin_password", "test-only-cred-123", scroll = false)
+            compose.onNodeWithTag("admin_password_toggle_visibility").performClick()
+            compose.waitForIdle()
+            assertEquals(
+                "test-only-cred-123",
+                compose
+                    .onNodeWithTag("admin_password")
+                    .fetchSemanticsNode()
+                    .config[SemanticsProperties.EditableText]
+                    .text,
+            )
+            compose.onNodeWithTag("admin_password_toggle_visibility").performClick()
             typeExactly("admin_otp", "112233", scroll = false)
             compose.onNodeWithTag("admin_confirm").performClick()
 

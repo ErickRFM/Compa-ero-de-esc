@@ -11,15 +11,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -42,6 +48,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.SecureFlagPolicy
@@ -638,7 +645,11 @@ internal fun adminUserDirectory(
     onConfirm: (String, String) -> Unit,
 ) {
     var password by remember(operation.operationId) { mutableStateOf("") }
+    var passwordVisible by remember(operation.operationId) { mutableStateOf(false) }
     var otp by remember(operation.operationId) { mutableStateOf("") }
+    LaunchedEffect(password) {
+        if (password.isEmpty()) passwordVisible = false
+    }
     val destructive = operation.kind == AdminOperationKind.REVOKE_ACCOUNT
     AlertDialog(properties = DialogProperties(securePolicy = SecureFlagPolicy.SecureOn), onDismissRequest = {
         if (!working) onDismiss()
@@ -654,7 +665,23 @@ internal fun adminUserDirectory(
                 label = { Text(stringResource(R.string.admin_password)) },
                 singleLine = true,
                 enabled = !working,
-                visualTransformation = PasswordVisualTransformation(),
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                trailingIcon = {
+                    IconButton(
+                        onClick = { passwordVisible = !passwordVisible },
+                        enabled = !working,
+                        modifier = Modifier.testTag("admin_password_toggle_visibility"),
+                    ) {
+                        Icon(
+                            imageVector = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                            contentDescription =
+                                stringResource(
+                                    if (passwordVisible) R.string.admin_hide_password else R.string.admin_show_password,
+                                ),
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 modifier = Modifier.fillMaxWidth().testTag("admin_password"),
             )

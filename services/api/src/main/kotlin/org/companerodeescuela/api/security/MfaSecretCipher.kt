@@ -18,8 +18,22 @@ class MfaSecretCipher(
         actorId: String,
         factorId: String,
         secret: ByteArray,
+    ): String = encryptBounded(actorId, factorId, secret, minBytes = 20, maxBytes = 64)
+
+    fun decrypt(
+        actorId: String,
+        factorId: String,
+        encrypted: String,
+    ): ByteArray = decryptBounded(actorId, factorId, encrypted, minBytes = 20, maxBytes = 64)
+
+    fun encryptBounded(
+        actorId: String,
+        factorId: String,
+        secret: ByteArray,
+        minBytes: Int,
+        maxBytes: Int,
     ): String {
-        require(secret.size in 20..64)
+        require(minBytes >= 1 && maxBytes in minBytes..512 && secret.size in minBytes..maxBytes)
         val iv = ByteArray(12).also(random::nextBytes)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, secretKey, GCMParameterSpec(128, iv))
@@ -27,18 +41,25 @@ class MfaSecretCipher(
         return Base64.getUrlEncoder().withoutPadding().encodeToString(iv + cipher.doFinal(secret))
     }
 
-    fun decrypt(
+    fun decryptBounded(
         actorId: String,
         factorId: String,
         encrypted: String,
+        minBytes: Int,
+        maxBytes: Int,
     ): ByteArray {
-        require(encrypted.length in 64..123 && Regex("[A-Za-z0-9_-]+").matches(encrypted))
+        require(minBytes >= 1 && maxBytes in minBytes..512)
+        val minPacked = minBytes + 28
+        val maxPacked = maxBytes + 28
+        val minEncoded = (minPacked * 4 + 2) / 3
+        val maxEncoded = (maxPacked * 4 + 2) / 3
+        require(encrypted.length in minEncoded..maxEncoded && Regex("[A-Za-z0-9_-]+").matches(encrypted))
         val packed = Base64.getUrlDecoder().decode(encrypted)
-        require(packed.size in 48..92 && Base64.getUrlEncoder().withoutPadding().encodeToString(packed) == encrypted)
+        require(packed.size in minPacked..maxPacked && Base64.getUrlEncoder().withoutPadding().encodeToString(packed) == encrypted)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(128, packed.copyOfRange(0, 12)))
         cipher.updateAAD(binding(actorId, factorId))
-        return cipher.doFinal(packed.copyOfRange(12, packed.size)).also { require(it.size in 20..64) }
+        return cipher.doFinal(packed.copyOfRange(12, packed.size)).also { require(it.size in minBytes..maxBytes) }
     }
 
     private fun binding(

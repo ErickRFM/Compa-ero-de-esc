@@ -25,6 +25,29 @@ class MfaSecretCipherTest {
 
     @Test fun `key material is bounded and never shown by cipher`() {
         assertFailsWith<IllegalArgumentException> { MfaSecretCipher(ByteArray(16)) }
+        assertFailsWith<IllegalArgumentException> { MfaSecretCipher(key).encrypt("actor", "factor", ByteArray(19)) }
+        assertFailsWith<IllegalArgumentException> { MfaSecretCipher(key).encrypt("actor", "factor", ByteArray(65)) }
         assertEquals("MfaSecretCipher([redacted])", MfaSecretCipher(key).toString())
+    }
+
+    @Test fun `bounded cipher encrypts and decrypts short and long outbox recipients`() {
+        val cipher = MfaSecretCipher(key)
+        val samples =
+            listOf(
+                "a@b.cd",
+                "erik55509@mail.test",
+                "coordinacion.ingenieria.posgrado@universidad-politecnica-tlaxcala.edu.test",
+            )
+        for (sample in samples) {
+            val bytes = sample.toByteArray(Charsets.UTF_8)
+            val encrypted =
+                cipher.encryptBounded("inv-1", "platform-invitation-outbox-recipient", bytes, minBytes = 1, maxBytes = 256)
+            val decrypted =
+                cipher.decryptBounded("inv-1", "platform-invitation-outbox-recipient", encrypted, minBytes = 1, maxBytes = 256)
+            assertContentEquals(bytes, decrypted)
+            assertFails {
+                cipher.decryptBounded("other-inv", "platform-invitation-outbox-recipient", encrypted, minBytes = 1, maxBytes = 256)
+            }
+        }
     }
 }

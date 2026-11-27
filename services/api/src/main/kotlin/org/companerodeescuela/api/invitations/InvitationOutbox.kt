@@ -167,14 +167,16 @@ internal class MongoInvitationOutbox(
         }
         // One-time compatibility migrations encrypt legacy recipient addresses and retry tokens.
         collection.find(Filters.exists("recipient")).collect { legacy ->
-            val id = legacy.getString("_id") ?: throw IllegalStateException("Legacy invitation outbox entry has no ID")
-            val recipient = legacy.getString("recipient") ?: ""
-            if (recipient.isNotEmpty()) {
+            val id = legacy.getString("_id") ?: return@collect
+            val recipientBytes = (legacy.getString("recipient") ?: "").toByteArray(Charsets.UTF_8)
+            if (recipientBytes.size in 1..MAX_RECIPIENT_BYTES && id.length <= 128) {
                 val encrypted =
-                    cipher.encrypt(
+                    cipher.encryptBounded(
                         id,
                         "platform-invitation-outbox-recipient",
-                        recipient.toByteArray(Charsets.UTF_8),
+                        recipientBytes,
+                        minBytes = 1,
+                        maxBytes = MAX_RECIPIENT_BYTES,
                     )
                 collection.updateOne(
                     Filters.and(Filters.eq("_id", id), Filters.exists("recipient")),
@@ -186,16 +188,19 @@ internal class MongoInvitationOutbox(
             } else {
                 collection.updateOne(
                     Filters.eq("_id", id),
-                    Updates.unset("recipient"),
+                    Updates.combine(
+                        Updates.set("lastStatus", VerificationDeliveryStatus.FAILED.name),
+                        Updates.unset("recipient"),
+                        Updates.unset("tokenValue"),
+                    ),
                 )
             }
         }
         collection.find(Filters.exists("tokenValue")).collect { legacy ->
-            val token = legacy.getString("tokenValue") ?: ""
-            if (token.isNotEmpty()) {
-                require(token.length in 20..64) { "Legacy invitation retry token has an invalid length" }
-                val id = legacy.getString("_id") ?: throw IllegalStateException("Legacy invitation outbox entry has no ID")
-                val encrypted = cipher.encrypt(id, "platform-invitation-outbox", token.toByteArray(Charsets.UTF_8))
+            val id = legacy.getString("_id") ?: return@collect
+            val tokenBytes = (legacy.getString("tokenValue") ?: "").toByteArray(Charsets.UTF_8)
+            if (tokenBytes.size in 20..64 && id.length <= 128) {
+                val encrypted = cipher.encrypt(id, "platform-invitation-outbox", tokenBytes)
                 collection.updateOne(
                     Filters.and(Filters.eq("_id", id), Filters.exists("tokenValue")),
                     Updates.combine(
@@ -205,7 +210,7 @@ internal class MongoInvitationOutbox(
                 )
             } else {
                 collection.updateOne(
-                    Filters.eq("_id", legacy.getString("_id")),
+                    Filters.eq("_id", id),
                     Updates.unset("tokenValue"),
                 )
             }
@@ -321,11 +326,17 @@ internal class MongoInvitationOutbox(
                 )
             }
         val encryptedRecipient =
-            cipher.encrypt(
-                invitationId,
-                "platform-invitation-outbox-recipient",
-                recipient.toByteArray(Charsets.UTF_8),
-            )
+            if (recipient.isEmpty()) {
+                ""
+            } else {
+                cipher.encryptBounded(
+                    invitationId,
+                    "platform-invitation-outbox-recipient",
+                    recipient.toByteArray(Charsets.UTF_8),
+                    minBytes = 1,
+                    maxBytes = MAX_RECIPIENT_BYTES,
+                )
+            }
         return Document("_id", invitationId)
             .append("recipientCiphertext", encryptedRecipient)
             .append("tokenCiphertext", encryptedToken)
@@ -340,9 +351,18 @@ internal class MongoInvitationOutbox(
         return try {
             val recipientCiphertext = getString("recipientCiphertext") ?: return null
             val recipient =
-                cipher
-                    .decrypt(getString("_id"), "platform-invitation-outbox-recipient", recipientCiphertext)
-                    .toString(Charsets.UTF_8)
+                if (recipientCiphertext.isEmpty()) {
+                    ""
+                } else {
+                    cipher
+                        .decryptBounded(
+                            getString("_id"),
+                            "platform-invitation-outbox-recipient",
+                            recipientCiphertext,
+                            minBytes = 1,
+                            maxBytes = MAX_RECIPIENT_BYTES,
+                        ).toString(Charsets.UTF_8)
+                }
             val ciphertext = getString("tokenCiphertext") ?: return null
             val value =
                 if (ciphertext.isEmpty()) {
@@ -365,5 +385,9 @@ internal class MongoInvitationOutbox(
         } catch (_: Exception) {
             null
         }
+    }
+
+    private companion object {
+        const val MAX_RECIPIENT_BYTES = 256
     }
 }

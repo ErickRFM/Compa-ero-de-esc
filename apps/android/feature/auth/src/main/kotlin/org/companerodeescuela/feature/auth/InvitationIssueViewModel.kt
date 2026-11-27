@@ -125,8 +125,11 @@ internal fun formatInvitationFailure(
                             400, 422 ->
                                 "El servidor rechazó los datos de la invitación (HTTP ${error.status}). " +
                                     "Revisa el correo y la institución."
-                            404, 503 ->
-                                "El servicio de invitaciones no está disponible en el servidor (HTTP ${error.status})."
+                            404 ->
+                                "La ruta de envío de invitaciones no está disponible en el servidor (HTTP 404)."
+                            503 ->
+                                "Falló una dependencia interna al registrar o despachar la invitación en el servidor (HTTP 503). " +
+                                    "Tu verificación MFA sí se completó; revisa el historial antes de reintentar."
                             429 ->
                                 "Demasiados intentos de envío (HTTP 429). Espera unos minutos e inténtalo de nuevo."
                             in 500..599 ->

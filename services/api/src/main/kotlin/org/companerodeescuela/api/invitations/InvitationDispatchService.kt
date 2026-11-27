@@ -146,17 +146,24 @@ internal class InvitationDispatchService(
         // Persist encrypted retry capability before network I/O so a process crash cannot strand it.
         if (outbox != null) {
             val queued =
-                authenticationDependency {
-                    outbox.enqueue(
-                        OutboxEntry(
-                            invitationId = id,
-                            recipient = command.recipient,
-                            tokenValue = token.value,
-                            expiresAt = expiresAt,
-                            nextAttemptAt = now.plusSeconds(60),
-                            createdAt = now,
-                        ),
-                    )
+                try {
+                    authenticationDependency {
+                        outbox.enqueue(
+                            OutboxEntry(
+                                invitationId = id,
+                                recipient = command.recipient,
+                                tokenValue = token.value,
+                                expiresAt = expiresAt,
+                                nextAttemptAt = now.plusSeconds(60),
+                                createdAt = now,
+                            ),
+                        )
+                    }
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (failure: Throwable) {
+                    runCatching { repository.revoke(id, clock.instant()) }
+                    throw failure
                 }
             if (!queued) {
                 authenticationDependency { repository.revoke(id, clock.instant()) }
@@ -174,10 +181,10 @@ internal class InvitationDispatchService(
         when (delivery) {
             VerificationDeliveryStatus.FAILED, VerificationDeliveryStatus.UNAVAILABLE -> {
                 authenticationDependency { repository.revoke(id, clock.instant()) }
-                outbox?.markFailed(id, clock.instant())
+                runCatching { outbox?.markFailed(id, clock.instant()) }
             }
-            VerificationDeliveryStatus.ACCEPTED -> outbox?.clearToken(id)
-            VerificationDeliveryStatus.DELIVERED -> outbox?.markDelivered(id, clock.instant())
+            VerificationDeliveryStatus.ACCEPTED -> runCatching { outbox?.clearToken(id) }
+            VerificationDeliveryStatus.DELIVERED -> runCatching { outbox?.markDelivered(id, clock.instant()) }
             else -> Unit
         }
         authenticationDependency { repository.updateDeliveryStatus(id, delivery.name, clock.instant()) }
@@ -292,10 +299,10 @@ internal class InvitationDispatchService(
         when (delivery) {
             VerificationDeliveryStatus.FAILED, VerificationDeliveryStatus.UNAVAILABLE -> {
                 authenticationDependency { repository.revoke(invitationId, clock.instant()) }
-                outbox?.markFailed(invitationId, clock.instant())
+                runCatching { outbox?.markFailed(invitationId, clock.instant()) }
             }
-            VerificationDeliveryStatus.ACCEPTED -> outbox?.clearToken(invitationId)
-            VerificationDeliveryStatus.DELIVERED -> outbox?.markDelivered(invitationId, clock.instant())
+            VerificationDeliveryStatus.ACCEPTED -> runCatching { outbox?.clearToken(invitationId) }
+            VerificationDeliveryStatus.DELIVERED -> runCatching { outbox?.markDelivered(invitationId, clock.instant()) }
             else -> Unit
         }
         authenticationDependency { repository.updateDeliveryStatus(invitationId, delivery.name, clock.instant()) }

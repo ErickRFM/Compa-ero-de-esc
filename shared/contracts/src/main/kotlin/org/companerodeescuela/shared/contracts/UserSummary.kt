@@ -20,6 +20,8 @@ data class UserSummary(
     val authRevision: Long = 0,
     val institutionId: String? = null,
     val registrationAccountType: RegistrationAccountType? = null,
+    /** String discriminator for profiles added after older clients shipped. */
+    val registrationProfile: String? = null,
     val emailVerified: Boolean = false,
     val verificationDelivery: VerificationDeliveryStatus? = null,
     val invitationAccepted: Boolean = false,

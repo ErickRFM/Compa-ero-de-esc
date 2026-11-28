@@ -627,6 +627,8 @@ class InvitationAuthorizationRoutesTest {
             assertEquals(AccountStatus.PENDING_APPROVAL, verified.user.accountStatus)
             assertTrue(verified.user.roles.isEmpty())
             assertTrue(verified.user.invitationAccepted)
+            assertNull(verified.user.registrationAccountType)
+            assertEquals("INVITED", verified.user.registrationProfile)
             assertEquals(InvitationStatus.ACCEPTED, h.invitations.find(adminInvId)?.status)
 
             val meResp =
@@ -637,6 +639,8 @@ class InvitationAuthorizationRoutesTest {
             val meSummary = json.decodeFromString<ApiResponse<UserSummary>>(meResp.bodyAsText()).data
             assertTrue(meSummary.invitationAccepted)
             assertTrue(meSummary.roles.isEmpty())
+            assertNull(meSummary.registrationAccountType)
+            assertEquals("INVITED", meSummary.registrationProfile)
 
             val listResp =
                 client.get("/admin/invitations") {

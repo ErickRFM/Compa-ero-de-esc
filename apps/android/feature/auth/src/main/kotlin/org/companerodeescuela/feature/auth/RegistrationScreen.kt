@@ -198,9 +198,13 @@ fun RegistrationScreen(
                         keyInput = invitationKeyInput,
                         onKeyInputChange = { raw ->
                             invitationKeyInput = raw.take(512)
-                            InvitationCredentialParser.parse(raw)?.let { parsed ->
+                            val parsed = InvitationCredentialParser.parse(raw)
+                            if (parsed != null) {
                                 invitationId = parsed.invitationId
                                 invitationCode = parsed.code
+                            } else {
+                                invitationId = ""
+                                invitationCode = ""
                             }
                         },
                         invitationId = invitationId,

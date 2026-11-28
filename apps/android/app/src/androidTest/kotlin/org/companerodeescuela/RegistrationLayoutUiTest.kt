@@ -77,6 +77,18 @@ class RegistrationLayoutUiTest {
         assertNull(submitted?.requestedInstitutionId)
     }
 
+    @Test fun invalidReplacementInvitationKeyClearsThePreviouslyParsedInvitation() {
+        val id = "dZdh8PeXUl9mtyYdQTNvw5CwivQpXs4i3sCepopjKKk"
+        val code = "BcmXYugjVh9yvYAkikbMkDUWN-kd6f3HvFRx442B44s"
+        render(1f, SessionUiState(checking = false))
+        compose.onNodeWithTag("registration_mode_invited").performScrollTo().performClick()
+        compose.onNodeWithTag("registration_invitation_key").performScrollTo().performTextInput("$id.$code")
+        compose.onNodeWithTag("registration_invitation_ready").performScrollTo().assertExists()
+        compose.onNodeWithTag("registration_invitation_key").performTextClearance()
+        compose.onNodeWithTag("registration_invitation_key").performTextInput("invalid replacement")
+        compose.onNodeWithTag("registration_invitation_ready").assertDoesNotExist()
+    }
+
     @Test fun tutorRequiresActualInstitutionAndSendsPreferenceWithoutRoleGrant() {
         var submitted: RegisterRequest? = null
         render(1f, SessionUiState(checking = false, institutions = listOf(InstitutionSummary("campus", "Test campus")))) { submitted = it }

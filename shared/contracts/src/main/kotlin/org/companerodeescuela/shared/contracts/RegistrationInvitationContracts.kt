@@ -86,6 +86,7 @@ data class RegistrationInvitationSummary(
     val deliveryStatus: String = "PENDING",
     val deliveryUpdatedAtEpochSeconds: Long? = null,
     val acceptedByAccountId: String? = null,
+    val acceptedIdentityReference: String? = null,
 ) {
     override fun toString() =
         "RegistrationInvitationSummary(id=$invitationId, profile=$profile, status=$status, deliveryStatus=$deliveryStatus)"

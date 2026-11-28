@@ -3,6 +3,7 @@ package org.companerodeescuela.api.auth
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.companerodeescuela.shared.contracts.AccountStatus
+import org.companerodeescuela.shared.contracts.RegistrationAccountType
 import org.companerodeescuela.shared.contracts.UserRole
 import org.companerodeescuela.shared.contracts.UserSummary
 import java.time.Instant
@@ -44,7 +45,11 @@ data class PlatformAccount(
             accountStatus = accountStatus,
             authRevision = authRevision,
             institutionId = institutionId,
-            registrationAccountType = registrationIntent?.profile,
+            registrationAccountType =
+                registrationIntent?.profile?.takeUnless {
+                    it == RegistrationAccountType.INVITED
+                },
+            registrationProfile = registrationIntent?.profile?.name,
             emailVerified = emailVerifiedAt != null,
             verificationDelivery = emailVerification?.deliveryStatus,
         )

@@ -16,6 +16,7 @@
 <string name="auth_submit">Sign in  →</string>
 <string name="auth_submitting">Connecting…</string>
 <string name="auth_create_account">Create account</string>
+<string name="auth_activate_invitation">Activate institutional invitation</string>
 <string name="auth_or">OR</string>
 <string name="auth_role_student">Student</string>
 <string name="auth_role_teacher">Teacher</string>
@@ -75,7 +76,8 @@
 <string name="registration_directory_empty">No institutions are available for requests.</string>
 <string name="registration_select_institution">Select institution</string>
 <string name="registration_retry">Reload</string>
-<string name="registration_identity">Professional identification or reference</string>
+<string name="registration_identity">SIII teacher code, payroll ID or license</string>
+<string name="registration_identity_help">Helps your institution match your SIII record or verify your staff status.</string>
 <string name="registration_group">Requested group (preference)</string>
 <string name="registration_preference_notice">Your preference does not grant group access. Administration determines assignments.</string>
 <string name="registration_submitting">Creating account…</string>
@@ -138,4 +140,24 @@
     <string name="registration_owner_invited">Invited owner</string>
     <string name="registration_owner_invitation_code">Owner invitation code</string>
     <string name="verification_delivered">Email delivered to the inbox (confirmed).</string>
+    <string name="registration_mode_standard">Without invitation</string>
+    <string name="registration_mode_invited">I have an invitation</string>
+    <string name="registration_invited_title">Activate invitation</string>
+    <string name="registration_invited_type">Invited</string>
+    <string name="registration_invited_notice">Valid for Administrator, Teacher, Tutor or Student with an institutional invitation. Your institution and profile are assigned upon authorization.</string>
+    <string name="registration_invitation_key">Activation key (ID.Code or pasted email text)</string>
+    <string name="registration_invitation_paste">Paste</string>
+    <string name="registration_invitation_detected">Invitation key ready (ID and code detected).</string>
+    <string name="registration_invitation_separate_toggle">Enter ID and code separately</string>
+    <string name="registration_invitation_hide_separate">Use single field</string>
+    <string name="registration_invitation_id">Invitation ID</string>
+    <string name="registration_invitation_code">Invitation code</string>
+    <string name="registration_siii_optional">SIII ID or staff code (optional)</string>
+    <string name="registration_siii_optional_help">If you belong to SIII (teacher or student), enter it so Administration can link your classes and schedules faster.</string>
+    <string name="registration_owner_toggle">Initial server owner setup</string>
+    <string name="registration_owner_cancel">Back to standard registration</string>
+    <string name="approval_invited_title">Invitation verified</string>
+    <string name="approval_invited_description">Your email and invitation are confirmed. An administrator must authorize your institutional profile to activate access. Tap \'Check status\' once confirmed.</string>
+    <string name="onboarding_have_invitation">I have an invitation key</string>
+    <string name="onboarding_hide_invitation">Hide invitation input</string>
 </resources>

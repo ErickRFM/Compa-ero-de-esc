@@ -176,6 +176,67 @@ class SessionViewModelTest {
                 "No pudimos renovar tu sesión. Revisa tu conexión e inténtalo de nuevo.",
                 state.noticeMessage,
             )
+            viewModel.dismissNotice()
+            assertNull(viewModel.state.value.noticeMessage)
+            assertNull(viewModel.state.value.noticeReason)
+        }
+
+    @Test
+    fun `transient cold start failure retries silently without flashing connection notice`() =
+        runTest {
+            val currentEpoch = System.currentTimeMillis() / 1000
+            val store =
+                FakeSessionStore(
+                    accessToken =
+                        token(
+                            subject = "admin-1",
+                            sessionId = "session-1",
+                            expiresAt = currentEpoch + 3600,
+                            roles = listOf("ADMIN"),
+                        ),
+                    refreshSession = RefreshSessionCredentials("session-1", "refresh-1"),
+                )
+            val clock =
+                java.time.Clock.fixed(
+                    java.time.Instant.ofEpochSecond(currentEpoch),
+                    java.time.ZoneId.of("UTC"),
+                )
+            var attempts = 0
+            val repo =
+                AuthRepository(
+                    client =
+                        createApiClient(
+                            ApiEnvironment("https://example.test/", "test"),
+                            MockEngine {
+                                attempts += 1
+                                if (attempts == 1) {
+                                    respond(
+                                        content = """{"error":"warming up"}""",
+                                        status = HttpStatusCode.ServiceUnavailable,
+                                        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                                    )
+                                } else {
+                                    respond(
+                                        content =
+                                            """{"data":{"id":"admin-1","displayName":"Admin UPTLAX","email":"admin@uptlax.edu.mx","roles":["admin"],"active":true}}""",
+                                        status = HttpStatusCode.OK,
+                                        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                                    )
+                                }
+                            },
+                        ),
+                    tokenStore = store,
+                    clock = clock,
+                )
+
+            val vm = SessionViewModel(repo, store, clock).also(viewModels::add)
+            val resolved = vm.state.first { !it.checking }
+
+            assertEquals(2, attempts)
+            assertTrue(resolved.authenticated)
+            assertNull(resolved.noticeReason)
+            assertNull(resolved.noticeMessage)
+            assertEquals(setOf(UserRole.ADMIN), resolved.roles)
         }
 
     @Test fun `restored pending identity shows live verification state without academic authority`() =

@@ -36,7 +36,6 @@ data class RefreshSessionRequest(
     val refreshToken: String,
 )
 
-
 @Serializable
 enum class RegistrationAccountType {
     STUDENT,
@@ -44,6 +43,7 @@ enum class RegistrationAccountType {
     TUTOR,
     PARTICIPANT,
     OWNER_INVITED,
+    INVITED,
 }
 
 @Serializable
@@ -56,4 +56,8 @@ data class RegisterRequest(
     val identityReference: String? = null,
     val preferredGroup: String? = null,
     val ownerInvitationCode: String? = null,
-)
+    val invitationId: String? = null,
+    val invitationCode: String? = null,
+) {
+    override fun toString() = "RegisterRequest(accountType=$accountType, requestedInstitutionId=$requestedInstitutionId, [redacted])"
+}

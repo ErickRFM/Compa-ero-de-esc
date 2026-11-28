@@ -76,9 +76,18 @@ class InvitationEmailTransportTest {
                     )
                 val code = "a".repeat(43)
                 val id = "b".repeat(43)
-                val status = adapter.send("recipient@example.test", code, id, Instant.parse("2026-11-10T20:00:00Z"))
+                val status =
+                    adapter.sendRegistration(
+                        "recipient@example.test",
+                        code,
+                        id,
+                        Instant.parse("2026-11-10T20:00:00Z"),
+                        InvitationProfile.INSTITUTION_ADMIN,
+                    )
                 assertEquals(VerificationDeliveryStatus.ACCEPTED, status)
                 assertTrue(body.contains("recipient@example.test"))
+                assertTrue(body.contains("$id.$code"))
+                assertTrue(body.contains("Administrador institucional"))
                 assertTrue(body.contains(code))
                 assertTrue(body.contains("Compañero de Clase"))
                 assertTrue(body.contains("regístrate"))

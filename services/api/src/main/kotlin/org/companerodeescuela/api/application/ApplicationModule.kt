@@ -504,6 +504,10 @@ fun Application.module(
             verificationEmail = identityGraph.verificationEmail,
             sessionAuthority = sessionAuthority,
             ownerInvitationRepository = ownerInvitationRepository,
+            invitations =
+                invitationRepository.takeIf {
+                    !settings.environment.isProduction || (invitationWorkerConfigured && invitationWorkerAllowed)
+                },
         )
         val maticaDatabase =
             if (settings.mongo.isConfigured && settings.hasMaticaIntegration) {

@@ -50,6 +50,10 @@ internal class MongoInvitationRepository(
                 Indexes.ascending("status", "expiresAt"),
                 IndexOptions().name("invitation_status_expiresAt_idx"),
             )
+            records.createIndex(
+                Indexes.ascending("acceptedBy"),
+                IndexOptions().name("invitation_acceptedBy_idx"),
+            )
         } catch (_: com.mongodb.MongoCommandException) {
             // Indexes already exist; safe to ignore
         }
@@ -86,6 +90,18 @@ internal class MongoInvitationRepository(
             .limit(limit.coerceIn(1, 50))
             .toList()
             .map { it.toInvitation() }
+    }
+
+    override suspend fun hasAcceptedForAccount(accountId: String): Boolean {
+        if (accountId.isBlank() || accountId.length > 128) return false
+        ensureIndexes()
+        return records
+            .find(
+                and(
+                    eq("acceptedBy", accountId),
+                    `in`("status", InvitationStatus.ACCEPTED.name, InvitationStatus.ACTIVE.name),
+                ),
+            ).firstOrNull() != null
     }
 
     override suspend fun markSent(

@@ -4,9 +4,17 @@ package org.companerodeescuela.feature.auth
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,7 +24,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8FrostedGlassPanel
 import org.companerodeescuela.core.designsystem.v8.V8RedDimensions
@@ -33,6 +43,7 @@ fun InvitationAcceptanceScreen(
 ) {
     var invitationId by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
+    val clipboard = LocalClipboardManager.current
     LaunchedEffect(state.invitationAccepted) {
         if (state.invitationAccepted) {
             invitationId = ""
@@ -51,12 +62,37 @@ fun InvitationAcceptanceScreen(
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
                 Text(
-                    "Usa el ID y código que recibiste por correo. Debes haber verificado tu dirección.",
+                    "Pega la clave completa del correo (ID.Código) o escribe el ID y el código por separado.",
                     color = authMuted(),
                 )
+                OutlinedButton(
+                    onClick = {
+                        val raw = clipboard.getText()?.text.orEmpty()
+                        InvitationCredentialParser.parse(raw)?.let { parsed ->
+                            invitationId = parsed.invitationId
+                            code = parsed.code
+                        }
+                    },
+                    enabled = !state.invitationWorking,
+                    modifier = Modifier.fillMaxWidth().testTag("invitation_paste_combined"),
+                ) {
+                    Row {
+                        Icon(Icons.Filled.ContentPaste, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Pegar clave desde portapapeles")
+                    }
+                }
                 OutlinedTextField(
                     value = invitationId,
-                    onValueChange = { invitationId = it.filterNot(Char::isWhitespace).take(43) },
+                    onValueChange = { raw ->
+                        val parsed = InvitationCredentialParser.parse(raw)
+                        if (parsed != null) {
+                            invitationId = parsed.invitationId
+                            code = parsed.code
+                        } else {
+                            invitationId = raw.filterNot(Char::isWhitespace).take(43)
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth().testTag("invitation_id"),
                     label = { Text("ID de invitación") },
                     singleLine = true,
@@ -64,7 +100,15 @@ fun InvitationAcceptanceScreen(
                 )
                 OutlinedTextField(
                     value = code,
-                    onValueChange = { code = it.filterNot(Char::isWhitespace).take(43) },
+                    onValueChange = { raw ->
+                        val parsed = InvitationCredentialParser.parse(raw)
+                        if (parsed != null) {
+                            invitationId = parsed.invitationId
+                            code = parsed.code
+                        } else {
+                            code = raw.filterNot(Char::isWhitespace).take(43)
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth().testTag("invitation_code"),
                     label = { Text("Código recibido") },
                     singleLine = true,
@@ -75,8 +119,8 @@ fun InvitationAcceptanceScreen(
                     { onAccept(invitationId, code) },
                     state.emailVerified &&
                         !state.invitationWorking &&
-                        Regex("[A-Za-z0-9_-]{43}").matches(invitationId) &&
-                        Regex("[A-Za-z0-9_-]{43}").matches(code),
+                        InvitationCredentialParser.isValidPart(invitationId) &&
+                        InvitationCredentialParser.isValidPart(code),
                     state.invitationWorking,
                     Modifier.testTag("invitation_submit"),
                     "Validando...",
@@ -96,7 +140,7 @@ fun InvitationAcceptanceScreen(
                         modifier = Modifier.testTag("invitation_error"),
                     )
                 }
-                AuthV8SecondaryAction("Volver a mi perfil", onBack, !state.invitationWorking)
+                AuthV8SecondaryAction("Volver", onBack, !state.invitationWorking)
             }
         }
     }

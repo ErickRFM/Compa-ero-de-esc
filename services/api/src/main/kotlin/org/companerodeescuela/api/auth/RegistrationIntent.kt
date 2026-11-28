@@ -13,8 +13,11 @@ data class RegistrationIntent(
     val requestedInstitutionId: String? = null,
     val identityReference: String? = null,
     val preferredGroup: String? = null,
+    val pendingInvitationId: String? = null,
+    val pendingInvitationTokenHash: String? = null,
 ) {
-    override fun toString() = "RegistrationIntent(profile=$profile, identityReferencePresent=${identityReference != null})"
+    override fun toString() =
+        "RegistrationIntent(profile=$profile, identityRef=${identityReference != null}, pendingInvite=${pendingInvitationId != null})"
 }
 
 data class EmailVerificationChallenge(
@@ -75,7 +78,7 @@ internal fun PlatformAccount.withVerifiedEmail(
             when (requireNotNull(intent).profile) {
                 RegistrationAccountType.STUDENT -> setOf(UserRole.STUDENT)
                 RegistrationAccountType.PARTICIPANT, RegistrationAccountType.OWNER_INVITED -> setOf(UserRole.WORKSHOP_PARTICIPANT)
-                RegistrationAccountType.TEACHER, RegistrationAccountType.TUTOR -> emptySet()
+                RegistrationAccountType.TEACHER, RegistrationAccountType.TUTOR, RegistrationAccountType.INVITED -> emptySet()
             }
         }
     val status =

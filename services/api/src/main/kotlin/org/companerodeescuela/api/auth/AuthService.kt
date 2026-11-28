@@ -5,6 +5,9 @@ import org.companerodeescuela.api.institutions.InMemoryInstitutionRepository
 import org.companerodeescuela.api.institutions.InstitutionRepository
 import org.companerodeescuela.api.integrations.identity.IdentityProvider
 import org.companerodeescuela.api.integrations.identity.InstitutionalCredentials
+import org.companerodeescuela.api.invitations.InvitationRepository
+import org.companerodeescuela.api.invitations.InvitationStatus
+import org.companerodeescuela.api.invitations.InvitationToken
 import org.companerodeescuela.api.mail.UnavailableVerificationEmailGateway
 import org.companerodeescuela.shared.contracts.AccountStatus
 import org.companerodeescuela.shared.contracts.LoginRequest
@@ -57,6 +60,12 @@ class AuthService(
     }
 
     private val authority = sessionAuthority ?: PlatformSessionAuthority(accounts, identityProvider, clock)
+    private var invitations: InvitationRepository? = null
+
+    internal fun withInvitations(repository: InvitationRepository?): AuthService =
+        apply {
+            this.invitations = repository
+        }
 
     suspend fun register(request: RegisterRequest): LoginResponse {
         val displayName = request.displayName.trim()
@@ -92,9 +101,53 @@ class AuthService(
         } else if (request.ownerInvitationCode != null) {
             throw ApiException.Validation("Owner invitation code is only valid for owner enrollment")
         }
+        if (request.accountType != RegistrationAccountType.INVITED &&
+            (request.invitationId != null || request.invitationCode != null)
+        ) {
+            throw ApiException.Validation("Invitation credentials are only valid for invited enrollment")
+        }
         val institutionPreference = bounded(request.requestedInstitutionId, 128, "institution")
         val reference = bounded(request.identityReference, 160, "identity reference")
         val groupPreference = bounded(request.preferredGroup, 128, "group preference")
+        var invitedInstitutionId: String? = null
+        var pendingInvitationId: String? = null
+        var pendingInvitationTokenHash: String? = null
+        if (request.accountType == RegistrationAccountType.INVITED) {
+            if (institutionPreference != null || groupPreference != null) {
+                throw ApiException.Validation("Invited registration uses the invitation institution")
+            }
+            val invId = request.invitationId?.trim()
+            val invCode = request.invitationCode?.trim()
+            if (invId == null ||
+                invCode == null ||
+                !Regex("[A-Za-z0-9_-]{43}").matches(invId) ||
+                !Regex("[A-Za-z0-9_-]{43}").matches(invCode)
+            ) {
+                throw ApiException.Validation("Invitation is invalid or unavailable")
+            }
+            val invitationRepo =
+                invitations ?: throw ApiException.DependencyUnavailable("Invitations are disabled in this environment")
+            val record = authenticationDependency { invitationRepo.find(invId) }
+            val now = clock.instant()
+            val computedHash = InvitationToken.hash(invCode)
+            val validInvitation =
+                record != null &&
+                    MessageDigest.isEqual(
+                        record.tokenHash.toByteArray(Charsets.US_ASCII),
+                        computedHash.toByteArray(Charsets.US_ASCII),
+                    ) &&
+                    record.recipient == email &&
+                    record.status == InvitationStatus.SENT &&
+                    now < record.expiresAt &&
+                    authenticationDependency { institutions.findEnabled(record.institutionId) } != null
+            if (!validInvitation) {
+                throw ApiException.Validation("Invitation is invalid or unavailable")
+            }
+            val verifiedRecord = requireNotNull(record)
+            invitedInstitutionId = verifiedRecord.institutionId
+            pendingInvitationId = verifiedRecord.id
+            pendingInvitationTokenHash = verifiedRecord.tokenHash
+        }
         if (request.accountType in setOf(RegistrationAccountType.TEACHER, RegistrationAccountType.TUTOR) &&
             (institutionPreference == null || reference == null)
         ) {
@@ -120,7 +173,15 @@ class AuthService(
                 passwordHash = passwordHasher.hashAsync(request.password),
                 roles = emptySet(),
                 accountStatus = AccountStatus.PENDING_VERIFICATION,
-                registrationIntent = RegistrationIntent(request.accountType, institutionPreference, reference, groupPreference),
+                registrationIntent =
+                    RegistrationIntent(
+                        profile = request.accountType,
+                        requestedInstitutionId = invitedInstitutionId ?: institutionPreference,
+                        identityReference = reference,
+                        preferredGroup = groupPreference,
+                        pendingInvitationId = pendingInvitationId,
+                        pendingInvitationTokenHash = pendingInvitationTokenHash,
+                    ),
                 createdAt = clock.instant(),
             )
         ownerInvitationAuthorization?.let { invitation ->
@@ -306,7 +367,37 @@ class AuthService(
     suspend fun verifyEmail(
         userId: String,
         token: String,
-    ): LoginResponse = createSession(verification.verify(userId, token).toUserSummary(), SessionIdentitySource.NATIVE)
+    ): LoginResponse {
+        val verified = verification.verify(userId, token)
+        val intent = verified.registrationIntent
+        val invitationRepo = invitations
+        val invitationAccepted =
+            when {
+                invitationRepo == null -> false
+                intent?.profile == RegistrationAccountType.INVITED &&
+                    intent.pendingInvitationId != null &&
+                    intent.pendingInvitationTokenHash != null -> {
+                    authenticationDependency {
+                        invitationRepo.accept(
+                            id = intent.pendingInvitationId,
+                            tokenHash = intent.pendingInvitationTokenHash,
+                            accountEmail = verified.email,
+                            emailVerified = true,
+                            accountId = verified.id,
+                            operationId = "register-verify-${verified.id}",
+                            now = verified.emailVerifiedAt ?: clock.instant(),
+                        )
+                    } != null
+                }
+                verified.accountStatus == AccountStatus.PENDING_APPROVAL ->
+                    authenticationDependency { invitationRepo.hasAcceptedForAccount(verified.id) }
+                else -> false
+            }
+        return createSession(
+            verified.toUserSummary().copy(invitationAccepted = invitationAccepted),
+            SessionIdentitySource.NATIVE,
+        )
+    }
 
     suspend fun login(request: LoginRequest): LoginResponse {
         if (request.username.length > 128 || request.username.any(Char::isISOControl)) {
@@ -329,7 +420,18 @@ class AuthService(
             verification.upgradedHash?.let {
                 authenticationDependency { accounts.updatePasswordHash(localAccount.id, localAccount.passwordHash, it) }
             }
-            return createSession(localAccount.toUserSummary(), SessionIdentitySource.NATIVE)
+            val invitationAccepted =
+                invitations?.let { repo ->
+                    if (localAccount.accountStatus == AccountStatus.PENDING_APPROVAL) {
+                        authenticationDependency { repo.hasAcceptedForAccount(localAccount.id) }
+                    } else {
+                        false
+                    }
+                } ?: false
+            return createSession(
+                localAccount.toUserSummary().copy(invitationAccepted = invitationAccepted),
+                SessionIdentitySource.NATIVE,
+            )
         }
 
         passwordHasher.verifyAsync(request.password, DUMMY_PASSWORD_HASH)
@@ -381,7 +483,13 @@ class AuthService(
             throw ApiException.Unauthorized()
         }
 
-        val updatedUser = authority.currentUser(session) ?: throw ApiException.Unauthorized()
+        val baseUser = authority.currentUser(session) ?: throw ApiException.Unauthorized()
+        val updatedUser =
+            if (baseUser.accountStatus == AccountStatus.PENDING_APPROVAL && invitations != null) {
+                baseUser.copy(invitationAccepted = authenticationDependency { invitations!!.hasAcceptedForAccount(baseUser.id) })
+            } else {
+                baseUser
+            }
 
         val nextRefreshToken = newRefreshToken()
         val rotated =
@@ -427,7 +535,8 @@ class AuthService(
                 expiresAt = minOf(now.plus(REFRESH_TOKEN_TTL), now.plus(maximumRefreshSessionAge)),
                 identitySource = source,
             )
-        val currentUser = authority.currentUser(pending) ?: throw ApiException.Unauthorized()
+        val liveUser = authority.currentUser(pending) ?: throw ApiException.Unauthorized()
+        val currentUser = if (user.invitationAccepted) liveUser.copy(invitationAccepted = true) else liveUser
         val session = pending.copy(user = currentUser)
         authenticationDependency { sessions.create(session) }
         return response(session, refreshToken)

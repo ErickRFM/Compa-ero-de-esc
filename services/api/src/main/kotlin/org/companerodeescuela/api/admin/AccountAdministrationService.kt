@@ -684,6 +684,7 @@ internal class AccountAdministrationService(
             account.staffApplications(),
             account.adminCapabilities,
             effectiveInstitution(account).takeIf { account.institutionId == null },
+            account.registrationIntent?.identityReference,
         )
 
     private fun effectiveInstitution(account: PlatformAccount): String? {

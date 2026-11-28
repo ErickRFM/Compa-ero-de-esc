@@ -191,7 +191,13 @@ fun superAdminAccountsScreen(
                 working = state.working,
                 onLifecycle = viewModel::prepareLifecycle,
                 onStudentAffiliation = viewModel::prepareStudentAffiliation,
-                onInstitutionalLink = { id -> linkTarget = overview.users.find { it.user.id == id } },
+                onInstitutionalLink = { id ->
+                    val found = overview.users.find { it.user.id == id }
+                    if (found != null && externalReference.isBlank() && !found.identityReference.isNullOrBlank()) {
+                        externalReference = found.identityReference.orEmpty().take(32)
+                    }
+                    linkTarget = found
+                },
             )
         }
     }
@@ -578,6 +584,13 @@ internal fun invitationSummaryCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (!invitation.acceptedIdentityReference.isNullOrBlank()) {
+                Text(
+                    "Referencia / clave SIII declarada: ${invitation.acceptedIdentityReference}",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
             StatusNotice(
                 title = deliveryTitle,
                 message = deliveryDetail,

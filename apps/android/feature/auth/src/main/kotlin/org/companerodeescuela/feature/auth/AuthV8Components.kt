@@ -16,6 +16,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -127,14 +128,16 @@ internal fun AuthWelcomeHero(
 internal fun AuthV8Layout(
     modifier: Modifier = Modifier,
     themeAware: Boolean = false,
+    balancedVerticalOffset: Boolean = false,
+    compactContent: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     if (themeAware) {
-        AuthV8Frame(modifier, content)
+        AuthV8Frame(modifier, balancedVerticalOffset, compactContent, content)
     } else {
         // Compatibility for callers that explicitly request the fixed V8 palette.
         MaterialTheme(colorScheme = V8ColorScheme) {
-            AuthV8Frame(modifier, content)
+            AuthV8Frame(modifier, balancedVerticalOffset, compactContent, content)
         }
     }
 }
@@ -142,6 +145,8 @@ internal fun AuthV8Layout(
 @Composable
 private fun AuthV8Frame(
     modifier: Modifier,
+    balancedVerticalOffset: Boolean,
+    compactContent: Boolean,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val background =
@@ -150,7 +155,14 @@ private fun AuthV8Frame(
         } else {
             MaterialTheme.colorScheme.background
         }
-    Box(modifier.fillMaxSize().background(background)) {
+    BoxWithConstraints(modifier.fillMaxSize().background(background)) {
+        val topLeadSpacer =
+            if (balancedVerticalOffset) {
+                val targetContentHeight = if (compactContent) 540.dp else 680.dp
+                ((maxHeight - targetContentHeight) * 0.42f).coerceIn(CompaneroSpacing.lg, 88.dp)
+            } else {
+                CompaneroSpacing.lg
+            }
         if (authDark() && !LocalCompaneroHighContrast.current) {
             V8MatteBackdrop(Modifier.matchParentSize())
         }
@@ -165,14 +177,14 @@ private fun AuthV8Frame(
                         .navigationBarsPadding()
                         .imePadding()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = V8RedDimensions.ScreenHorizontal, vertical = CompaneroSpacing.xs),
+                        .padding(horizontal = V8RedDimensions.ScreenHorizontal, vertical = CompaneroSpacing.sm),
             ) {
                 V8BrandHeader(
                     contentColor = authInk(),
                     secondaryColor = authMuted(),
                     tagline = stringResource(R.string.auth_tagline),
                 )
-                Spacer(Modifier.height(CompaneroSpacing.lg))
+                Spacer(Modifier.height(topLeadSpacer))
                 content()
             }
         }

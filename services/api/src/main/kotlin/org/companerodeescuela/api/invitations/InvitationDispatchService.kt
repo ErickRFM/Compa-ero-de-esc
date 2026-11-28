@@ -53,6 +53,14 @@ internal fun interface InvitationEmailGateway {
         expiresAt: Instant,
     ): VerificationDeliveryStatus
 
+    suspend fun sendRegistration(
+        recipient: String,
+        code: String,
+        invitationId: String,
+        expiresAt: Instant,
+        profile: InvitationProfile? = null,
+    ): VerificationDeliveryStatus = send(recipient, code, invitationId, expiresAt)
+
     suspend fun sendOwnerBootstrap(
         recipient: String,
         code: String,
@@ -172,7 +180,7 @@ internal class InvitationDispatchService(
         }
         val delivery =
             try {
-                email.send(command.recipient, token.value, id, expiresAt)
+                email.sendRegistration(command.recipient, token.value, id, expiresAt, command.profile)
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
@@ -290,7 +298,7 @@ internal class InvitationDispatchService(
         }
         val delivery =
             try {
-                email.send(existing.recipient, newToken.value, invitationId, existing.expiresAt)
+                email.sendRegistration(existing.recipient, newToken.value, invitationId, existing.expiresAt, existing.profile)
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
@@ -327,7 +335,7 @@ internal class InvitationDispatchService(
             }
             val status =
                 try {
-                    email.send(entry.recipient, entry.tokenValue, entry.invitationId, entry.expiresAt)
+                    email.sendRegistration(entry.recipient, entry.tokenValue, entry.invitationId, entry.expiresAt, invitation.profile)
                 } catch (cancelled: kotlinx.coroutines.CancellationException) {
                     throw cancelled
                 } catch (_: Exception) {

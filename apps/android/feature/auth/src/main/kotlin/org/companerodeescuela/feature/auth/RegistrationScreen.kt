@@ -208,9 +208,21 @@ fun RegistrationScreen(
                             }
                         },
                         invitationId = invitationId,
-                        onInvitationIdChange = { invitationId = it.filterNot(Char::isWhitespace).take(43) },
+                        onInvitationIdChange = { raw ->
+                            val normalized = raw.filterNot(Char::isWhitespace).take(43)
+                            if (invitationId.isNotEmpty() && invitationCode.isNotEmpty() && normalized != invitationId) {
+                                invitationCode = ""
+                            }
+                            invitationId = normalized
+                        },
                         invitationCode = invitationCode,
-                        onInvitationCodeChange = { invitationCode = it.filterNot(Char::isWhitespace).take(43) },
+                        onInvitationCodeChange = { raw ->
+                            val normalized = raw.filterNot(Char::isWhitespace).take(43)
+                            if (invitationCode.isNotEmpty() && invitationId.isNotEmpty() && normalized != invitationCode) {
+                                invitationId = ""
+                            }
+                            invitationCode = normalized
+                        },
                         separateFields = separateInvitationFields,
                         onToggleSeparateFields = { separateInvitationFields = !separateInvitationFields },
                         enabled = !state.submitting,

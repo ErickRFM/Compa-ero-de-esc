@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import org.companerodeescuela.core.designsystem.theme.CompaneroSpacing
 import org.companerodeescuela.core.designsystem.v8.V8FrostedGlassPanel
@@ -43,16 +44,57 @@ fun InvitationAcceptanceScreen(
 ) {
     var invitationId by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
+    var pasteError by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
     LaunchedEffect(state.invitationAccepted) {
         if (state.invitationAccepted) {
             invitationId = ""
             code = ""
+            pasteError = false
+        }
+    }
+
+    fun updateInvitationId(raw: String) {
+        val parsed = InvitationCredentialParser.parse(raw)
+        if (parsed != null) {
+            invitationId = parsed.invitationId
+            code = parsed.code
+        } else {
+            val normalized = raw.filterNot(Char::isWhitespace).take(43)
+            if (invitationId.isNotEmpty() && code.isNotEmpty() && normalized != invitationId) code = ""
+            invitationId = normalized
+        }
+        pasteError = false
+    }
+
+    fun updateInvitationCode(raw: String) {
+        val parsed = InvitationCredentialParser.parse(raw)
+        if (parsed != null) {
+            invitationId = parsed.invitationId
+            code = parsed.code
+        } else {
+            val normalized = raw.filterNot(Char::isWhitespace).take(43)
+            if (code.isNotEmpty() && invitationId.isNotEmpty() && normalized != code) invitationId = ""
+            code = normalized
+        }
+        pasteError = false
+    }
+
+    fun pasteInvitation() {
+        val parsed = InvitationCredentialParser.parse(clipboard.getText()?.text.orEmpty())
+        if (parsed == null) {
+            invitationId = ""
+            code = ""
+            pasteError = true
+        } else {
+            invitationId = parsed.invitationId
+            code = parsed.code
+            pasteError = false
         }
     }
     AuthV8Layout(themeAware = true) {
         Text(
-            "Aceptar invitación",
+            stringResource(R.string.invitation_accept_title),
             style = MaterialTheme.typography.headlineMedium,
             color = authInk(),
         )
@@ -62,16 +104,12 @@ fun InvitationAcceptanceScreen(
                 verticalArrangement = Arrangement.spacedBy(CompaneroSpacing.sm),
             ) {
                 Text(
-                    "Pega la clave completa del correo (ID.Código) o escribe el ID y el código por separado.",
+                    stringResource(R.string.invitation_accept_instructions),
                     color = authMuted(),
                 )
                 OutlinedButton(
                     onClick = {
-                        val raw = clipboard.getText()?.text.orEmpty()
-                        InvitationCredentialParser.parse(raw)?.let { parsed ->
-                            invitationId = parsed.invitationId
-                            code = parsed.code
-                        }
+                        pasteInvitation()
                     },
                     enabled = !state.invitationWorking,
                     modifier = Modifier.fillMaxWidth().testTag("invitation_paste_combined"),
@@ -79,43 +117,35 @@ fun InvitationAcceptanceScreen(
                     Row {
                         Icon(Icons.Filled.ContentPaste, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Pegar clave desde portapapeles")
+                        Text(stringResource(R.string.invitation_paste_button))
                     }
+                }
+                if (pasteError) {
+                    StatusNotice(
+                        title = stringResource(R.string.invitation_paste_invalid),
+                        message = stringResource(R.string.invitation_accept_instructions),
+                        tone = NoticeTone.ERROR,
+                        modifier = Modifier.testTag("invitation_paste_error"),
+                    )
                 }
                 OutlinedTextField(
                     value = invitationId,
-                    onValueChange = { raw ->
-                        val parsed = InvitationCredentialParser.parse(raw)
-                        if (parsed != null) {
-                            invitationId = parsed.invitationId
-                            code = parsed.code
-                        } else {
-                            invitationId = raw.filterNot(Char::isWhitespace).take(43)
-                        }
-                    },
+                    onValueChange = ::updateInvitationId,
                     modifier = Modifier.fillMaxWidth().testTag("invitation_id"),
-                    label = { Text("ID de invitación") },
+                    label = { Text(stringResource(R.string.registration_invitation_id)) },
                     singleLine = true,
                     enabled = !state.invitationWorking,
                 )
                 OutlinedTextField(
                     value = code,
-                    onValueChange = { raw ->
-                        val parsed = InvitationCredentialParser.parse(raw)
-                        if (parsed != null) {
-                            invitationId = parsed.invitationId
-                            code = parsed.code
-                        } else {
-                            code = raw.filterNot(Char::isWhitespace).take(43)
-                        }
-                    },
+                    onValueChange = ::updateInvitationCode,
                     modifier = Modifier.fillMaxWidth().testTag("invitation_code"),
-                    label = { Text("Código recibido") },
+                    label = { Text(stringResource(R.string.registration_invitation_code)) },
                     singleLine = true,
                     enabled = !state.invitationWorking,
                 )
                 AuthV8PrimaryAction(
-                    "Aceptar invitación",
+                    stringResource(R.string.invitation_accept_action),
                     { onAccept(invitationId, code) },
                     state.emailVerified &&
                         !state.invitationWorking &&
@@ -123,24 +153,24 @@ fun InvitationAcceptanceScreen(
                         InvitationCredentialParser.isValidPart(code),
                     state.invitationWorking,
                     Modifier.testTag("invitation_submit"),
-                    "Validando...",
+                    stringResource(R.string.invitation_accept_working),
                 )
                 if (state.invitationAccepted) {
                     Text(
-                        "Invitación aceptada. Los permisos dependen de la aprobación correspondiente.",
+                        stringResource(R.string.invitation_accept_success),
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.testTag("invitation_success"),
                     )
                 }
                 state.invitationFailure?.let {
                     StatusNotice(
-                        title = "Invitación no aceptada",
+                        title = stringResource(R.string.invitation_accept_failure),
                         message = it.userMessage,
                         tone = NoticeTone.ERROR,
                         modifier = Modifier.testTag("invitation_error"),
                     )
                 }
-                AuthV8SecondaryAction("Volver", onBack, !state.invitationWorking)
+                AuthV8SecondaryAction(stringResource(R.string.security_back), onBack, !state.invitationWorking)
             }
         }
     }

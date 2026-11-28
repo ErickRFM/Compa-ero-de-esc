@@ -37,6 +37,9 @@ import java.time.Clock
 import java.util.UUID
 import javax.inject.Inject
 
+internal fun isValidInstitutionalExternalReference(value: String): Boolean =
+    value.isNotBlank() && value == value.trim() && value.length <= 256 && value.none(Char::isISOControl)
+
 @HiltViewModel
 class AdminViewModel
     @Inject
@@ -357,8 +360,8 @@ class AdminViewModel
                     ?.find { it.user.id == userId }
                     ?.user ?: return invalid()
             val institution = target.institutionId ?: return invalid()
-            val reference = externalId.trim().uppercase(java.util.Locale.ROOT)
-            if (!reference.matches(Regex("[A-Z0-9][A-Z0-9_-]{1,31}")) ||
+            val reference = externalId
+            if (!isValidInstitutionalExternalReference(reference) ||
                 !target.emailVerified ||
                 target.accountStatus != AccountStatus.ACTIVE ||
                 target.roles.any { it == UserRole.ADMIN || it == UserRole.SUPER_ADMIN }
@@ -393,9 +396,9 @@ class AdminViewModel
                     ?.find { it.user.id == userId }
                     ?.user ?: return invalid()
             val institution = target.institutionId ?: return invalid()
-            val reference = externalId.trim().uppercase(java.util.Locale.ROOT)
+            val reference = externalId
             val cleanReason = reason.trim()
-            if (!reference.matches(Regex("[A-Z0-9][A-Z0-9_-]{1,31}")) || cleanReason.length !in 3..500) return invalid()
+            if (!isValidInstitutionalExternalReference(reference) || cleanReason.length !in 3..500) return invalid()
             val kind =
                 when {
                     UserRole.TEACHER in target.roles -> InstitutionalIdentityKind.TEACHER

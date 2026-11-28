@@ -77,7 +77,7 @@
 <string name="registration_select_institution">Seleccionar institución</string>
 <string name="registration_retry">Volver a cargar</string>
 <string name="registration_identity">Clave docente SIII, nómina o cédula</string>
-<string name="registration_identity_help">Permite que tu institución identifique tu expediente en SIII o valide tu adscripción docente.</string>
+<string name="registration_identity_help">Es una referencia para que Administración revise tu identidad; no crea una vinculación automática con SIII.</string>
 <string name="registration_group">Grupo solicitado (preferencia)</string>
 <string name="registration_preference_notice">La preferencia no concede acceso a un grupo. Administración determina las asignaciones.</string>
 <string name="registration_submitting">Creando cuenta…</string>
@@ -153,11 +153,20 @@
     <string name="registration_invitation_id">ID de invitación</string>
     <string name="registration_invitation_code">Código de invitación</string>
     <string name="registration_siii_optional">Matrícula o clave SIII (opcional)</string>
-    <string name="registration_siii_optional_help">Si perteneces a SIII (docente o alumno), escríbela para agilizar la vinculación de tus clases y horarios.</string>
+<string name="registration_siii_optional_help">Compártela para que Administración identifique tu expediente y gestione el vínculo con SIII. El dato no verifica ni vincula tu cuenta automáticamente.</string>
     <string name="registration_owner_toggle">Configuración inicial de propietario del servidor</string>
     <string name="registration_owner_cancel">Volver a registro estándar</string>
     <string name="approval_invited_title">Invitación verificada</string>
     <string name="approval_invited_description">Tu correo e invitación quedaron confirmados. Un administrador debe autorizar tu perfil institucional para activar tu acceso. Pulsa «Comprobar estado» cuando te confirmen.</string>
     <string name="onboarding_have_invitation">Tengo una clave de invitación</string>
     <string name="onboarding_hide_invitation">Ocultar captura de invitación</string>
+<string name="onboarding_invitation_confirmed">Invitación aceptada y pendiente de autorización final por Administración.</string>
+<string name="invitation_accept_title">Aceptar invitación</string>
+<string name="invitation_accept_instructions">Pega la clave completa del correo (ID.Código) o escribe el ID y el código por separado.</string>
+<string name="invitation_paste_button">Pegar clave desde el portapapeles</string>
+<string name="invitation_paste_invalid">El portapapeles no contiene una clave completa. Los datos anteriores se borraron.</string>
+<string name="invitation_accept_action">Aceptar invitación</string>
+<string name="invitation_accept_working">Validando…</string>
+<string name="invitation_accept_success">Invitación aceptada. Los permisos dependen de la aprobación correspondiente.</string>
+<string name="invitation_accept_failure">Invitación no aceptada</string>
 </resources>

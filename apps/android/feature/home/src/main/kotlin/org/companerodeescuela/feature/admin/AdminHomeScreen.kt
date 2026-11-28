@@ -347,7 +347,7 @@ fun adminHomeScreenContent(
                     Text(target.user.displayName)
                     Text(stringResource(R.string.admin_link_reference_help))
                     OutlinedTextField(externalReference, {
-                        externalReference = it.take(32)
+                        externalReference = it.take(256)
                     }, label = { Text(stringResource(R.string.admin_link_reference)) }, singleLine = true)
                     Text(stringResource(R.string.admin_unlink_help))
                     OutlinedTextField(
@@ -361,7 +361,7 @@ fun adminHomeScreenContent(
                             linkTarget = null
                         },
                         enabled =
-                            externalReference.trim().uppercase(java.util.Locale.ROOT).matches(Regex("[A-Z0-9][A-Z0-9_-]{1,31}")) &&
+                            isValidInstitutionalExternalReference(externalReference) &&
                                 unlinkReason.trim().length >= 3,
                     ) { Text(stringResource(R.string.admin_unlink_siii)) }
                 }
@@ -370,7 +370,7 @@ fun adminHomeScreenContent(
                 TextButton(onClick = {
                     onInstitutionalLink(target.user.id, externalReference)
                     linkTarget = null
-                }, enabled = externalReference.trim().uppercase(java.util.Locale.ROOT).matches(Regex("[A-Z0-9][A-Z0-9_-]{1,31}"))) {
+                }, enabled = isValidInstitutionalExternalReference(externalReference)) {
                     Text(stringResource(R.string.admin_link_siii))
                 }
             },

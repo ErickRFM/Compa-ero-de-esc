@@ -77,4 +77,34 @@ class AccountOnboardingUiTest {
         compose.onNodeWithText("Comprobar estado").performScrollTo().performClick()
         compose.runOnIdle { assertEquals(1, checked) }
     }
+
+    @Test fun invalidInvitationEditClearsPreviouslyParsedCredentials() {
+        compose.setContent {
+            AuthTestLocale {
+                CompaneroTheme {
+                    AccountOnboardingScreen(
+                        SessionUiState(
+                            checking = false,
+                            authenticated = true,
+                            accountStatus = AccountStatus.PENDING_APPROVAL,
+                            emailVerified = true,
+                        ),
+                        {},
+                        {},
+                        {},
+                        {},
+                    )
+                }
+            }
+        }
+        compose.onNodeWithTag("onboarding_toggle_invitation").performScrollTo().performClick()
+        val id = "a".repeat(43)
+        val code = "b".repeat(43)
+        compose.onNodeWithTag("onboarding_invitation_key").performScrollTo().performTextInput("$id.$code")
+        compose.onNodeWithTag("onboarding_invitation_ready").assertExists()
+        compose.onNodeWithTag("onboarding_invitation_key").performScrollTo().performTextClearance()
+        compose.onNodeWithTag("onboarding_invitation_key").performTextInput("clave incompleta")
+        compose.onNodeWithTag("onboarding_invitation_ready").assertDoesNotExist()
+        compose.onNodeWithTag("onboarding_invitation_submit").assertIsNotEnabled()
+    }
 }

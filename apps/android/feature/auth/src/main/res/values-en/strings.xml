@@ -77,7 +77,7 @@
 <string name="registration_select_institution">Select institution</string>
 <string name="registration_retry">Reload</string>
 <string name="registration_identity">SIII teacher code, payroll ID or license</string>
-<string name="registration_identity_help">Helps your institution match your SIII record or verify your staff status.</string>
+<string name="registration_identity_help">This is a reference for Administration to review your identity; it does not automatically link your account to SIII.</string>
 <string name="registration_group">Requested group (preference)</string>
 <string name="registration_preference_notice">Your preference does not grant group access. Administration determines assignments.</string>
 <string name="registration_submitting">Creating account…</string>
@@ -153,11 +153,20 @@
     <string name="registration_invitation_id">Invitation ID</string>
     <string name="registration_invitation_code">Invitation code</string>
     <string name="registration_siii_optional">SIII ID or staff code (optional)</string>
-    <string name="registration_siii_optional_help">If you belong to SIII (teacher or student), enter it so Administration can link your classes and schedules faster.</string>
+<string name="registration_siii_optional_help">Share it so Administration can identify your record and manage the SIII link. This value does not verify or link your account automatically.</string>
     <string name="registration_owner_toggle">Initial server owner setup</string>
     <string name="registration_owner_cancel">Back to standard registration</string>
     <string name="approval_invited_title">Invitation verified</string>
     <string name="approval_invited_description">Your email and invitation are confirmed. An administrator must authorize your institutional profile to activate access. Tap \'Check status\' once confirmed.</string>
     <string name="onboarding_have_invitation">I have an invitation key</string>
     <string name="onboarding_hide_invitation">Hide invitation input</string>
+    <string name="onboarding_invitation_confirmed">Invitation accepted and pending final authorization by Administration.</string>
+    <string name="invitation_accept_title">Accept invitation</string>
+    <string name="invitation_accept_instructions">Paste the complete key from the email (ID.Code), or enter the ID and code separately.</string>
+    <string name="invitation_paste_button">Paste key from clipboard</string>
+    <string name="invitation_paste_invalid">The clipboard does not contain a complete key. Previous values were cleared.</string>
+    <string name="invitation_accept_action">Accept invitation</string>
+    <string name="invitation_accept_working">Checking…</string>
+    <string name="invitation_accept_success">Invitation accepted. Permissions depend on the required approval.</string>
+    <string name="invitation_accept_failure">Invitation not accepted</string>
 </resources>

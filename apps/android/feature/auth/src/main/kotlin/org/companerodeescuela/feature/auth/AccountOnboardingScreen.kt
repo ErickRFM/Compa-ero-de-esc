@@ -120,7 +120,7 @@ fun AccountOnboardingScreen(
                     if (invitedConfirmed) {
                         StatusNotice(
                             title = stringResource(R.string.approval_invited_title),
-                            message = "Invitación aceptada y pendiente de autorización final por Administración.",
+                            message = stringResource(R.string.onboarding_invitation_confirmed),
                             tone = NoticeTone.SUCCESS,
                             modifier = Modifier.testTag("onboarding_invitation_confirmed"),
                         )
@@ -146,37 +146,57 @@ fun AccountOnboardingScreen(
                             Modifier.testTag("onboarding_toggle_invitation"),
                         )
                         if (showInvitationRescue) {
+                            fun updateInvitationId(next: String) {
+                                val normalized = next.filterNot(Char::isWhitespace).take(43)
+                                if (rescueId.isNotEmpty() && rescueCode.isNotEmpty() && normalized != rescueId) {
+                                    rescueCode = ""
+                                }
+                                rescueId = normalized
+                            }
+
+                            fun updateInvitationCode(next: String) {
+                                val normalized = next.filterNot(Char::isWhitespace).take(43)
+                                if (rescueCode.isNotEmpty() && rescueId.isNotEmpty() && normalized != rescueCode) {
+                                    rescueId = ""
+                                }
+                                rescueCode = normalized
+                            }
+
                             SmartInvitationKeySection(
                                 keyInput = rescueKeyInput,
                                 onKeyInputChange = { raw ->
                                     rescueKeyInput = raw.take(512)
-                                    InvitationCredentialParser.parse(raw)?.let { parsed ->
+                                    val parsed = InvitationCredentialParser.parse(raw)
+                                    if (parsed != null) {
                                         rescueId = parsed.invitationId
                                         rescueCode = parsed.code
+                                    } else {
+                                        rescueId = ""
+                                        rescueCode = ""
                                     }
                                 },
                                 invitationId = rescueId,
-                                onInvitationIdChange = { rescueId = it.filterNot(Char::isWhitespace).take(43) },
+                                onInvitationIdChange = ::updateInvitationId,
                                 invitationCode = rescueCode,
-                                onInvitationCodeChange = { rescueCode = it.filterNot(Char::isWhitespace).take(43) },
+                                onInvitationCodeChange = ::updateInvitationCode,
                                 separateFields = rescueSeparate,
                                 onToggleSeparateFields = { rescueSeparate = !rescueSeparate },
                                 enabled = !state.invitationWorking && !state.submitting,
                                 tagPrefix = "onboarding_invitation",
                             )
                             AuthV8PrimaryAction(
-                                "Aceptar invitación",
+                                stringResource(R.string.invitation_accept_action),
                                 { onAcceptInvitation(rescueId.trim(), rescueCode.trim()) },
                                 !state.invitationWorking &&
                                     InvitationCredentialParser.isValidPart(rescueId) &&
                                     InvitationCredentialParser.isValidPart(rescueCode),
                                 state.invitationWorking,
                                 Modifier.testTag("onboarding_invitation_submit"),
-                                "Validando...",
+                                stringResource(R.string.invitation_accept_working),
                             )
                             state.invitationFailure?.let { failure ->
                                 StatusNotice(
-                                    title = "Invitación no aceptada",
+                                    title = stringResource(R.string.invitation_accept_failure),
                                     message = failure.userMessage,
                                     tone = NoticeTone.ERROR,
                                     modifier = Modifier.testTag("onboarding_invitation_error"),

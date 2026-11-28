@@ -194,7 +194,7 @@ fun superAdminAccountsScreen(
                 onInstitutionalLink = { id ->
                     val found = overview.users.find { it.user.id == id }
                     if (found != null && externalReference.isBlank() && !found.identityReference.isNullOrBlank()) {
-                        externalReference = found.identityReference.orEmpty().take(32)
+                        externalReference = found.identityReference.orEmpty().take(256)
                     }
                     linkTarget = found
                 },
@@ -213,7 +213,7 @@ fun superAdminAccountsScreen(
                     Text(stringResource(R.string.admin_link_reference_help))
                     OutlinedTextField(
                         externalReference,
-                        { externalReference = it.take(32) },
+                        { externalReference = it.take(256) },
                         label = { Text(stringResource(R.string.admin_link_reference)) },
                         singleLine = true,
                     )
@@ -229,7 +229,7 @@ fun superAdminAccountsScreen(
                             linkTarget = null
                         },
                         enabled =
-                            externalReference.trim().uppercase(Locale.ROOT).matches(Regex("[A-Z0-9][A-Z0-9_-]{1,31}")) &&
+                            isValidInstitutionalExternalReference(externalReference) &&
                                 unlinkReason.trim().length >= 3,
                     ) { Text(stringResource(R.string.admin_unlink_siii)) }
                 }
@@ -240,7 +240,7 @@ fun superAdminAccountsScreen(
                         viewModel.prepareInstitutionalLink(target.user.id, externalReference)
                         linkTarget = null
                     },
-                    enabled = externalReference.trim().uppercase(Locale.ROOT).matches(Regex("[A-Z0-9][A-Z0-9_-]{1,31}")),
+                    enabled = isValidInstitutionalExternalReference(externalReference),
                 ) { Text(stringResource(R.string.admin_link_siii)) }
             },
             dismissButton = { TextButton({ linkTarget = null }) { Text(stringResource(R.string.admin_cancel)) } },

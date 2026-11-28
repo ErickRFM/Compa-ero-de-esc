@@ -23,6 +23,16 @@ import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AdminViewModelTest {
+    @Test
+    fun institutionalReferenceValidationMatchesServiceBoundsAndPreservesIdentifiers() {
+        assertTrue(isValidInstitutionalExternalReference("EMP-Ä/2026:abc"))
+        assertTrue(isValidInstitutionalExternalReference("x".repeat(256)))
+        assertFalse(isValidInstitutionalExternalReference("x".repeat(257)))
+        assertFalse(isValidInstitutionalExternalReference("  EMP-1"))
+        assertFalse(isValidInstitutionalExternalReference("EMP-1\n"))
+        assertFalse(isValidInstitutionalExternalReference(" \t "))
+    }
+
     private suspend fun <T> awaitReal(block: suspend () -> T): T = withContext(Dispatchers.Default) { withTimeout(5000) { block() } }
 
     private class Store : SessionTokenStore {
@@ -222,7 +232,7 @@ class AdminViewModelTest {
                     assertEquals("campus", teacher.proofs.single().resourceId)
                     assertEquals(InstitutionalIdentityLinkDigest.command(body), teacher.proofs.single().payloadDigest)
                     assertEquals(InstitutionalIdentityKind.TEACHER, body.entityType)
-                    assertEquals("EMP-QA-2026", body.externalId)
+                    assertEquals("emp-qa-2026", body.externalId)
                     assertEquals("target", body.nativeUserId)
                 } finally {
                     teacher.close()
